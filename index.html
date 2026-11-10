@@ -174,6 +174,7 @@ footer{border-top:1px solid var(--line);padding:18px 0;font-size:12.5px;color:va
       <button data-nav="packages">Packages</button>
       <button data-nav="custom">Build Your Own Menu</button>
       <button data-nav="admin" class="staff hidden" id="navAdmin">Inquiries</button>
+      <button data-nav="menu" class="staff hidden" id="navMenu">Menu items</button>
       <button data-nav="rates" class="staff hidden" id="navRates">Custom rates</button>
       <button data-nav="logout" class="staff hidden" id="navLogout">Log out</button>
     </nav>
@@ -193,7 +194,7 @@ const COURSES = {
   fish:"Fish / Seafood", veg:"Vegetables / Salad", pasta:"Pasta / Noodles", dessert:"Dessert"
 };
 const COURSE_ORDER = ["soup","appetizer","chicken","pork","beef","fish","veg","pasta","dessert"];
-const MENU = {
+const DEFAULT_MENU = {
   standard:{
     soup:["Creamy Mushroom","Creamy Corn","Egg Drop Soup","Molo Soup","Chicken Mami","Hinalang","Pochero (Pork/Beef)"],
     appetizer:["Tea Sandwiches","Lumpia Ubod with Garlic Sauce","Assorted Finger Food (Cheese Stick, Dynamite, etc.)","Tofu & Pork Ears","Chicken Skin","Baked Eggplant Roll","Bacon-Wrapped Hotdogs"],
@@ -217,6 +218,23 @@ const MENU = {
     dessert:["Assorted Pastries","Fresh Fruits in Cups","Mango Pandan Salad","Mango Tapioca","Watermelon Balls with Lychee","Coffee Jelly","Crema Española","Leche Flan","Banana Walnut Cupcakes","Lemon or Chocolate Cupcakes"]
   }
 };
+let MENU = JSON.parse(JSON.stringify(DEFAULT_MENU));
+let PRICE_OVERRIDE = {};   // "tier|cat|dish" -> ₱/head for custom menus (set by Admin on the Menu items page)
+function menuToSaved(m,po){const out={standard:{},premium:{}};for(const t of ["standard","premium"])for(const c of COURSE_ORDER)out[t][c]=(m[t][c]||[]).map(n=>{const p=po[t+"|"+c+"|"+n];return p==null?{name:n}:{name:n,price:p}});return out}
+function applyMenu(saved){
+  if(!saved||typeof saved!=="object")return;
+  const m={standard:{},premium:{}},po={};
+  for(const t of ["standard","premium"])for(const c of COURSE_ORDER){
+    const arr=Array.isArray(saved?.[t]?.[c])?saved[t][c]:DEFAULT_MENU[t][c].map(n=>({name:n}));
+    m[t][c]=[];
+    arr.forEach(it=>{const n=String(typeof it==="string"?it:it?.name||"").trim();if(!n||m[t][c].includes(n))return;m[t][c].push(n);
+      const p=it&&typeof it==="object"&&it.price!=null&&it.price!==""?Number(it.price):null;if(p!=null&&isFinite(p)&&p>=0)po[t+"|"+c+"|"+n]=p});
+  }
+  MENU=m;PRICE_OVERRIDE=po;
+  // drop selections for dishes that no longer exist
+  for(const k of [...state.custom]){const [t,c,d]=k.split("|");if(!MENU[t]?.[c]?.includes(d))state.custom.delete(k)}
+  if(state.pkg){const p=PACKAGES.find(x=>x.id===state.pkg);for(const sl of p.slots)state.pkgSel[sl.id]=(state.pkgSel[sl.id]||[]).filter(k=>{const [c,d]=k.split("|");return MENU[p.list][c].includes(d)})}
+}
 const S = (id,label,cats,n)=>({id,label,cats,n});
 const PACKAGES = [
   {id:"classic",name:"CLASSIC",price:500,list:"standard",best:"Birthdays & simple gatherings",
@@ -254,6 +272,7 @@ function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&l
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),2600)}
 function minPax(){return Math.max(1, Number(state.rates.minPax)||50)}
 function paxVal(){return Math.max(minPax(), Math.floor(Number(state.pax)||0))}
+function dishRate(tier,cat,dish){const o=PRICE_OVERRIDE[tier+"|"+cat+"|"+dish];return o!=null?o:rate(tier,cat)}
 function rate(tier,cat){const v=Number(state.rates?.[tier]?.[cat]);return isFinite(v)?v:DEFAULT_RATES[tier][cat]}
 function newRef(){const d=new Date();const p=n=>String(n).padStart(2,"0");const a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let r="";for(let i=0;i<4;i++)r+=a[Math.floor(Math.random()*a.length)];return `RCS-${String(d.getFullYear()).slice(2)}${p(d.getMonth()+1)}${p(d.getDate())}-${r}`}
 function fmtDate(s){if(!s)return"";const d=new Date(s.length===10?s+"T00:00:00":s);return isNaN(d)?s:d.toLocaleDateString("en-PH",{year:"numeric",month:"short",day:"numeric"})}
@@ -265,7 +284,7 @@ function b64d(str){const s=atob(str);const b=new Uint8Array(s.length);for(let i=
 function pkgEstimate(p){return {perHead:p.price,total:p.price*paxVal()}}
 function customItems(){
   const items=[];
-  for(const key of state.custom){const [tier,cat,dish]=key.split("|");items.push({tier,cat,dish,perHead:rate(tier,cat)})}
+  for(const key of state.custom){const [tier,cat,dish]=key.split("|");items.push({tier,cat,dish,perHead:dishRate(tier,cat,dish)})}
   items.sort((a,b)=>COURSE_ORDER.indexOf(a.cat)-COURSE_ORDER.indexOf(b.cat));
   return items;
 }
@@ -284,6 +303,7 @@ function go(view){state.view=view;render();window.scrollTo({top:0,behavior:"smoo
 document.querySelectorAll("header nav button").forEach(b=>b.addEventListener("click",()=>{
   const v=b.dataset.nav; if(v==="packages"){state.pkg=null}
   if(v==="logout"){logout();return}
+  if(v==="menu"&&(!state.menuDraft||!state.menuDirty))startMenuDraft();
   if(v==="admin"){location.hash="staff";loadInquiries()} else if(location.hash){history.replaceState(null,"",location.pathname)}
   go(v);
 }));
@@ -297,6 +317,7 @@ function render(){
   });
   $("#navAdmin").classList.toggle("hidden",!state.isStaff);
   $("#navRates").classList.toggle("hidden",!state.canEdit);
+  $("#navMenu").classList.toggle("hidden",!state.canEdit);
   $("#navLogout").classList.toggle("hidden",!state.isStaff);
   $("#staffLink").classList.toggle("hidden",state.isStaff);
   const v=$("#view");
@@ -307,6 +328,7 @@ function render(){
   else if(state.view==="login") v.innerHTML=viewLogin();
   else if(state.view==="admin") v.innerHTML=state.isStaff?viewAdmin():viewLogin();
   else if(state.view==="rates") v.innerHTML=state.canEdit?viewRates():viewPackages();
+  else if(state.view==="menu") v.innerHTML=state.canEdit?viewMenu():viewPackages();
   bind();
 }
 
@@ -407,7 +429,7 @@ function viewCustom(){
     const picked=[...state.custom].filter(k=>k.split("|")[1]===cat).length;
     return `<div class="panel">
       <h3>${esc(COURSES[cat])}<span class="count">${picked?picked+" selected · ":""}${peso(rate(t,cat))}/head each</span></h3>
-      <div class="chips">${MENU[t][cat].map(d=>{const k=`${t}|${cat}|${d}`;return `<button class="chip" data-ck="${esc(k)}" aria-pressed="${state.custom.has(k)}">${esc(d)}</button>`}).join("")}</div>
+      <div class="chips">${MENU[t][cat].map(d=>{const k=`${t}|${cat}|${d}`;return `<button class="chip" data-ck="${esc(k)}" aria-pressed="${state.custom.has(k)}">${esc(d)}${PRICE_OVERRIDE[k]!=null?` <span class="p">${peso(PRICE_OVERRIDE[k])}</span>`:""}</button>`}).join("")}</div>
     </div>`}).join("");
   return `<section class="hero">
     <div>
@@ -577,9 +599,94 @@ function viewRates(){
   </div>`;
 }
 
+/* ---------- Admin: menu items ---------- */
+function startMenuDraft(){
+  state.menuDraft={};
+  for(const t of ["standard","premium"]){state.menuDraft[t]={};for(const c of COURSE_ORDER)state.menuDraft[t][c]=MENU[t][c].map(n=>({name:n,price:PRICE_OVERRIDE[t+"|"+c+"|"+n]??""}))}
+  state.menuDirty=false;state.menuTier=state.menuTier||"standard";state.menuCat=state.menuCat||"soup";state.menuMsg="";
+}
+function viewMenu(){
+  if(!state.menuDraft)startMenuDraft();
+  const t=state.menuTier,c=state.menuCat,list=state.menuDraft[t][c];
+  const courseTabs=COURSE_ORDER.map(k=>`<button class="chip" data-mcat="${k}" aria-pressed="${k===c}">${esc(COURSES[k])} <span class="p">${state.menuDraft[t][k].length}</span></button>`).join("");
+  const rows=list.map((it,i)=>`<tr>
+      <td style="width:36px;color:var(--muted)">${i+1}</td>
+      <td><input data-mname="${i}" value="${esc(it.name)}" maxlength="100" style="width:100%;padding:7px 9px;border:1.5px solid var(--line);border-radius:6px"></td>
+      <td class="num"><input data-mprice="${i}" type="number" min="0" value="${esc(it.price)}" placeholder="${rate(t,c)}" style="width:96px;padding:7px 9px;border:1.5px solid var(--line);border-radius:6px;text-align:right"></td>
+      <td style="white-space:nowrap"><button class="btn small ghost" data-mup="${i}" ${i===0?"disabled":""} aria-label="Move up">↑</button> <button class="btn small ghost" data-mdown="${i}" ${i===list.length-1?"disabled":""} aria-label="Move down">↓</button> <button class="btn small danger" data-mdel="${i}">Remove</button></td>
+    </tr>`).join("");
+  const used=PACKAGES.filter(p=>p.list===t&&p.slots.some(sl=>sl.cats.includes(c))).map(p=>p.name[0]+p.name.slice(1).toLowerCase());
+  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>Menu items</h1><span class="who">Admin only · changes show on the website after you click Save</span></div>
+  <div class="panel">
+    <div class="tierswitch" role="group" aria-label="Menu list">
+      <button data-mtier="standard" aria-pressed="${t==="standard"}">Standard list</button>
+      <button data-mtier="premium" aria-pressed="${t==="premium"}">Premium list</button>
+    </div>
+    <p class="hint" style="margin:4px 0 10px">${t==="standard"?"Standard":"Premium"} dishes appear in the ${used.join(" & ")} packages and in Build Your Own Menu.</p>
+    <div class="chips" style="margin-bottom:16px">${courseTabs}</div>
+    <h3>${esc(COURSES[c])} · ${t==="standard"?"Standard":"Premium"} list</h3>
+    <p class="hint" style="margin-top:0">Custom-menu price: leave blank to use the course rate (${peso(rate(t,c))}/head, set on Custom rates), or enter a price for this dish only.</p>
+    <div style="overflow:auto"><table>
+      <thead><tr><th>#</th><th>Dish name</th><th class="num">Custom-menu ₱/head</th><th></th></tr></thead>
+      <tbody>${rows||`<tr><td colspan="4" class="empty">No dishes in this course yet.</td></tr>`}</tbody>
+    </table></div>
+    <form id="addDish" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;align-items:center">
+      <input name="name" placeholder="New dish name" maxlength="100" style="flex:1;min-width:220px;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px">
+      <input name="price" type="number" min="0" placeholder="₱/head (optional)" style="width:150px;padding:9px 11px;border:1.5px solid var(--line);border-radius:8px">
+      <button class="btn" type="submit">+ Add dish</button>
+    </form>
+  </div>
+  <div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:sticky;bottom:10px;border-color:${state.menuDirty?"var(--gold)":"var(--line)"}">
+    <button class="btn gold" id="saveMenu" ${state.menuDirty?"":"disabled"}>Save menu</button>
+    <button class="btn ghost" id="discardMenu" ${state.menuDirty?"":"disabled"}>Discard changes</button>
+    <button class="btn ghost small" id="resetMenu">Restore original 2026 menu</button>
+    <span class="formmsg" id="menuMsg" style="margin:0">${esc(state.menuMsg||(state.menuDirty?"You have unsaved changes.":""))}</span>
+  </div>`;
+}
+function menuDirty(){state.menuDirty=true;state.menuMsg=""}
+async function saveMenu(){
+  const out={standard:{},premium:{}};let err="";
+  for(const t of ["standard","premium"])for(const c of COURSE_ORDER){
+    const seen=new Set();out[t][c]=[];
+    for(const it of state.menuDraft[t][c]){
+      const n=String(it.name||"").trim().replace(/\s+/g," ");if(!n)continue;
+      if(n.includes("|")){err=`Dish names can't contain "|" (${n}).`;break}
+      if(seen.has(n.toLowerCase())){err=`"${n}" is listed twice in ${COURSES[c]} (${t}).`;break}
+      seen.add(n.toLowerCase());
+      const p=it.price===""||it.price==null?null:Math.max(0,Number(it.price)||0);
+      out[t][c].push(p==null?{name:n}:{name:n,price:p});
+    }
+    if(!out[t][c].length&&!err)err=`${COURSES[c]} (${t==="standard"?"Standard":"Premium"} list) needs at least one dish — packages require it.`;
+    if(err)break;
+  }
+  if(err){state.menuMsg=err;keepScroll(render);return}
+  state.menuMsg="Saving…";keepScroll(render);
+  const r=await api("saveMenu",{menu:out});
+  if(r.ok){applyMenu(r.menu||out);startMenuDraft();toast("Menu saved — the website now shows the updated dishes");keepScroll(render)}
+  else{state.menuMsg=r.error==="Unknown action."?"Menu saving isn't switched on yet: update the Google script (see README → Changing Code.gs) and try again.":(r.error||"Couldn't save the menu.");keepScroll(render)}
+}
+function bindMenu(v){
+  v.querySelectorAll("[data-mtier]").forEach(b=>b.onclick=()=>{state.menuTier=b.dataset.mtier;keepScroll(render)});
+  v.querySelectorAll("[data-mcat]").forEach(b=>b.onclick=()=>{state.menuCat=b.dataset.mcat;keepScroll(render)});
+  const L=()=>state.menuDraft[state.menuTier][state.menuCat];
+  v.querySelectorAll("[data-mname]").forEach(el=>el.oninput=()=>{L()[+el.dataset.mname].name=el.value;if(!state.menuDirty){menuDirty();refreshMenuBar()}});
+  v.querySelectorAll("[data-mprice]").forEach(el=>el.oninput=()=>{L()[+el.dataset.mprice].price=el.value;if(!state.menuDirty){menuDirty();refreshMenuBar()}});
+  v.querySelectorAll("[data-mdel]").forEach(b=>b.onclick=()=>{L().splice(+b.dataset.mdel,1);menuDirty();keepScroll(render)});
+  v.querySelectorAll("[data-mup]").forEach(b=>b.onclick=()=>{const i=+b.dataset.mup,a=L();[a[i-1],a[i]]=[a[i],a[i-1]];menuDirty();keepScroll(render)});
+  v.querySelectorAll("[data-mdown]").forEach(b=>b.onclick=()=>{const i=+b.dataset.mdown,a=L();[a[i+1],a[i]]=[a[i],a[i+1]];menuDirty();keepScroll(render)});
+  const f=$("#addDish",v);if(f)f.onsubmit=e=>{e.preventDefault();const n=f.elements.name.value.trim();if(!n){f.elements.name.focus();return}
+    if(L().some(x=>String(x.name).trim().toLowerCase()===n.toLowerCase())){toast(`"${n}" is already in this course`);return}
+    L().push({name:n,price:f.elements.price.value});menuDirty();keepScroll(render);toast(`Added "${n}" — click Save menu to publish`)};
+  const sm=$("#saveMenu",v);if(sm)sm.onclick=saveMenu;
+  const dm=$("#discardMenu",v);if(dm)dm.onclick=()=>{startMenuDraft();keepScroll(render)};
+  const rm=$("#resetMenu",v);if(rm)rm.onclick=()=>{state.menuDraft={};for(const t of ["standard","premium"]){state.menuDraft[t]={};for(const c of COURSE_ORDER)state.menuDraft[t][c]=DEFAULT_MENU[t][c].map(n=>({name:n,price:""}))}menuDirty();state.menuMsg="Original menu loaded — click Save menu to publish it.";keepScroll(render)};
+}
+function refreshMenuBar(){["#saveMenu","#discardMenu"].forEach(id=>{const b=$(id);if(b)b.disabled=false});const m=$("#menuMsg");if(m)m.textContent="You have unsaved changes."}
+
 /* ============ EVENTS ============ */
 function bind(){
   const v=$("#view");
+  if(state.view==="menu")bindMenu(v);
   v.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{if(b.dataset.go==="packages")state.pkg=null;go(b.dataset.go)});
   v.querySelectorAll("[data-pax]").forEach(b=>b.onclick=()=>{state.pax=Number(b.dataset.pax);render()});
   const pax=$("#pax",v);
@@ -833,11 +940,13 @@ function route(){
   if(location.hash==="#staff"){go(state.isStaff?"admin":"login");if(state.isStaff&&!state.inqLoaded)loadInquiries()}
 }
 window.addEventListener("hashchange",route);
+window.addEventListener("beforeunload",e=>{if(state.menuDirty){e.preventDefault();e.returnValue=""}});
 async function init(){
   const t=stored("rcs_token");
   if(t){state.token=t;const me=await api("me");if(me.ok)setSession(t,me.user);else setSession(null,null)}
   render();route();
-  const c=await api("config");if(c.ok&&c.rates){applyRates(c.rates);if(state.view!=="rates")keepScroll(render)}
+  const c=await api("config");
+  if(c.ok){if(c.rates)applyRates(c.rates);if(c.menu)applyMenu(c.menu);if(state.view!=="rates"&&state.view!=="menu")keepScroll(render)}
 }
 init();
 </script>

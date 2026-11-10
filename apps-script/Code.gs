@@ -36,7 +36,7 @@ function doPost(e) {
   try {
     switch (req.action) {
       // ---- public ----
-      case 'config':    return out({ ok: true, rates: readDb().rates || null });
+      case 'config':    { const db = readDb(); return out({ ok: true, rates: db.rates || null, menu: db.menu || null }); }
       case 'submit':    return out(submitInquiry(req.inquiry, 'web', req.website));
       case 'login':     return out(login(req.username, req.password));
       // ---- staff ----
@@ -48,6 +48,7 @@ function doPost(e) {
       // ---- admin ----
       case 'delete':    requireAdmin(req.token); return out(deleteInquiry(req.ref));
       case 'saveRates': requireAdmin(req.token); return out(saveRates(req.rates));
+      case 'saveMenu':  requireAdmin(req.token); return out(saveMenu(req.menu));
       default:          return out({ ok: false, error: 'Unknown action.' });
     }
   } catch (err) {
@@ -174,6 +175,32 @@ function saveRates(r) {
   return withLock(function () {
     const db = readDb(); db.rates = clean; writeDb(db);
     return { ok: true, rates: clean };
+  });
+}
+
+/** Menu items edited by Admins. Shape: { standard: { soup: [{name, price?}], ... }, premium: {...} } */
+function saveMenu(m) {
+  m = m || {};
+  const courses = ['soup', 'appetizer', 'chicken', 'pork', 'beef', 'fish', 'veg', 'pasta', 'dessert'];
+  const clean = { standard: {}, premium: {} };
+  for (const t of ['standard', 'premium']) {
+    for (const c of courses) {
+      const seen = {}; const list = [];
+      ((m[t] && Array.isArray(m[t][c])) ? m[t][c] : []).slice(0, 100).forEach(function (it) {
+        const name = str(it && it.name, 100).replace(/[|]/g, ' ').replace(/\s+/g, ' ');
+        if (!name || seen[name.toLowerCase()]) return;
+        seen[name.toLowerCase()] = true;
+        const item = { name: name };
+        if (it.price !== null && it.price !== undefined && it.price !== '' && isFinite(Number(it.price))) item.price = num(it.price);
+        list.push(item);
+      });
+      if (!list.length) return { ok: false, error: 'Every course needs at least one dish (' + c + ', ' + t + ' list).' };
+      clean[t][c] = list;
+    }
+  }
+  return withLock(function () {
+    const db = readDb(); db.menu = clean; writeDb(db);
+    return { ok: true, menu: clean };
   });
 }
 
