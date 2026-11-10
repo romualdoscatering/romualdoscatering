@@ -36,7 +36,7 @@ function doPost(e) {
   try {
     switch (req.action) {
       // ---- public ----
-      case 'config':    { const db = readDb(); return out({ ok: true, rates: db.rates || null, menu: db.menu || null }); }
+      case 'config':    { const db = readDb(); return out({ ok: true, rates: db.rates || null, menu: db.menu || null, about: db.about || null, gallery: Array.isArray(db.gallery) ? db.gallery : null }); }
       case 'submit':    return out(submitInquiry(req.inquiry, 'web', req.website));
       case 'login':     return out(login(req.username, req.password));
       // ---- staff ----
@@ -49,6 +49,11 @@ function doPost(e) {
       case 'delete':    requireAdmin(req.token); return out(deleteInquiry(req.ref));
       case 'saveRates': requireAdmin(req.token); return out(saveRates(req.rates));
       case 'saveMenu':  requireAdmin(req.token); return out(saveMenu(req.menu));
+      // ---- About Us page (text + photo gallery) ----
+      case 'saveAbout':   requireAdmin(req.token); return out(saveAbout(req.about));
+      case 'saveGallery': requireAdmin(req.token); return out(saveGallery(req.gallery));
+      case 'uploadPhoto': requireAdmin(req.token); return out(uploadPhoto(req.photo));
+      case 'deletePhoto': requireAdmin(req.token); return out(deletePhoto(req.id));
       // ---- operations app (purchasing, stock, requisitions) — see Ops.gs ----
       case 'opsSync':
       case 'opsWrite':  return out(handleOps(req));
@@ -205,6 +210,102 @@ function saveMenu(m) {
     const db = readDb(); db.menu = clean; writeDb(db);
     return { ok: true, menu: clean };
   });
+}
+
+/* ===================== ABOUT US PAGE ===================== */
+const ABOUT_TEXT_FIELDS = { kicker: 60, headline: 120, story: 2500, servicesTitle: 60, vision: 600, team: 1500, customTitle: 80, custom: 1200 };
+const ABOUT_LIST_FIELDS = { services: 12, mission: 12, clients: 30 };
+const PHOTO_CATS = ['food', 'events'];
+
+function saveAbout(a) {
+  a = a || {};
+  const clean = {};
+  Object.keys(ABOUT_TEXT_FIELDS).forEach(function (k) { clean[k] = str(a[k], ABOUT_TEXT_FIELDS[k]); });
+  Object.keys(ABOUT_LIST_FIELDS).forEach(function (k) {
+    clean[k] = (Array.isArray(a[k]) ? a[k] : []).map(function (x) { return str(x, 300); }).filter(String).slice(0, ABOUT_LIST_FIELDS[k]);
+  });
+  if (!clean.headline || !clean.vision || !clean.mission.length) return { ok: false, error: 'Headline, vision and at least one mission point are required.' };
+  return withLock(function () { const db = readDb(); db.about = clean; writeDb(db); return { ok: true, about: clean }; });
+}
+
+function cleanPhoto(p) {
+  p = p || {};
+  const cat = PHOTO_CATS.indexOf(p.category) >= 0 ? p.category : 'food';
+  const caption = str(p.caption, 140);
+  if (p.id && /^[A-Za-z0-9_-]{10,}$/.test(String(p.id))) return { id: String(p.id), category: cat, caption: caption };
+  if (p.src && /^assets\/gallery\/[A-Za-z0-9._-]+\.(jpe?g|png|webp)$/i.test(String(p.src))) return { src: String(p.src), category: cat, caption: caption };
+  return null;
+}
+
+/** Saves captions, types and order. Drive photos must already belong to the gallery. */
+function saveGallery(list) {
+  return withLock(function () {
+    const db = readDb();
+    const known = {};
+    (Array.isArray(db.gallery) ? db.gallery : []).forEach(function (p) { if (p.id) known[p.id] = true; });
+    const clean = (Array.isArray(list) ? list : []).slice(0, 200).map(cleanPhoto)
+      .filter(function (p) { return p && (p.src || known[p.id]); });
+    db.gallery = clean; writeDb(db);
+    return { ok: true, gallery: clean };
+  });
+}
+
+function photosFolder(db) {
+  if (db.photosFolderId) { try { return DriveApp.getFolderById(db.photosFolderId); } catch (e) {} }
+  const parent = DriveApp.getFolderById(CONFIG.APP_FOLDER_ID);
+  const it = parent.getFoldersByName('Website Photos');
+  const f = it.hasNext() ? it.next() : parent.createFolder('Website Photos');
+  db.photosFolderId = f.getId();
+  return f;
+}
+
+/** Stores a (browser-resized) JPEG in Drive, makes it viewable by link, and adds it to the gallery. */
+function uploadPhoto(p) {
+  p = p || {};
+  const b64 = String(p.data || '');
+  if (!b64 || b64.length > 8 * 1024 * 1024) return { ok: false, error: 'The photo is missing or too large.' };
+  let bytes;
+  try { bytes = Utilities.base64Decode(b64); } catch (e) { return { ok: false, error: 'The photo could not be read.' }; }
+  if (!(bytes.length > 3 && (bytes[0] & 255) === 0xFF && (bytes[1] & 255) === 0xD8)) return { ok: false, error: 'Only JPEG photos are accepted.' };
+  return withLock(function () {
+    const db = readDb();
+    const folder = photosFolder(db);
+    const name = 'photo-' + Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyyMMdd-HHmmss') + '-' + Math.floor(Math.random() * 1000) + '.jpg';
+    const file = folder.createFile(Utilities.newBlob(bytes, 'image/jpeg', name));
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    const photo = { id: file.getId(), category: PHOTO_CATS.indexOf(p.category) >= 0 ? p.category : 'food', caption: str(p.caption, 140) };
+    if (!Array.isArray(db.gallery)) db.gallery = null;
+    if (db.gallery === null) db.gallery = defaultGallery();
+    db.gallery.push(photo);
+    writeDb(db);
+    return { ok: true, photo: photo };
+  });
+}
+
+function deletePhoto(id) {
+  id = String(id || '');
+  return withLock(function () {
+    const db = readDb();
+    const list = Array.isArray(db.gallery) ? db.gallery : [];
+    if (!list.some(function (p) { return p.id === id; })) return { ok: false, error: 'Photo not found.' };
+    try { DriveApp.getFileById(id).setTrashed(true); } catch (e) {}
+    db.gallery = list.filter(function (p) { return p.id !== id; });
+    writeDb(db);
+    return { ok: true };
+  });
+}
+
+/** Mirrors the website's built-in portfolio photos, used the first time a photo is uploaded. */
+function defaultGallery() {
+  return [
+    ['buffet-setup.jpg', 'events', 'Buffet setup for an evening celebration'], ['roast-beef.jpg', 'food', 'Sliced roast beef with gravy'],
+    ['filipino-feast.jpg', 'food', 'A Filipino feast, served family-style'], ['garden-table-setting.jpg', 'events', 'Garden reception table setting'],
+    ['grill-and-salads.jpg', 'food', 'Grilled skewers and fresh salads'], ['pasta-station.jpg', 'events', 'Pasta station, served fresh to guests'],
+    ['welcome-display.jpg', 'events', "Romualdo's welcome display"], ['pasta-chafing-dish.jpg', 'food', 'Creamy pasta, buffet-ready'],
+    ['packed-meals.jpg', 'food', 'Packed meals for corporate events'], ['dessert-station.jpg', 'events', 'Appetizer station at an event'],
+    ['chef-live-station.jpg', 'events', 'Live cooking with our chef'], ['corporate-meal-boxes.jpg', 'food', 'Corporate meal boxes'],
+    ['plating-in-the-kitchen.jpg', 'food', 'Plating in our kitchen']
+  ].map(function (x) { return { src: 'assets/gallery/' + x[0], category: x[1], caption: x[2] }; });
 }
 
 /* ===================== STAFF LOGIN ===================== */

@@ -139,6 +139,78 @@ td.num{text-align:right;white-space:nowrap}
 .detail{background:var(--cream);font-size:13px}
 .detail ul{margin:6px 0;padding-left:18px}
 .rates td input{width:84px;padding:6px 8px;border:1.5px solid var(--line);border-radius:6px;text-align:right}
+/* About page */
+.about-top{display:grid;grid-template-columns:1fr 1.05fr;gap:34px;align-items:center;margin-bottom:34px}
+.about-photo{position:relative;border-radius:18px;overflow:hidden;aspect-ratio:4/3;background:var(--custard)}
+.about-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.about-photo .since{position:absolute;left:16px;bottom:16px;background:var(--navy);color:#fff;border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;line-height:1.1}
+.about-photo .since b{font-family:"Libre Baskerville",serif;font-size:26px;color:var(--custard)}
+.about-photo .since span{font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.about-intro .kicker,.team .kicker,.clients .kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:8px}
+.about-intro h1{font-size:34px;line-height:1.2}
+.about-intro p{color:var(--muted);margin:0 0 10px}
+.services-band{background:var(--navy);color:#fff;border-radius:18px;padding:28px 30px;margin-bottom:34px}
+.services-band h2{color:var(--custard);margin-bottom:14px}
+.services-band ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px 24px}
+.services-band li{padding:8px 0 8px 26px;position:relative;border-top:1px solid rgba(255,255,255,.14);font-size:14.5px}
+.services-band li:before{content:"✦";position:absolute;left:0;color:var(--gold)}
+.team{display:grid;grid-template-columns:1.1fr 1fr;gap:30px;align-items:start;margin-bottom:34px}
+.team p{color:var(--muted)}
+.chefs{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.chefs figure,.team-photo{margin:0;border-radius:14px;overflow:hidden;background:var(--paper);border:1px solid var(--line)}
+.chefs img{width:100%;aspect-ratio:3/4;object-fit:cover;display:block}
+.chefs figcaption{padding:10px 12px;display:flex;flex-direction:column}
+.chefs figcaption span{font-size:12.5px;color:var(--muted)}
+.team-photo img{width:100%;display:block}
+.team-photo figcaption{padding:10px 12px;font-size:13px;color:var(--muted)}
+.custom-band{background:var(--paper);border:1px solid var(--line);border-left:6px solid var(--wine);border-radius:14px;padding:24px 26px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin-bottom:34px}
+.custom-band div{flex:1;min-width:260px}.custom-band p{margin:0;color:var(--muted)}
+.clients{margin-bottom:34px}
+.client-list{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin-top:10px}
+.client-list span{background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:10px 18px;font-weight:700;letter-spacing:.04em;font-size:14px}
+@media (max-width:960px){.about-top,.team{grid-template-columns:1fr}}
+.about-hero{display:grid;grid-template-columns:1.2fr 1fr;gap:30px;align-items:center;margin-bottom:30px}
+.about-hero .kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:8px}
+.about-hero h1{font-size:34px;line-height:1.2}
+.about-hero p{color:var(--muted);margin:0 0 10px;white-space:pre-line}
+.about-hero .tagbox{background:var(--navy);color:#fff;border-radius:16px;padding:26px;position:relative;overflow:hidden}
+.about-hero .tagbox:after{content:"";position:absolute;right:-40px;bottom:-40px;width:160px;height:160px;border-radius:50%;background:rgba(232,153,8,.18)}
+.about-hero .tagbox h3{color:var(--custard);font-size:16px;margin:0 0 12px;letter-spacing:.04em}
+.about-hero .tagbox ul{margin:0;padding:0;list-style:none}
+.about-hero .tagbox li{padding:7px 0;border-top:1px solid rgba(255,255,255,.15);font-size:14px}
+.about-hero .tagbox li:first-child{border-top:0}
+.about-hero .tagbox li:before{content:"✦ ";color:var(--gold)}
+.vm{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:34px}
+.vm .panel{margin:0;border-top:5px solid var(--gold)}
+.vm .panel.mission{border-top-color:var(--wine)}
+.vm .label{font-size:12px;letter-spacing:.14em;text-transform:uppercase;font-weight:700;color:var(--blue);margin-bottom:6px}
+.vm .panel:first-child{display:flex;flex-direction:column;justify-content:center;background:linear-gradient(160deg,#fff 60%,#fdf3dc)}
+.vm .vision-text{font-family:"Libre Baskerville",serif;font-size:22px;line-height:1.55;margin:0}
+.vm ol{margin:6px 0 0;padding-left:20px}
+.vm ol li{padding:5px 0}
+.gallery-head{display:flex;align-items:end;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.gallery figure{margin:0;border-radius:12px;overflow:hidden;background:var(--custard);position:relative;cursor:zoom-in;aspect-ratio:4/3}
+.gallery img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
+.gallery figure:hover img{transform:scale(1.04)}
+.gallery figcaption{position:absolute;left:0;right:0;bottom:0;padding:22px 12px 10px;color:#fff;font-size:13px;background:linear-gradient(transparent,rgba(26,44,84,.85))}
+.gallery-empty{background:var(--paper);border:1.5px dashed var(--line);border-radius:14px;padding:34px;text-align:center;color:var(--muted)}
+.lightbox{position:fixed;inset:0;background:rgba(10,16,32,.92);display:flex;align-items:center;justify-content:center;z-index:20;padding:20px;flex-direction:column;gap:10px}
+.lightbox img{max-width:100%;max-height:82vh;border-radius:8px}
+.lightbox .cap{color:#fff;font-size:14px;text-align:center}
+.lightbox button{position:absolute;background:rgba(255,255,255,.12);border:0;color:#fff;font-size:26px;width:46px;height:46px;border-radius:50%}
+.lightbox .x{top:16px;right:16px}.lightbox .prev{left:16px;top:50%}.lightbox .next{right:16px;top:50%}
+.about-cta{background:var(--paper);border:1px solid var(--line);border-left:6px solid var(--gold);border-radius:14px;padding:22px;display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-top:30px}
+.about-cta p{margin:0;flex:1;min-width:240px;color:var(--muted)}
+.ed label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--blue);margin-bottom:12px}
+.ed input,.ed textarea,.ed select{border:1.5px solid var(--line);border-radius:8px;padding:9px 11px;background:#fff;font-family:inherit;font-size:14px}
+.ph-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.ph-item{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#fff}
+.ph-item img{width:100%;height:130px;object-fit:cover;display:block;background:var(--custard)}
+.ph-item .b{padding:8px;display:flex;flex-direction:column;gap:6px}
+.ph-item .b input,.ph-item .b select{border:1.5px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px}
+.ph-item .row{display:flex;gap:6px}
+@media (max-width:960px){.about-hero,.vm{grid-template-columns:1fr}}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
 .toast.show{opacity:1}
 .hint{font-size:12.5px;color:var(--muted)}
@@ -172,9 +244,11 @@ footer{border-top:1px solid var(--line);padding:18px 0;font-size:12.5px;color:va
     <img src="assets/logo.png" alt="Romualdo's">
     <nav>
       <button data-nav="packages">Packages</button>
+      <button data-nav="about">About Us</button>
       <button data-nav="custom">Build Your Own Menu</button>
       <button data-nav="admin" class="staff hidden" id="navAdmin">Inquiries</button>
       <button data-nav="menu" class="staff hidden" id="navMenu">Menu items</button>
+      <button data-nav="aboutEdit" class="staff hidden" id="navAboutEdit">About page</button>
       <button data-nav="rates" class="staff hidden" id="navRates">Custom rates</button>
       <button data-nav="logout" class="staff hidden" id="navLogout">Log out</button>
     </nav>
@@ -304,7 +378,8 @@ document.querySelectorAll("header nav button").forEach(b=>b.addEventListener("cl
   const v=b.dataset.nav; if(v==="packages"){state.pkg=null}
   if(v==="logout"){logout();return}
   if(v==="menu"&&(!state.menuDraft||!state.menuDirty))startMenuDraft();
-  if(v==="admin"){location.hash="staff";loadInquiries()} else if(location.hash){history.replaceState(null,"",location.pathname)}
+  if(v==="aboutEdit")startAboutDraft();
+  if(v==="admin"){location.hash="staff";loadInquiries()} else if(v==="about"){history.replaceState(null,"","#about")} else if(location.hash){history.replaceState(null,"",location.pathname)}
   go(v);
 }));
 
@@ -318,6 +393,7 @@ function render(){
   $("#navAdmin").classList.toggle("hidden",!state.isStaff);
   $("#navRates").classList.toggle("hidden",!state.canEdit);
   $("#navMenu").classList.toggle("hidden",!state.canEdit);
+  $("#navAboutEdit").classList.toggle("hidden",!state.canEdit);
   $("#navLogout").classList.toggle("hidden",!state.isStaff);
   $("#staffLink").classList.toggle("hidden",state.isStaff);
   const v=$("#view");
@@ -329,6 +405,8 @@ function render(){
   else if(state.view==="admin") v.innerHTML=state.isStaff?viewAdmin():viewLogin();
   else if(state.view==="rates") v.innerHTML=state.canEdit?viewRates():viewPackages();
   else if(state.view==="menu") v.innerHTML=state.canEdit?viewMenu():viewPackages();
+  else if(state.view==="about") v.innerHTML=viewAbout();
+  else if(state.view==="aboutEdit") v.innerHTML=state.canEdit?viewAboutEdit():viewAbout();
   bind();
 }
 
@@ -683,10 +761,213 @@ function bindMenu(v){
 }
 function refreshMenuBar(){["#saveMenu","#discardMenu"].forEach(id=>{const b=$(id);if(b)b.disabled=false});const m=$("#menuMsg");if(m)m.textContent="You have unsaved changes."}
 
+/* ============ ABOUT US ============ */
+/* Wording from Romualdo's Portfolio 2026. Admins can edit everything on the "About page" screen. */
+const ABOUT_DEFAULT={
+  kicker:"About Us · Since 2020",
+  headline:"Exceptional Quality and Refined Elegance",
+  story:"Founded in 2020, Romualdo's Catering Services has steadily grown from a small kitchen operation to a renowned catering service in the city.\n\nWith years of experience and a team of talented chefs and event specialists, we have become a trusted partner for weddings, corporate events, social gatherings, and more.",
+  servicesTitle:"What we cater",
+  services:["Weddings — from intimate garden affairs to grand ballroom receptions","Corporate events — meetings, conferences and galas","Private parties and social gatherings","Special occasions of all sizes","Customized menus for every theme and dietary need"],
+  vision:"To elevate ordinary events into extraordinary occasions through exceptional food and hospitality.",
+  mission:["Exceed our clients' expectations with every event we cater.","Approach each occasion — from an intimate dinner party to a lavish wedding reception — with creativity, professionalism and a dedication to excellence.","Work closely with every client to curate a menu that suits their preferences, dietary needs and theme.","Ensure every event runs smoothly, so our clients can relax and enjoy the occasion.","Create lasting memories that our clients and their guests will cherish for years to come."],
+  team:"Our head chefs, Jasper Patrick Domingo, a graduate of Professional Culinary and Pastry Arts, and John Philip Domingo, a graduate of Culinary & Restaurant Management at Ecole Hôtelière de Lausanne, Switzerland, curate and craft menus for each unique client — showcasing their versatility and making sure every event is memorable.",
+  clients:["Ulticon Builders Inc.","BDO Unibank","BYD","Apo Agua","LANDBANK"],
+  customTitle:"A customized menu, just for you",
+  custom:"We understand that every event is unique, which is why we offer customizable menus to suit your preferences, dietary needs, and theme. Whether you desire a traditional feast or a contemporary fusion experience, our culinary experts will work closely with you to curate a menu that exceeds expectations."
+};
+const ABOUT_LISTS=["services","mission","clients"];
+const DEFAULT_GALLERY=[
+  ["buffet-setup.jpg","events","Buffet setup for an evening celebration"],
+  ["roast-beef.jpg","food","Sliced roast beef with gravy"],
+  ["filipino-feast.jpg","food","A Filipino feast, served family-style"],
+  ["garden-table-setting.jpg","events","Garden reception table setting"],
+  ["grill-and-salads.jpg","food","Grilled skewers and fresh salads"],
+  ["pasta-station.jpg","events","Pasta station, served fresh to guests"],
+  ["welcome-display.jpg","events","Romualdo's welcome display"],
+  ["pasta-chafing-dish.jpg","food","Creamy pasta, buffet-ready"],
+  ["packed-meals.jpg","food","Packed meals for corporate events"],
+  ["dessert-station.jpg","events","Appetizer station at an event"],
+  ["chef-live-station.jpg","events","Live cooking with our chef"],
+  ["corporate-meal-boxes.jpg","food","Corporate meal boxes"],
+  ["plating-in-the-kitchen.jpg","food","Plating in our kitchen"]
+].map(([f,c,cap])=>({src:"assets/gallery/"+f,category:c,caption:cap}));
+const PHOTO_CATS={food:"Food",events:"Events"};
+state.about=JSON.parse(JSON.stringify(ABOUT_DEFAULT));state.gallery=DEFAULT_GALLERY.map(p=>({...p}));state.galleryFilter="all";
+function cleanPhoto(p){
+  if(!p||typeof p!=="object")return null;
+  const cat=PHOTO_CATS[p.category]?p.category:"food",caption=String(p.caption||"").slice(0,140);
+  if(p.id&&/^[A-Za-z0-9_-]{10,}$/.test(String(p.id)))return {id:String(p.id),category:cat,caption};
+  if(p.src&&/^assets\/gallery\/[A-Za-z0-9._-]+\.(jpe?g|png|webp)$/i.test(String(p.src)))return {src:String(p.src),category:cat,caption};
+  return null;
+}
+function applyAbout(a,g){
+  if(a&&typeof a==="object"){const n=JSON.parse(JSON.stringify(ABOUT_DEFAULT));for(const k of Object.keys(n)){if(Array.isArray(n[k])){if(Array.isArray(a[k]))n[k]=a[k].map(String).map(x=>x.trim()).filter(Boolean)}else if(typeof a[k]==="string"&&a[k].trim())n[k]=a[k]}state.about=n}
+  if(Array.isArray(g))state.gallery=g.map(cleanPhoto).filter(Boolean);
+}
+function photoKey(p){return p.id||p.src}
+function photoUrl(p,w){return p.src?p.src:`https://lh3.googleusercontent.com/d/${encodeURIComponent(p.id)}=w${w||1200}`}
+function photoFallback(img){if(img.dataset.id&&!img.dataset.fb){img.dataset.fb=1;img.src=`https://drive.google.com/thumbnail?id=${encodeURIComponent(img.dataset.id)}&sz=w1200`}}
+function imgTag(p,w,extra){return `<img ${extra||""} src="${esc(photoUrl(p,w))}" ${p.id?`data-id="${esc(p.id)}" onerror="photoFallback(this)"`:""} alt="${esc(p.caption||PHOTO_CATS[p.category])}">`}
+function paras(t){return String(t||"").split(/\n\s*\n/).filter(x=>x.trim()).map(p=>`<p>${esc(p.trim())}</p>`).join("")}
+function viewAbout(){
+  const a=state.about;
+  const list=state.gallery.filter(p=>state.galleryFilter==="all"||p.category===state.galleryFilter);
+  const counts={all:state.gallery.length,food:state.gallery.filter(p=>p.category==="food").length,events:state.gallery.filter(p=>p.category==="events").length};
+  const tabs=[["all","All"],["food","Food"],["events","Events"]].map(([k,l])=>`<button data-gf="${k}" aria-pressed="${state.galleryFilter===k}">${l} (${counts[k]})</button>`).join("");
+  const gal=state.gallery.length?(list.length?`<div class="gallery">${list.map(p=>`<figure data-photo="${esc(photoKey(p))}" tabindex="0">${imgTag(p,800,'loading="lazy"')}${p.caption?`<figcaption>${esc(p.caption)}</figcaption>`:""}</figure>`).join("")}</div>`:`<div class="gallery-empty">No ${esc(PHOTO_CATS[state.galleryFilter]||"")} photos yet.</div>`)
+    :`<div class="gallery-empty"><div style="font-size:30px">📷</div><b>Photos of our food and events are coming soon.</b></div>`;
+  return `<section class="about-top">
+    <div class="about-photo"><img src="assets/about/hero-garden-reception.jpg" alt="Romualdo's garden reception setup"><div class="since"><b>2020</b><span>serving Davao since</span></div></div>
+    <div class="about-intro">
+      <div class="kicker">${esc(a.kicker)}</div>
+      <h1>${esc(a.headline)}</h1>
+      ${paras(a.story)}
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px"><button class="btn gold" data-go="packages">See our packages</button><button class="btn ghost" data-scroll="gallerySec">View our work</button></div>
+    </div>
+  </section>
+  <section class="vm">
+    <div class="panel"><div class="label">Our Vision</div><p class="vision-text">${esc(a.vision)}</p></div>
+    <div class="panel mission"><div class="label">Our Mission &amp; Commitment</div><ol>${a.mission.map(x=>`<li>${esc(x)}</li>`).join("")}</ol></div>
+  </section>
+  <section class="services-band"><h2>${esc(a.servicesTitle)}</h2><ul>${a.services.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></section>
+  <section class="team">
+    <div class="team-text"><div class="kicker">Our Team</div><h2>Meet our head chefs</h2><p>${esc(a.team)}</p>
+      <div class="chefs"><figure><img src="assets/about/chef-jp.jpg" alt="Chef JP" loading="lazy"><figcaption><b>Chef JP</b><span>John Philip Domingo</span></figcaption></figure>
+      <figure><img src="assets/about/chef-jasper.jpg" alt="Chef Jasper" loading="lazy"><figcaption><b>Chef Jasper</b><span>Jasper Patrick Domingo</span></figcaption></figure></div>
+    </div>
+    <figure class="team-photo"><img src="assets/about/team.jpg" alt="The Romualdo's kitchen team" loading="lazy"><figcaption>The Romualdo's team</figcaption></figure>
+  </section>
+  <section class="custom-band"><div><h2>${esc(a.customTitle)}</h2><p>${esc(a.custom)}</p></div><button class="btn gold" data-go="custom">Build your own menu →</button></section>
+  ${a.clients.length?`<section class="clients"><div class="kicker" style="text-align:center">Trusted by</div><h2 style="text-align:center">Our corporate clients</h2><div class="client-list">${a.clients.map(c=>`<span>${esc(c)}</span>`).join("")}</div></section>`:""}
+  <section id="gallerySec">
+    <div class="gallery-head"><div><h2 style="margin:0">Our Food &amp; Events</h2><p class="hint" style="margin:4px 0 0">A taste of the feasts we've prepared and the celebrations we've been part of. Tap a photo to enlarge.</p></div>
+      ${state.gallery.length?`<div class="tierswitch" role="group" aria-label="Photo filter">${tabs}</div>`:""}</div>
+    ${gal}
+  </section>
+  <div class="about-cta"><h3 style="margin:0">Ready to elevate your next event?</h3><p>Browse our 2026 packages or build your own menu for an instant estimate — or call <b>0995 540 0308</b> to start planning.</p><button class="btn gold" data-go="packages">See packages</button></div>`;
+}
+function openLightbox(key){
+  const list=state.gallery.filter(p=>state.galleryFilter==="all"||p.category===state.galleryFilter);
+  let i=Math.max(0,list.findIndex(p=>photoKey(p)===key));
+  const box=document.createElement("div");box.className="lightbox";box.setAttribute("role","dialog");box.setAttribute("aria-label","Photo viewer");
+  const show=()=>{const p=list[i];box.innerHTML=`${imgTag(p,1600)}<div class="cap">${esc(p.caption)}${list.length>1?` · ${i+1} of ${list.length}`:""}</div><button class="x" aria-label="Close">×</button>${list.length>1?`<button class="prev" aria-label="Previous">‹</button><button class="next" aria-label="Next">›</button>`:""}`};
+  const close=()=>{box.remove();document.removeEventListener("keydown",key_)};
+  const key_=e=>{if(e.key==="Escape")close();if(e.key==="ArrowRight"){i=(i+1)%list.length;show()}if(e.key==="ArrowLeft"){i=(i-1+list.length)%list.length;show()}};
+  box.onclick=e=>{if(e.target===box||e.target.classList.contains("x"))close();else if(e.target.classList.contains("next")){i=(i+1)%list.length;show()}else if(e.target.classList.contains("prev")){i=(i-1+list.length)%list.length;show()}};
+  document.addEventListener("keydown",key_);show();document.body.appendChild(box);
+}
+function bindAbout(v){
+  v.querySelectorAll("[data-gf]").forEach(b=>b.onclick=()=>{state.galleryFilter=b.dataset.gf;keepScroll(render)});
+  v.querySelectorAll("[data-photo]").forEach(f=>{f.onclick=()=>openLightbox(f.dataset.photo);f.onkeydown=e=>{if(e.key==="Enter")openLightbox(f.dataset.photo)}});
+  v.querySelectorAll("[data-scroll]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.scroll)?.scrollIntoView({behavior:"smooth"}));
+}
+
+/* ---------- Admin: About page editor ---------- */
+function startAboutDraft(){state.aboutDraft=JSON.parse(JSON.stringify(state.about));state.galleryDraft=state.gallery.map(p=>({...p}));state.aboutDirty=false;state.aboutMsg="";state.upMsg=""}
+function viewAboutEdit(){
+  if(!state.aboutDraft)startAboutDraft();
+  const a=state.aboutDraft;
+  const items=state.galleryDraft.map((p,i)=>`<div class="ph-item">
+      ${imgTag(p,400,'loading="lazy"')}
+      <div class="b">
+        <input data-pcap="${i}" value="${esc(p.caption)}" maxlength="140" placeholder="Caption (optional)">
+        <select data-pcat="${i}">${Object.entries(PHOTO_CATS).map(([k,l])=>`<option value="${k}" ${p.category===k?"selected":""}>${l}</option>`).join("")}</select>
+        <div class="row"><button class="btn small ghost" data-pup="${i}" ${i===0?"disabled":""} aria-label="Move earlier">←</button><button class="btn small ghost" data-pdown="${i}" ${i===state.galleryDraft.length-1?"disabled":""} aria-label="Move later">→</button><button class="btn small danger" data-pdel="${i}" style="flex:1">${state.confirmPhotoDel===photoKey(p)?"Click again":"Remove"}</button></div>
+      </div></div>`).join("");
+  const ta=(k,label,rows,max)=>`<label>${label}<textarea data-af="${k}" rows="${rows}" maxlength="${max}">${esc(ABOUT_LISTS.includes(k)?a[k].join("\n"):a[k])}</textarea></label>`;
+  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>About page</h1><span class="who">Admin only · <a href="#about" data-go="about">view the public page</a></span></div>
+  <div class="layout" style="grid-template-columns:1fr 1fr">
+    <div class="panel ed">
+      <h3>Text</h3>
+      <label>Small heading<input data-af="kicker" value="${esc(a.kicker)}" maxlength="60"></label>
+      <label>Headline<input data-af="headline" value="${esc(a.headline)}" maxlength="120"></label>
+      ${ta("story","Our story (leave a blank line between paragraphs)",6,2500)}
+      ${ta("vision","Our vision",3,600)}
+      ${ta("mission","Our mission &amp; commitment (one point per line)",7,2500)}
+      <label>Services title<input data-af="servicesTitle" value="${esc(a.servicesTitle)}" maxlength="60"></label>
+      ${ta("services","Services (one per line)",5,1500)}
+      ${ta("team","Our team",5,1500)}
+      <label>Customized menu title<input data-af="customTitle" value="${esc(a.customTitle)}" maxlength="80"></label>
+      ${ta("custom","Customized menu text",4,1200)}
+      ${ta("clients","Corporate clients (one per line; leave empty to hide the section)",5,1000)}
+      <button class="btn ghost small" id="aboutDefaults">Load the portfolio wording</button>
+    </div>
+    <div class="panel">
+      <h3>Photos <span class="count">${state.galleryDraft.length} photo${state.galleryDraft.length===1?"":"s"}</span></h3>
+      <p class="hint" style="margin-top:0">Add JPG or PNG photos of your food and events. New photos are resized automatically, saved in your Google Drive (Romualdo's Inquiry App → Website Photos), and appear on the public page right away. Edit captions, types and order below, then click <b>Save changes</b>.</p>
+      <div class="ed" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:8px">
+        <label style="margin:0">Type for new photos<select id="upCat">${Object.entries(PHOTO_CATS).map(([k,l])=>`<option value="${k}">${l}</option>`).join("")}</select></label>
+        <label class="btn" style="margin:0;flex-direction:row;color:#fff;cursor:pointer">＋ Add photos<input type="file" id="upFiles" accept="image/*" multiple style="display:none"></label>
+      </div>
+      <div class="formmsg" id="upMsg" style="color:var(--blue)">${esc(state.upMsg||"")}</div>
+      ${items?`<div class="ph-list">${items}</div>`:`<div class="gallery-empty">No photos in the gallery.</div>`}
+      <button class="btn ghost small" id="galleryDefaults" style="margin-top:12px">Restore the portfolio photos</button>
+    </div>
+  </div>
+  <div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:sticky;bottom:10px;border-color:${state.aboutDirty?"var(--gold)":"var(--line)"}">
+    <button class="btn gold" id="saveAbout" ${state.aboutDirty?"":"disabled"}>Save changes</button>
+    <button class="btn ghost" id="discardAbout" ${state.aboutDirty?"":"disabled"}>Discard changes</button>
+    <span class="formmsg" id="aboutMsg" style="margin:0">${esc(state.aboutMsg||(state.aboutDirty?"You have unsaved changes.":""))}</span>
+  </div>`;
+}
+function aboutDirty(){if(!state.aboutDirty){state.aboutDirty=true;state.aboutMsg="";["#saveAbout","#discardAbout"].forEach(id=>{const b=$(id);if(b)b.disabled=false});const m=$("#aboutMsg");if(m)m.textContent="You have unsaved changes."}}
+function resizeImage(file,max){
+  return new Promise((res,rej)=>{const url=URL.createObjectURL(file);const img=new Image();
+    img.onload=()=>{const s=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement("canvas");c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);
+      const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);res(c.toDataURL("image/jpeg",0.82).split(",")[1])};
+    img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error("Not an image"))};img.src=url});
+}
+async function uploadPhotos(files){
+  const cat=$("#upCat").value;let ok=0,fail=0,err="";
+  for(let i=0;i<files.length;i++){
+    state.upMsg=`Uploading ${i+1} of ${files.length}…`;const m=$("#upMsg");if(m)m.textContent=state.upMsg;
+    try{const data=await resizeImage(files[i],1600);
+      const r=await api("uploadPhoto",{photo:{data,category:cat,caption:"",name:files[i].name}});
+      const p=r.ok&&cleanPhoto(r.photo);
+      if(p){state.gallery.push(p);state.galleryDraft.push({...p});ok++}else{fail++;err=r.error==="Unknown action."?"photo uploads aren't switched on yet — update the Google script":(r.error||"")}
+    }catch(e){fail++;err="a file isn't a photo the browser can read"}
+  }
+  state.upMsg=`${ok} photo${ok===1?"":"s"} added${fail?` · ${fail} failed${err?" ("+err+")":""}`:""}.`;
+  keepScroll(render);toast(ok?"Photos added to the About page":"Upload failed");
+}
+async function saveAbout(){
+  const d=state.aboutDraft;
+  if(!d.headline.trim()||!d.vision.trim()||!d.mission.length){state.aboutMsg="Headline, vision and at least one mission point are required.";keepScroll(render);return}
+  state.aboutMsg="Saving…";keepScroll(render);
+  const r1=await api("saveAbout",{about:d});
+  if(!r1.ok){state.aboutMsg=r1.error==="Unknown action."?"About page saving isn't switched on yet: update the Google script (paste the new Code.gs and deploy a New version).":(r1.error||"Couldn't save.");keepScroll(render);return}
+  const r2=await api("saveGallery",{gallery:state.galleryDraft.map(p=>p.id?{id:p.id,caption:p.caption,category:p.category}:{src:p.src,caption:p.caption,category:p.category})});
+  if(!r2.ok){state.aboutMsg=r2.error||"Text saved, but photo changes couldn't be saved.";keepScroll(render);return}
+  applyAbout(r1.about||d,r2.gallery||state.galleryDraft);startAboutDraft();toast("About page saved");keepScroll(render);
+}
+function bindAboutEdit(v){
+  const d=state.aboutDraft;
+  v.querySelectorAll("[data-af]").forEach(el=>el.oninput=()=>{const k=el.dataset.af;d[k]=ABOUT_LISTS.includes(k)?el.value.split("\n").map(x=>x.trim()).filter(Boolean):el.value;aboutDirty()});
+  v.querySelectorAll("[data-pcap]").forEach(el=>el.oninput=()=>{state.galleryDraft[+el.dataset.pcap].caption=el.value;aboutDirty()});
+  v.querySelectorAll("[data-pcat]").forEach(el=>el.onchange=()=>{state.galleryDraft[+el.dataset.pcat].category=el.value;aboutDirty()});
+  const G=state.galleryDraft;
+  v.querySelectorAll("[data-pup]").forEach(b=>b.onclick=()=>{const i=+b.dataset.pup;[G[i-1],G[i]]=[G[i],G[i-1]];state.aboutDirty=true;keepScroll(render)});
+  v.querySelectorAll("[data-pdown]").forEach(b=>b.onclick=()=>{const i=+b.dataset.pdown;[G[i+1],G[i]]=[G[i],G[i+1]];state.aboutDirty=true;keepScroll(render)});
+  v.querySelectorAll("[data-pdel]").forEach(b=>b.onclick=async()=>{const p=G[+b.dataset.pdel],k=photoKey(p);
+    if(state.confirmPhotoDel!==k){state.confirmPhotoDel=k;keepScroll(render);return}
+    state.confirmPhotoDel=null;
+    if(p.src){state.galleryDraft=G.filter(x=>photoKey(x)!==k);state.aboutDirty=true;state.aboutMsg="Photo removed — click Save changes to publish.";keepScroll(render);return}
+    const r=await api("deletePhoto",{id:p.id});
+    if(r.ok){state.galleryDraft=G.filter(x=>x.id!==p.id);state.gallery=state.gallery.filter(x=>x.id!==p.id);toast("Photo deleted")}else toast(r.error||"Couldn't delete");keepScroll(render)});
+  const f=$("#upFiles",v);if(f)f.onchange=()=>{const files=[...f.files].slice(0,20);f.value="";if(files.length)uploadPhotos(files)};
+  const s=$("#saveAbout",v);if(s)s.onclick=saveAbout;
+  const x=$("#discardAbout",v);if(x)x.onclick=()=>{startAboutDraft();keepScroll(render)};
+  const dd=$("#aboutDefaults",v);if(dd)dd.onclick=()=>{const g=state.galleryDraft;state.aboutDraft=JSON.parse(JSON.stringify(ABOUT_DEFAULT));state.galleryDraft=g;state.aboutDirty=true;state.aboutMsg="Portfolio wording loaded — click Save changes to publish it.";keepScroll(render)};
+  const gd=$("#galleryDefaults",v);if(gd)gd.onclick=()=>{const have=new Set(G.map(photoKey));DEFAULT_GALLERY.forEach(p=>{if(!have.has(p.src))G.push({...p})});state.aboutDirty=true;state.aboutMsg="Portfolio photos restored — click Save changes to publish.";keepScroll(render)};
+}
+
 /* ============ EVENTS ============ */
 function bind(){
   const v=$("#view");
   if(state.view==="menu")bindMenu(v);
+  if(state.view==="about")bindAbout(v);
+  if(state.view==="aboutEdit")bindAboutEdit(v);
   v.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{if(b.dataset.go==="packages")state.pkg=null;go(b.dataset.go)});
   v.querySelectorAll("[data-pax]").forEach(b=>b.onclick=()=>{state.pax=Number(b.dataset.pax);render()});
   const pax=$("#pax",v);
@@ -938,15 +1219,16 @@ function downloadExcel(){
 function applyRates(r){if(!r)return;state.rates={base:Number(r.base)||0,minPax:Number(r.minPax)||50,standard:{...DEFAULT_RATES.standard,...(r.standard||{})},premium:{...DEFAULT_RATES.premium,...(r.premium||{})}}}
 function route(){
   if(location.hash==="#staff"){go(state.isStaff?"admin":"login");if(state.isStaff&&!state.inqLoaded)loadInquiries()}
+  else if(location.hash==="#about"&&state.view!=="about")go("about");
 }
 window.addEventListener("hashchange",route);
-window.addEventListener("beforeunload",e=>{if(state.menuDirty){e.preventDefault();e.returnValue=""}});
+window.addEventListener("beforeunload",e=>{if(state.menuDirty||state.aboutDirty){e.preventDefault();e.returnValue=""}});
 async function init(){
   const t=stored("rcs_token");
   if(t){state.token=t;const me=await api("me");if(me.ok)setSession(t,me.user);else setSession(null,null)}
   render();route();
   const c=await api("config");
-  if(c.ok){if(c.rates)applyRates(c.rates);if(c.menu)applyMenu(c.menu);if(state.view!=="rates"&&state.view!=="menu")keepScroll(render)}
+  if(c.ok){if(c.rates)applyRates(c.rates);if(c.menu)applyMenu(c.menu);applyAbout(c.about,c.gallery);if(!["rates","menu","aboutEdit"].includes(state.view))keepScroll(render)}
 }
 init();
 </script>

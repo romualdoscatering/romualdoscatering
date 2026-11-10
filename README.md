@@ -51,3 +51,8 @@ Internal app for **purchase requisitions, cash advances, purchases & receiving, 
 Send staff the link **romualdos.ph/ops/**. Logins stay valid for 6 hours; deactivating someone in the staff file takes effect within 2 minutes.
 
 All prices shown on the site are estimates only. Final prices are confirmed in a formal quotation.
+
+## About Us page
+
+`#about` shows Romualdo's story, vision, mission, head chefs, corporate clients and a photo gallery (portfolio photos in `assets/gallery/`).
+Admins edit everything on **About page** after logging in. Uploaded photos are saved in Drive under *Romualdo's Inquiry App → Website Photos* (shared view-only by link so the website can show them). Requires the latest `apps-script/Code.gs` deployed as a New version.
