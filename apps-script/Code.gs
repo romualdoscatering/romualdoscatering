@@ -213,38 +213,65 @@ function saveMenu(m) {
 }
 
 /* ===================== ABOUT US PAGE ===================== */
-const ABOUT_TEXT_FIELDS = { kicker: 60, headline: 120, story: 2500, servicesTitle: 60, vision: 600, team: 1500, customTitle: 80, custom: 1200 };
+// Every word and photo on the public About Us page. Limits are character counts.
+const ABOUT_TEXT_FIELDS = {
+  kicker: 60, headline: 120, story: 2500, heroAlt: 140, badgeYear: 20, badgeText: 60, btnPackages: 40, btnGallery: 40,
+  visionTitle: 60, vision: 600, missionTitle: 60, servicesTitle: 60, teamKicker: 60, teamTitle: 80, team: 1500, teamCaption: 120,
+  customTitle: 80, custom: 1200, customButton: 40, clientsKicker: 60, clientsTitle: 80, galleryTitle: 80, galleryIntro: 200,
+  labelAll: 20, labelFood: 20, labelEvents: 20, ctaTitle: 80, ctaText: 400, ctaButton: 40
+};
 const ABOUT_LIST_FIELDS = { services: 12, mission: 12, clients: 30 };
+const ABOUT_PHOTO_FIELDS = ['heroPhoto', 'teamPhoto'];
 const PHOTO_CATS = ['food', 'events'];
+
+/** A photo reference: a file shipped with the website, or a photo uploaded through the About page editor. */
+function cleanRef(p, known) {
+  if (!p || typeof p !== 'object') return null;
+  if (p.id && /^[A-Za-z0-9_-]{10,}$/.test(String(p.id)) && known[String(p.id)]) return { id: String(p.id) };
+  if (p.src && /^assets\/(gallery|about)\/[A-Za-z0-9._-]+\.(jpe?g|png|webp)$/i.test(String(p.src))) return { src: String(p.src) };
+  return null;
+}
+function knownPhotoIds(db) {
+  const known = {};
+  (Array.isArray(db.photoIds) ? db.photoIds : []).forEach(function (id) { known[id] = true; });
+  (Array.isArray(db.gallery) ? db.gallery : []).forEach(function (p) { if (p && p.id) known[p.id] = true; });
+  return known;
+}
 
 function saveAbout(a) {
   a = a || {};
-  const clean = {};
-  Object.keys(ABOUT_TEXT_FIELDS).forEach(function (k) { clean[k] = str(a[k], ABOUT_TEXT_FIELDS[k]); });
-  Object.keys(ABOUT_LIST_FIELDS).forEach(function (k) {
-    clean[k] = (Array.isArray(a[k]) ? a[k] : []).map(function (x) { return str(x, 300); }).filter(String).slice(0, ABOUT_LIST_FIELDS[k]);
+  return withLock(function () {
+    const db = readDb();
+    const known = knownPhotoIds(db);
+    const clean = {};
+    Object.keys(ABOUT_TEXT_FIELDS).forEach(function (k) { clean[k] = str(a[k], ABOUT_TEXT_FIELDS[k]); });
+    Object.keys(ABOUT_LIST_FIELDS).forEach(function (k) {
+      clean[k] = (Array.isArray(a[k]) ? a[k] : []).map(function (x) { return str(x, 300); }).filter(String).slice(0, ABOUT_LIST_FIELDS[k]);
+    });
+    ABOUT_PHOTO_FIELDS.forEach(function (k) { clean[k] = cleanRef(a[k], known); });
+    clean.chefs = (Array.isArray(a.chefs) ? a.chefs : []).slice(0, 8).map(function (c) {
+      c = c || {};
+      return { name: str(c.name, 60), subtitle: str(c.subtitle, 100), photo: cleanRef(c.photo, known) };
+    });
+    if (!clean.headline || !clean.vision || !clean.mission.length) return { ok: false, error: 'Headline, vision and at least one mission point are required.' };
+    db.about = clean; writeDb(db);
+    return { ok: true, about: clean };
   });
-  if (!clean.headline || !clean.vision || !clean.mission.length) return { ok: false, error: 'Headline, vision and at least one mission point are required.' };
-  return withLock(function () { const db = readDb(); db.about = clean; writeDb(db); return { ok: true, about: clean }; });
 }
 
-function cleanPhoto(p) {
-  p = p || {};
-  const cat = PHOTO_CATS.indexOf(p.category) >= 0 ? p.category : 'food';
-  const caption = str(p.caption, 140);
-  if (p.id && /^[A-Za-z0-9_-]{10,}$/.test(String(p.id))) return { id: String(p.id), category: cat, caption: caption };
-  if (p.src && /^assets\/gallery\/[A-Za-z0-9._-]+\.(jpe?g|png|webp)$/i.test(String(p.src))) return { src: String(p.src), category: cat, caption: caption };
-  return null;
-}
-
-/** Saves captions, types and order. Drive photos must already belong to the gallery. */
+/** Saves the gallery: order, captions, types. Photos must be website files or uploaded through the editor. */
 function saveGallery(list) {
   return withLock(function () {
     const db = readDb();
-    const known = {};
-    (Array.isArray(db.gallery) ? db.gallery : []).forEach(function (p) { if (p.id) known[p.id] = true; });
-    const clean = (Array.isArray(list) ? list : []).slice(0, 200).map(cleanPhoto)
-      .filter(function (p) { return p && (p.src || known[p.id]); });
+    const known = knownPhotoIds(db);
+    const clean = [];
+    (Array.isArray(list) ? list : []).slice(0, 200).forEach(function (p) {
+      const ref = cleanRef(p, known);
+      if (!ref) return;
+      ref.category = PHOTO_CATS.indexOf(p.category) >= 0 ? p.category : 'food';
+      ref.caption = str(p.caption, 140);
+      clean.push(ref);
+    });
     db.gallery = clean; writeDb(db);
     return { ok: true, gallery: clean };
   });
@@ -259,7 +286,8 @@ function photosFolder(db) {
   return f;
 }
 
-/** Stores a (browser-resized) JPEG in Drive, makes it viewable by link, and adds it to the gallery. */
+/** Stores a (browser-resized) JPEG in Drive and makes it viewable by link.
+ *  The photo goes live only when the Admin clicks Save changes (saveAbout / saveGallery). */
 function uploadPhoto(p) {
   p = p || {};
   const b64 = String(p.data || '');
@@ -273,39 +301,26 @@ function uploadPhoto(p) {
     const name = 'photo-' + Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyyMMdd-HHmmss') + '-' + Math.floor(Math.random() * 1000) + '.jpg';
     const file = folder.createFile(Utilities.newBlob(bytes, 'image/jpeg', name));
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    const photo = { id: file.getId(), category: PHOTO_CATS.indexOf(p.category) >= 0 ? p.category : 'food', caption: str(p.caption, 140) };
-    if (!Array.isArray(db.gallery)) db.gallery = null;
-    if (db.gallery === null) db.gallery = defaultGallery();
-    db.gallery.push(photo);
+    if (!Array.isArray(db.photoIds)) db.photoIds = [];
+    db.photoIds.push(file.getId());
+    if (db.photoIds.length > 2000) db.photoIds = db.photoIds.slice(-2000);
     writeDb(db);
-    return { ok: true, photo: photo };
+    return { ok: true, photo: { id: file.getId(), category: PHOTO_CATS.indexOf(p.category) >= 0 ? p.category : 'food', caption: str(p.caption, 140) } };
   });
 }
 
+/** Moves an uploaded photo to Drive's trash and takes it off the gallery. */
 function deletePhoto(id) {
   id = String(id || '');
   return withLock(function () {
     const db = readDb();
-    const list = Array.isArray(db.gallery) ? db.gallery : [];
-    if (!list.some(function (p) { return p.id === id; })) return { ok: false, error: 'Photo not found.' };
+    if (!knownPhotoIds(db)[id]) return { ok: false, error: 'Photo not found.' };
     try { DriveApp.getFileById(id).setTrashed(true); } catch (e) {}
-    db.gallery = list.filter(function (p) { return p.id !== id; });
+    db.gallery = (Array.isArray(db.gallery) ? db.gallery : []).filter(function (p) { return p.id !== id; });
+    db.photoIds = (Array.isArray(db.photoIds) ? db.photoIds : []).filter(function (x) { return x !== id; });
     writeDb(db);
     return { ok: true };
   });
-}
-
-/** Mirrors the website's built-in portfolio photos, used the first time a photo is uploaded. */
-function defaultGallery() {
-  return [
-    ['buffet-setup.jpg', 'events', 'Buffet setup for an evening celebration'], ['roast-beef.jpg', 'food', 'Sliced roast beef with gravy'],
-    ['filipino-feast.jpg', 'food', 'A Filipino feast, served family-style'], ['garden-table-setting.jpg', 'events', 'Garden reception table setting'],
-    ['grill-and-salads.jpg', 'food', 'Grilled skewers and fresh salads'], ['pasta-station.jpg', 'events', 'Pasta station, served fresh to guests'],
-    ['welcome-display.jpg', 'events', "Romualdo's welcome display"], ['pasta-chafing-dish.jpg', 'food', 'Creamy pasta, buffet-ready'],
-    ['packed-meals.jpg', 'food', 'Packed meals for corporate events'], ['dessert-station.jpg', 'events', 'Appetizer station at an event'],
-    ['chef-live-station.jpg', 'events', 'Live cooking with our chef'], ['corporate-meal-boxes.jpg', 'food', 'Corporate meal boxes'],
-    ['plating-in-the-kitchen.jpg', 'food', 'Plating in our kitchen']
-  ].map(function (x) { return { src: 'assets/gallery/' + x[0], category: x[1], caption: x[2] }; });
 }
 
 /* ===================== STAFF LOGIN ===================== */

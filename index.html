@@ -210,6 +210,13 @@ td.num{text-align:right;white-space:nowrap}
 .ph-item .b{padding:8px;display:flex;flex-direction:column;gap:6px}
 .ph-item .b input,.ph-item .b select{border:1.5px solid var(--line);border-radius:6px;padding:6px 8px;font-size:13px}
 .ph-item .row{display:flex;gap:6px}
+details.sec{padding:16px 22px}details.sec summary{cursor:pointer;list-style-position:outside}
+.slot{display:flex;gap:14px;align-items:center;border:1px dashed var(--line);border-radius:12px;padding:10px;margin-bottom:12px;background:var(--cream)}
+.slot-img{width:150px;height:110px;border-radius:8px;overflow:hidden;background:var(--custard);display:flex;align-items:center;justify-content:center;flex:none}
+.slot-img img{width:100%;height:100%;object-fit:cover}
+.slot-b{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.chef-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.chef-ed{border:1px solid var(--line);border-radius:12px;padding:12px}
 @media (max-width:960px){.about-hero,.vm{grid-template-columns:1fr}}
 .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
 .toast.show{opacity:1}
@@ -762,90 +769,112 @@ function bindMenu(v){
 function refreshMenuBar(){["#saveMenu","#discardMenu"].forEach(id=>{const b=$(id);if(b)b.disabled=false});const m=$("#menuMsg");if(m)m.textContent="You have unsaved changes."}
 
 /* ============ ABOUT US ============ */
-/* Wording from Romualdo's Portfolio 2026. Admins can edit everything on the "About page" screen. */
+/* Wording and photos from Romualdo's Portfolio 2026. Admins can edit every word and photo on the "About page" screen. */
+const P=(src)=>({src:"assets/"+src});
 const ABOUT_DEFAULT={
   kicker:"About Us · Since 2020",
   headline:"Exceptional Quality and Refined Elegance",
   story:"Founded in 2020, Romualdo's Catering Services has steadily grown from a small kitchen operation to a renowned catering service in the city.\n\nWith years of experience and a team of talented chefs and event specialists, we have become a trusted partner for weddings, corporate events, social gatherings, and more.",
+  heroPhoto:P("about/hero-garden-reception.jpg"), heroAlt:"Romualdo's garden reception setup",
+  badgeYear:"2020", badgeText:"Serving Davao since",
+  btnPackages:"See our packages", btnGallery:"View our work",
+  visionTitle:"Our Vision",
+  vision:"To elevate ordinary events into extraordinary occasions through exceptional food and hospitality.",
+  missionTitle:"Our Mission & Commitment",
+  mission:["Exceed our clients' expectations with every event we cater.","Approach each occasion — from an intimate dinner party to a lavish wedding reception — with creativity, professionalism and a dedication to excellence.","Work closely with every client to curate a menu that suits their preferences, dietary needs and theme.","Ensure every event runs smoothly, so our clients can relax and enjoy the occasion.","Create lasting memories that our clients and their guests will cherish for years to come."],
   servicesTitle:"What we cater",
   services:["Weddings — from intimate garden affairs to grand ballroom receptions","Corporate events — meetings, conferences and galas","Private parties and social gatherings","Special occasions of all sizes","Customized menus for every theme and dietary need"],
-  vision:"To elevate ordinary events into extraordinary occasions through exceptional food and hospitality.",
-  mission:["Exceed our clients' expectations with every event we cater.","Approach each occasion — from an intimate dinner party to a lavish wedding reception — with creativity, professionalism and a dedication to excellence.","Work closely with every client to curate a menu that suits their preferences, dietary needs and theme.","Ensure every event runs smoothly, so our clients can relax and enjoy the occasion.","Create lasting memories that our clients and their guests will cherish for years to come."],
+  teamKicker:"Our Team", teamTitle:"Meet our head chefs",
   team:"Our head chefs, Jasper Patrick Domingo, a graduate of Professional Culinary and Pastry Arts, and John Philip Domingo, a graduate of Culinary & Restaurant Management at Ecole Hôtelière de Lausanne, Switzerland, curate and craft menus for each unique client — showcasing their versatility and making sure every event is memorable.",
-  clients:["Ulticon Builders Inc.","BDO Unibank","BYD","Apo Agua","LANDBANK"],
+  chefs:[{name:"Chef JP",subtitle:"John Philip Domingo",photo:P("about/chef-jp.jpg")},{name:"Chef Jasper",subtitle:"Jasper Patrick Domingo",photo:P("about/chef-jasper.jpg")}],
+  teamPhoto:P("about/team.jpg"), teamCaption:"The Romualdo's team",
   customTitle:"A customized menu, just for you",
-  custom:"We understand that every event is unique, which is why we offer customizable menus to suit your preferences, dietary needs, and theme. Whether you desire a traditional feast or a contemporary fusion experience, our culinary experts will work closely with you to curate a menu that exceeds expectations."
+  custom:"We understand that every event is unique, which is why we offer customizable menus to suit your preferences, dietary needs, and theme. Whether you desire a traditional feast or a contemporary fusion experience, our culinary experts will work closely with you to curate a menu that exceeds expectations.",
+  customButton:"Build your own menu →",
+  clientsKicker:"Trusted by", clientsTitle:"Our corporate clients",
+  clients:["Ulticon Builders Inc.","BDO Unibank","BYD","Apo Agua","LANDBANK"],
+  galleryTitle:"Our Food & Events",
+  galleryIntro:"A taste of the feasts we've prepared and the celebrations we've been part of. Tap a photo to enlarge.",
+  labelAll:"All", labelFood:"Food", labelEvents:"Events",
+  ctaTitle:"Ready to elevate your next event?",
+  ctaText:"Browse our 2026 packages or build your own menu for an instant estimate — or call 0995 540 0308 to start planning.",
+  ctaButton:"See packages"
 };
 const ABOUT_LISTS=["services","mission","clients"];
+const ABOUT_PHOTOS=["heroPhoto","teamPhoto"];
 const DEFAULT_GALLERY=[
-  ["buffet-setup.jpg","events","Buffet setup for an evening celebration"],
-  ["roast-beef.jpg","food","Sliced roast beef with gravy"],
-  ["filipino-feast.jpg","food","A Filipino feast, served family-style"],
-  ["garden-table-setting.jpg","events","Garden reception table setting"],
-  ["grill-and-salads.jpg","food","Grilled skewers and fresh salads"],
-  ["pasta-station.jpg","events","Pasta station, served fresh to guests"],
-  ["welcome-display.jpg","events","Romualdo's welcome display"],
-  ["pasta-chafing-dish.jpg","food","Creamy pasta, buffet-ready"],
-  ["packed-meals.jpg","food","Packed meals for corporate events"],
-  ["dessert-station.jpg","events","Appetizer station at an event"],
-  ["chef-live-station.jpg","events","Live cooking with our chef"],
-  ["corporate-meal-boxes.jpg","food","Corporate meal boxes"],
+  ["buffet-setup.jpg","events","Buffet setup for an evening celebration"],["roast-beef.jpg","food","Sliced roast beef with gravy"],
+  ["filipino-feast.jpg","food","A Filipino feast, served family-style"],["garden-table-setting.jpg","events","Garden reception table setting"],
+  ["grill-and-salads.jpg","food","Grilled skewers and fresh salads"],["pasta-station.jpg","events","Pasta station, served fresh to guests"],
+  ["welcome-display.jpg","events","Romualdo's welcome display"],["pasta-chafing-dish.jpg","food","Creamy pasta, buffet-ready"],
+  ["packed-meals.jpg","food","Packed meals for corporate events"],["dessert-station.jpg","events","Appetizer station at an event"],
+  ["chef-live-station.jpg","events","Live cooking with our chef"],["corporate-meal-boxes.jpg","food","Corporate meal boxes"],
   ["plating-in-the-kitchen.jpg","food","Plating in our kitchen"]
 ].map(([f,c,cap])=>({src:"assets/gallery/"+f,category:c,caption:cap}));
-const PHOTO_CATS={food:"Food",events:"Events"};
+const PHOTO_CATS=["food","events"];
+function catLabel(c){return c==="events"?state.about.labelEvents:state.about.labelFood}
 state.about=JSON.parse(JSON.stringify(ABOUT_DEFAULT));state.gallery=DEFAULT_GALLERY.map(p=>({...p}));state.galleryFilter="all";
-function cleanPhoto(p){
+function cleanRef(p){
   if(!p||typeof p!=="object")return null;
-  const cat=PHOTO_CATS[p.category]?p.category:"food",caption=String(p.caption||"").slice(0,140);
-  if(p.id&&/^[A-Za-z0-9_-]{10,}$/.test(String(p.id)))return {id:String(p.id),category:cat,caption};
-  if(p.src&&/^assets\/gallery\/[A-Za-z0-9._-]+\.(jpe?g|png|webp)$/i.test(String(p.src)))return {src:String(p.src),category:cat,caption};
+  if(p.id&&/^[A-Za-z0-9_-]{10,}$/.test(String(p.id)))return {id:String(p.id)};
+  if(p.src&&/^assets\/(gallery|about)\/[A-Za-z0-9._-]+\.(jpe?g|png|webp)$/i.test(String(p.src)))return {src:String(p.src)};
   return null;
 }
+function cleanPhoto(p){const r=cleanRef(p);if(!r)return null;return {...r,category:PHOTO_CATS.includes(p.category)?p.category:"food",caption:String(p.caption||"").slice(0,140)}}
 function applyAbout(a,g){
-  if(a&&typeof a==="object"){const n=JSON.parse(JSON.stringify(ABOUT_DEFAULT));for(const k of Object.keys(n)){if(Array.isArray(n[k])){if(Array.isArray(a[k]))n[k]=a[k].map(String).map(x=>x.trim()).filter(Boolean)}else if(typeof a[k]==="string"&&a[k].trim())n[k]=a[k]}state.about=n}
+  if(a&&typeof a==="object"){
+    const n=JSON.parse(JSON.stringify(ABOUT_DEFAULT));
+    for(const k of Object.keys(n)){
+      if(ABOUT_LISTS.includes(k)){if(Array.isArray(a[k]))n[k]=a[k].map(x=>String(x).trim()).filter(Boolean)}
+      else if(ABOUT_PHOTOS.includes(k)){const r=cleanRef(a[k]);if(r)n[k]=r}
+      else if(k==="chefs"){if(Array.isArray(a.chefs))n.chefs=a.chefs.filter(c=>c&&typeof c==="object").map(c=>({name:String(c.name||""),subtitle:String(c.subtitle||""),photo:cleanRef(c.photo)}))}
+      else if(typeof a[k]==="string")n[k]=a[k];
+    }
+    state.about=n;
+  }
   if(Array.isArray(g))state.gallery=g.map(cleanPhoto).filter(Boolean);
 }
 function photoKey(p){return p.id||p.src}
 function photoUrl(p,w){return p.src?p.src:`https://lh3.googleusercontent.com/d/${encodeURIComponent(p.id)}=w${w||1200}`}
 function photoFallback(img){if(img.dataset.id&&!img.dataset.fb){img.dataset.fb=1;img.src=`https://drive.google.com/thumbnail?id=${encodeURIComponent(img.dataset.id)}&sz=w1200`}}
-function imgTag(p,w,extra){return `<img ${extra||""} src="${esc(photoUrl(p,w))}" ${p.id?`data-id="${esc(p.id)}" onerror="photoFallback(this)"`:""} alt="${esc(p.caption||PHOTO_CATS[p.category])}">`}
+function imgTag(p,w,extra,alt){if(!p)return "";return `<img ${extra||""} src="${esc(photoUrl(p,w))}" ${p.id?`data-id="${esc(p.id)}" onerror="photoFallback(this)"`:""} alt="${esc(alt!=null?alt:(p.caption||""))}">`}
 function paras(t){return String(t||"").split(/\n\s*\n/).filter(x=>x.trim()).map(p=>`<p>${esc(p.trim())}</p>`).join("")}
 function viewAbout(){
   const a=state.about;
   const list=state.gallery.filter(p=>state.galleryFilter==="all"||p.category===state.galleryFilter);
   const counts={all:state.gallery.length,food:state.gallery.filter(p=>p.category==="food").length,events:state.gallery.filter(p=>p.category==="events").length};
-  const tabs=[["all","All"],["food","Food"],["events","Events"]].map(([k,l])=>`<button data-gf="${k}" aria-pressed="${state.galleryFilter===k}">${l} (${counts[k]})</button>`).join("");
-  const gal=state.gallery.length?(list.length?`<div class="gallery">${list.map(p=>`<figure data-photo="${esc(photoKey(p))}" tabindex="0">${imgTag(p,800,'loading="lazy"')}${p.caption?`<figcaption>${esc(p.caption)}</figcaption>`:""}</figure>`).join("")}</div>`:`<div class="gallery-empty">No ${esc(PHOTO_CATS[state.galleryFilter]||"")} photos yet.</div>`)
-    :`<div class="gallery-empty"><div style="font-size:30px">📷</div><b>Photos of our food and events are coming soon.</b></div>`;
+  const tabs=[["all",a.labelAll],["food",a.labelFood],["events",a.labelEvents]].map(([k,l])=>`<button data-gf="${k}" aria-pressed="${state.galleryFilter===k}">${esc(l)} (${counts[k]})</button>`).join("");
+  const gal=state.gallery.length?(list.length?`<div class="gallery">${list.map(p=>`<figure data-photo="${esc(photoKey(p))}" tabindex="0">${imgTag(p,800,'loading="lazy"',p.caption||catLabel(p.category))}${p.caption?`<figcaption>${esc(p.caption)}</figcaption>`:""}</figure>`).join("")}</div>`:`<div class="gallery-empty">No photos here yet.</div>`)
+    :`<div class="gallery-empty"><div style="font-size:30px">📷</div><b>Photos coming soon.</b></div>`;
+  const chefs=a.chefs.filter(c=>c.name||c.subtitle||c.photo);
   return `<section class="about-top">
-    <div class="about-photo"><img src="assets/about/hero-garden-reception.jpg" alt="Romualdo's garden reception setup"><div class="since"><b>2020</b><span>serving Davao since</span></div></div>
+    <div class="about-photo">${a.heroPhoto?imgTag(a.heroPhoto,1400,"",a.heroAlt):""}${a.badgeYear||a.badgeText?`<div class="since">${a.badgeYear?`<b>${esc(a.badgeYear)}</b>`:""}${a.badgeText?`<span>${esc(a.badgeText)}</span>`:""}</div>`:""}</div>
     <div class="about-intro">
-      <div class="kicker">${esc(a.kicker)}</div>
+      ${a.kicker?`<div class="kicker">${esc(a.kicker)}</div>`:""}
       <h1>${esc(a.headline)}</h1>
       ${paras(a.story)}
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px"><button class="btn gold" data-go="packages">See our packages</button><button class="btn ghost" data-scroll="gallerySec">View our work</button></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">${a.btnPackages?`<button class="btn gold" data-go="packages">${esc(a.btnPackages)}</button>`:""}${a.btnGallery?`<button class="btn ghost" data-scroll="gallerySec">${esc(a.btnGallery)}</button>`:""}</div>
     </div>
   </section>
   <section class="vm">
-    <div class="panel"><div class="label">Our Vision</div><p class="vision-text">${esc(a.vision)}</p></div>
-    <div class="panel mission"><div class="label">Our Mission &amp; Commitment</div><ol>${a.mission.map(x=>`<li>${esc(x)}</li>`).join("")}</ol></div>
+    <div class="panel"><div class="label">${esc(a.visionTitle)}</div><p class="vision-text">${esc(a.vision)}</p></div>
+    <div class="panel mission"><div class="label">${esc(a.missionTitle)}</div><ol>${a.mission.map(x=>`<li>${esc(x)}</li>`).join("")}</ol></div>
   </section>
-  <section class="services-band"><h2>${esc(a.servicesTitle)}</h2><ul>${a.services.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></section>
+  ${a.services.length?`<section class="services-band"><h2>${esc(a.servicesTitle)}</h2><ul>${a.services.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></section>`:""}
   <section class="team">
-    <div class="team-text"><div class="kicker">Our Team</div><h2>Meet our head chefs</h2><p>${esc(a.team)}</p>
-      <div class="chefs"><figure><img src="assets/about/chef-jp.jpg" alt="Chef JP" loading="lazy"><figcaption><b>Chef JP</b><span>John Philip Domingo</span></figcaption></figure>
-      <figure><img src="assets/about/chef-jasper.jpg" alt="Chef Jasper" loading="lazy"><figcaption><b>Chef Jasper</b><span>Jasper Patrick Domingo</span></figcaption></figure></div>
+    <div class="team-text">${a.teamKicker?`<div class="kicker">${esc(a.teamKicker)}</div>`:""}<h2>${esc(a.teamTitle)}</h2>${paras(a.team)}
+      ${chefs.length?`<div class="chefs">${chefs.map(c=>`<figure>${c.photo?imgTag(c.photo,700,'loading="lazy"',c.name):""}<figcaption><b>${esc(c.name)}</b>${c.subtitle?`<span>${esc(c.subtitle)}</span>`:""}</figcaption></figure>`).join("")}</div>`:""}
     </div>
-    <figure class="team-photo"><img src="assets/about/team.jpg" alt="The Romualdo's kitchen team" loading="lazy"><figcaption>The Romualdo's team</figcaption></figure>
+    ${a.teamPhoto?`<figure class="team-photo">${imgTag(a.teamPhoto,1400,'loading="lazy"',a.teamCaption||"Our team")}${a.teamCaption?`<figcaption>${esc(a.teamCaption)}</figcaption>`:""}</figure>`:""}
   </section>
-  <section class="custom-band"><div><h2>${esc(a.customTitle)}</h2><p>${esc(a.custom)}</p></div><button class="btn gold" data-go="custom">Build your own menu →</button></section>
-  ${a.clients.length?`<section class="clients"><div class="kicker" style="text-align:center">Trusted by</div><h2 style="text-align:center">Our corporate clients</h2><div class="client-list">${a.clients.map(c=>`<span>${esc(c)}</span>`).join("")}</div></section>`:""}
+  <section class="custom-band"><div><h2>${esc(a.customTitle)}</h2>${paras(a.custom)}</div>${a.customButton?`<button class="btn gold" data-go="custom">${esc(a.customButton)}</button>`:""}</section>
+  ${a.clients.length?`<section class="clients">${a.clientsKicker?`<div class="kicker" style="text-align:center">${esc(a.clientsKicker)}</div>`:""}<h2 style="text-align:center">${esc(a.clientsTitle)}</h2><div class="client-list">${a.clients.map(c=>`<span>${esc(c)}</span>`).join("")}</div></section>`:""}
   <section id="gallerySec">
-    <div class="gallery-head"><div><h2 style="margin:0">Our Food &amp; Events</h2><p class="hint" style="margin:4px 0 0">A taste of the feasts we've prepared and the celebrations we've been part of. Tap a photo to enlarge.</p></div>
+    <div class="gallery-head"><div><h2 style="margin:0">${esc(a.galleryTitle)}</h2>${a.galleryIntro?`<p class="hint" style="margin:4px 0 0">${esc(a.galleryIntro)}</p>`:""}</div>
       ${state.gallery.length?`<div class="tierswitch" role="group" aria-label="Photo filter">${tabs}</div>`:""}</div>
     ${gal}
   </section>
-  <div class="about-cta"><h3 style="margin:0">Ready to elevate your next event?</h3><p>Browse our 2026 packages or build your own menu for an instant estimate — or call <b>0995 540 0308</b> to start planning.</p><button class="btn gold" data-go="packages">See packages</button></div>`;
+  ${a.ctaTitle||a.ctaText?`<div class="about-cta"><h3 style="margin:0">${esc(a.ctaTitle)}</h3><p>${esc(a.ctaText)}</p>${a.ctaButton?`<button class="btn gold" data-go="packages">${esc(a.ctaButton)}</button>`:""}</div>`:""}`;
 }
 function openLightbox(key){
   const list=state.gallery.filter(p=>state.galleryFilter==="all"||p.category===state.galleryFilter);
@@ -868,46 +897,55 @@ function startAboutDraft(){state.aboutDraft=JSON.parse(JSON.stringify(state.abou
 function viewAboutEdit(){
   if(!state.aboutDraft)startAboutDraft();
   const a=state.aboutDraft;
+  const inp=(k,label,max)=>`<label>${label}<input data-af="${k}" value="${esc(a[k])}" maxlength="${max||120}"></label>`;
+  const ta=(k,label,rows,max)=>`<label>${label}<textarea data-af="${k}" rows="${rows}" maxlength="${max}">${esc(ABOUT_LISTS.includes(k)?a[k].join("\n"):a[k])}</textarea></label>`;
+  const slot=(key,label,ref)=>`<div class="slot"><div class="slot-img">${ref?imgTag(ref,500,"",label):`<span class="hint">No photo</span>`}</div>
+      <div class="slot-b"><b>${label}</b>
+        <label class="btn small" style="cursor:pointer;color:#fff;margin:0">Replace photo<input type="file" accept="image/*" data-slot-up="${key}" style="display:none"></label>
+        ${ref?`<button class="btn small ghost" data-slot-clear="${key}">Remove photo</button>`:""}
+        <button class="btn small ghost" data-slot-reset="${key}">Use original</button></div></div>`;
+  const chefs=a.chefs.map((c,i)=>`<div class="chef-ed">
+      ${slot("chef:"+i,"Chef "+(i+1)+" photo",c.photo)}
+      <label>Name<input data-chef="${i}" data-cf="name" value="${esc(c.name)}" maxlength="60"></label>
+      <label>Line under the name<input data-chef="${i}" data-cf="subtitle" value="${esc(c.subtitle)}" maxlength="100"></label>
+      <div class="row" style="display:flex;gap:6px"><button class="btn small ghost" data-chef-up="${i}" ${i===0?"disabled":""}>Move up</button><button class="btn small danger" data-chef-del="${i}">Remove chef</button></div>
+    </div>`).join("");
   const items=state.galleryDraft.map((p,i)=>`<div class="ph-item">
-      ${imgTag(p,400,'loading="lazy"')}
+      ${imgTag(p,400,'loading="lazy"',"")}
       <div class="b">
-        <input data-pcap="${i}" value="${esc(p.caption)}" maxlength="140" placeholder="Caption (optional)">
-        <select data-pcat="${i}">${Object.entries(PHOTO_CATS).map(([k,l])=>`<option value="${k}" ${p.category===k?"selected":""}>${l}</option>`).join("")}</select>
+        <input data-pcap="${i}" value="${esc(p.caption)}" maxlength="140" placeholder="Caption (optional)" aria-label="Caption">
+        <select data-pcat="${i}" aria-label="Type">${PHOTO_CATS.map(k=>`<option value="${k}" ${p.category===k?"selected":""}>${esc(k==="events"?a.labelEvents:a.labelFood)}</option>`).join("")}</select>
+        <label class="btn small ghost" style="cursor:pointer;margin:0;text-align:center">Replace photo<input type="file" accept="image/*" data-preplace="${i}" style="display:none"></label>
         <div class="row"><button class="btn small ghost" data-pup="${i}" ${i===0?"disabled":""} aria-label="Move earlier">←</button><button class="btn small ghost" data-pdown="${i}" ${i===state.galleryDraft.length-1?"disabled":""} aria-label="Move later">→</button><button class="btn small danger" data-pdel="${i}" style="flex:1">${state.confirmPhotoDel===photoKey(p)?"Click again":"Remove"}</button></div>
       </div></div>`).join("");
-  const ta=(k,label,rows,max)=>`<label>${label}<textarea data-af="${k}" rows="${rows}" maxlength="${max}">${esc(ABOUT_LISTS.includes(k)?a[k].join("\n"):a[k])}</textarea></label>`;
-  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>About page</h1><span class="who">Admin only · <a href="#about" data-go="about">view the public page</a></span></div>
-  <div class="layout" style="grid-template-columns:1fr 1fr">
-    <div class="panel ed">
-      <h3>Text</h3>
-      <label>Small heading<input data-af="kicker" value="${esc(a.kicker)}" maxlength="60"></label>
-      <label>Headline<input data-af="headline" value="${esc(a.headline)}" maxlength="120"></label>
-      ${ta("story","Our story (leave a blank line between paragraphs)",6,2500)}
-      ${ta("vision","Our vision",3,600)}
-      ${ta("mission","Our mission &amp; commitment (one point per line)",7,2500)}
-      <label>Services title<input data-af="servicesTitle" value="${esc(a.servicesTitle)}" maxlength="60"></label>
-      ${ta("services","Services (one per line)",5,1500)}
-      ${ta("team","Our team",5,1500)}
-      <label>Customized menu title<input data-af="customTitle" value="${esc(a.customTitle)}" maxlength="80"></label>
-      ${ta("custom","Customized menu text",4,1200)}
-      ${ta("clients","Corporate clients (one per line; leave empty to hide the section)",5,1000)}
-      <button class="btn ghost small" id="aboutDefaults">Load the portfolio wording</button>
+  const sec=(t,body)=>`<details class="panel ed sec" ${state.openSecs?.[t]===false?"":"open"} data-sec="${esc(t)}"><summary><h3 style="display:inline">${t}</h3></summary><div style="margin-top:12px">${body}</div></details>`;
+  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>About page</h1><span class="who">Admin only · every word and photo on the public About Us page is editable here · <a href="#about" data-go="about">view the public page</a></span></div>
+  <div class="formmsg" id="upMsg" style="color:var(--blue);min-height:0;margin-bottom:8px">${esc(state.upMsg||"")}</div>
+  ${sec("1. Top section",`${slot("heroPhoto","Main photo",a.heroPhoto)}${inp("heroAlt","Main photo description (for screen readers)",140)}
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px">${inp("badgeYear","Badge — big text",20)}${inp("badgeText","Badge — small text",60)}</div>
+    ${inp("kicker","Small heading",60)}${inp("headline","Headline",120)}${ta("story","Our story (leave a blank line between paragraphs)",6,2500)}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${inp("btnPackages","Gold button text (leave empty to hide)",40)}${inp("btnGallery","Second button text (leave empty to hide)",40)}</div>`)}
+  ${sec("2. Vision &amp; mission",`${inp("visionTitle","Vision heading",60)}${ta("vision","Our vision",3,600)}${inp("missionTitle","Mission heading",60)}${ta("mission","Mission points (one per line)",7,2500)}`)}
+  ${sec("3. What we cater",`${inp("servicesTitle","Heading",60)}${ta("services","Services (one per line; leave empty to hide the section)",6,1500)}`)}
+  ${sec("4. Team",`${inp("teamKicker","Small heading",60)}${inp("teamTitle","Heading",80)}${ta("team","Team text",5,1500)}
+    <div class="chef-grid">${chefs}</div><button class="btn small" id="addChef" style="margin:10px 0 16px">＋ Add a chef</button>
+    ${slot("teamPhoto","Team photo",a.teamPhoto)}${inp("teamCaption","Team photo caption",120)}`)}
+  ${sec("5. Customized menu",`${inp("customTitle","Heading",80)}${ta("custom","Text",4,1200)}${inp("customButton","Button text (leave empty to hide)",40)}`)}
+  ${sec("6. Corporate clients",`${inp("clientsKicker","Small heading",60)}${inp("clientsTitle","Heading",80)}${ta("clients","Clients (one per line; leave empty to hide the section)",6,1000)}`)}
+  ${sec("7. Photo gallery",`${inp("galleryTitle","Heading",80)}${inp("galleryIntro","Intro line",200)}
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">${inp("labelAll","Filter label: all",20)}${inp("labelFood","Filter label: food",20)}${inp("labelEvents","Filter label: events",20)}</div>
+    <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:6px 0 12px">
+      <label style="margin:0">Type for new photos<select id="upCat">${PHOTO_CATS.map(k=>`<option value="${k}">${esc(k==="events"?a.labelEvents:a.labelFood)}</option>`).join("")}</select></label>
+      <label class="btn" style="margin:0;flex-direction:row;color:#fff;cursor:pointer">＋ Add photos<input type="file" id="upFiles" accept="image/*" multiple style="display:none"></label>
+      <button class="btn ghost small" id="galleryDefaults">Restore the portfolio photos</button>
     </div>
-    <div class="panel">
-      <h3>Photos <span class="count">${state.galleryDraft.length} photo${state.galleryDraft.length===1?"":"s"}</span></h3>
-      <p class="hint" style="margin-top:0">Add JPG or PNG photos of your food and events. New photos are resized automatically, saved in your Google Drive (Romualdo's Inquiry App → Website Photos), and appear on the public page right away. Edit captions, types and order below, then click <b>Save changes</b>.</p>
-      <div class="ed" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin-bottom:8px">
-        <label style="margin:0">Type for new photos<select id="upCat">${Object.entries(PHOTO_CATS).map(([k,l])=>`<option value="${k}">${l}</option>`).join("")}</select></label>
-        <label class="btn" style="margin:0;flex-direction:row;color:#fff;cursor:pointer">＋ Add photos<input type="file" id="upFiles" accept="image/*" multiple style="display:none"></label>
-      </div>
-      <div class="formmsg" id="upMsg" style="color:var(--blue)">${esc(state.upMsg||"")}</div>
-      ${items?`<div class="ph-list">${items}</div>`:`<div class="gallery-empty">No photos in the gallery.</div>`}
-      <button class="btn ghost small" id="galleryDefaults" style="margin-top:12px">Restore the portfolio photos</button>
-    </div>
-  </div>
-  <div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:sticky;bottom:10px;border-color:${state.aboutDirty?"var(--gold)":"var(--line)"}">
+    <p class="hint" style="margin-top:0">New photos are saved in your Google Drive (Romualdo's Inquiry App → Website Photos). Edit captions, types and order here, then click <b>Save changes</b>.</p>
+    ${items?`<div class="ph-list">${items}</div>`:`<div class="gallery-empty">No photos in the gallery.</div>`}`)}
+  ${sec("8. Closing message",`${inp("ctaTitle","Heading",80)}${ta("ctaText","Text",3,400)}${inp("ctaButton","Button text (leave empty to hide)",40)}`)}
+  <div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:sticky;bottom:10px;z-index:5;border-color:${state.aboutDirty?"var(--gold)":"var(--line)"}">
     <button class="btn gold" id="saveAbout" ${state.aboutDirty?"":"disabled"}>Save changes</button>
     <button class="btn ghost" id="discardAbout" ${state.aboutDirty?"":"disabled"}>Discard changes</button>
+    <button class="btn ghost small" id="aboutDefaults">Load the portfolio wording &amp; photos</button>
     <span class="formmsg" id="aboutMsg" style="margin:0">${esc(state.aboutMsg||(state.aboutDirty?"You have unsaved changes.":""))}</span>
   </div>`;
 }
@@ -918,47 +956,66 @@ function resizeImage(file,max){
       const ctx=c.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);res(c.toDataURL("image/jpeg",0.82).split(",")[1])};
     img.onerror=()=>{URL.revokeObjectURL(url);rej(new Error("Not an image"))};img.src=url});
 }
+function upErr(r){return r&&r.error==="Unknown action."?"photo uploads aren't switched on yet — update the Google script":(r&&r.error)||"upload failed"}
+async function uploadOne(file,extra){
+  const data=await resizeImage(file,1600);
+  return api("uploadPhoto",{photo:{data,name:file.name,...extra}});
+}
+function setUpMsg(t){state.upMsg=t;const m=$("#upMsg");if(m)m.textContent=t}
 async function uploadPhotos(files){
   const cat=$("#upCat").value;let ok=0,fail=0,err="";
   for(let i=0;i<files.length;i++){
-    state.upMsg=`Uploading ${i+1} of ${files.length}…`;const m=$("#upMsg");if(m)m.textContent=state.upMsg;
-    try{const data=await resizeImage(files[i],1600);
-      const r=await api("uploadPhoto",{photo:{data,category:cat,caption:"",name:files[i].name}});
-      const p=r.ok&&cleanPhoto(r.photo);
-      if(p){state.gallery.push(p);state.galleryDraft.push({...p});ok++}else{fail++;err=r.error==="Unknown action."?"photo uploads aren't switched on yet — update the Google script":(r.error||"")}
-    }catch(e){fail++;err="a file isn't a photo the browser can read"}
+    setUpMsg(`Uploading ${i+1} of ${files.length}…`);
+    try{const r=await uploadOne(files[i],{category:cat,caption:""});const p=r.ok&&cleanPhoto(r.photo);
+      if(p){state.galleryDraft.push({...p});ok++}else{fail++;err=upErr(r)}}catch(e){fail++;err="a file isn't a photo the browser can read"}
   }
-  state.upMsg=`${ok} photo${ok===1?"":"s"} added${fail?` · ${fail} failed${err?" ("+err+")":""}`:""}.`;
-  keepScroll(render);toast(ok?"Photos added to the About page":"Upload failed");
+  if(ok)state.aboutDirty=true;
+  setUpMsg(`${ok} photo${ok===1?"":"s"} uploaded${fail?` · ${fail} failed (${err})`:""}.${ok?" Click Save changes to publish.":""}`);
+  keepScroll(render);
 }
+async function uploadToSlot(file,apply){
+  setUpMsg("Uploading photo…");
+  try{const r=await uploadOne(file,{slot:true});const ref=r.ok&&cleanRef(r.photo);
+    if(ref){apply(ref);state.aboutDirty=true;setUpMsg("Photo uploaded. Click Save changes to publish.")}else setUpMsg("Photo not uploaded: "+upErr(r))
+  }catch(e){setUpMsg("That file isn't a photo the browser can read.")}
+  keepScroll(render);
+}
+function slotGet(key){const a=state.aboutDraft;if(key.startsWith("chef:"))return {get:()=>a.chefs[+key.slice(5)].photo,set:v=>{a.chefs[+key.slice(5)].photo=v},orig:()=>{const d=ABOUT_DEFAULT.chefs[+key.slice(5)];return d?{...d.photo}:null}};return {get:()=>a[key],set:v=>{a[key]=v},orig:()=>ABOUT_DEFAULT[key]?{...ABOUT_DEFAULT[key]}:null}}
 async function saveAbout(){
   const d=state.aboutDraft;
-  if(!d.headline.trim()||!d.vision.trim()||!d.mission.length){state.aboutMsg="Headline, vision and at least one mission point are required.";keepScroll(render);return}
+  if(!String(d.headline).trim()||!String(d.vision).trim()||!d.mission.length){state.aboutMsg="Headline, vision and at least one mission point are required.";keepScroll(render);return}
   state.aboutMsg="Saving…";keepScroll(render);
   const r1=await api("saveAbout",{about:d});
   if(!r1.ok){state.aboutMsg=r1.error==="Unknown action."?"About page saving isn't switched on yet: update the Google script (paste the new Code.gs and deploy a New version).":(r1.error||"Couldn't save.");keepScroll(render);return}
   const r2=await api("saveGallery",{gallery:state.galleryDraft.map(p=>p.id?{id:p.id,caption:p.caption,category:p.category}:{src:p.src,caption:p.caption,category:p.category})});
   if(!r2.ok){state.aboutMsg=r2.error||"Text saved, but photo changes couldn't be saved.";keepScroll(render);return}
-  applyAbout(r1.about||d,r2.gallery||state.galleryDraft);startAboutDraft();toast("About page saved");keepScroll(render);
+  applyAbout(r1.about||d,r2.gallery||state.galleryDraft);startAboutDraft();toast("About page saved — live for customers now");keepScroll(render);
 }
 function bindAboutEdit(v){
   const d=state.aboutDraft;
+  state.openSecs=state.openSecs||{};
+  v.querySelectorAll("details[data-sec]").forEach(el=>el.addEventListener("toggle",()=>{state.openSecs[el.dataset.sec]=el.open}));
   v.querySelectorAll("[data-af]").forEach(el=>el.oninput=()=>{const k=el.dataset.af;d[k]=ABOUT_LISTS.includes(k)?el.value.split("\n").map(x=>x.trim()).filter(Boolean):el.value;aboutDirty()});
+  v.querySelectorAll("[data-chef]").forEach(el=>el.oninput=()=>{d.chefs[+el.dataset.chef][el.dataset.cf]=el.value;aboutDirty()});
+  v.querySelectorAll("[data-chef-del]").forEach(b=>b.onclick=()=>{d.chefs.splice(+b.dataset.chefDel,1);state.aboutDirty=true;keepScroll(render)});
+  v.querySelectorAll("[data-chef-up]").forEach(b=>b.onclick=()=>{const i=+b.dataset.chefUp;[d.chefs[i-1],d.chefs[i]]=[d.chefs[i],d.chefs[i-1]];state.aboutDirty=true;keepScroll(render)});
+  const ac=$("#addChef",v);if(ac)ac.onclick=()=>{if(d.chefs.length>=8){toast("Up to 8 chefs");return}d.chefs.push({name:"",subtitle:"",photo:null});state.aboutDirty=true;keepScroll(render)};
+  v.querySelectorAll("[data-slot-up]").forEach(el=>el.onchange=()=>{const f=el.files[0];el.value="";if(f)uploadToSlot(f,ref=>slotGet(el.dataset.slotUp).set(ref))});
+  v.querySelectorAll("[data-slot-clear]").forEach(b=>b.onclick=()=>{slotGet(b.dataset.slotClear).set(null);state.aboutDirty=true;keepScroll(render)});
+  v.querySelectorAll("[data-slot-reset]").forEach(b=>b.onclick=()=>{const s=slotGet(b.dataset.slotReset);const o=s.orig();if(!o){toast("No original photo for this one");return}s.set(o);state.aboutDirty=true;keepScroll(render)});
   v.querySelectorAll("[data-pcap]").forEach(el=>el.oninput=()=>{state.galleryDraft[+el.dataset.pcap].caption=el.value;aboutDirty()});
   v.querySelectorAll("[data-pcat]").forEach(el=>el.onchange=()=>{state.galleryDraft[+el.dataset.pcat].category=el.value;aboutDirty()});
+  v.querySelectorAll("[data-preplace]").forEach(el=>el.onchange=()=>{const f=el.files[0];const i=+el.dataset.preplace;el.value="";if(f)uploadToSlot(f,ref=>{const old=state.galleryDraft[i];state.galleryDraft[i]={...ref,category:old.category,caption:old.caption}})});
   const G=state.galleryDraft;
   v.querySelectorAll("[data-pup]").forEach(b=>b.onclick=()=>{const i=+b.dataset.pup;[G[i-1],G[i]]=[G[i],G[i-1]];state.aboutDirty=true;keepScroll(render)});
   v.querySelectorAll("[data-pdown]").forEach(b=>b.onclick=()=>{const i=+b.dataset.pdown;[G[i+1],G[i]]=[G[i],G[i+1]];state.aboutDirty=true;keepScroll(render)});
-  v.querySelectorAll("[data-pdel]").forEach(b=>b.onclick=async()=>{const p=G[+b.dataset.pdel],k=photoKey(p);
+  v.querySelectorAll("[data-pdel]").forEach(b=>b.onclick=()=>{const i=+b.dataset.pdel,k=photoKey(G[i]);
     if(state.confirmPhotoDel!==k){state.confirmPhotoDel=k;keepScroll(render);return}
-    state.confirmPhotoDel=null;
-    if(p.src){state.galleryDraft=G.filter(x=>photoKey(x)!==k);state.aboutDirty=true;state.aboutMsg="Photo removed — click Save changes to publish.";keepScroll(render);return}
-    const r=await api("deletePhoto",{id:p.id});
-    if(r.ok){state.galleryDraft=G.filter(x=>x.id!==p.id);state.gallery=state.gallery.filter(x=>x.id!==p.id);toast("Photo deleted")}else toast(r.error||"Couldn't delete");keepScroll(render)});
+    state.confirmPhotoDel=null;G.splice(i,1);state.aboutDirty=true;state.aboutMsg="Photo removed — click Save changes to publish.";keepScroll(render)});
   const f=$("#upFiles",v);if(f)f.onchange=()=>{const files=[...f.files].slice(0,20);f.value="";if(files.length)uploadPhotos(files)};
   const s=$("#saveAbout",v);if(s)s.onclick=saveAbout;
   const x=$("#discardAbout",v);if(x)x.onclick=()=>{startAboutDraft();keepScroll(render)};
-  const dd=$("#aboutDefaults",v);if(dd)dd.onclick=()=>{const g=state.galleryDraft;state.aboutDraft=JSON.parse(JSON.stringify(ABOUT_DEFAULT));state.galleryDraft=g;state.aboutDirty=true;state.aboutMsg="Portfolio wording loaded — click Save changes to publish it.";keepScroll(render)};
+  const dd=$("#aboutDefaults",v);if(dd)dd.onclick=()=>{state.aboutDraft=JSON.parse(JSON.stringify(ABOUT_DEFAULT));state.galleryDraft=DEFAULT_GALLERY.map(p=>({...p}));state.aboutDirty=true;state.aboutMsg="Portfolio wording and photos loaded — click Save changes to publish.";keepScroll(render)};
   const gd=$("#galleryDefaults",v);if(gd)gd.onclick=()=>{const have=new Set(G.map(photoKey));DEFAULT_GALLERY.forEach(p=>{if(!have.has(p.src))G.push({...p})});state.aboutDirty=true;state.aboutMsg="Portfolio photos restored — click Save changes to publish.";keepScroll(render)};
 }
 
