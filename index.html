@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Romualdo's Catering — Packages & Inquiries</title>
+<meta name="description" content="Romualdo's Catering Services, Davao City — catering packages, build-your-own menus and instant estimates.">
+<link rel="icon" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Montserrat:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="config.js"></script>
+<style>
+:root{
+  --navy:#1A2C54; --blue:#294074; --wine:#631B1C; --gold:#E89908; --custard:#E5DEB2;
+  --cream:#FBF8EE; --paper:#FFFFFF; --line:#E4DFC8; --muted:#5B6478; --ok:#2F6B3F;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:Montserrat,system-ui,sans-serif;color:var(--navy);background:var(--cream);font-size:15px;line-height:1.5}
+h1,h2,h3{font-family:"Libre Baskerville",Georgia,serif;margin:0 0 .4em}
+h1{font-size:30px} h2{font-size:23px} h3{font-size:18px}
+button{font-family:inherit;cursor:pointer}
+input,select,textarea{font-family:inherit;font-size:15px;color:var(--navy)}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px}
+
+header.top{background:var(--paper);border-bottom:3px solid var(--gold)}
+header .bar{display:flex;align-items:center;gap:20px;padding:14px 0;flex-wrap:wrap}
+header img{width:220px;height:auto;display:block}
+header nav{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+header nav button{border:0;background:transparent;padding:10px 14px;border-radius:999px;font-weight:600;color:var(--blue);font-size:14px}
+header nav button[aria-current="true"]{background:var(--navy);color:#fff}
+header nav button.staff{border:1.5px dashed var(--blue)}
+
+.notice{background:var(--wine);color:#fff;font-size:13.5px;padding:9px 0;text-align:center}
+.notice b{color:var(--custard)}
+
+main{padding:28px 0 60px}
+.hero{display:grid;grid-template-columns:1.4fr 1fr;gap:28px;align-items:end;margin-bottom:26px}
+.hero p{color:var(--muted);margin:0}
+.steps{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.step{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:13px}
+.step b{color:var(--gold);margin-right:4px}
+
+.pax{background:var(--navy);color:#fff;border-radius:14px;padding:18px 20px}
+.pax label{font-weight:600;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--custard)}
+.pax .row{display:flex;align-items:center;gap:10px;margin-top:8px}
+.pax input{width:110px;padding:10px 12px;border-radius:8px;border:0;font-size:20px;font-weight:700}
+.pax .q{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.pax .q button{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:999px;padding:4px 10px;font-size:12.5px}
+.pax .q button:hover{background:rgba(255,255,255,.12)}
+.pax small{display:block;margin-top:6px;color:var(--custard);font-size:12px}
+
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px 18px;display:flex;flex-direction:column;position:relative}
+.card.feature{border:2px solid var(--gold)}
+.card .tag{position:absolute;top:-11px;left:18px;background:var(--gold);color:#fff;font-size:11px;font-weight:700;letter-spacing:.06em;padding:3px 9px;border-radius:999px;text-transform:uppercase}
+.card .name{font-weight:700;letter-spacing:.12em;font-size:13px;color:var(--blue)}
+.card .price{font-family:"Libre Baskerville",serif;font-size:32px;font-weight:700;margin:4px 0 0}
+.card .per{font-size:12px;color:var(--muted)}
+.card .best{font-size:13px;margin:10px 0;min-height:40px}
+.card ul{list-style:none;padding:0;margin:0 0 14px;font-size:13.5px;flex:1}
+.card li{padding:5px 0;border-top:1px dashed var(--line);display:flex;justify-content:space-between;gap:8px}
+.card li span:last-child{font-weight:600;text-align:right}
+.card .est{background:var(--cream);border-radius:10px;padding:10px 12px;margin-bottom:12px}
+.card .est div:first-child{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+.card .est div:last-child{font-size:20px;font-weight:700}
+.btn{border:0;border-radius:10px;padding:12px 16px;font-weight:700;font-size:14px;background:var(--navy);color:#fff}
+.btn:hover{background:var(--blue)}
+.btn.gold{background:var(--gold);color:#fff}
+.btn.gold:hover{background:#cf8706}
+.btn.ghost{background:transparent;color:var(--navy);border:1.5px solid var(--navy)}
+.btn.small{padding:7px 11px;font-size:13px;border-radius:8px}
+.btn.danger{background:var(--wine)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+.custom-cta{margin-top:26px;background:var(--paper);border:1px solid var(--line);border-left:6px solid var(--wine);border-radius:14px;padding:20px 22px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
+.custom-cta p{margin:0;color:var(--muted);flex:1;min-width:260px}
+
+.layout{display:grid;grid-template-columns:1fr 340px;gap:24px;align-items:start}
+.panel{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin-bottom:18px}
+.panel h3 .count{font-family:Montserrat,sans-serif;font-size:13px;color:var(--muted);font-weight:600;margin-left:6px}
+.sub{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--blue);margin:12px 0 6px}
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{border:1.5px solid var(--line);background:var(--cream);border-radius:999px;padding:7px 12px;font-size:13.5px;color:var(--navy);display:inline-flex;align-items:center;gap:6px}
+.chip:hover{border-color:var(--blue)}
+.chip[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.chip .p{font-size:11.5px;opacity:.75}
+.chip .t{font-size:10px;font-weight:700;letter-spacing:.05em;padding:1px 6px;border-radius:999px;background:var(--custard);color:var(--navy)}
+.chip[aria-pressed="true"] .t{background:var(--gold);color:#fff}
+.tierswitch{display:inline-flex;background:var(--cream);border:1px solid var(--line);border-radius:999px;padding:3px;margin-bottom:6px}
+.tierswitch button{border:0;background:transparent;padding:6px 14px;border-radius:999px;font-weight:600;font-size:13px;color:var(--blue)}
+.tierswitch button[aria-pressed="true"]{background:var(--navy);color:#fff}
+
+.summary{position:sticky;top:16px}
+.summary .box{background:var(--navy);color:#fff;border-radius:14px;padding:20px}
+.summary h3{color:#fff}
+.summary .line{display:flex;justify-content:space-between;gap:10px;font-size:13.5px;padding:4px 0}
+.summary .line span:last-child{font-weight:600;text-align:right}
+.summary .total{border-top:1px solid rgba(255,255,255,.25);margin-top:10px;padding-top:10px}
+.summary .total .big{font-family:"Libre Baskerville",serif;font-size:28px;font-weight:700;color:var(--custard)}
+.summary .est-label{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--gold);font-weight:700}
+.summary .disclaim{background:rgba(232,153,8,.15);border:1px solid var(--gold);border-radius:10px;padding:10px 12px;font-size:12.5px;margin-top:12px;color:#fff}
+.summary ol{margin:8px 0 0;padding-left:18px;font-size:13px;max-height:260px;overflow:auto}
+.summary ol li{padding:2px 0}
+.summary ol li small{opacity:.7}
+
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--blue)}
+.form label.full{grid-column:1/-1}
+.form input,.form select,.form textarea{border:1.5px solid var(--line);border-radius:8px;padding:9px 11px;background:#fff}
+.form input:focus,.form select:focus,.form textarea:focus{outline:2px solid var(--gold);border-color:transparent}
+.form .err{border-color:var(--wine)}
+.req{color:var(--wine)}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;margin-top:6px}
+.formmsg{color:var(--wine);font-size:13px;margin-top:8px;min-height:18px}
+
+.back{background:none;border:0;color:var(--blue);font-weight:600;padding:0;margin-bottom:14px;font-size:14px}
+
+.done{max-width:760px;margin:0 auto}
+.done pre{white-space:pre-wrap;background:var(--cream);border:1px solid var(--line);border-radius:10px;padding:14px;font-size:12.5px;font-family:ui-monospace,Menlo,monospace;max-height:340px;overflow:auto;word-break:break-all}
+.contact{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.contact div{background:var(--cream);border-radius:10px;padding:10px 12px;font-size:13px}
+.contact b{display:block;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--blue)}
+.okmark{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;border-radius:50%;background:var(--ok);color:#fff;font-size:22px;margin-bottom:8px}
+
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--blue)}
+td.num{text-align:right;white-space:nowrap}
+.status{border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:13px}
+.empty{color:var(--muted);text-align:center;padding:24px}
+.admin-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.admin-actions .spacer{flex:1}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.kpi{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.kpi div:first-child{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.kpi div:last-child{font-size:22px;font-weight:700}
+.detail{background:var(--cream);font-size:13px}
+.detail ul{margin:6px 0;padding-left:18px}
+.rates td input{width:84px;padding:6px 8px;border:1.5px solid var(--line);border-radius:6px;text-align:right}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:999px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:9}
+.toast.show{opacity:1}
+.hint{font-size:12.5px;color:var(--muted)}
+.hidden{display:none !important}
+.login{max-width:420px;margin:30px auto}
+.login .panel{padding:28px}
+.login label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--blue);margin-bottom:12px}
+.login input{border:1.5px solid var(--line);border-radius:8px;padding:11px 12px}
+.who{font-size:13px;color:var(--muted)}
+footer{border-top:1px solid var(--line);padding:18px 0;font-size:12.5px;color:var(--muted);text-align:center}
+
+@media (max-width:960px){
+  .cards{grid-template-columns:repeat(2,1fr)}
+  .layout{grid-template-columns:1fr}
+  .summary{position:static}
+  .hero{grid-template-columns:1fr}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+}
+@media (max-width:560px){
+  .cards{grid-template-columns:1fr}
+  .form{grid-template-columns:1fr}
+  .contact{grid-template-columns:1fr}
+  header img{width:200px}
+  h1{font-size:24px}
+}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap bar">
+    <img src="assets/logo.png" alt="Romualdo's">
+    <nav>
+      <button data-nav="packages">Packages</button>
+      <button data-nav="custom">Build Your Own Menu</button>
+      <button data-nav="admin" class="staff hidden" id="navAdmin">Inquiries</button>
+      <button data-nav="rates" class="staff hidden" id="navRates">Custom rates</button>
+      <button data-nav="logout" class="staff hidden" id="navLogout">Log out</button>
+    </nav>
+  </div>
+</header>
+<div class="notice"><div class="wrap"><b>Please note:</b> all prices shown are <b>estimates only</b>. Your final price is confirmed in a written quotation after we review your event details.</div></div>
+
+<main><div class="wrap" id="view"></div></main>
+
+<footer><div class="wrap">Romualdo's Catering Services · 13 Juna Avenue, Juna Subdivision, Davao City · 0995 540 0308 / 0915 677 4958 · romualdoscatering@gmail.com<br><a href="#staff" id="staffLink" style="color:var(--muted);font-size:12px">Staff login</a></div></footer>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============ MENU DATA (from Catering Packages 2026) ============ */
+const COURSES = {
+  soup:"Soup", appetizer:"Appetizer", chicken:"Chicken", pork:"Pork", beef:"Beef",
+  fish:"Fish / Seafood", veg:"Vegetables / Salad", pasta:"Pasta / Noodles", dessert:"Dessert"
+};
+const COURSE_ORDER = ["soup","appetizer","chicken","pork","beef","fish","veg","pasta","dessert"];
+const MENU = {
+  standard:{
+    soup:["Creamy Mushroom","Creamy Corn","Egg Drop Soup","Molo Soup","Chicken Mami","Hinalang","Pochero (Pork/Beef)"],
+    appetizer:["Tea Sandwiches","Lumpia Ubod with Garlic Sauce","Assorted Finger Food (Cheese Stick, Dynamite, etc.)","Tofu & Pork Ears","Chicken Skin","Baked Eggplant Roll","Bacon-Wrapped Hotdogs"],
+    chicken:["Sweet & Tangy Chicken","Chicken Curry","Chicken Pastel","Boneless Chicken Steak","Afritada","Chopped Pinoy BBQ","Creamy Mushroom Chicken","Chicken Lumpia Shanghai"],
+    pork:["Menudo","Humba","Binagoongan","Picadillo","Adobo","Hamonado","Bicol Express","Lumpia Shanghai"],
+    beef:["Caldereta","Bistek","Pares (optional add-on: Chicharon Bulaklak)","Tripe and Skin Kare-Kare","Mechado","Beef with Stir-Fried Veggies","Burger Steak with Gravy"],
+    fish:["Fish Fillet with Tartar Sauce","Fish Fillet with Lemon Butter","Sweet & Sour Fish","Tuna Bicol Express","Garlic Butter Shrimp","Bangus Sisig"],
+    veg:["Cabbage and Carrot Slaw","Creamy Cucumber","Buttered Veggies","Chopsuey","Buttered Veggies with Toge"],
+    pasta:["Alfredo","Creamy Mushroom","Filipino Spaghetti","Aglio Olio","Bam-i","Silky Sotanghon","Pancit Canton","Bihon Guisado","Palabok"],
+    dessert:["Mango Tapioca","Buko Gulaman","Cathedral Window Jelly","Mini Classic Turon","Maja Blanca with Caramel","Brownies","Cheesy Mamon","Banana Cupcakes","Fruit Salad"]
+  },
+  premium:{
+    soup:["Pancit Molo","Creamy Chicken Tinola","Cream of Mushroom Soup","Potato Leek Soup","Squash Soup","Cream of Corn Soup","Cream of Asparagus Soup","Carrot and Celery Soup"],
+    appetizer:["Kinilaw na Malasugue","Pomelo Salad","Chicken Potato Salad","Chicken Macaroni Salad","Green Salad with Dressing","Tofu Squares","Embutido","Fresh Lumpia","Fried Lumpia","Lumpia Shanghai","Shrimp Potato Salad","Caesar Salad"],
+    chicken:["Chicken Cordon Bleu","Baked Chicken with Mushrooms","Grilled Chicken with Vegetables","Chicken Parmigiana","Crusty Chicken with Potatoes","Spicy Sweet Chicken Lollies","Chicken Sultanas","Chicken Pandan","Steamed Chicken"],
+    pork:["Roast Pork","Grilled Spare Ribs","Crispy Pork Kare-Kare","Binagoongan","Grilled Pork Belly"],
+    beef:["Bakareta","Bakareta con Chorizos","Lengua in Mushroom Sauce","Callos","Beef Pot Roast","Beef Broccoli","Oriental Beef Ribs","Beef Stroganoff","Oxtail Kare-Kare","Beef Mechado","Braised Beef Special","Osso Buco"],
+    fish:["Fish Fillet with Tartar Sauce","Baked Fish in Herbed Tomatoes","Fish Fillet Sweet and Sour","Pan-Grilled Tuna Steak","Shrimp Tempura","Fish Fillet Parmigiana","Seafood Curry","Rellenong Bangus","Tuna Belly in Olive Oil","Baked Salmon with Garlic Cream"],
+    veg:["Broccoli with Oyster Sauce","Mixed Vegetables","Four Seasons","Buttered Florets","Seafood Chopsuey with Quail Egg"],
+    pasta:["Silky Sotanghon","Pancit Bam-i","Crispy Canton","Beef Lasagna","Chicken Fettuccine","Baked Macaroni","Tuna and Olive Pasta","Garden Fresh Pasta","Pasta with Three Sauces"],
+    dessert:["Assorted Pastries","Fresh Fruits in Cups","Mango Pandan Salad","Mango Tapioca","Watermelon Balls with Lychee","Coffee Jelly","Crema Española","Leche Flan","Banana Walnut Cupcakes","Lemon or Chocolate Cupcakes"]
+  }
+};
+const S = (id,label,cats,n)=>({id,label,cats,n});
+const PACKAGES = [
+  {id:"classic",name:"CLASSIC",price:500,list:"standard",best:"Birthdays & simple gatherings",
+   slots:[S("soup","Soup",["soup"],1),S("chicken","Chicken",["chicken"],1),S("main","Pork, Beef or Fish (your choice)",["pork","beef","fish"],1),S("side","Vegetables or Pasta/Noodles",["veg","pasta"],1),S("dessert","Dessert",["dessert"],1)]},
+  {id:"signature",name:"SIGNATURE",price:650,list:"standard",best:"Family celebrations & company events",
+   slots:[S("soup","Soup",["soup"],1),S("appetizer","Appetizer",["appetizer"],1),S("chicken","Chicken",["chicken"],1),S("pork","Pork",["pork"],1),S("bf","Beef or Fish",["beef","fish"],1),S("veg","Vegetables / Salad",["veg"],1),S("pasta","Pasta / Noodles",["pasta"],1),S("dessert","Dessert",["dessert"],1)]},
+  {id:"premium",name:"PREMIUM",price:850,list:"premium",best:"Weddings, debuts & corporate events",feature:true,
+   slots:[S("soup","Soup",["soup"],1),S("appetizer","Appetizer",["appetizer"],1),S("chicken","Chicken",["chicken"],1),S("pork","Pork",["pork"],1),S("bf","Beef or Fish",["beef","fish"],1),S("veg","Vegetables / Salad",["veg"],1),S("pasta","Pasta / Noodles",["pasta"],1),S("dessert","Dessert",["dessert"],1)]},
+  {id:"grand",name:"GRAND",price:990,list:"premium",best:"Grand weddings & milestone events",
+   slots:[S("soup","Soup",["soup"],1),S("appetizer","Appetizers",["appetizer"],2),S("chicken","Chicken",["chicken"],1),S("pork","Pork",["pork"],1),S("beef","Beef",["beef"],1),S("fish","Fish / Seafood",["fish"],1),S("veg","Vegetables / Salad",["veg"],1),S("pasta","Pasta / Noodles",["pasta"],1),S("dessert","Desserts",["dessert"],2)]}
+];
+/* Default per-head rates for custom menus. Staff can override these in "Custom rates". */
+const DEFAULT_RATES = {
+  base:150, minPax:50,
+  standard:{soup:50,appetizer:50,chicken:80,pork:80,beef:95,fish:85,veg:45,pasta:55,dessert:45},
+  premium:{soup:65,appetizer:70,chicken:110,pork:115,beef:135,fish:125,veg:60,pasta:75,dessert:60}
+};
+const EVENT_TYPES = ["Birthday","Wedding","Debut","Christening / Baptism","Corporate event","Family reunion","Anniversary","Memorial","Other"];
+const STATUSES = ["New","Contacted","Quoted","Booked","Declined"];
+
+/* ============ STATE ============ */
+const state = {
+  view:"packages", pax:50, pkg:null, pkgSel:{}, chefPick:false,
+  custom:new Set(), customTier:"standard",
+  form:{name:"",phone:"",email:"",date:"",time:"",type:"",venue:"",notes:""},
+  rates:structuredClone(DEFAULT_RATES),
+  token:null, staff:null, isStaff:false, canEdit:false,
+  inquiries:[], inqLoaded:false, inqError:"", openRow:null, lastDone:null, confirmDel:null
+};
+
+/* ============ HELPERS ============ */
+const $ = (s,el=document)=>el.querySelector(s);
+const peso = n => "₱" + Math.round(n).toLocaleString("en-PH");
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),2600)}
+function minPax(){return Math.max(1, Number(state.rates.minPax)||50)}
+function paxVal(){return Math.max(minPax(), Math.floor(Number(state.pax)||0))}
+function rate(tier,cat){const v=Number(state.rates?.[tier]?.[cat]);return isFinite(v)?v:DEFAULT_RATES[tier][cat]}
+function newRef(){const d=new Date();const p=n=>String(n).padStart(2,"0");const a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let r="";for(let i=0;i<4;i++)r+=a[Math.floor(Math.random()*a.length)];return `RCS-${String(d.getFullYear()).slice(2)}${p(d.getMonth()+1)}${p(d.getDate())}-${r}`}
+function fmtDate(s){if(!s)return"";const d=new Date(s.length===10?s+"T00:00:00":s);return isNaN(d)?s:d.toLocaleDateString("en-PH",{year:"numeric",month:"short",day:"numeric"})}
+function fmtTime(s){if(!s)return"";const [h,m]=s.split(":").map(Number);if(isNaN(h))return s;return `${((h+11)%12)+1}:${String(m).padStart(2,"0")} ${h<12?"AM":"PM"}`}
+function b64e(str){const b=new TextEncoder().encode(str);let s="";b.forEach(x=>s+=String.fromCharCode(x));return btoa(s)}
+function b64d(str){const s=atob(str);const b=new Uint8Array(s.length);for(let i=0;i<s.length;i++)b[i]=s.charCodeAt(i);return new TextDecoder().decode(b)}
+
+/* ============ ESTIMATES ============ */
+function pkgEstimate(p){return {perHead:p.price,total:p.price*paxVal()}}
+function customItems(){
+  const items=[];
+  for(const key of state.custom){const [tier,cat,dish]=key.split("|");items.push({tier,cat,dish,perHead:rate(tier,cat)})}
+  items.sort((a,b)=>COURSE_ORDER.indexOf(a.cat)-COURSE_ORDER.indexOf(b.cat));
+  return items;
+}
+function customEstimate(){
+  const items=customItems();const dishes=items.reduce((s,i)=>s+i.perHead,0);
+  const base=Number(state.rates.base)||0;const perHead=items.length?base+dishes:0;
+  return {items,base,dishes,perHead,total:perHead*paxVal()};
+}
+function closestPackageHint(perHead){
+  const cheaper=PACKAGES.filter(p=>p.price<=perHead).pop();
+  return cheaper?`Tip: our ${cheaper.name[0]+cheaper.name.slice(1).toLowerCase()} package is ${peso(cheaper.price)}/head and includes bundled savings.`:"";
+}
+
+/* ============ NAV ============ */
+function go(view){state.view=view;render();window.scrollTo({top:0,behavior:"smooth"})}
+document.querySelectorAll("header nav button").forEach(b=>b.addEventListener("click",()=>{
+  const v=b.dataset.nav; if(v==="packages"){state.pkg=null}
+  if(v==="logout"){logout();return}
+  if(v==="admin"){location.hash="staff";loadInquiries()} else if(location.hash){history.replaceState(null,"",location.pathname)}
+  go(v);
+}));
+
+document.getElementById("staffLink").addEventListener("click",e=>{e.preventDefault();location.hash="staff";route()});
+/* ============ VIEWS ============ */
+function render(){
+  document.querySelectorAll("header nav button").forEach(b=>{
+    const on = b.dataset.nav===state.view || (state.view==="choose"&&b.dataset.nav==="packages");
+    b.setAttribute("aria-current", on?"true":"false");
+  });
+  $("#navAdmin").classList.toggle("hidden",!state.isStaff);
+  $("#navRates").classList.toggle("hidden",!state.canEdit);
+  $("#navLogout").classList.toggle("hidden",!state.isStaff);
+  $("#staffLink").classList.toggle("hidden",state.isStaff);
+  const v=$("#view");
+  if(state.view==="packages") v.innerHTML=viewPackages();
+  else if(state.view==="choose") v.innerHTML=viewChoose();
+  else if(state.view==="custom") v.innerHTML=viewCustom();
+  else if(state.view==="done") v.innerHTML=viewDone();
+  else if(state.view==="login") v.innerHTML=viewLogin();
+  else if(state.view==="admin") v.innerHTML=state.isStaff?viewAdmin():viewLogin();
+  else if(state.view==="rates") v.innerHTML=state.canEdit?viewRates():viewPackages();
+  bind();
+}
+
+function paxBox(){
+  const mp=minPax();
+  return `<div class="pax">
+    <label for="pax">Number of guests</label>
+    <div class="row"><input id="pax" type="number" min="${mp}" step="1" value="${esc(state.pax)}" inputmode="numeric"><span>pax</span></div>
+    <div class="q">${[50,75,100,150,200,300].map(n=>`<button data-pax="${n}">${n}</button>`).join("")}</div>
+    <small>Minimum of ${mp} guests. Estimates below update as you type.</small>
+  </div>`;
+}
+
+function viewPackages(){
+  const cards=PACKAGES.map(p=>{
+    const e=pkgEstimate(p);
+    const counts={};p.slots.forEach(s=>{counts[s.id]=s.n});
+    const total=p.slots.reduce((a,s)=>a+s.n,0);
+    const rows=p.slots.map(s=>`<li><span>${esc(s.label)}</span><span>${s.n}</span></li>`).join("");
+    return `<div class="card ${p.feature?"feature":""}">
+      ${p.feature?'<div class="tag">Weddings & debuts</div>':""}
+      <div class="name">${p.name}</div>
+      <div class="price">${peso(p.price)}</div><div class="per">per head · ${p.list==="premium"?"Premium":"Standard"} menu list</div>
+      <div class="best">${esc(p.best)}</div>
+      <ul>${rows}<li><span>Rice & softdrinks</span><span>✓</span></li><li><span><b>Dishes you choose</b></span><span>${total}</span></li></ul>
+      <div class="est"><div>Estimated total · ${paxVal()} pax</div><div data-est="${p.id}">${peso(e.total)}</div></div>
+      <button class="btn ${p.feature?"gold":""}" data-pick="${p.id}">Choose ${p.name[0]+p.name.slice(1).toLowerCase()}</button>
+    </div>`;
+  }).join("");
+  return `<section class="hero">
+    <div>
+      <h1>Catering Packages 2026</h1>
+      <p>From birthdays and weddings to corporate events and family celebrations — pick a package, choose your dishes, and send us your inquiry. We'll get back to you with a formal quotation.</p>
+      <div class="steps"><div class="step"><b>1</b>Count your guests</div><div class="step"><b>2</b>Pick a package</div><div class="step"><b>3</b>Choose your dishes</div></div>
+    </div>
+    ${paxBox()}
+  </section>
+  <div class="cards">${cards}</div>
+  <div class="custom-cta">
+    <div><h3 style="margin:0">Want a menu that's all yours?</h3></div>
+    <p>Mix and match any dishes from our Standard and Premium lists and see an estimated price per head instantly.</p>
+    <button class="btn ghost" data-go="custom">Build your own menu →</button>
+  </div>`;
+}
+
+function slotOptions(p,slot){
+  const chosen=state.pkgSel[slot.id]||[];
+  return slot.cats.map(cat=>`${slot.cats.length>1?`<div class="sub">${esc(COURSES[cat])}</div>`:""}
+    <div class="chips">${MENU[p.list][cat].map(d=>{const k=cat+"|"+d;return `<button class="chip" data-slot="${slot.id}" data-k="${esc(k)}" aria-pressed="${chosen.includes(k)}">${esc(d)}</button>`}).join("")}</div>`).join("");
+}
+function pkgSelCount(p){return p.slots.reduce((a,s)=>a+Math.min(s.n,(state.pkgSel[s.id]||[]).length),0)}
+function pkgTotalDishes(p){return p.slots.reduce((a,s)=>a+s.n,0)}
+
+function viewChoose(){
+  const p=PACKAGES.find(x=>x.id===state.pkg); if(!p) return viewPackages();
+  const slots=p.slots.map(s=>{
+    const n=(state.pkgSel[s.id]||[]).length;
+    return `<div class="panel" ${state.chefPick?'style="opacity:.5"':""}>
+      <h3>${esc(s.label)}<span class="count">${n}/${s.n} chosen</span></h3>
+      ${slotOptions(p,s)}
+    </div>`}).join("");
+  return `<button class="back" data-go="packages">← All packages</button>
+  <div class="layout">
+    <div>
+      <div class="panel">
+        <h2>${p.name[0]+p.name.slice(1).toLowerCase()} Package · ${peso(p.price)}/head</h2>
+        <p class="hint" style="margin:0 0 10px">Choose ${pkgTotalDishes(p)} dishes from our ${p.list==="premium"?"Premium":"Standard"} menu list. Rice and softdrinks are included.</p>
+        <div class="row" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+          <label class="check" style="margin:0"><input type="checkbox" id="chefPick" ${state.chefPick?"checked":""}> I'd like the chef to recommend my menu</label>
+          <label class="check" style="margin:0">Guests: <input id="pax" type="number" min="${minPax()}" value="${esc(state.pax)}" style="width:90px;padding:6px 8px;border:1.5px solid var(--line);border-radius:6px"></label>
+        </div>
+      </div>
+      ${slots}
+      ${formPanel()}
+    </div>
+    <aside class="summary">${pkgSummary(p)}</aside>
+  </div>`;
+}
+function pkgSummary(p){
+  const e=pkgEstimate(p);
+  const list=state.chefPick?`<p style="font-size:13px;margin:8px 0 0">Chef will recommend your menu.</p>`:
+    `<ol>${p.slots.flatMap(s=>(state.pkgSel[s.id]||[]).map(k=>{const [c,d]=k.split("|");return `<li>${esc(d)} <small>· ${esc(COURSES[c])}</small></li>`})).join("")||"<li style='list-style:none;margin-left:-18px;opacity:.7'>No dishes chosen yet</li>"}</ol>`;
+  return `<div class="box">
+    <h3>Your estimate</h3>
+    <div class="line"><span>Package</span><span>${p.name}</span></div>
+    <div class="line"><span>Price per head</span><span>${peso(p.price)}</span></div>
+    <div class="line"><span>Guests</span><span>${paxVal()} pax</span></div>
+    <div class="line"><span>Dishes chosen</span><span>${state.chefPick?"Chef's choice":pkgSelCount(p)+" / "+pkgTotalDishes(p)}</span></div>
+    ${list}
+    <div class="total"><div class="est-label">Estimated total</div><div class="big">${peso(e.total)}</div></div>
+    <div class="disclaim">This is an <b>estimate only</b>, not a final quotation. Final price may change based on headcount, venue, date and menu adjustments.</div>
+  </div>`;
+}
+
+function viewCustom(){
+  const t=state.customTier;
+  const courses=COURSE_ORDER.map(cat=>{
+    const picked=[...state.custom].filter(k=>k.split("|")[1]===cat).length;
+    return `<div class="panel">
+      <h3>${esc(COURSES[cat])}<span class="count">${picked?picked+" selected · ":""}${peso(rate(t,cat))}/head each</span></h3>
+      <div class="chips">${MENU[t][cat].map(d=>{const k=`${t}|${cat}|${d}`;return `<button class="chip" data-ck="${esc(k)}" aria-pressed="${state.custom.has(k)}">${esc(d)}</button>`}).join("")}</div>
+    </div>`}).join("");
+  return `<section class="hero">
+    <div>
+      <h1>Build Your Own Menu</h1>
+      <p>Pick as many dishes as you like from any course. Switch between our Standard and Premium lists — you can mix both. Rice and softdrinks are included in every custom menu.</p>
+    </div>
+    ${paxBox()}
+  </section>
+  <div class="layout">
+    <div>
+      <div class="tierswitch" role="group" aria-label="Menu list">
+        <button data-tier="standard" aria-pressed="${t==="standard"}">Standard list</button>
+        <button data-tier="premium" aria-pressed="${t==="premium"}">Premium list</button>
+      </div>
+      ${courses}
+      ${formPanel()}
+    </div>
+    <aside class="summary">${customSummary()}</aside>
+  </div>`;
+}
+function customSummary(){
+  const e=customEstimate();
+  const hint=e.items.length?closestPackageHint(e.perHead):"";
+  return `<div class="box">
+    <h3>Your custom estimate</h3>
+    <div class="line"><span>Guests</span><span>${paxVal()} pax</span></div>
+    <div class="line"><span>Dishes selected</span><span>${e.items.length}</span></div>
+    <ol>${e.items.map(i=>`<li>${esc(i.dish)} <small>· ${esc(COURSES[i.cat])}${i.tier==="premium"?" · Premium":""} · ${peso(i.perHead)}</small> <button class="chip" style="padding:0 6px;font-size:11px;background:transparent;color:#fff;border-color:rgba(255,255,255,.3)" data-ck="${esc(i.tier+"|"+i.cat+"|"+i.dish)}" aria-label="Remove ${esc(i.dish)}">✕</button></li>`).join("")||"<li style='list-style:none;margin-left:-18px;opacity:.7'>Tap dishes to add them</li>"}</ol>
+    <div class="total">
+      <div class="line"><span>Rice & softdrinks</span><span>${e.items.length?peso(e.base):"—"}/head</span></div>
+      <div class="line"><span>Your dishes</span><span>${peso(e.dishes)}/head</span></div>
+      <div class="line"><span><b>Estimated per head</b></span><span><b>${peso(e.perHead)}</b></span></div>
+      <div class="est-label" style="margin-top:8px">Estimated total</div><div class="big">${peso(e.total)}</div>
+    </div>
+    ${hint?`<p style="font-size:12.5px;margin:8px 0 0;color:var(--custard)">${esc(hint)}</p>`:""}
+    <div class="disclaim">This is an <b>estimate only</b>, not a final quotation. Custom menus are priced per dish and confirmed by our team after review.</div>
+  </div>`;
+}
+
+function formPanel(){
+  const f=state.form;
+  return `<div class="panel" id="formPanel">
+    <h2>Your event details</h2>
+    <p class="hint" style="margin-top:0">Send us your inquiry and we'll reply with a formal quotation.</p>
+    <form class="form" id="inqForm" novalidate>
+      <label>Full name <span class="req">*</span><input name="name" value="${esc(f.name)}" autocomplete="name" required></label>
+      <label>Mobile number <span class="req">*</span><input name="phone" value="${esc(f.phone)}" autocomplete="tel" inputmode="tel" required></label>
+      <label>Email<input name="email" type="email" value="${esc(f.email)}" autocomplete="email"></label>
+      <label>Type of event<select name="type"><option value="">Select…</option>${EVENT_TYPES.map(t=>`<option ${f.type===t?"selected":""}>${t}</option>`).join("")}</select></label>
+      <label>Event date <span class="req">*</span><input name="date" type="date" value="${esc(f.date)}" required></label>
+      <label>Serving time<input name="time" type="time" value="${esc(f.time)}"></label>
+      <label class="full">Venue / location<input name="venue" value="${esc(f.venue)}" placeholder="e.g. Clubhouse, Juna Subdivision, Davao City"></label>
+      <input name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px">
+      <label class="full">Notes or special requests<textarea name="notes" rows="3" placeholder="Allergies, setup needs, budget, theme…">${esc(f.notes)}</textarea></label>
+      <label class="check full" style="flex-direction:row;font-weight:500;color:var(--navy)"><input type="checkbox" name="ack" required> I understand the prices shown are estimates only and the final price will be confirmed in a quotation.</label>
+      <div class="full"><button class="btn gold" type="submit" style="width:100%">Send my inquiry</button><div class="formmsg" id="formMsg"></div></div>
+    </form>
+  </div>`;
+}
+
+function viewDone(){
+  const d=state.lastDone; if(!d) return viewPackages();
+  if(d.saved){
+    return `<div class="done panel">
+      <div class="okmark">✓</div>
+      <h2>${state.isStaff?"Inquiry saved":"Thank you! We've received your inquiry."}</h2>
+      <p>Your reference number is <b>${esc(d.inq.ref)}</b>. ${state.isStaff?"It is now in the inquiry list.":"Our team will contact you at <b>"+esc(d.inq.customer.phone)+"</b> with a formal quotation."}</p>
+      <p class="hint">Estimated total: ${peso(d.inq.estimate.total)} — this is an <b>estimate only</b>; the final price is confirmed in your quotation.</p>
+      <div class="contact" style="margin-bottom:14px"><div><b>Text / Call</b>0995 540 0308</div><div><b>Text / Call</b>0915 677 4958</div><div><b>Email</b>romualdoscatering@gmail.com</div></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" data-go="packages">New inquiry</button>${state.isStaff?'<button class="btn ghost" data-go="admin">Open inquiry list</button>':""}</div>
+    </div>`;
+  }
+  return `<div class="done panel">
+    <div class="okmark">✓</div>
+    <h2>One last step: send this to us</h2>
+    <p>We couldn't reach our inquiry system just now, but your inquiry is ready. Tap <b>Copy message</b>, then send it to Romualdo's by text, Messenger or email. Please keep the reference line at the bottom — it lets us load your full menu instantly.</p>
+    <pre id="msgText">${esc(d.message)}</pre>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+      <button class="btn gold" id="copyMsg">Copy message</button>
+      <a class="btn ghost" style="text-decoration:none" href="mailto:romualdoscatering@gmail.com?subject=${encodeURIComponent("Catering inquiry "+d.inq.ref)}&body=${encodeURIComponent(d.message)}">Open in email</a>
+      <button class="btn ghost" data-go="packages">Back to packages</button>
+    </div>
+    <div class="contact">
+      <div><b>Text / Call</b>0995 540 0308</div>
+      <div><b>Text / Call</b>0915 677 4958</div>
+      <div><b>Email</b>romualdoscatering@gmail.com</div>
+    </div>
+    <p class="hint" style="margin-top:14px">Reminder: the amount shown (${peso(d.inq.estimate.total)}) is an <b>estimate only</b>. We'll confirm the final price in your quotation.</p>
+  </div>`;
+}
+
+/* ---------- Staff: inquiries ---------- */
+function planName(q){return q.plan?.kind==="package"?`${q.plan.packageName} Package`:"Custom Menu"}
+function viewAdmin(){
+  const list=state.inquiries;
+  const now=list.filter(q=>q.status==="New").length;
+  const booked=list.filter(q=>q.status==="Booked").length;
+  const pipeline=list.filter(q=>q.status!=="Declined").reduce((s,q)=>s+(Number(q.estimate?.total)||0),0);
+  const customers=new Set(list.map(custKey)).size;
+  const rows=list.map(q=>{
+    const open=state.openRow===q._id;
+    return `<tr>
+      <td>${esc(fmtDate(q.createdAt))}<div class="hint">${esc(q.ref)}</div></td>
+      <td><b>${esc(q.customer?.name)}</b><div class="hint">${esc(q.customer?.phone)}</div></td>
+      <td>${esc(fmtDate(q.event?.date))}<div class="hint">${esc(q.event?.type||"")}</div></td>
+      <td>${esc(planName(q))}</td>
+      <td class="num">${esc(q.event?.pax)}</td>
+      <td class="num">${peso(q.estimate?.total||0)}</td>
+      <td><select class="status" data-status="${esc(q._id)}">${STATUSES.map(s=>`<option ${q.status===s?"selected":""}>${s}</option>`).join("")}</select></td>
+      <td style="white-space:nowrap"><button class="btn small ghost" data-open="${esc(q._id)}">${open?"Hide":"Menu"}</button></td>
+    </tr>${open?`<tr class="detail"><td colspan="8">${detailHtml(q)}</td></tr>`:""}`}).join("");
+  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>Inquiries</h1><span class="who">Signed in as <b>${esc(state.staff?.name)}</b> · ${esc(state.staff?.role)}</span></div>
+  <div class="kpis">
+    <div class="kpi"><div>Inquiries</div><div>${list.length}</div></div>
+    <div class="kpi"><div>Customers</div><div>${customers}</div></div>
+    <div class="kpi"><div>New / Booked</div><div>${now} / ${booked}</div></div>
+    <div class="kpi"><div>Est. pipeline</div><div>${peso(pipeline)}</div></div>
+  </div>
+  <div class="panel">
+    <div class="admin-actions">
+      <h3 style="margin:0">All inquiries</h3><div class="spacer"></div>
+      <button class="btn ghost small" id="refreshInq">↻ Refresh</button>
+      <button class="btn gold" id="dlXlsx" ${list.length?"":"disabled"}>⬇ Download Excel (1 sheet per customer)</button>
+    </div>
+    ${state.inqError?`<div class="empty" style="color:var(--wine)">${esc(state.inqError)}</div>`:!state.inqLoaded?`<div class="empty" id="inqLoading">Loading inquiries…</div>`:
+      list.length?`<div style="overflow:auto"><table><thead><tr><th>Received</th><th>Customer</th><th>Event</th><th>Plan</th><th class="num">Pax</th><th class="num">Est. total</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`:
+      `<div class="empty">No inquiries yet. Inquiries sent from the website appear here automatically.</div>`}
+  </div>
+  <div class="panel">
+    <h3>Add a customer's inquiry message</h3>
+    <p class="hint" style="margin-top:0">Backup option: if a customer couldn't submit online and sent their inquiry by text, Messenger or email instead, paste the whole message here. The reference line at the bottom brings in their full menu and estimate.</p>
+    <textarea id="importText" rows="5" style="width:100%;border:1.5px solid var(--line);border-radius:8px;padding:10px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px" placeholder="Paste the customer's message here…"></textarea>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn" id="importBtn">Add to inquiry list</button><span class="formmsg" id="importMsg" style="margin:0"></span></div>
+  </div>`;
+}
+function detailHtml(q){
+  const items=(q.items||[]).map(i=>`<li>${esc(COURSES[i.cat]||i.cat)}: <b>${esc(i.dish)}</b>${i.tier?` <span class="hint">(${i.tier==="premium"?"Premium":"Standard"}${i.perHead?` · ${peso(i.perHead)}/head`:""})</span>`:""}</li>`).join("");
+  return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div><b>Menu</b>${q.plan?.chefPick?"<p>Chef to recommend the menu.</p>":`<ul>${items||"<li>No dishes listed</li>"}</ul>`}</div>
+    <div><b>Details</b><ul>
+      <li>Email: ${esc(q.customer?.email||"—")}</li>
+      <li>Serving time: ${esc(fmtTime(q.event?.time)||"—")}</li>
+      <li>Venue: ${esc(q.event?.venue||"—")}</li>
+      <li>Est. per head: ${peso(q.estimate?.perHead||0)}</li>
+      <li>Notes: ${esc(q.notes||"—")}</li>
+      <li>Source: ${q.source==="message"?"Customer message (pasted by staff)":"Website form"}</li>
+    </ul>
+    ${state.canEdit?`<button class="btn small danger" data-del="${esc(q._id)}">${state.confirmDel===q._id?"Click again to delete":"Delete inquiry"}</button>`:""}</div>
+  </div>`;
+}
+
+/* ---------- Staff: rates ---------- */
+function viewRates(){
+  const r=state.rates;
+  const rows=COURSE_ORDER.map(c=>`<tr><td>${esc(COURSES[c])}</td>
+    <td class="num"><input type="number" min="0" data-rate="standard|${c}" value="${esc(r.standard?.[c]??DEFAULT_RATES.standard[c])}"></td>
+    <td class="num"><input type="number" min="0" data-rate="premium|${c}" value="${esc(r.premium?.[c]??DEFAULT_RATES.premium[c])}"></td></tr>`).join("");
+  return `<h1>Custom menu rates</h1>
+  <p class="hint">These per-head amounts drive the estimates on <b>Build Your Own Menu</b>. Estimated per head = rice & softdrinks + the rate of each dish chosen. Package prices stay fixed at ₱500 / ₱650 / ₱850 / ₱990.</p>
+  <div class="panel rates" style="max-width:620px">
+    <table><thead><tr><th>Course</th><th class="num">Standard ₱/head</th><th class="num">Premium ₱/head</th></tr></thead><tbody>
+      <tr><td><b>Rice & softdrinks</b> (every custom menu)</td><td class="num" colspan="2"><input type="number" min="0" data-rate="base" value="${esc(r.base)}"></td></tr>
+      <tr><td><b>Minimum guests</b></td><td class="num" colspan="2"><input type="number" min="1" data-rate="minPax" value="${esc(r.minPax)}"></td></tr>
+      ${rows}
+    </tbody></table>
+    <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn gold" id="saveRates">Save rates</button><button class="btn ghost" id="resetRates">Reset to defaults</button><span class="formmsg" id="ratesMsg"></span></div>
+  </div>`;
+}
+
+/* ============ EVENTS ============ */
+function bind(){
+  const v=$("#view");
+  v.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{if(b.dataset.go==="packages")state.pkg=null;go(b.dataset.go)});
+  v.querySelectorAll("[data-pax]").forEach(b=>b.onclick=()=>{state.pax=Number(b.dataset.pax);render()});
+  const pax=$("#pax",v);
+  if(pax){
+    pax.oninput=()=>{state.pax=pax.value;refreshEstimates()};
+    pax.onblur=()=>{if(Number(pax.value)<minPax()){state.pax=minPax();pax.value=minPax();toast(`Minimum is ${minPax()} guests`);refreshEstimates()}};
+  }
+  v.querySelectorAll("[data-pick]").forEach(b=>b.onclick=()=>{
+    if(state.pkg!==b.dataset.pick){state.pkgSel={};state.chefPick=false}
+    state.pkg=b.dataset.pick;go("choose");
+  });
+  v.querySelectorAll("[data-slot]").forEach(b=>b.onclick=()=>{
+    const p=PACKAGES.find(x=>x.id===state.pkg);const slot=p.slots.find(s=>s.id===b.dataset.slot);
+    const arr=state.pkgSel[slot.id]=state.pkgSel[slot.id]||[];const k=b.dataset.k;const i=arr.indexOf(k);
+    if(i>=0)arr.splice(i,1);else{arr.push(k);while(arr.length>slot.n)arr.shift()}
+    state.chefPick=false;keepScroll(render);
+  });
+  const cp=$("#chefPick",v); if(cp) cp.onchange=()=>{state.chefPick=cp.checked;keepScroll(render)};
+  v.querySelectorAll("[data-tier]").forEach(b=>b.onclick=()=>{state.customTier=b.dataset.tier;keepScroll(render)});
+  v.querySelectorAll("[data-ck]").forEach(b=>b.onclick=()=>{const k=b.dataset.ck;state.custom.has(k)?state.custom.delete(k):state.custom.add(k);keepScroll(render)});
+  const f=$("#inqForm",v);
+  if(f){
+    f.querySelectorAll("input,select,textarea").forEach(el=>{if(el.name&&el.name!=="ack")el.addEventListener("input",()=>{state.form[el.name]=el.value})});
+    f.onsubmit=e=>{e.preventDefault();submitInquiry(f)};
+  }
+  const cm=$("#copyMsg",v); if(cm) cm.onclick=async()=>{try{await navigator.clipboard.writeText(state.lastDone.message);toast("Message copied — now paste it in your text, Messenger or email")}catch{selectPre();toast("Select the text above and copy it")}};
+  // staff
+  v.querySelectorAll("[data-status]").forEach(s=>s.onchange=()=>updateStatus(s.dataset.status,s.value));
+  v.querySelectorAll("[data-open]").forEach(b=>b.onclick=()=>{state.openRow=state.openRow===b.dataset.open?null:b.dataset.open;state.confirmDel=null;keepScroll(render)});
+  v.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>deleteInquiry(b.dataset.del));
+  const dl=$("#dlXlsx",v); if(dl) dl.onclick=downloadExcel;
+  const ib=$("#importBtn",v); if(ib) ib.onclick=importMessage;
+  const sr=$("#saveRates",v); if(sr) sr.onclick=saveRates;
+  const lf=$("#loginForm",v); if(lf){lf.onsubmit=e=>{e.preventDefault();doLogin(lf)};setTimeout(()=>lf.elements.username.focus(),50)}
+  const rf=$("#refreshInq",v); if(rf) rf.onclick=()=>{toast("Refreshing…");loadInquiries()};
+  const rr=$("#resetRates",v); if(rr) rr.onclick=()=>{state.rates=structuredClone(DEFAULT_RATES);render();$("#ratesMsg").textContent="Defaults loaded — click Save to apply."};
+}
+function selectPre(){const el=$("#msgText");if(!el)return;const r=document.createRange();r.selectNodeContents(el);const s=getSelection();s.removeAllRanges();s.addRange(r)}
+function keepScroll(fn){const y=window.scrollY;fn();window.scrollTo(0,y)}
+function refreshEstimates(){
+  if(state.view==="packages"){PACKAGES.forEach(p=>{const el=document.querySelector(`[data-est="${p.id}"]`);if(el)el.textContent=peso(pkgEstimate(p).total)});
+    document.querySelectorAll(".card .est div:first-child").forEach(el=>el.textContent=`Estimated total · ${paxVal()} pax`)}
+  else if(state.view==="choose"){const p=PACKAGES.find(x=>x.id===state.pkg);$(".summary").innerHTML=pkgSummary(p)}
+  else if(state.view==="custom"){$(".summary").innerHTML=customSummary();bindSummaryRemove()}
+}
+function bindSummaryRemove(){document.querySelectorAll(".summary [data-ck]").forEach(b=>b.onclick=()=>{state.custom.delete(b.dataset.ck);keepScroll(render)})}
+
+/* ============ SUBMIT ============ */
+function buildInquiry(){
+  const f=state.form, pax=paxVal();
+  const base={ref:newRef(),createdAt:new Date().toISOString(),status:"New",
+    customer:{name:f.name.trim(),phone:f.phone.trim(),email:f.email.trim()},
+    event:{date:f.date,time:f.time,type:f.type,venue:f.venue.trim(),pax},notes:f.notes.trim()};
+  if(state.view==="choose"){
+    const p=PACKAGES.find(x=>x.id===state.pkg);
+    const items=state.chefPick?[]:p.slots.flatMap(s=>(state.pkgSel[s.id]||[]).map(k=>{const [cat,dish]=k.split("|");return {cat,dish,tier:p.list,slot:s.label}}));
+    return {...base,plan:{kind:"package",packageId:p.id,packageName:p.name[0]+p.name.slice(1).toLowerCase(),pricePerHead:p.price,chefPick:state.chefPick},items,estimate:pkgEstimate(p)};
+  }
+  const e=customEstimate();
+  return {...base,plan:{kind:"custom",basePerHead:e.base,chefPick:false},items:e.items.map(i=>({cat:i.cat,dish:i.dish,tier:i.tier,perHead:i.perHead})),estimate:{perHead:e.perHead,total:e.total}};
+}
+function validate(f){
+  const msg=$("#formMsg");msg.textContent="";
+  f.querySelectorAll(".err").forEach(el=>el.classList.remove("err"));
+  const bad=[];
+  ["name","phone","date"].forEach(n=>{const el=f.elements[n];if(!el.value.trim()){el.classList.add("err");bad.push(n)}});
+  if(state.view==="choose"){
+    const p=PACKAGES.find(x=>x.id===state.pkg);
+    if(!state.chefPick&&pkgSelCount(p)<pkgTotalDishes(p)){msg.textContent=`Please choose all ${pkgTotalDishes(p)} dishes, or tick "I'd like the chef to recommend my menu".`;return false}
+  }
+  if(state.view==="custom"&&state.custom.size===0){msg.textContent="Please add at least one dish to your custom menu.";return false}
+  if(bad.length){msg.textContent="Please fill in your name, mobile number and event date.";f.elements[bad[0]].focus();return false}
+  if(!f.elements.ack.checked){msg.textContent="Please confirm you understand the prices are estimates only.";return false}
+  return true;
+}
+function messageFor(q){
+  const lines=["Hi Romualdo's! I'd like to inquire about catering.","",
+    `Reference: ${q.ref}`,`Name: ${q.customer.name}`,`Mobile: ${q.customer.phone}`];
+  if(q.customer.email)lines.push(`Email: ${q.customer.email}`);
+  lines.push(`Event: ${q.event.type||"Event"} on ${fmtDate(q.event.date)}${q.event.time?" at "+fmtTime(q.event.time):""}`);
+  if(q.event.venue)lines.push(`Venue: ${q.event.venue}`);
+  lines.push(`Guests: ${q.event.pax} pax`);
+  lines.push(`Plan: ${q.plan.kind==="package"?`${q.plan.packageName} Package (${peso(q.plan.pricePerHead)}/head)`:"Custom menu"}`);
+  if(q.plan.chefPick)lines.push("Menu: Chef to recommend");
+  else{lines.push("Menu:");q.items.forEach(i=>lines.push(`- ${COURSES[i.cat]}: ${i.dish}`))}
+  lines.push(`Estimated total: ${peso(q.estimate.total)} (${peso(q.estimate.perHead)}/head) — estimate only`);
+  if(q.notes)lines.push(`Notes: ${q.notes}`);
+  const compact={...q};delete compact.status;
+  lines.push("","[Please keep this reference line] RCS1:"+b64e(JSON.stringify(compact)));
+  return lines.join("\n");
+}
+async function submitInquiry(f){
+  if(!validate(f))return;
+  const btn=f.querySelector("button[type=submit]");btn.disabled=true;btn.textContent="Sending…";
+  const q=buildInquiry();
+  let saved=false;
+  const r=await api("submit",{inquiry:q,website:f.elements.website?.value||""});
+  if(r.ok){saved=true;if(r.ref)q.ref=r.ref}
+  else if(!r.network&&r.error){btn.disabled=false;btn.textContent="Send my inquiry";$("#formMsg").textContent=r.error;return}
+  state.lastDone={inq:q,saved,message:messageFor(q)};
+  state.form={name:"",phone:"",email:"",date:"",time:"",type:"",venue:"",notes:""};
+  state.pkgSel={};state.chefPick=false;state.custom=new Set();
+  if(saved&&state.isStaff)loadInquiries();
+  go("done");
+}
+
+/* ============ BACKEND (Google Apps Script) ============ */
+const API_URL=(window.ROMUALDOS_CONFIG&&window.ROMUALDOS_CONFIG.API_URL)||"";
+async function api(action,payload={}){
+  if(!API_URL||API_URL.includes("PASTE_"))return {ok:false,network:true,error:"The inquiry system isn't connected yet."};
+  try{
+    const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({action,token:state.token,...payload})});
+    const data=await res.json();
+    if(data&&data.auth&&state.token&&action!=="login"){endSession(data.error)}
+    return data||{ok:false,error:"Empty response"};
+  }catch(e){return {ok:false,network:true,error:"Can't reach the inquiry system. Check your connection and try again."}}
+}
+function store(k,v){try{v==null?sessionStorage.removeItem(k):sessionStorage.setItem(k,v)}catch{}}
+function stored(k){try{return sessionStorage.getItem(k)}catch{return null}}
+function setSession(token,user){
+  state.token=token;state.staff=user;state.isStaff=!!token;state.canEdit=user?.role==="Admin";
+  store("rcs_token",token);
+}
+function endSession(msg){
+  setSession(null,null);state.inquiries=[];state.inqLoaded=false;state.openRow=null;
+  state.loginMsg=msg||"";go("login");
+}
+async function logout(){await api("logout");endSession("You have logged out.");history.replaceState(null,"",location.pathname);go("packages")}
+
+function viewLogin(){
+  return `<div class="login"><div class="panel">
+    <h2>Staff login</h2>
+    <p class="hint" style="margin-top:0">For Romualdo's staff only. Use the username and password the owner gave you.</p>
+    <form id="loginForm" novalidate>
+      <label>Username<input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
+      <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
+      <button class="btn gold" type="submit" style="width:100%">Log in</button>
+      <div class="formmsg" id="loginMsg">${esc(state.loginMsg||"")}</div>
+    </form>
+  </div></div>`;
+}
+async function doLogin(f){
+  const u=f.elements.username.value.trim(),p=f.elements.password.value;
+  const msg=$("#loginMsg");
+  if(!u||!p){msg.textContent="Enter your username and password.";return}
+  const b=f.querySelector("button");b.disabled=true;b.textContent="Checking…";msg.textContent="";
+  const r=await api("login",{username:u,password:p});
+  b.disabled=false;b.textContent="Log in";
+  if(!r.ok){msg.textContent=r.error||"Login failed.";f.elements.password.value="";return}
+  state.loginMsg="";setSession(r.token,r.user);location.hash="staff";
+  go("admin");loadInquiries();
+}
+async function loadInquiries(){
+  if(!state.token)return;
+  state.inqError="";
+  const r=await api("list");
+  if(!state.token)return;
+  if(r.ok){state.inquiries=(r.inquiries||[]).map(q=>({...q,_id:q.ref}));state.inqLoaded=true}
+  else state.inqError=r.error||"Couldn't load inquiries.";
+  if(state.view==="admin")keepScroll(render);
+}
+
+/* ============ STAFF ACTIONS ============ */
+function custKey(q){return (q.customer?.name||"").trim().toLowerCase().replace(/\s+/g," ")+"|"+(q.customer?.phone||"").replace(/\D/g,"").slice(-10)}
+async function updateStatus(id,status){
+  const r=await api("status",{ref:id,status});
+  if(r.ok){const q=state.inquiries.find(x=>x._id===id);if(q)q.status=status;toast(`Status set to ${status}`);keepScroll(render)}
+  else {toast(r.error||"Couldn't update status");loadInquiries()}
+}
+async function deleteInquiry(id){
+  if(state.confirmDel!==id){state.confirmDel=id;keepScroll(render);return}
+  state.confirmDel=null;
+  const r=await api("delete",{ref:id});
+  if(r.ok){state.inquiries=state.inquiries.filter(x=>x._id!==id);state.openRow=null;toast("Inquiry deleted");keepScroll(render)}
+  else toast(r.error||"Couldn't delete");
+}
+async function importMessage(){
+  const t=$("#importText").value, msg=$("#importMsg");
+  const at=t.indexOf("RCS1:");
+  const code=at<0?"":(t.slice(at+5).replace(/\s+/g,"").match(/^[A-Za-z0-9+/=]+/)||[""])[0];
+  if(!code){msg.textContent="No reference line found. Make sure the message includes the line starting with RCS1:";return}
+  let q;
+  try{q=JSON.parse(b64d(code))}catch{msg.textContent="The reference line looks incomplete. Ask the customer to resend the full message.";return}
+  if(!q||typeof q!=="object"||!q.customer?.name){msg.textContent="That reference line isn't a valid inquiry.";return}
+  msg.textContent="Saving…";
+  const r=await api("add",{inquiry:q});
+  if(r.ok){$("#importText").value="";msg.textContent="";toast(`Added ${r.ref} — ${q.customer.name}`);loadInquiries()}
+  else msg.textContent=r.error||"Couldn't save. Please try again.";
+}
+async function saveRates(){
+  const r={base:0,minPax:50,standard:{},premium:{}};
+  document.querySelectorAll("[data-rate]").forEach(el=>{
+    const v=Math.max(0,Number(el.value)||0);const k=el.dataset.rate;
+    if(k==="base")r.base=v;else if(k==="minPax")r.minPax=Math.max(1,Math.floor(v)||50);else{const [t,c]=k.split("|");r[t][c]=v}
+  });
+  $("#ratesMsg").textContent="Saving…";
+  const res=await api("saveRates",{rates:r});
+  if(res.ok){state.rates=res.rates||r;$("#ratesMsg").textContent="";toast("Rates saved")}
+  else $("#ratesMsg").textContent=res.error||"Couldn't save rates.";
+}
+
+/* ============ EXCEL EXPORT ============ */
+function sheetName(name,used){
+  let base=(name||"Customer").replace(/[\[\]:*?\/\\]/g," ").replace(/\s+/g," ").trim().slice(0,28)||"Customer";
+  let n=base,i=2;while(used.has(n.toLowerCase())){n=`${base.slice(0,26)} ${i++}`}
+  used.add(n.toLowerCase());return n;
+}
+function fmtCells(ws){
+  for(const k in ws){if(k[0]==="!")continue;const c=ws[k];if(c.t==="n")c.z="#,##0"}
+}
+function buildWorkbook(list){
+  const wb=XLSX.utils.book_new();const used=new Set(["summary"]);
+  const groups=new Map();
+  [...list].sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt))).forEach(q=>{const k=custKey(q);if(!groups.has(k))groups.set(k,[]);groups.get(k).push(q)});
+  const summary=[["Romualdo's Catering Services — Inquiry Summary"],[`Exported ${new Date().toLocaleString("en-PH")}`],["All amounts are estimates only, not final quotations."],[],
+    ["Sheet","Customer","Mobile","Email","Inquiry Ref","Received","Event Type","Event Date","Guests (pax)","Plan","Est. Price/Head (₱)","Est. Total (₱)","Status"]];
+  const sheets=[];
+  for(const qs of groups.values()){
+    const c=qs[qs.length-1].customer||{};const sn=sheetName(c.name,used);
+    const rows=[["Romualdo's Catering Services — Customer Inquiry"],[],["Customer",c.name||""],["Mobile",c.phone||""],["Email",c.email||""],["Inquiries",qs.length],[]];
+    qs.forEach((q,idx)=>{
+      summary.push([sn,q.customer?.name||"",q.customer?.phone||"",q.customer?.email||"",q.ref,fmtDate(q.createdAt),q.event?.type||"",fmtDate(q.event?.date),Number(q.event?.pax)||0,planName(q),Number(q.estimate?.perHead)||0,Number(q.estimate?.total)||0,q.status||"New"]);
+      rows.push([`INQUIRY ${idx+1} of ${qs.length}`,q.ref],
+        ["Received",fmtDate(q.createdAt)],["Status",q.status||"New"],["Event Type",q.event?.type||""],["Event Date",fmtDate(q.event?.date)],["Serving Time",fmtTime(q.event?.time)],["Venue",q.event?.venue||""],
+        ["Guests (pax)",Number(q.event?.pax)||0],["Plan",planName(q)+(q.plan?.kind==="package"?` (₱${q.plan.pricePerHead}/head)`:"")],
+        ["Chef to recommend menu",q.plan?.chefPick?"Yes":"No"],["Est. Price per Head (₱)",Number(q.estimate?.perHead)||0],["Est. Total (₱)",Number(q.estimate?.total)||0],["Notes",q.notes||""],[],
+        ["Course","Dish","Menu List","Est. ₱/Head"]);
+      if(q.plan?.kind==="custom"&&q.plan.basePerHead)rows.push(["Rice & softdrinks","Included","—",Number(q.plan.basePerHead)]);
+      if(q.plan?.chefPick)rows.push(["—","Chef to recommend","",""]);
+      (q.items||[]).forEach(i=>rows.push([COURSES[i.cat]||i.cat,i.dish,i.tier==="premium"?"Premium":"Standard",q.plan?.kind==="custom"?Number(i.perHead)||0:"Included"]));
+      rows.push([],["* Estimate only — final price to be confirmed in a formal quotation."],[]);
+    });
+    const ws=XLSX.utils.aoa_to_sheet(rows);fmtCells(ws);ws["!cols"]=[{wch:26},{wch:46},{wch:14},{wch:14}];
+    sheets.push([sn,ws]);
+  }
+  const sws=XLSX.utils.aoa_to_sheet(summary);fmtCells(sws);
+  sws["!cols"]=[{wch:22},{wch:24},{wch:15},{wch:26},{wch:18},{wch:13},{wch:18},{wch:13},{wch:11},{wch:20},{wch:15},{wch:14},{wch:11}];
+  XLSX.utils.book_append_sheet(wb,sws,"Summary");
+  sheets.forEach(([n,ws])=>XLSX.utils.book_append_sheet(wb,ws,n));
+  return wb;
+}
+function downloadExcel(){
+  if(!window.XLSX){toast("Excel library didn't load. Please reload the page.");return}
+  const d=new Date();const p=n=>String(n).padStart(2,"0");
+  XLSX.writeFile(buildWorkbook(state.inquiries),`Romualdos_Inquiries_${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}.xlsx`);
+}
+
+/* ============ START ============ */
+function applyRates(r){if(!r)return;state.rates={base:Number(r.base)||0,minPax:Number(r.minPax)||50,standard:{...DEFAULT_RATES.standard,...(r.standard||{})},premium:{...DEFAULT_RATES.premium,...(r.premium||{})}}}
+function route(){
+  if(location.hash==="#staff"){go(state.isStaff?"admin":"login");if(state.isStaff&&!state.inqLoaded)loadInquiries()}
+}
+window.addEventListener("hashchange",route);
+async function init(){
+  const t=stored("rcs_token");
+  if(t){state.token=t;const me=await api("me");if(me.ok)setSession(t,me.user);else setSession(null,null)}
+  render();route();
+  const c=await api("config");if(c.ok&&c.rates){applyRates(c.rates);if(state.view!=="rates")keepScroll(render)}
+}
+init();
+</script>
+</body>
+</html>
