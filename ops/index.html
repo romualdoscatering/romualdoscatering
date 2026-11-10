@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Romualdo's Operations — Purchasing, Stock & Requisitions</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f6f3ee;--card:#fff;--ink:#1f1d1a;--mut:#6b655c;--line:#e6e0d6;--acc:#8a3b12;--r:#0f766e;--rbg:#e3f4f1;--c:#a0410f;--cbg:#fdecdf;--bad:#b42318;--badbg:#fdecea;--warn:#8a5300;--warnbg:#fff3d9;--ok:#1d7a3a;--okbg:#e6f4ea;--info:#3756a6;--infobg:#e9eefb;color-scheme:light}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.45 Inter,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink)}
+header{position:sticky;top:0;z-index:5;background:#1f1d1a;color:#fff}
+.top{display:flex;align-items:center;gap:12px;padding:10px 16px 4px;max-width:1150px;margin:auto}
+.brand{font-family:Fraunces,Georgia,serif;font-size:19px;line-height:1.1}
+.brand small{display:block;font:600 10.5px Inter,sans-serif;color:#c9bfae;letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
+.conn{margin-left:auto;font-size:12px;color:#c9bfae}
+.conn i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#888;margin-right:6px}
+.conn.live i{background:#4ade80}
+.conn.err i{background:#f87171}
+.who{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#e9e2d6;margin-left:10px}.who b{font-weight:600}.who button{background:transparent;color:#e9e2d6;border-color:#5a544b;padding:4px 10px;font-size:12px}
+.login{max-width:380px;margin:60px auto}.login h2{text-align:center}
+.pr-from{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;background:var(--infobg);margin-bottom:12px}
+nav{display:flex;gap:2px;overflow-x:auto;padding:0 10px;max-width:1150px;margin:auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav a{color:#d8cfc0;text-decoration:none;padding:9px 11px;white-space:nowrap;border-bottom:3px solid transparent;font-weight:500;font-size:13.5px}
+nav a.on{color:#fff;border-color:#e8a25c}
+main{max-width:1150px;margin:auto;padding:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+h2{font-family:Fraunces,Georgia,serif;font-size:23px;margin:4px 0 4px;font-weight:600}
+.lede{color:var(--mut);margin:0 0 14px;max-width:760px}
+h3{font-size:15px;margin:0 0 10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px 12px;margin-bottom:12px}
+label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--mut)}
+input,select,textarea{font:inherit;font-size:14px;color:var(--ink);padding:8px 10px;border:1px solid #d9d2c6;border-radius:8px;background:#fff;min-width:0;width:100%}
+textarea{min-height:90px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:3px solid #e8a25c40;border-color:#d98b3f}
+input[type=checkbox]{width:auto}
+button{font:inherit;font-weight:600;font-size:13.5px;border-radius:8px;padding:8px 14px;border:1px solid #d9d2c6;background:#fff;color:var(--ink);cursor:pointer}
+button:hover{border-color:#b9ae9c}
+button.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+button.pri:hover{background:#73300e}
+button.sm{padding:4px 9px;font-size:12px}
+button.ghost{border-color:transparent;background:transparent;color:var(--mut)}
+button.danger{color:var(--bad)}
+button:disabled{opacity:.5;cursor:default}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;padding:3px;background:#fff;gap:2px;flex-wrap:wrap}
+.seg button{border:0;border-radius:999px;padding:6px 14px;background:transparent;color:var(--mut)}
+.seg button.on{background:var(--ink);color:#fff}
+.seg button.on.r{background:var(--r)}
+.seg button.on.c{background:var(--c)}
+.chip{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap}
+.chip.r{background:var(--rbg);color:var(--r)}.chip.c{background:var(--cbg);color:var(--c)}
+.chip.bad{background:var(--badbg);color:var(--bad)}.chip.warn{background:var(--warnbg);color:var(--warn)}
+.chip.ok{background:var(--okbg);color:var(--ok)}.chip.info{background:var(--infobg);color:var(--info)}.chip.mut{background:#eee;color:#666}
+table{width:100%;border-collapse:collapse}
+th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);font-weight:600;white-space:nowrap}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.void td{text-decoration:line-through;color:#a39d94}
+tr.void td:last-child{text-decoration:none}
+tr.click{cursor:pointer}
+tr.click:hover td{background:#faf7f2}
+tfoot td{font-weight:700;border-top:2px solid var(--line)}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.lines td{padding:5px 4px;border-bottom:1px dashed var(--line)}
+.lines input,.lines select{padding:7px 8px}
+.lines input[type=number]{min-width:78px}
+.lines select{min-width:170px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px}
+.kpi{background:#fbf9f6;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.kpi b{display:block;font-size:19px;font-variant-numeric:tabular-nums;margin-top:2px}
+.kpi span{font-size:12px;color:var(--mut);font-weight:500}
+.kpi.bad b{color:var(--bad)}.kpi.ok b{color:var(--ok)}
+.alert{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border-radius:10px;margin-bottom:7px;font-size:13.5px}
+.alert.bad{background:var(--badbg)}.alert.warn{background:var(--warnbg)}.alert.info{background:var(--infobg)}.alert.ok{background:var(--okbg)}
+.alert .ic{font-weight:700;width:18px;text-align:center}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.end{justify-content:flex-end}
+.spacer{flex:1}
+.mut{color:var(--mut)}.small{font-size:12px}.bad-t{color:var(--bad);font-weight:600}.ok-t{color:var(--ok);font-weight:600}.warn-t{color:var(--warn);font-weight:600}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:820px){.two{grid-template-columns:1fr}}
+.banner{padding:10px 14px;border-radius:10px;margin-bottom:14px;background:var(--warnbg);color:var(--warn);font-weight:500}
+.steps{margin:0;padding-left:20px}.steps li{margin-bottom:6px}
+#modal{position:fixed;inset:0;background:#1f1d1a80;display:none;align-items:flex-start;justify-content:center;padding:40px 10px;z-index:20;overflow:auto}
+#modal.open{display:flex}
+#modal .box{background:#fff;border-radius:14px;max-width:760px;width:100%;padding:18px;box-shadow:0 20px 50px #0003}
+#modal h3{font-family:Fraunces,Georgia,serif;font-size:19px;font-weight:600}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1f1d1a;color:#fff;padding:10px 16px;border-radius:10px;display:none;z-index:30;max-width:90vw;box-shadow:0 8px 24px #0004}
+#toast.err{background:var(--bad)}
+.empty{padding:18px;text-align:center;color:var(--mut)}
+.tabs-mini{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+details summary{cursor:pointer;font-weight:600}
+@media (max-width:640px){.conn span{display:none}.who span{display:none}.who{margin-left:6px}main{padding:10px}.card{padding:12px}h2{font-size:20px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="top">
+    <div class="brand">Romualdo's<small>Operations · Requisitions · Stock</small></div>
+    <div class="conn" id="conn"><i></i><span>Connecting…</span></div><div class="who" id="who"></div>
+  </div>
+  <nav id="nav"></nav>
+</header>
+<main id="view"></main>
+<div id="modal"><div class="box" id="mbox"></div></div>
+<div id="toast"></div>
+
+<script src="../config.js"></script>
+<script>
+/* ============ helpers ============ */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+const r2 = n => Math.round(n * 100) / 100;
+const peso = n => (n < 0 ? '−' : '') + '₱' + Math.abs(Number(n) || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+const fq = n => (Math.round((Number(n) || 0) * 100) / 100).toLocaleString('en-PH', {maximumFractionDigits: 2});
+const pad = n => String(n).padStart(2, '0');
+const dstr = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+const today = () => dstr(new Date());
+const daysAgo = n => { const d = new Date(); d.setDate(d.getDate() - n); return dstr(d); };
+const daysAhead = n => daysAgo(-n);
+const monthStart = () => { const d = new Date(); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-01'; };
+const fmtD = s => { if (!s) return ''; const d = new Date(s + 'T00:00'); const o = {month: 'short', day: 'numeric'}; if (d.getFullYear() !== new Date().getFullYear()) o.year = 'numeric'; return d.toLocaleDateString('en-PH', o); };
+const fmtT = t => t ? new Date(t).toLocaleString('en-PH', {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'}) : '';
+const sum = (arr, f) => arr.reduce((a, x) => a + (f(x) || 0), 0);
+
+const BOOK = {R: {name: 'Restaurant', cls: 'r'}, C: {name: 'Catering', cls: 'c'}};
+const ITEM_CATS = ['Vegetables','Fruits','Pork','Beef','Chicken & poultry','Seafood','Rice & grains','Dry goods / grocery','Condiments & spices','Dairy & eggs','Oil & fats','Beverages','Bread & bakery','Others'];
+const UNITS = ['kg','g','pc','pack','bundle','tray','sack','L','bottle','can','box','dozen','gallon','head'];
+const WASTE_REASONS = ['Spoiled / rotten','Expired','Damaged / dropped','Cooking error','Over-production (cooked, unsold)','Other'];
+const DEFAULT_CONFIG = {company: "Romualdo's Catering", address: '', departments: ['Kitchen', 'Catering operations', 'Dining / service', 'Bar', 'Admin / office', 'Maintenance'], staff: [], suppliers: [], expCats: ['Transportation / fare','LPG / fuel','Ice','Packaging / disposables','Cleaning supplies','Utilities','Equipment rental','Repairs & maintenance','Extra labor / helpers','Permits & fees','Miscellaneous'], priceAlertPct: 10};
+const MT = {
+  issue:   {label: 'Issue (stock used)', short: 'Issue', chip: 'info'},
+  return:  {label: 'Return of leftovers from event', short: 'Return', chip: 'ok'},
+  waste:   {label: 'Waste / spoilage', short: 'Waste', chip: 'bad'},
+  transfer:{label: 'Transfer to the other book', short: 'Transfer', chip: 'mut'}
+};
+
+/* ============ state ============ */
+const ACT = {};
+const S = {state: 'login', prs: [], token: '', me: null, isAdmin: false, users: [], lastSync: 0, syncErr: '', syncing: false, loginMsg: '',
+  config: {...DEFAULT_CONFIG}, items: {}, events: {}, advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: {}, names: {}, busy: false};
+
+const newPurchase = (o = {}) => ({date: today(), book: 'R', eventId: '', supplier: '', buyer: '', receiptNo: '', advanceId: '', prId: '', prNo: '', lines: [{itemId: '', qty: '', cost: ''}], ...o});
+const newExpense = (o = {}) => ({date: today(), book: 'R', eventId: '', cat: '', desc: '', amount: '', paidBy: '', receiptNo: '', advanceId: '', ...o});
+const newAdvance = (o = {}) => ({date: today(), book: 'R', eventId: '', to: '', amount: '', givenBy: '', note: '', ...o});
+const newMove = (o = {}) => ({date: today(), book: 'R', type: 'issue', eventId: '', by: '', receivedBy: '', reason: '', note: '', lines: [{itemId: '', qty: ''}], ...o});
+const newEvent = () => ({name: '', client: '', date: daysAhead(7), pax: '', contract: '', venue: '', notes: ''});
+
+const D = {
+  purchase: newPurchase(), expense: newExpense(), advance: newAdvance(), move: newMove(), event: newEvent(),
+  plan: null, count: null, sale: {date: today(), amount: ''},
+  ui: {tab: 'dash', pBook: '', pStatus: '', eBook: '', mBook: '', stockBook: 'R', stockQ: '', eventId: '', rFrom: monthStart(), rTo: today(), showAll: {}}
+};
+const getPath = (o, p) => p.split('.').reduce((a, k) => a?.[k], o);
+const setPath = (o, p, v) => { const k = p.split('.'); let x = o; for (let i = 0; i < k.length - 1; i++) x = x[k[i]]; x[k[k.length - 1]] = v; };
+
+/* ============ lookups ============ */
+const activeItems = () => Object.values(S.items).filter(i => i.active !== false).sort((a, b) => (ITEM_CATS.indexOf(a.cat) - ITEM_CATS.indexOf(b.cat)) || String(a.name).localeCompare(b.name));
+const iname = id => S.items[id]?.name || (id ? '(removed item)' : '');
+const iunit = id => S.items[id]?.unit || '';
+const evName = id => id ? (S.events[id]?.name || '(event)') : '';
+const live_ = x => x.status !== 'void';
+const chipBook = (b, ev) => `<span class="chip ${BOOK[b]?.cls || 'mut'}">${BOOK[b]?.name || '?'}</span>${ev ? ` <span class="small">${esc(evName(ev))}</span>` : ''}`;
+const who = u => { if (!u) return ''; const x = S.users.find(v => v.username === u); return x ? (x.name || x.username) : u; };
+const staffList = () => [...new Set([...S.users.filter(u => u.active !== false).map(u => u.name || u.username), ...(S.config.staff || []), ...S.purchases.map(p => p.buyer), ...S.advances.map(a => a.to)].filter(Boolean))].sort();
+const supplierList = () => [...new Set([...(S.config.suppliers || []), ...S.purchases.map(p => p.supplier)].filter(Boolean))].sort();
+const recvQty = (p, i) => num(p.recv?.qty?.[i] ?? p.lines[i].qty);
+const shortValue = p => p.status === 'received' ? p.lines.reduce((a, l, i) => a + Math.max(0, num(l.qty) - recvQty(p, i)) * num(l.cost), 0) : 0;
+const pctAlert = () => num(S.config.priceAlertPct) || 10;
+function priceJump(l, base) { const prev = num(base); if (!prev || !num(l.cost)) return 0; return (num(l.cost) - prev) / prev * 100; }
+function priceFlag(l) {
+  const it = S.items[l.itemId]; if (!it) return '';
+  const ch = priceJump(l, it.lastCost); const p = pctAlert();
+  if (ch > p) return `<span class="chip bad" title="Last price ${peso(it.lastCost)}">▲ ${ch.toFixed(0)}% vs last</span>`;
+  if (ch < -p) return `<span class="chip info" title="Last price ${peso(it.lastCost)}">▼ ${Math.abs(ch).toFixed(0)}% vs last</span>`;
+  return '';
+}
+
+/* ============ stock engine ============
+   On hand = last posted physical count (per item, per book) + received purchases − issues + returns − waste ± transfers recorded after it */
+function stockFor(book) {
+  const st = {}, since = {}, sinceDate = {};
+  S.counts.filter(c => c.book === book && live_(c)).sort((a, b) => a.createdAt - b.createdAt)
+    .forEach(c => (c.lines || []).forEach(l => { since[l.itemId] = c.createdAt; sinceDate[l.itemId] = c.date; st[l.itemId] = num(l.actual); }));
+  const add = (id, t, q) => { if (t > (since[id] ?? -Infinity)) st[id] = (st[id] || 0) + q; };
+  S.purchases.forEach(p => { if (p.book === book && p.status === 'received') { const t = p.recv?.at || p.createdAt; p.lines.forEach((l, i) => add(l.itemId, t, recvQty(p, i))); } });
+  S.moves.forEach(m => {
+    if (!live_(m)) return; let sign = 0;
+    if (m.book === book) sign = m.type === 'return' ? 1 : -1;
+    else if (m.type === 'transfer' && m.toBook === book) sign = 1;
+    if (sign) (m.lines || []).forEach(l => add(l.itemId, m.createdAt, sign * num(l.qty)));
+  });
+  return {st, sinceDate};
+}
+function costOf(id) { return num(S.items[id]?.lastCost); }
+
+/* ============ period figures ============ */
+function figures(book, from, to) {
+  const inR = x => x.date >= from && x.date <= to && live_(x) && (!book || x.book === book);
+  const ps = S.purchases.filter(inR), es = S.expenses.filter(inR);
+  const f = {bought: sum(ps, p => num(p.total)), pending: sum(ps.filter(p => p.status === 'pending'), p => num(p.total)),
+    received: sum(ps.filter(p => p.status === 'received'), p => p.lines.reduce((a, l, i) => a + recvQty(p, i) * num(l.cost), 0)),
+    shortRecv: sum(ps, shortValue), expenses: sum(es, e => num(e.amount)), used: 0, waste: 0, shrink: 0, sales: 0, expByCat: {}};
+  es.forEach(e => f.expByCat[e.cat || 'Uncategorized'] = (f.expByCat[e.cat || 'Uncategorized'] || 0) + num(e.amount));
+  S.moves.filter(inR).forEach(m => { const v = sum(m.lines || [], l => num(l.qty) * num(l.cost));
+    if (m.type === 'issue') f.used += v; else if (m.type === 'return') f.used -= v; else if (m.type === 'waste') f.waste += v; });
+  S.counts.filter(inR).forEach(c => f.shrink += num(c.varianceValue));
+  if (!book || book === 'R') Object.values(S.sales).forEach(s => { if (s.date >= from && s.date <= to) f.sales += num(s.R); });
+  return f;
+}
+function eventStats(ev) {
+  const id = ev.id, items = {};
+  const g = i => items[i] ||= {planned: 0, bought: 0, pending: 0, issued: 0, returned: 0};
+  (ev.plan || []).forEach(l => g(l.itemId).planned += num(l.qty));
+  const ps = S.purchases.filter(p => p.eventId === id && live_(p));
+  ps.forEach(p => p.lines.forEach((l, i) => { if (p.status === 'received') g(l.itemId).bought += recvQty(p, i); else g(l.itemId).pending += num(l.qty); }));
+  const ms = S.moves.filter(m => m.eventId === id && live_(m) && (m.type === 'issue' || m.type === 'return'));
+  let used = 0;
+  ms.forEach(m => m.lines.forEach(l => { const v = num(l.qty) * num(l.cost); if (m.type === 'issue') { g(l.itemId).issued += num(l.qty); used += v; } else { g(l.itemId).returned += num(l.qty); used -= v; } }));
+  const es = S.expenses.filter(e => e.eventId === id && live_(e));
+  const exp = sum(es, e => num(e.amount)), purch = sum(ps, p => num(p.total)), cost = used + exp, contract = num(ev.contract);
+  return {items, ps, ms, es, purch, used, exp, cost, contract, margin: contract - cost, pct: contract ? (contract - cost) / contract * 100 : null, perPax: num(ev.pax) ? cost / num(ev.pax) : null};
+}
+function advanceSpent(id) {
+  const ps = S.purchases.filter(p => p.advanceId === id && live_(p)), es = S.expenses.filter(e => e.advanceId === id && live_(e));
+  return {ps, es, spent: sum(ps, p => num(p.total)) + sum(es, e => num(e.amount))};
+}
+const openAdvances = book => S.advances.filter(a => a.status === 'open' && (!book || a.book === book));
+
+/* ============ alerts ============ */
+function alerts() {
+  const A = [], wk = daysAgo(7), t = today(), pct = pctAlert();
+  const waitPR = S.prs.filter(p => p.status === 'submitted');
+  if (waitPR.length) A.push([S.isAdmin ? 'warn' : 'info', `${waitPR.length} requisition${waitPR.length > 1 ? 's' : ''} waiting for approval (${peso(sum(waitPR, p => num(p.total)))})${waitPR.some(p => p.priority === 'Urgent') ? ' — includes URGENT' : ''}.`, 'prs']);
+  const noPR = S.purchases.filter(p => p.date >= daysAgo(7) && live_(p) && !p.prId);
+  if (noPR.length && S.prs.length) A.push(['info', `${noPR.length} purchase${noPR.length > 1 ? 's' : ''} this week were made without a requisition (${peso(sum(noPR, p => num(p.total)))}).`, 'purchases']);
+  const pend = S.purchases.filter(p => p.status === 'pending');
+  const oldPend = pend.filter(p => p.date < t);
+  if (oldPend.length) A.push(['bad', `${oldPend.length} purchase${oldPend.length > 1 ? 's' : ''} from previous days still not received (${peso(sum(oldPend, p => num(p.total)))}). Goods that were paid for but never checked in are the most common leak.`, 'purchases']);
+  else if (pend.length) A.push(['warn', `${pend.length} purchase${pend.length > 1 ? 's' : ''} today waiting to be received and weighed.`, 'purchases']);
+  const shorts = S.purchases.filter(p => p.date >= daysAgo(30) && shortValue(p) > 0.5);
+  if (shorts.length) A.push(['bad', `Short deliveries in the last 30 days: ${shorts.length} purchase${shorts.length > 1 ? 's' : ''}, ${peso(sum(shorts, shortValue))} paid for but not received.`, 'purchases']);
+  const self = S.purchases.filter(p => p.date >= wk && p.status === 'received' && p.recv?.by && p.buyer && p.recv.by.trim().toLowerCase() === p.buyer.trim().toLowerCase());
+  if (self.length) A.push(['warn', `${self.length} purchase${self.length > 1 ? 's were' : ' was'} received by the same person who bought ${self.length > 1 ? 'them' : 'it'} this week. Receiving should be done by someone else.`, 'purchases']);
+  let jumps = 0; S.purchases.filter(p => p.date >= wk && live_(p)).forEach(p => p.lines.forEach(l => { if (priceJump(l, l.prevCost) > pct) jumps++; }));
+  if (jumps) A.push(['warn', `${jumps} item price${jumps > 1 ? 's' : ''} this week came in more than ${pct}% above the last price paid. Check with the buyer or compare stalls.`, 'purchases']);
+  const noRcpt = S.purchases.filter(p => p.date >= wk && live_(p) && !p.receiptNo);
+  if (noRcpt.length) A.push(['info', `${noRcpt.length} purchase${noRcpt.length > 1 ? 's' : ''} this week ${noRcpt.length > 1 ? 'have' : 'has'} no receipt number (${peso(sum(noRcpt, p => num(p.total)))}).`, 'purchases']);
+  const oldAdv = S.advances.filter(a => a.status === 'open' && a.date < daysAgo(1));
+  if (oldAdv.length) A.push(['warn', `${oldAdv.length} cash advance${oldAdv.length > 1 ? 's' : ''} older than a day not yet liquidated (${peso(sum(oldAdv, a => num(a.amount)))}).`, 'advances']);
+  const badLiq = S.advances.filter(a => a.status === 'liquidated' && a.date >= daysAgo(30) && Math.abs(num(a.diff)) >= 1);
+  if (badLiq.length) A.push(['bad', `${badLiq.length} liquidation${badLiq.length > 1 ? 's' : ''} in the last 30 days did not balance. Net unaccounted cash: ${peso(sum(badLiq, a => num(a.diff)))}.`, 'advances']);
+  ['R', 'C'].forEach(b => {
+    const cs = S.counts.filter(c => c.book === b && live_(c)).sort((x, y) => y.createdAt - x.createdAt);
+    if (!cs.length) { if (Object.keys(S.items).length) A.push(['info', `No physical count yet for ${BOOK[b].name}. Do a first count to set opening stock.`, 'stock']); return; }
+    const last = cs[0];
+    if (num(last.lossValue) < -1) A.push(['bad', `${BOOK[b].name} count on ${fmtD(last.date)}: ${peso(Math.abs(last.lossValue))} of stock missing with no record of use or waste.`, 'stock']);
+    if (last.date < daysAgo(7)) A.push(['warn', `${BOOK[b].name} has not been counted since ${fmtD(last.date)}. Count at least weekly (meats daily).`, 'stock']);
+    const {st} = stockFor(b); const neg = Object.entries(st).filter(([id, q]) => q < -0.001 && S.items[id]);
+    if (neg.length) A.push(['warn', `${BOOK[b].name}: ${neg.length} item${neg.length > 1 ? 's show' : ' shows'} negative stock (more issued than received). Purchases may be unrecorded or not yet received.`, 'stock']);
+    const low = activeItems().filter(i => num(i.par?.[b]) > 0 && (st[i.id] || 0) < num(i.par[b]));
+    if (low.length) A.push(['info', `${BOOK[b].name}: ${low.length} item${low.length > 1 ? 's' : ''} below par level — ${low.slice(0, 5).map(i => esc(i.name)).join(', ')}${low.length > 5 ? '…' : ''}.`, 'stock']);
+  });
+  const voids = [...S.purchases, ...S.expenses, ...S.moves].filter(x => x.status === 'void' && x.voidAt > Date.now() - 7 * 864e5);
+  if (voids.length) A.push(['info', `${voids.length} record${voids.length > 1 ? 's were' : ' was'} voided in the last 7 days. Review the reasons.`, 'reports']);
+  Object.values(S.events).filter(e => e.status !== 'closed' && e.date < t).forEach(e => {
+    const s = eventStats(e); const unissued = Object.values(s.items).some(x => x.bought > 0) && !s.ms.length;
+    if (unissued) A.push(['warn', `Event “${esc(e.name)}” has purchases but nothing was issued to it — its food cost is not recorded yet.`, 'events']);
+  });
+  return A;
+}
+
+/* ============ rendering infra ============ */
+const TABS_ALL = [['dash', 'Dashboard'], ['prs', 'Requisitions'], ['advances', 'Cash advances'], ['purchases', 'Purchases'], ['expenses', 'Expenses'], ['usage', 'Issue & waste'], ['stock', 'Stock & counts'], ['events', 'Catering events'], ['reports', 'Reports'], ['setup', 'Setup']];
+const tabsFor = () => TABS_ALL.filter(t => t[0] !== 'setup' || S.isAdmin);
+let TABS = TABS_ALL;
+const V = {};
+let pendingR = false;
+const isEditing = () => { const a = document.activeElement; return a && a.closest && a.closest('#view') && /INPUT|TEXTAREA|SELECT/.test(a.tagName); };
+function schedule() { if (pendingR) return; pendingR = true; requestAnimationFrame(() => { pendingR = false; if (isEditing()) { S.dirty = true; return; } render(); }); }
+document.addEventListener('focusout', () => setTimeout(() => { if (S.dirty && !isEditing()) { S.dirty = false; render(); } }, 60));
+
+function render() {
+  const c = $('#conn');
+  if (!S.me) {
+    $('#nav').innerHTML = ''; $('#who').innerHTML = ''; c.className = 'conn'; c.querySelector('span').textContent = '';
+    $('#view').innerHTML = S.token ? '<div class="empty" style="margin-top:60px">Loading…</div>' : loginView(); return;
+  }
+  TABS = tabsFor(); if (!TABS.some(t => t[0] === D.ui.tab)) D.ui.tab = 'dash';
+  const tab = D.ui.tab, waitPR = S.prs.filter(p => p.status === 'submitted').length;
+  $('#nav').innerHTML = TABS.map(([k, l]) => `<a href="#${k}" class="${k === tab ? 'on' : ''}">${l}${k === 'prs' && waitPR ? ` <span class="chip warn" style="margin-left:2px">${waitPR}</span>` : ''}</a>`).join('');
+  c.className = 'conn' + (S.syncErr ? ' err' : S.lastSync ? ' live' : '');
+  c.querySelector('span').textContent = S.syncErr ? 'Offline — retrying' : S.syncing && !S.lastSync ? 'Loading…' : S.lastSync ? 'Synced ' + new Date(S.lastSync).toLocaleTimeString('en-PH', {hour: 'numeric', minute: '2-digit'}) : 'Connecting…';
+  $('#who').innerHTML = `<span><b>${esc(S.me.name || S.me.username)}</b> · ${esc(S.me.role)}</span><button data-act2="refresh" title="Get the latest records">↻</button><button data-act2="logout">Log out</button>`;
+  let banner = '';
+  if (S.syncErr) banner = `<div class="banner">${esc(S.syncErr)} — what you see may be out of date.</div>`;
+  else if (!S.lastSync) banner = `<div class="banner" style="background:var(--infobg);color:var(--info)">Loading records…</div>`;
+  const dl = `<datalist id="dl-staff">${staffList().map(s => `<option value="${esc(s)}">`).join('')}</datalist>
+    <datalist id="dl-sup">${supplierList().map(s => `<option value="${esc(s)}">`).join('')}</datalist>
+    <datalist id="dl-units">${UNITS.map(s => `<option value="${s}">`).join('')}</datalist>`;
+  $('#view').innerHTML = banner + (V[tab] ? V[tab]() : '') + dl;
+  $('#view').querySelectorAll('[data-b]').forEach(el => { const v = getPath(D, el.dataset.b); if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? ''; });
+}
+function live() {
+  document.querySelectorAll('#view [data-live]').forEach(el => {
+    const [k, a, b] = el.dataset.live.split(':'); let h;
+    if (k === 'line') { const l = D[a].lines[b]; h = peso(num(l.qty) * num(l.cost)); }
+    else if (k === 'flag') h = priceFlag(D[a].lines[b]);
+    else if (k === 'total') h = peso(sum(D[a].lines, l => num(l.qty) * num(l.cost)));
+    else if (k === 'cvar') { const l = D.count.lines[a]; if (l.actual === '' || l.actual == null) h = ''; else { const v = num(l.actual) - l.system; h = `<span class="${v < -0.001 ? 'bad-t' : v > 0.001 ? 'ok-t' : 'mut'}">${v > 0 ? '+' : ''}${fq(v)}</span>`; } }
+    else if (k === 'counted') h = D.count.lines.filter(l => l.actual !== '' && l.actual != null).length;
+    if (h !== undefined) el.innerHTML = h;
+  });
+}
+const sel = (path, opts, rr = true) => `<select data-b="${path}"${rr ? ' data-rr' : ''}>${opts}</select>`;
+const opt = (v, l) => `<option value="${esc(v)}">${esc(l)}</option>`;
+const bookSeg = path => `<div class="seg">${['R', 'C'].map(b => `<button type="button" class="${getPath(D, path) === b ? 'on ' + BOOK[b].cls : ''}" data-act="set" data-arg="${path}|${b}">${BOOK[b].name}</button>`).join('')}</div>`;
+const filterSeg = (path, choices) => `<div class="seg">${choices.map(([v, l]) => `<button type="button" class="${getPath(D, path) === v ? 'on' + (v === 'R' ? ' r' : v === 'C' ? ' c' : '') : ''}" data-act="set" data-arg="${path}|${v}">${l}</button>`).join('')}</div>`;
+function itemOptions() {
+  const groups = {}; activeItems().forEach(i => (groups[i.cat || 'Others'] ||= []).push(i));
+  return opt('', '— choose item —') + Object.entries(groups).map(([g, is]) => `<optgroup label="${esc(g)}">${is.map(i => opt(i.id, `${i.name} (${i.unit})`)).join('')}</optgroup>`).join('') + opt('__new', '＋ Add a new item…');
+}
+function eventOptions(general = 'General catering stock (no specific event)') {
+  const evs = Object.values(S.events).filter(e => e.status !== 'closed').sort((a, b) => a.date.localeCompare(b.date));
+  return opt('', general) + evs.map(e => opt(e.id, `${fmtD(e.date)} · ${e.name}`)).join('');
+}
+function linesEditor(key, o = {}) {
+  const d = D[key], st = o.stock ? stockFor(o.stockBook || d.book).st : null;
+  return `<div class="tw"><table class="lines"><thead><tr><th style="min-width:190px">Item</th><th class="n" style="width:95px">${o.qtyLabel || 'Qty'}</th><th style="width:48px">Unit</th>
+    ${o.cost ? '<th class="n" style="width:110px">Unit cost ₱</th><th class="n" style="width:120px">Amount</th>' : ''}
+    ${st ? '<th class="n">On hand</th>' : ''}${o.plan ? '<th class="n">To buy</th>' : ''}<th style="width:30px"></th></tr></thead><tbody>
+    ${d.lines.map((l, i) => {
+      const oh = st && l.itemId ? (st[l.itemId] || 0) : null;
+      const short = oh != null && !o.plan && num(l.qty) > oh + 0.001;
+      return `<tr><td>${sel(`${key}.lines.${i}.itemId`, itemOptions())}</td>
+      <td><input type="number" inputmode="decimal" step="any" min="0" data-b="${key}.lines.${i}.qty" style="text-align:right"></td>
+      <td class="mut small" style="padding-top:12px">${esc(iunit(l.itemId))}</td>
+      ${o.cost ? `<td><input type="number" inputmode="decimal" step="any" min="0" data-b="${key}.lines.${i}.cost" style="text-align:right" placeholder="${S.items[l.itemId]?.lastCost ? 'last ' + fq(S.items[l.itemId].lastCost) : ''}"></td>
+        <td class="n" style="padding-top:12px"><span data-live="line:${key}:${i}">${peso(num(l.qty) * num(l.cost))}</span><div data-live="flag:${key}:${i}">${priceFlag(l)}</div></td>` : ''}
+      ${st ? `<td class="n ${short ? 'bad-t' : 'mut'}" style="padding-top:12px">${oh == null ? '' : fq(oh)}${short ? ' ⚠' : ''}</td>` : ''}
+      ${o.plan ? `<td class="n" style="padding-top:12px">${l.itemId ? fq(Math.max(0, num(l.qty) - Math.max(0, oh || 0))) : ''}</td>` : ''}
+      <td><button class="sm ghost" data-act="rmLine" data-arg="${key}|${i}" title="Remove line">✕</button></td></tr>`;
+    }).join('')}
+    </tbody></table></div><div class="row" style="margin-top:6px"><button class="sm" data-act="addLine" data-arg="${key}">＋ Add line</button></div>`;
+}
+function voidBtn(coll, x) { return live_(x) ? (!S.isAdmin ? '' : `<button class="sm ghost danger" data-act="void" data-arg="${coll}|${x.id}">Void</button>`) : `<span class="chip mut" title="${esc(x.voidReason || '')}">void</span>`; }
+const showMore = (key, n) => n > (D.ui.showAll[key] || 40) ? `<div class="row" style="margin-top:8px"><button class="sm" data-act="more" data-arg="${key}">Show more (${n - (D.ui.showAll[key] || 40)} older)</button></div>` : '';
+const take = (key, arr) => arr.slice(0, D.ui.showAll[key] || 40);
+
+/* ============ DASHBOARD ============ */
+V.dash = () => {
+  const t = today(), fr = figures('R', t, t), fc = figures('C', t, t), A = alerts();
+  const mr = figures('R', monthStart(), t), mc = figures('C', monthStart(), t);
+  const pend = S.purchases.filter(p => p.status === 'pending');
+  const adv = openAdvances();
+  const upcoming = Object.values(S.events).filter(e => e.date >= t && e.date <= daysAhead(21) && e.status !== 'closed').sort((a, b) => a.date.localeCompare(b.date));
+  const kp = (l, v, cls = '') => `<div class="kpi ${cls}"><span>${l}</span><b>${v}</b></div>`;
+  const fcPct = mr.sales ? mr.used / mr.sales * 100 : null;
+  return `<h2>Today · ${new Date().toLocaleDateString('en-PH', {weekday: 'long', month: 'long', day: 'numeric'})}</h2>
+  <p class="lede">Every peso goes through four checkpoints: <b>cash advance → purchase → receiving → issue/waste</b>, and a physical count catches whatever slipped through. Restaurant and Catering are kept in separate books.</p>
+  ${!Object.keys(S.items).length && S.lastSync && S.isAdmin ? `<div class="alert info"><span class="ic">i</span><div>Start in <a href="#setup">Setup</a>: add your staff, suppliers and the items you buy. Then do an opening stock count in <a href="#stock">Stock & counts</a>.</div></div>` : ''}
+  <div class="two">
+   <div class="card"><div class="row"><h3>${chipBook('R')} Today</h3></div>
+    <div class="kpis">${kp('Bought', peso(fr.bought))}${kp('Expenses', peso(fr.expenses))}${kp('Ingredients used', peso(fr.used))}${kp('Waste', peso(fr.waste), fr.waste ? 'bad' : '')}${kp('Sales', S.sales[t] ? peso(S.sales[t].R) : '—')}</div>
+    <p class="small mut" style="margin:6px 0 0">Month to date: bought ${peso(mr.bought)} · used ${peso(mr.used)} · sales ${peso(mr.sales)}${fcPct != null ? ` · <b>food cost ${fcPct.toFixed(1)}%</b>` : ''}</p></div>
+   <div class="card"><div class="row"><h3>${chipBook('C')} Today</h3></div>
+    <div class="kpis">${kp('Bought', peso(fc.bought))}${kp('Expenses', peso(fc.expenses))}${kp('Issued to events', peso(fc.used))}${kp('Waste', peso(fc.waste), fc.waste ? 'bad' : '')}</div>
+    <p class="small mut" style="margin:6px 0 0">Month to date: bought ${peso(mc.bought)} · issued ${peso(mc.used)} · expenses ${peso(mc.expenses)}</p></div>
+  </div>
+  <div class="card"><h3>Things to check</h3>
+   ${A.length ? A.map(([lvl, msg, tab]) => `<div class="alert ${lvl}"><span class="ic">${lvl === 'bad' ? '!' : lvl === 'warn' ? '⚠' : 'i'}</span><div style="flex:1">${msg}</div><a href="#${tab}" class="small">Open</a></div>`).join('') : `<div class="alert ok"><span class="ic">✓</span><div>Nothing needs attention right now.</div></div>`}
+  </div>
+  <div class="two">
+   <div class="card"><h3>Waiting to be received (${pend.length})</h3>
+    ${pend.length ? `<div class="tw"><table><tbody>${pend.slice(0, 12).map(p => `<tr><td>${fmtD(p.date)}</td><td>${chipBook(p.book)}</td><td>${esc(p.supplier || '—')}<div class="small mut">by ${esc(p.buyer)}</div></td><td class="n">${peso(p.total)}</td><td><button class="sm pri" data-act="receive" data-arg="${p.id}">Receive</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">All purchases have been received.</div>'}
+   </div>
+   <div class="card"><h3>Open cash advances (${adv.length})</h3>
+    ${adv.length ? `<div class="tw"><table><tbody>${adv.map(a => { const s = advanceSpent(a.id); return `<tr><td>${fmtD(a.date)}</td><td>${chipBook(a.book)}</td><td>${esc(a.to)}</td><td class="n">${peso(a.amount)}<div class="small mut">spent ${peso(s.spent)}</div></td><td><button class="sm" data-act="liquidate" data-arg="${a.id}">Liquidate</button></td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">No open advances.</div>'}
+   </div>
+  </div>
+  <div class="card"><h3>Upcoming catering events (next 3 weeks)</h3>
+   ${upcoming.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Event</th><th class="n">Pax</th><th class="n">Contract</th><th>Menu plan</th><th></th></tr></thead><tbody>${upcoming.map(e => `<tr class="click" data-act="openEvent" data-arg="${e.id}"><td>${fmtD(e.date)}</td><td>${esc(e.name)}<div class="small mut">${esc(e.client)}</div></td><td class="n">${esc(e.pax)}</td><td class="n">${peso(e.contract)}</td><td>${(e.plan || []).length ? `<span class="chip ok">${e.plan.length} items</span>` : '<span class="chip warn">not planned</span>'}</td><td>›</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No events in the next 3 weeks.</div>'}
+  </div>`;
+};
+
+/* ============ CASH ADVANCES ============ */
+V.advances = () => {
+  const d = D.advance, list = S.advances;
+  return `<h2>Cash advances</h2>
+  <p class="lede">Record every peso handed to a buyer before they go to the market. When they come back, liquidate: the app adds up the purchases and expenses they recorded against the advance and tells you how much change must be returned. Anything left over is flagged as unaccounted.</p>
+  <div class="card"><div class="row"><h3>Give a cash advance</h3><span class="spacer"></span>${bookSeg('advance.book')}</div>
+   <div class="grid">
+    <label>Date<input type="date" data-b="advance.date"></label>
+    ${d.book === 'C' ? `<label>For event${sel('advance.eventId', eventOptions(), false)}</label>` : ''}
+    <label>Given to (buyer)<input list="dl-staff" data-b="advance.to" placeholder="Name"></label>
+    <label>Amount ₱<input type="number" inputmode="decimal" step="any" min="0" data-b="advance.amount"></label>
+    <label>Released by<input list="dl-staff" data-b="advance.givenBy" placeholder="Cashier / owner"></label>
+    <label>Note<input data-b="advance.note" placeholder="e.g. Wet market run"></label>
+   </div>
+   <div class="row end"><button class="pri" data-act="saveAdv">Record advance</button></div>
+  </div>
+  <div class="card"><div class="row" style="margin-bottom:8px"><h3>All advances</h3></div>
+   ${list.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Book</th><th>Buyer</th><th class="n">Advance</th><th class="n">Spent (recorded)</th><th class="n">Change returned</th><th class="n">Unaccounted</th><th>Status</th><th></th></tr></thead><tbody>
+   ${take('adv', list).map(a => { const s = advanceSpent(a.id); const exp = num(a.amount) - s.spent; return `<tr class="${a.status === 'void' ? 'void' : ''}">
+    <td>${fmtD(a.date)}</td><td>${chipBook(a.book, a.eventId)}</td><td>${esc(a.to)}<div class="small mut">released by ${esc(a.givenBy || '—')}</div></td>
+    <td class="n">${peso(a.amount)}</td><td class="n">${peso(s.spent)}<div class="small mut">${s.ps.length} purch · ${s.es.length} exp</div></td>
+    <td class="n">${a.status === 'liquidated' ? peso(a.change) : `<span class="mut">expect ${peso(exp)}</span>`}</td>
+    <td class="n">${a.status === 'liquidated' ? (Math.abs(num(a.diff)) >= 1 ? `<span class="bad-t">${peso(a.diff)}</span>` : '<span class="ok-t">balanced</span>') : ''}</td>
+    <td>${a.status === 'open' ? '<span class="chip warn">open</span>' : a.status === 'liquidated' ? '<span class="chip ok">liquidated</span>' : ''}</td>
+    <td class="row">${a.status === 'open' ? `<button class="sm pri" data-act="liquidate" data-arg="${a.id}">Liquidate</button>` : a.status === 'liquidated' ? `<button class="sm" data-act="liquidate" data-arg="${a.id}">View</button>` : ''}${a.status === 'open' || a.status === 'void' ? voidBtn('advances', a) : ''}</td></tr>`; }).join('')}
+   </tbody></table></div>${showMore('adv', list.length)}` : '<div class="empty">No cash advances yet.</div>'}
+  </div>`;
+};
+
+/* ============ PURCHASES ============ */
+V.purchases = () => {
+  const d = D.purchase, f = D.ui;
+  const advs = openAdvances(d.book);
+  const list = S.purchases.filter(p => (!f.pBook || p.book === f.pBook) && (!f.pStatus || (f.pStatus === 'short' ? shortValue(p) > 0.5 : p.status === f.pStatus)));
+  return `<h2>Purchases</h2>
+  <p class="lede">The buyer records what was bought, from whom and at what price. Every purchase is charged to <b>Restaurant</b> or to <b>Catering</b> (and to a specific event when it's for one). Nothing enters stock until someone else receives it.</p>
+  <div class="card"><div class="row"><h3>New purchase</h3><span class="spacer"></span>${bookSeg('purchase.book')}</div>
+   ${d.prId ? `<div class="pr-from">From approved requisition <b>${esc(d.prNo)}</b><span class="spacer"></span><button class="sm" data-act="openPR" data-arg="${d.prId}">View PR</button><button class="sm ghost" data-act="unlinkPR">Unlink</button></div>` : `<p class="small mut" style="margin-top:0">Buying against a requisition? Open it in <a href="#prs">Requisitions</a> and tap <b>Enter the purchase</b>.</p>`}
+   <div class="grid">
+    <label>Date<input type="date" data-b="purchase.date"></label>
+    ${d.book === 'C' ? `<label>For event${sel('purchase.eventId', eventOptions(), false)}</label>` : ''}
+    <label>Supplier / stall<input list="dl-sup" data-b="purchase.supplier" placeholder="e.g. Aling Nena, Stall 12"></label>
+    <label>Bought by<input list="dl-staff" data-b="purchase.buyer" placeholder="Name"></label>
+    <label>Receipt / OR no.<input data-b="purchase.receiptNo" placeholder="Blank if none"></label>
+    <label>Paid from${sel('purchase.advanceId', opt('', 'Paid directly (no advance)') + advs.map(a => opt(a.id, `${a.to} · ${peso(a.amount)} · ${fmtD(a.date)}`)).join(''), false)}</label>
+   </div>
+   ${linesEditor('purchase', {cost: true})}
+   <div class="row" style="margin-top:12px"><span>Total&nbsp; <b style="font-size:17px" data-live="total:purchase">${peso(sum(d.lines, l => num(l.qty) * num(l.cost)))}</b></span><span class="spacer"></span><button class="ghost" data-act="resetP">Clear</button><button class="pri" data-act="saveP">Save purchase</button></div>
+  </div>
+  <div class="card"><div class="row" style="margin-bottom:10px"><h3>Purchase register</h3><span class="spacer"></span>
+    ${filterSeg('ui.pBook', [['', 'Both'], ['R', 'Restaurant'], ['C', 'Catering']])}
+    ${filterSeg('ui.pStatus', [['', 'All'], ['pending', 'To receive'], ['received', 'Received'], ['short', 'Short'], ['void', 'Void']])}</div>
+   ${list.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Book</th><th>Supplier</th><th>Buyer</th><th>Receipt</th><th class="n">Total</th><th>Status</th><th></th></tr></thead><tbody>
+    ${take('pur', list).map(p => { const sv = shortValue(p); const jump = p.lines.some(l => priceJump(l, l.prevCost) > pctAlert());
+      return `<tr class="click ${p.status === 'void' ? 'void' : ''}" data-act="viewP" data-arg="${p.id}"><td>${fmtD(p.date)}</td><td>${chipBook(p.book, p.eventId)}</td><td>${esc(p.supplier || '—')}<div class="small mut">${p.lines.length} item${p.lines.length > 1 ? 's' : ''}${jump ? ' · <span class="bad-t">price ▲</span>' : ''}${p.prNo ? ' · ' + esc(p.prNo) : ' · <span class="warn-t">no PR</span>'}</div></td><td>${esc(p.buyer)}</td><td>${p.receiptNo ? esc(p.receiptNo) : '<span class="chip warn">none</span>'}</td><td class="n">${peso(p.total)}</td>
+      <td>${p.status === 'pending' ? '<span class="chip warn">to receive</span>' : p.status === 'received' ? (sv > 0.5 ? `<span class="chip bad">short ${peso(sv)}</span>` : '<span class="chip ok">received</span>') + `<div class="small mut">by ${esc(p.recv?.by || '')}</div>` : ''}</td>
+      <td class="row">${p.status === 'pending' ? `<button class="sm pri" data-act="receive" data-arg="${p.id}">Receive</button>` : ''}${voidBtn('purchases', p)}</td></tr>`; }).join('')}
+   </tbody></table></div>${showMore('pur', list.length)}` : '<div class="empty">No purchases match.</div>'}
+  </div>`;
+};
+
+/* ============ EXPENSES ============ */
+V.expenses = () => {
+  const d = D.expense, advs = openAdvances(d.book);
+  const list = S.expenses.filter(e => !D.ui.eBook || e.book === D.ui.eBook);
+  return `<h2>Expenses</h2>
+  <p class="lede">Money spent on things that are <b>not ingredients</b> and never go into stock: fare, LPG, ice, packaging, rentals, extra helpers. Keeping them out of purchases means your stock counts stay clean.</p>
+  <div class="card"><div class="row"><h3>Record an expense</h3><span class="spacer"></span>${bookSeg('expense.book')}</div>
+   <div class="grid">
+    <label>Date<input type="date" data-b="expense.date"></label>
+    ${d.book === 'C' ? `<label>For event${sel('expense.eventId', eventOptions('General catering (no specific event)'), false)}</label>` : ''}
+    <label>Category${sel('expense.cat', opt('', '— choose —') + (S.config.expCats || []).map(c => opt(c, c)).join(''), false)}</label>
+    <label>Description<input data-b="expense.desc" placeholder="e.g. Tricycle to Farmers market"></label>
+    <label>Amount ₱<input type="number" inputmode="decimal" step="any" min="0" data-b="expense.amount"></label>
+    <label>Paid by<input list="dl-staff" data-b="expense.paidBy"></label>
+    <label>Receipt / OR no.<input data-b="expense.receiptNo" placeholder="Blank if none"></label>
+    <label>Paid from${sel('expense.advanceId', opt('', 'Paid directly (no advance)') + advs.map(a => opt(a.id, `${a.to} · ${peso(a.amount)} · ${fmtD(a.date)}`)).join(''), false)}</label>
+   </div>
+   <div class="row end"><button class="pri" data-act="saveE">Save expense</button></div>
+  </div>
+  <div class="card"><div class="row" style="margin-bottom:10px"><h3>Expense register</h3><span class="spacer"></span>${filterSeg('ui.eBook', [['', 'Both'], ['R', 'Restaurant'], ['C', 'Catering']])}</div>
+   ${list.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Book</th><th>Category</th><th>Description</th><th>Paid by</th><th>Receipt</th><th class="n">Amount</th><th></th></tr></thead><tbody>
+    ${take('exp', list).map(e => `<tr class="${e.status === 'void' ? 'void' : ''}"><td>${fmtD(e.date)}</td><td>${chipBook(e.book, e.eventId)}</td><td>${esc(e.cat)}</td><td>${esc(e.desc)}</td><td>${esc(e.paidBy)}</td><td>${e.receiptNo ? esc(e.receiptNo) : '<span class="chip warn">none</span>'}</td><td class="n">${peso(e.amount)}</td><td>${voidBtn('expenses', e)}</td></tr>`).join('')}
+   </tbody></table></div>${showMore('exp', list.length)}` : '<div class="empty">No expenses yet.</div>'}
+  </div>`;
+};
+
+/* ============ ISSUE & WASTE ============ */
+V.usage = () => {
+  const d = D.move;
+  if (d.book === 'R' && d.type === 'return') d.type = 'issue';
+  const list = S.moves.filter(m => !D.ui.mBook || m.book === D.ui.mBook);
+  const types = d.book === 'R' ? ['issue', 'waste', 'transfer'] : ['issue', 'return', 'waste', 'transfer'];
+  const lbl = {issue: d.book === 'R' ? 'Issue to kitchen' : 'Issue to event', return: 'Return leftovers', waste: 'Waste / spoilage', transfer: `Transfer to ${d.book === 'R' ? 'Catering' : 'Restaurant'}`};
+  return `<h2>Issue & waste</h2>
+  <p class="lede">This is consumption. Stock leaves the storeroom only through a signed issue: to the restaurant kitchen each day, or to a catering event. Leftovers that come back from an event are returned. Spoilage is written off here with a reason, so it is never confused with missing stock.</p>
+  <div class="card"><div class="row"><h3>Record stock out</h3><span class="spacer"></span>${bookSeg('move.book')}</div>
+   <div class="row" style="margin-bottom:12px"><div class="seg">${types.map(t => `<button type="button" class="${d.type === t ? 'on' : ''}" data-act="set" data-arg="move.type|${t}">${lbl[t]}</button>`).join('')}</div></div>
+   <div class="grid">
+    <label>Date<input type="date" data-b="move.date"></label>
+    ${d.book === 'C' && (d.type === 'issue' || d.type === 'return') ? `<label>Event${sel('move.eventId', eventOptions('— choose event —'), false)}</label>` : ''}
+    ${d.type === 'waste' ? `<label>Reason${sel('move.reason', opt('', '— choose —') + WASTE_REASONS.map(r => opt(r, r)).join(''), false)}</label>` : ''}
+    <label>${d.type === 'return' ? 'Returned by' : 'Released by (storekeeper)'}<input list="dl-staff" data-b="move.by"></label>
+    <label>${d.type === 'waste' ? 'Witnessed by' : d.type === 'return' ? 'Received back by' : 'Received by (cook / event head)'}<input list="dl-staff" data-b="move.receivedBy"></label>
+    <label>Note<input data-b="move.note"></label>
+   </div>
+   ${linesEditor('move', {stock: true})}
+   <div class="row end" style="margin-top:12px"><button class="ghost" data-act="resetM">Clear</button><button class="pri" data-act="saveM">Save</button></div>
+  </div>
+  <div class="card"><div class="row" style="margin-bottom:10px"><h3>Stock-out register</h3><span class="spacer"></span>${filterSeg('ui.mBook', [['', 'Both'], ['R', 'Restaurant'], ['C', 'Catering']])}</div>
+   ${list.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Book</th><th>Type</th><th>Items</th><th>Released / received</th><th class="n">Value</th><th></th></tr></thead><tbody>
+    ${take('mov', list).map(m => `<tr class="${m.status === 'void' ? 'void' : ''}"><td>${fmtD(m.date)}</td><td>${chipBook(m.book, m.eventId)}</td><td><span class="chip ${MT[m.type]?.chip}">${MT[m.type]?.short}${m.type === 'transfer' ? ' → ' + BOOK[m.toBook]?.name : ''}</span>${m.reason ? `<div class="small mut">${esc(m.reason)}</div>` : ''}</td>
+     <td class="small">${(m.lines || []).map(l => `${esc(iname(l.itemId))} ${fq(l.qty)}${esc(iunit(l.itemId))}`).join(', ')}</td><td class="small">${esc(m.by)} → ${esc(m.receivedBy)}</td><td class="n">${peso(sum(m.lines || [], l => num(l.qty) * num(l.cost)))}</td><td>${voidBtn('moves', m)}</td></tr>`).join('')}
+   </tbody></table></div>${showMore('mov', list.length)}` : '<div class="empty">Nothing recorded yet.</div>'}
+  </div>`;
+};
+
+/* ============ STOCK & COUNTS ============ */
+V.stock = () => {
+  const b = D.ui.stockBook, {st, sinceDate} = stockFor(b), q = D.ui.stockQ.trim().toLowerCase();
+  const rows = activeItems().filter(i => !q || i.name.toLowerCase().includes(q) || (i.cat || '').toLowerCase().includes(q));
+  const totalVal = sum(activeItems(), i => Math.max(0, st[i.id] || 0) * costOf(i.id));
+  const counts = S.counts.filter(c => c.book === b);
+  if (D.count) return countSheet();
+  return `<h2>Stock & counts</h2>
+  <p class="lede">Expected stock = last physical count + received purchases − issues − waste ± returns and transfers. A physical count compares this to what is actually on the shelf. The difference is <b>unexplained loss</b>: pilferage, unrecorded use, or wrong entries.</p>
+  <div class="card"><div class="row" style="margin-bottom:10px">${filterSeg('ui.stockBook', [['R', 'Restaurant storeroom'], ['C', 'Catering storeroom']])}<span class="spacer"></span>
+    <input data-b="ui.stockQ" data-rr placeholder="Search item…" style="max-width:200px"><button class="pri" data-act="startCount">Start physical count</button></div>
+   <div class="kpis"><div class="kpi"><span>Stock value (at last cost)</span><b>${peso(totalVal)}</b></div><div class="kpi"><span>Items below par</span><b>${activeItems().filter(i => num(i.par?.[b]) > 0 && (st[i.id] || 0) < num(i.par[b])).length}</b></div><div class="kpi"><span>Last count</span><b>${counts.find(live_) ? fmtD(counts.find(live_).date) : '—'}</b></div></div>
+   ${rows.length ? `<div class="tw"><table><thead><tr><th>Item</th><th>Category</th><th class="n">On hand</th><th>Unit</th><th class="n">Par</th><th class="n">Last cost</th><th class="n">Value</th><th>Counted</th></tr></thead><tbody>
+    ${rows.map(i => { const oh = st[i.id] || 0, par = num(i.par?.[b]); return `<tr><td>${esc(i.name)}</td><td class="small mut">${esc(i.cat)}</td><td class="n ${oh < -0.001 ? 'bad-t' : par && oh < par ? 'warn-t' : ''}">${fq(oh)}</td><td class="mut">${esc(i.unit)}</td><td class="n mut">${par ? fq(par) : ''}</td><td class="n">${peso(i.lastCost)}</td><td class="n">${peso(Math.max(0, oh) * costOf(i.id))}</td><td class="small mut">${sinceDate[i.id] ? fmtD(sinceDate[i.id]) : 'never'}</td></tr>`; }).join('')}
+   </tbody></table></div>` : '<div class="empty">No items yet. Add them in Setup.</div>'}
+  </div>
+  <div class="card"><h3>Count history · ${BOOK[b].name}</h3>
+   ${counts.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Counted by</th><th class="n">Items</th><th class="n">Missing (value)</th><th class="n">Excess (value)</th><th class="n">Net variance</th><th></th></tr></thead><tbody>
+    ${counts.map(c => `<tr class="click ${c.status === 'void' ? 'void' : ''}" data-act="viewCount" data-arg="${c.id}"><td>${fmtD(c.date)}</td><td>${esc(c.by)}${c.witness ? `<div class="small mut">witness ${esc(c.witness)}</div>` : ''}</td><td class="n">${(c.lines || []).length}</td><td class="n ${num(c.lossValue) < -1 ? 'bad-t' : ''}">${peso(c.lossValue)}</td><td class="n">${peso(c.gainValue)}</td><td class="n">${peso(c.varianceValue)}</td><td>${voidBtn('counts', c)}</td></tr>`).join('')}
+   </tbody></table></div>` : '<div class="empty">No counts yet. Your first count sets the opening stock.</div>'}
+  </div>`;
+};
+function countSheet() {
+  const c = D.count, blind = c.blind;
+  const q = (c.q || '').toLowerCase();
+  return `<h2>Physical count · ${BOOK[c.book].name}</h2>
+  <p class="lede">Count what is physically on the shelf, chiller and freezer. ${blind ? '<b>Blind count is on:</b> the expected quantity is hidden so the counter can\'t just copy it. Variances show after posting.' : ''} Items left blank are skipped and keep their expected quantity.</p>
+  <div class="card"><div class="grid">
+    <label>Count date<input type="date" data-b="count.date"></label>
+    <label>Counted by<input list="dl-staff" data-b="count.by"></label>
+    <label>Witness<input list="dl-staff" data-b="count.witness" placeholder="Second person"></label>
+    <label>Find item<input data-b="count.q" data-rr placeholder="Search…"></label>
+   </div>
+   <div class="row" style="margin-bottom:8px"><label class="row" style="flex-direction:row;gap:6px"><input type="checkbox" data-b="count.blind" data-rr> Blind count (hide expected quantities)</label><span class="spacer"></span><span class="small mut"><b data-live="counted">${c.lines.filter(l => l.actual !== '').length}</b> of ${c.lines.length} counted</span></div>
+   <div class="tw"><table class="lines"><thead><tr><th>Item</th><th>Unit</th>${blind ? '' : '<th class="n">Expected</th>'}<th class="n" style="width:120px">Actual count</th>${blind ? '' : '<th class="n">Variance</th>'}</tr></thead><tbody>
+    ${c.lines.map((l, i) => (!q || iname(l.itemId).toLowerCase().includes(q)) ? `<tr><td>${esc(iname(l.itemId))}<div class="small mut">${esc(S.items[l.itemId]?.cat || '')}</div></td><td class="mut">${esc(iunit(l.itemId))}</td>${blind ? '' : `<td class="n">${fq(l.system)}</td>`}<td><input type="number" inputmode="decimal" step="any" min="0" data-b="count.lines.${i}.actual" style="text-align:right"></td>${blind ? '' : `<td class="n" data-live="cvar:${i}"></td>`}</tr>` : '').join('')}
+   </tbody></table></div>
+   <div class="row end" style="margin-top:12px"><button class="ghost" data-act="cancelCount">Discard count</button><button class="pri" data-act="postCount">Post count</button></div>
+  </div>`;
+}
+
+/* ============ EVENTS ============ */
+V.events = () => {
+  if (D.ui.eventId && S.events[D.ui.eventId]) return eventDetail(S.events[D.ui.eventId]);
+  const evs = Object.values(S.events).sort((a, b) => b.date.localeCompare(a.date));
+  return `<h2>Catering events</h2>
+  <p class="lede">Each event is its own cost centre. Plan the menu quantities, buy against the plan, issue to the event, return leftovers, then compare what was planned, bought and used, and what the event actually cost against the contract.</p>
+  <div class="card"><h3>New event</h3>
+   <div class="grid">
+    <label>Event name<input data-b="event.name" placeholder="e.g. Santos wedding"></label>
+    <label>Client<input data-b="event.client"></label>
+    <label>Event date<input type="date" data-b="event.date"></label>
+    <label>Pax<input type="number" inputmode="numeric" min="0" data-b="event.pax"></label>
+    <label>Contract price ₱<input type="number" inputmode="decimal" min="0" step="any" data-b="event.contract"></label>
+    <label>Venue<input data-b="event.venue"></label>
+   </div>
+   <label>Menu / notes<textarea data-b="event.notes" placeholder="Menu, package, special requests"></textarea></label>
+   <div class="row end" style="margin-top:10px"><button class="pri" data-act="saveEv">Create event</button></div>
+  </div>
+  <div class="card"><h3>Events</h3>
+   ${evs.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Event</th><th class="n">Pax</th><th class="n">Contract</th><th class="n">Cost so far</th><th class="n">Margin</th><th>Status</th><th></th></tr></thead><tbody>
+    ${evs.map(e => { const s = eventStats(e); return `<tr class="click" data-act="openEvent" data-arg="${e.id}"><td>${fmtD(e.date)}</td><td>${esc(e.name)}<div class="small mut">${esc(e.client)}</div></td><td class="n">${esc(e.pax)}</td><td class="n">${peso(s.contract)}</td><td class="n">${peso(s.cost)}</td><td class="n ${s.margin < 0 ? 'bad-t' : ''}">${s.contract ? peso(s.margin) + `<div class="small mut">${s.pct.toFixed(0)}%</div>` : ''}</td><td><span class="chip ${e.status === 'closed' ? 'mut' : e.status === 'done' ? 'ok' : 'info'}">${e.status}</span></td><td>›</td></tr>`; }).join('')}
+   </tbody></table></div>` : '<div class="empty">No events yet.</div>'}
+  </div>`;
+};
+function eventDetail(e) {
+  const s = eventStats(e);
+  if (!D.plan || D.plan.eventId !== e.id) D.plan = {eventId: e.id, book: 'C', lines: (e.plan || []).length ? JSON.parse(JSON.stringify(e.plan)) : [{itemId: '', qty: ''}]};
+  const rows = Object.entries(s.items).filter(([id]) => S.items[id]).sort((a, b) => iname(a[0]).localeCompare(iname(b[0])));
+  const kp = (l, v, cls = '') => `<div class="kpi ${cls}"><span>${l}</span><b>${v}</b></div>`;
+  return `<div class="row"><button class="sm" data-act="closeEvent">‹ All events</button></div>
+  <h2 style="margin-top:10px">${esc(e.name)}</h2>
+  <p class="lede">${fmtD(e.date)} · ${esc(e.client || 'no client')} · ${esc(e.pax || '?')} pax${e.venue ? ' · ' + esc(e.venue) : ''} · <span class="chip ${e.status === 'closed' ? 'mut' : e.status === 'done' ? 'ok' : 'info'}">${e.status}</span></p>
+  <div class="card"><div class="kpis">${kp('Contract', peso(s.contract))}${kp('Ingredients used', peso(s.used))}${kp('Event expenses', peso(s.exp))}${kp('Total cost', peso(s.cost))}${kp('Gross margin', s.contract ? peso(s.margin) + ` <small class="small">${s.pct.toFixed(1)}%</small>` : '—', s.margin < 0 ? 'bad' : 'ok')}${kp('Cost per pax', s.perPax != null ? peso(s.perPax) : '—')}</div>
+   <p class="small mut" style="margin:6px 0 10px">Purchases charged to this event: ${peso(s.purch)}. Ingredients used = issued to the event − leftovers returned, valued at purchase cost.</p>
+   <div class="row">${e.status === 'planned' ? '<button class="sm" data-act="evStatus" data-arg="done">Mark event done</button>' : ''}${e.status === 'done' ? '<button class="sm" data-act="evStatus" data-arg="closed">Close event (lock)</button><button class="sm ghost" data-act="evStatus" data-arg="planned">Reopen</button>' : ''}${e.status === 'closed' ? '<button class="sm ghost" data-act="evStatus" data-arg="done">Reopen</button>' : ''}<button class="sm" data-act="editEv">Edit details</button><button class="sm" data-act="issueEvent">Issue all received purchases to this event</button></div>
+   ${e.notes ? `<p class="small" style="white-space:pre-wrap;margin-bottom:0">${esc(e.notes)}</p>` : ''}
+  </div>
+  <div class="card"><div class="row"><h3>Menu plan — ingredient quantities</h3><span class="spacer"></span><button class="sm" data-act="marketList">Market list</button></div>
+   <p class="small mut" style="margin-top:0">Enter the total quantity of each ingredient this event needs. "To buy" subtracts what is already in the catering storeroom.</p>
+   ${linesEditor('plan', {stock: true, stockBook: 'C', plan: true, qtyLabel: 'Planned'})}
+   <div class="row end" style="margin-top:10px"><button class="pri" data-act="savePlan">Save plan</button></div>
+  </div>
+  <div class="card"><h3>Planned vs bought vs used</h3>
+   ${rows.length ? `<div class="tw"><table><thead><tr><th>Item</th><th>Unit</th><th class="n">Planned</th><th class="n">Bought</th><th class="n">Issued</th><th class="n">Returned</th><th class="n">Used</th><th class="n">Used vs plan</th></tr></thead><tbody>
+    ${rows.map(([id, x]) => { const used = x.issued - x.returned; const dv = x.planned ? (used - x.planned) / x.planned * 100 : null; return `<tr><td>${esc(iname(id))}</td><td class="mut">${esc(iunit(id))}</td><td class="n">${x.planned ? fq(x.planned) : '—'}</td><td class="n">${fq(x.bought)}${x.pending ? `<div class="small warn-t">+${fq(x.pending)} unreceived</div>` : ''}</td><td class="n">${fq(x.issued)}</td><td class="n">${fq(x.returned)}</td><td class="n"><b>${fq(used)}</b></td><td class="n ${dv != null && dv > 10 ? 'bad-t' : dv != null && dv < -10 ? 'ok-t' : ''}">${dv == null ? (used ? '<span class="chip warn">not planned</span>' : '') : (dv > 0 ? '+' : '') + dv.toFixed(0) + '%'}</td></tr>`; }).join('')}
+   </tbody></table></div>` : '<div class="empty">Nothing planned, bought or issued yet.</div>'}
+  </div>
+  <div class="two">
+   <div class="card"><h3>Purchases for this event</h3>${s.ps.length ? `<table><tbody>${s.ps.map(p => `<tr class="click" data-act="viewP" data-arg="${p.id}"><td>${fmtD(p.date)}</td><td>${esc(p.supplier)}<div class="small mut">${esc(p.buyer)}</div></td><td class="n">${peso(p.total)}</td><td>${p.status === 'pending' ? '<span class="chip warn">to receive</span>' : '<span class="chip ok">received</span>'}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">None</div>'}</div>
+   <div class="card"><h3>Expenses for this event</h3>${s.es.length ? `<table><tbody>${s.es.map(x => `<tr><td>${fmtD(x.date)}</td><td>${esc(x.cat)}<div class="small mut">${esc(x.desc)}</div></td><td class="n">${peso(x.amount)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">None</div>'}</div>
+  </div>`;
+}
+
+/* ============ REPORTS ============ */
+V.reports = () => {
+  const {rFrom: from, rTo: to} = D.ui;
+  const R = figures('R', from, to), C = figures('C', from, to), T = figures('', from, to);
+  const row = (l, k, note = '', cls = '') => `<tr><td>${l}${note ? `<div class="small mut">${note}</div>` : ''}</td><td class="n ${cls}">${peso(R[k])}</td><td class="n ${cls}">${peso(C[k])}</td><td class="n ${cls}"><b>${peso(T[k])}</b></td></tr>`;
+  const cats = [...new Set([...Object.keys(R.expByCat), ...Object.keys(C.expByCat)])].sort();
+  const spend = {}; S.purchases.filter(p => p.date >= from && p.date <= to && live_(p)).forEach(p => p.lines.forEach(l => { const s = spend[l.itemId] ||= {R: 0, C: 0, qty: 0}; s[p.book] += num(l.qty) * num(l.cost); s.qty += num(l.qty); }));
+  const top = Object.entries(spend).sort((a, b) => (b[1].R + b[1].C) - (a[1].R + a[1].C)).slice(0, 12);
+  const evs = Object.values(S.events).filter(e => e.date >= from && e.date <= to).sort((a, b) => a.date.localeCompare(b.date));
+  const voids = [...S.purchases.map(x => ['Purchase', x]), ...S.expenses.map(x => ['Expense', x]), ...S.moves.map(x => ['Stock out', x]), ...S.counts.map(x => ['Count', x])].filter(([, x]) => x.status === 'void' && x.date >= from && x.date <= to);
+  const sales = Object.values(S.sales).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 14);
+  return `<h2>Reports</h2>
+  <div class="card"><div class="row"><label>From<input type="date" data-b="ui.rFrom" data-rr></label><label>To<input type="date" data-b="ui.rTo" data-rr></label><span class="spacer"></span>
+   <button class="sm" data-act="csv" data-arg="purchases">Purchase register CSV</button><button class="sm" data-act="csv" data-arg="expenses">Expense register CSV</button><button class="sm" data-act="csv" data-arg="moves">Stock-out register CSV</button></div></div>
+  <div class="card"><h3>Purchases vs expenses vs consumption · ${fmtD(from)} – ${fmtD(to)}</h3>
+   <div class="tw"><table><thead><tr><th></th><th class="n">Restaurant</th><th class="n">Catering</th><th class="n">Total</th></tr></thead><tbody>
+    ${row('Purchases (cash out for ingredients)', 'bought')}
+    ${row('… received into stock', 'received')}
+    ${row('… still waiting to be received', 'pending', '', 'warn-t')}
+    ${row('… short deliveries (paid, not received)', 'shortRecv', '', 'bad-t')}
+    ${row('Expenses (non-ingredient)', 'expenses')}
+    ${row('Ingredients used (issued − returned)', 'used', 'This is your real food cost')}
+    ${row('Waste / spoilage (recorded)', 'waste')}
+    ${row('Count variance (unexplained)', 'shrink', 'Negative = missing stock', 'bad-t')}
+    <tr><td>Restaurant sales</td><td class="n">${peso(R.sales)}</td><td class="n mut">see events</td><td class="n"></td></tr>
+    <tr><td><b>Restaurant food cost %</b><div class="small mut">ingredients used ÷ sales</div></td><td class="n"><b>${R.sales ? (R.used / R.sales * 100).toFixed(1) + '%' : '—'}</b></td><td></td><td></td></tr>
+    <tr><td><b>Purchases − (used + waste)</b><div class="small mut">positive = stock built up; large negative = check counts</div></td><td class="n">${peso(R.received - R.used - R.waste)}</td><td class="n">${peso(C.received - C.used - C.waste)}</td><td class="n">${peso(T.received - T.used - T.waste)}</td></tr>
+   </tbody></table></div></div>
+  <div class="two">
+   <div class="card"><h3>Expenses by category</h3>${cats.length ? `<table><thead><tr><th></th><th class="n">Rest.</th><th class="n">Cater.</th></tr></thead><tbody>${cats.map(c => `<tr><td>${esc(c)}</td><td class="n">${peso(R.expByCat[c] || 0)}</td><td class="n">${peso(C.expByCat[c] || 0)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No expenses in this period.</div>'}</div>
+   <div class="card"><h3>Top items by spend</h3>${top.length ? `<table><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Rest.</th><th class="n">Cater.</th></tr></thead><tbody>${top.map(([id, s]) => `<tr><td>${esc(iname(id))}</td><td class="n mut">${fq(s.qty)} ${esc(iunit(id))}</td><td class="n">${peso(s.R)}</td><td class="n">${peso(s.C)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">No purchases in this period.</div>'}</div>
+  </div>
+  <div class="card"><h3>Catering events in this period</h3>${evs.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Event</th><th class="n">Pax</th><th class="n">Contract</th><th class="n">Ingredients</th><th class="n">Expenses</th><th class="n">Margin</th><th class="n">Cost/pax</th></tr></thead><tbody>${evs.map(e => { const s = eventStats(e); return `<tr class="click" data-act="openEvent" data-arg="${e.id}"><td>${fmtD(e.date)}</td><td>${esc(e.name)}</td><td class="n">${esc(e.pax)}</td><td class="n">${peso(s.contract)}</td><td class="n">${peso(s.used)}</td><td class="n">${peso(s.exp)}</td><td class="n ${s.margin < 0 ? 'bad-t' : ''}">${s.contract ? peso(s.margin) + ' · ' + s.pct.toFixed(0) + '%' : '—'}</td><td class="n">${s.perPax != null ? peso(s.perPax) : '—'}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">No events in this period.</div>'}</div>
+  <div class="two">
+   <div class="card"><h3>Restaurant daily sales</h3>
+    <div class="row" style="align-items:flex-end"><label style="flex:1">Date<input type="date" data-b="sale.date"></label><label style="flex:1">Total sales ₱<input type="number" inputmode="decimal" step="any" min="0" data-b="sale.amount"></label><button class="pri" data-act="saveSale">Save</button></div>
+    <p class="small mut">Enter the day's total from the POS / sales book. Used for food cost %.</p>
+    ${sales.length ? `<table><tbody>${sales.map(s => `<tr><td>${fmtD(s.date)}</td><td class="n">${peso(s.R)}</td></tr>`).join('')}</tbody></table>` : ''}
+   </div>
+   <div class="card"><h3>Voided records in this period (${voids.length})</h3>${voids.length ? `<table><tbody>${voids.map(([k, x]) => `<tr><td>${fmtD(x.date)}</td><td>${k} ${chipBook(x.book)}</td><td class="small">${esc(x.voidReason)}<div class="mut">by ${esc(x.voidByName || who(x.voidBy) || '—')} · ${fmtT(x.voidAt)}</div></td></tr>`).join('')}</tbody></table>` : '<div class="empty">None.</div>'}</div>
+  </div>`;
+};
+
+/* ============ SETUP ============ */
+V.setup = () => {
+  const items = Object.values(S.items).sort((a, b) => (ITEM_CATS.indexOf(a.cat) - ITEM_CATS.indexOf(b.cat)) || a.name.localeCompare(b.name));
+  if (!D.cfg) D.cfg = {company: S.config.company || '', address: S.config.address || '', departments: (S.config.departments || []).join('\n'), staff: (S.config.staff || []).join('\n'), suppliers: (S.config.suppliers || []).join('\n'), expCats: (S.config.expCats || []).join('\n'), pct: String(S.config.priceAlertPct ?? 10)};
+  return `<h2>Setup</h2>
+  <div class="card"><div class="row"><h3>Items you buy (${items.length})</h3><span class="spacer"></span><button class="pri sm" data-act="newItem">＋ Add item</button></div>
+   <p class="small mut" style="margin-top:0">One master list for both books. Use the unit you buy and count in (kg for meat and vegetables, pc for eggs, pack for noodles). Par level is the minimum you want on hand in each storeroom.</p>
+   ${items.length ? `<div class="tw"><table><thead><tr><th>Item</th><th>Category</th><th>Unit</th><th class="n">Last cost</th><th class="n">Par · Rest.</th><th class="n">Par · Cater.</th><th></th></tr></thead><tbody>
+    ${items.map(i => `<tr class="${i.active === false ? 'void' : ''}"><td>${esc(i.name)}</td><td class="small">${esc(i.cat)}</td><td>${esc(i.unit)}</td><td class="n">${peso(i.lastCost)}</td><td class="n">${num(i.par?.R) ? fq(i.par.R) : ''}</td><td class="n">${num(i.par?.C) ? fq(i.par.C) : ''}</td><td><button class="sm" data-act="editItem" data-arg="${i.id}">Edit</button></td></tr>`).join('')}
+   </tbody></table></div>` : '<div class="empty">No items yet.</div>'}
+  </div>
+  <div class="card"><h3>Lists</h3>
+   <div class="grid"><label>Business name (printed on forms)<input data-b="cfg.company"></label><label>Address / contact line<input data-b="cfg.address" placeholder="Street, city · phone"></label></div>
+   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+    <label>Departments (one per line)<textarea data-b="cfg.departments"></textarea></label>
+    <label>Other names for buyer / receiver lists (one per line)<textarea data-b="cfg.staff" placeholder="Helpers without a login"></textarea></label>
+    <label>Suppliers / stalls (one per line)<textarea data-b="cfg.suppliers"></textarea></label>
+    <label>Expense categories (one per line)<textarea data-b="cfg.expCats"></textarea></label>
+   </div>
+   <div class="row"><label style="max-width:240px">Flag price increases above (%)<input type="number" min="1" step="1" data-b="cfg.pct"></label><span class="spacer"></span><button class="pri" data-act="saveCfg">Save lists</button></div>
+  </div>
+  <div class="card"><h3>Logins & roles</h3>
+   <p class="small">Logins come from the <b>Romualdos Staff Logins</b> file in the Romualdo's Inquiry App folder on Google Drive, the same file used for the inquiry dashboard. Add a row to give someone access, set <b>Role</b> to Admin or Staff, and set <b>Active = No</b> to block them (takes effect within 2 minutes).</p>
+   <p class="small"><b>Staff</b> can file requisitions, record advances, purchases, receiving, expenses, issues, waste and counts, liquidate advances, and print. <b>Admins</b> can also approve or reject requisitions, void records, change saved amounts, edit items and this Setup page. The server enforces these rules, not just the screen.</p>
+   <div class="tw"><table><thead><tr><th>Name</th><th>Username</th><th>Role</th></tr></thead><tbody>${S.users.filter(u => u.active !== false).map(u => `<tr><td>${esc(u.name)}</td><td>${esc(u.username)}</td><td>${u.role === 'Admin' ? '<span class="chip c">Admin</span>' : '<span class="chip mut">Staff</span>'}</td></tr>`).join('')}</tbody></table></div></div>
+  <div class="card"><h3>How to run it day to day</h3>
+   <ol class="steps">
+    <li><b>Request first:</b> the cook or storekeeper files a <a href="#prs">requisition</a>; an Admin approves it and it is printed for the buyer.</li>
+    <li><b>Before market:</b> the cashier records a <a href="#advances">cash advance</a> to the buyer, charged to Restaurant or Catering. Separate advances for each.</li>
+    <li><b>At the market:</b> the buyer keeps every receipt (or writes the stall name and price) and records each <a href="#purchases">purchase</a> on their phone, against the advance.</li>
+    <li><b>On arrival:</b> a different person (storekeeper or head cook) weighs and counts the goods and taps <b>Receive</b>. Shortages are flagged automatically.</li>
+    <li><b>Same day:</b> the buyer returns the change and the cashier <b>liquidates</b> the advance. It must balance to zero.</li>
+    <li><b>Every issue out of the storeroom</b> goes through <a href="#usage">Issue & waste</a>, with a releaser and a receiver. Catering issues name the event; leftovers come back as returns.</li>
+    <li><b>Spoilage</b> is written off with a reason and a witness, never just thrown out.</li>
+    <li><b>Count</b> high-value items (meat, seafood) daily and everything weekly, using blind count with a witness. Rotate who counts.</li>
+    <li><b>Owner review:</b> check the Dashboard daily and Reports weekly. Look at short deliveries, price jumps, unbalanced liquidations, voids and count variances.</li>
+   </ol>
+   <p class="small mut">Records are never deleted, only voided with a reason and the name of whoever voided it. Enter purchases and issues <i>before</i> starting a count: anything recorded after a count is posted is treated as happening after it. The app reads the latest 1,000 records of each type, so count each storeroom at least monthly.</p>
+  </div>`;
+};
+
+/* ============ REQUISITIONS (merged from the PR page) ============ */
+const PRST = {submitted: ['For approval', 'warn'], approved: ['Approved — to buy', 'info'], rejected: ['Rejected', 'bad'], purchased: ['Purchased', 'ok'], cancelled: ['Cancelled', 'mut']};
+const chipPR = s => `<span class="chip ${PRST[s]?.[1]}">${PRST[s]?.[0] || esc(s)}</span>`;
+const newReq = (o = {}) => ({date: today(), needed: daysAgo(-1), book: 'R', eventId: '', dept: '', requestedBy: S.me?.name || '', purpose: '', priority: 'Normal', lines: [{itemId: '', qty: '', cost: ''}], ...o});
+const prApproved = p => p.status === 'approved' || p.status === 'purchased';
+const prTotal = (lines, appr) => sum(lines || [], l => num(appr && l.apprQty != null ? l.apprQty : l.qty) * num(l.cost));
+V.prs = () => {
+  if (!D.req) D.req = newReq();
+  const d = D.req, f = D.ui, q = (f.prQ || '').trim().toLowerCase();
+  const waiting = S.prs.filter(p => p.status === 'submitted').sort((a, b) => (b.priority === 'Urgent') - (a.priority === 'Urgent') || String(a.needed).localeCompare(b.needed));
+  const toBuy = S.prs.filter(p => p.status === 'approved');
+  const all = S.prs.filter(p => (!f.prSt || p.status === f.prSt) && (!f.prBook || p.book === f.prBook) && (!q || [p.prNo, p.requestedBy, p.purpose, evName(p.eventId), p.dept, ...(p.lines || []).map(l => l.desc)].join(' ').toLowerCase().includes(q)));
+  return `<h2>Purchase requisitions</h2>
+  <p class="lede">Nothing is bought without an approved PR. Staff request, an Admin approves (and can cut quantities), the printed PR goes to the buyer with the cash advance, and the purchase is entered straight from the PR.</p>
+  <div class="kpis"><div class="kpi"><span>Waiting for approval</span><b>${waiting.length}</b></div><div class="kpi"><span>Value waiting</span><b>${peso(sum(waiting, p => num(p.total)))}</b></div><div class="kpi"><span>Approved, not yet bought</span><b>${toBuy.length}</b></div><div class="kpi"><span>Approved value to buy</span><b>${peso(sum(toBuy, p => prTotal(p.lines, true)))}</b></div></div>
+  <div class="card"><div class="row" style="margin-bottom:10px"><h3 style="margin:0">New request</h3><span class="spacer"></span>${bookSeg('req.book')}</div>
+   <div class="grid">
+    <label>Date requested<input type="date" data-b="req.date"></label>
+    <label>Date needed<input type="date" data-b="req.needed"></label>
+    ${d.book === 'C' ? `<label>Catering event${sel('req.eventId', eventOptions('— not for a specific event —'), false)}</label>` : ''}
+    <label>Department${sel('req.dept', opt('', '— choose —') + (S.config.departments || DEFAULT_CONFIG.departments).map(x => opt(x, x)).join(''), false)}</label>
+    <label>Requested by<input list="dl-staff" data-b="req.requestedBy"></label>
+    <label>Priority${sel('req.priority', opt('Normal', 'Normal') + opt('Urgent', 'Urgent — needed today'), false)}</label>
+   </div>
+   <label style="margin-bottom:10px">Purpose / reason<input data-b="req.purpose" placeholder="e.g. Weekend restock; menu for 150 pax"></label>
+   ${linesEditor('req', {cost: true, stock: true})}
+   <div class="row" style="margin-top:12px"><span>Estimated total&nbsp; <b style="font-size:17px" data-live="total:req">${peso(sum(d.lines, l => num(l.qty) * num(l.cost)))}</b></span><span class="spacer"></span><button class="ghost" data-act="resetReq">Clear</button><button class="pri" data-act="submitReq">Submit for approval</button></div>
+   <p class="small mut" style="margin-bottom:0">"On hand" is filled in from the ${BOOK[d.book].name.toLowerCase()} storeroom stock automatically, so the approver can see if it's really needed.</p>
+  </div>
+  <div class="card"><h3>Waiting for approval${S.isAdmin ? '' : ' <span class="small mut">(an Admin approves)</span>'}</h3>${prTable(waiting)}</div>
+  <div class="card"><h3>Approved — to buy</h3>${prTable(toBuy)}</div>
+  <div class="card"><div class="row" style="margin-bottom:10px"><h3 style="margin:0">All requisitions</h3><span class="spacer"></span>${filterSeg('ui.prBook', [['', 'Both'], ['R', 'Restaurant'], ['C', 'Catering']])}
+    ${filterSeg('ui.prSt', [['', 'All'], ['submitted', 'For approval'], ['approved', 'Approved'], ['purchased', 'Purchased'], ['rejected', 'Rejected'], ['cancelled', 'Cancelled']])}
+    <input data-b="ui.prQ" data-rr placeholder="Search…" style="max-width:180px"></div>
+   ${prTable(take('prs', all))}${showMore('prs', all.length)}
+   <div class="row" style="margin-top:12px"><span class="small mut">For times without signal at the market:</span><button class="sm" data-act="printBlank">Print blank PR form</button><button class="sm" data-act="pdfBlank">Blank form PDF</button></div></div>`;
+};
+function prTable(list) {
+  if (!list.length) return '<div class="empty">None.</div>';
+  return `<div class="tw"><table><thead><tr><th>PR no.</th><th>Needed</th><th>Book</th><th>Requested by</th><th>Purpose</th><th class="n">Est. total</th><th>Status</th></tr></thead><tbody>
+   ${list.map(p => `<tr class="click" data-act="openPR" data-arg="${p.id}"><td><b>${esc(p.prNo)}</b>${p.priority === 'Urgent' ? ' <span class="chip bad">urgent</span>' : ''}<div class="small mut">${fmtD(p.date)}</div></td><td>${fmtD(p.needed)}</td><td>${chipBook(p.book, p.eventId)}</td><td>${esc(p.requestedBy)}<div class="small mut">${esc(p.dept)}</div></td><td class="small">${esc(p.purpose)}<div class="mut">${(p.lines || []).length} item${(p.lines || []).length === 1 ? '' : 's'}</div></td><td class="n">${peso(prTotal(p.lines, prApproved(p)))}</td><td>${chipPR(p.status)}${p.status === 'purchased' && p.actual ? `<div class="small mut">actual ${peso(p.actual.amount)}</div>` : ''}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+ACT.resetReq = () => { D.req = newReq({book: D.req.book}); render(); };
+ACT.submitReq = () => {
+  const d = D.req, lines = d.lines.filter(l => l.itemId && num(l.qty) > 0);
+  if (!d.requestedBy.trim()) return toast('Enter who is requesting.', true);
+  if (!lines.length) return toast('Add at least one item with a quantity.', true);
+  if (d.lines.some(l => l.itemId && !(num(l.qty) > 0))) return toast('Some items have no quantity.', true);
+  const {st} = stockFor(d.book);
+  const L = lines.map(l => ({itemId: l.itemId, desc: iname(l.itemId), unit: iunit(l.itemId), qty: num(l.qty), cost: num(l.cost) || costOf(l.itemId), onHand: r2(st[l.itemId] || 0)}));
+  guard(async () => {
+    const id = await addDoc('prs', {date: d.date, needed: d.needed, book: d.book, eventId: d.book === 'C' ? d.eventId : '', dept: d.dept, requestedBy: d.requestedBy.trim(), purpose: d.purpose.trim(), priority: d.priority, lines: L, total: r2(prTotal(L)), status: 'submitted'});
+    D.req = newReq({book: d.book, dept: d.dept, requestedBy: d.requestedBy});
+    setTimeout(() => openPR(id), 200);
+  }, 'Submitted for approval');
+};
+ACT.openPR = id => openPR(id);
+function openPR(id) {
+  const p = S.prs.find(x => x.id === id); if (!p) return;
+  const mine = p.createdBy === S.me?.username, acts = [];
+  if (p.status === 'submitted' && S.isAdmin) acts.push('<button class="pri" style="background:var(--ok);border-color:var(--ok)" data-mact="approve">Approve…</button>', '<button class="danger" data-mact="reject">Reject…</button>');
+  if (p.status === 'approved') acts.push('<button class="pri" data-mact="buy">Enter the purchase →</button>', '<button data-mact="manual">Mark purchased (no stock items)…</button>');
+  if ((p.status === 'submitted' && (mine || S.isAdmin)) || (p.status === 'approved' && S.isAdmin)) acts.push('<button class="ghost danger" data-mact="cancel">Cancel PR</button>');
+  const hist = [['Submitted', p.requestedBy + (p.createdBy && who(p.createdBy) !== p.requestedBy ? ` (entered by ${who(p.createdBy)})` : ''), p.createdAt], p.approvedAt && [p.status === 'rejected' ? 'Rejected' : 'Approved', p.approvedBy || who(p.approverUser), p.approvedAt], p.actual && ['Purchased', p.actual.by, p.actual.at], p.cancelledAt && ['Cancelled', p.cancelledBy, p.cancelledAt]].filter(Boolean);
+  openModal(`<div class="row"><h3 style="margin:0">${esc(p.prNo)}</h3>${chipPR(p.status)}${chipBook(p.book)}<span class="spacer"></span><button class="sm" data-mact="print">🖨 Print</button><button class="sm" data-mact="pdf">PDF</button><button class="sm ghost" data-mact="close">✕</button></div>
+   ${p.status === 'submitted' ? '<div class="alert warn" style="margin-top:10px">Not yet approved. A printout will be stamped "NOT YET APPROVED".</div>' : ''}
+   <div class="paper">${formHTML(p)}</div>
+   <div class="small mut">${hist.map(([a, n, t]) => `${a} by <b>${esc(n || '—')}</b> · ${fmtT(t)}`).join('<br>')}${p.actual?.receipt ? `<br>Receipt / OR: ${esc(p.actual.receipt)}` : ''}${p.actual?.purchaseId ? '<br>Recorded as a purchase in the Purchases register.' : ''}${p.actual?.note ? `<br>Note: ${esc(p.actual.note)}` : ''}${p.cancelReason ? `<br>Cancel reason: ${esc(p.cancelReason)}` : ''}</div>
+   <div class="row end" style="margin-top:14px">${acts.join('')}<button data-mact="close">Close</button></div>`,
+   {print: () => printDoc(p), pdf: () => pdfDoc(p), approve: () => approveModal(p, true), reject: () => approveModal(p, false), buy: () => buyFromPR(p), manual: () => purchasedModal(p), cancel: () => cancelPR(p)});
+}
+function approveModal(p, ok) {
+  openModal(`<h3>${ok ? 'Approve' : 'Reject'} ${esc(p.prNo)}</h3>
+   ${ok ? `<p class="mut">You can lower the approved quantity per line, or set it to 0 to leave an item out.</p><div class="tw"><table><thead><tr><th>Item</th><th class="n">Requested</th><th class="n">On hand</th><th class="n">Approved qty</th><th class="n">Est. cost</th></tr></thead><tbody>
+    ${p.lines.map((l, i) => `<tr><td>${esc(l.desc)}</td><td class="n">${fq(l.qty)} ${esc(l.unit)}</td><td class="n mut">${l.onHand !== '' && l.onHand != null ? fq(l.onHand) : '—'}</td><td><input class="m-aq" data-i="${i}" type="number" step="any" min="0" value="${l.qty}" style="width:100px;text-align:right"></td><td class="n">${peso(l.cost)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+   <label style="margin-top:10px">${ok ? 'Note (optional)' : 'Reason for rejecting'}<input id="m-note"></label>
+   <div class="row end" style="margin-top:12px"><button data-mact="back">Back</button><button class="pri" data-mact="save">${ok ? 'Approve' : 'Reject'}</button></div>`,
+   {back: () => openPR(p.id), save: () => {
+     const note = $('#m-note').value.trim(); if (!ok && !note) return toast('Give a reason for rejecting.', true);
+     const u = {status: ok ? 'approved' : 'rejected', approvedBy: S.me.name || S.me.username, apprNote: note};
+     if (ok) { const aq = [...document.querySelectorAll('.m-aq')].map(el => num(el.value)); u.lines = p.lines.map((l, i) => ({...l, apprQty: Math.min(aq[i], num(l.qty))})); u.approvedTotal = r2(prTotal(u.lines, true)); }
+     guard(async () => { await upd('prs/' + p.id, u); closeModal(); }, ok ? 'Approved' : 'Rejected');
+   }});
+}
+function buyFromPR(p) {
+  const lines = p.lines.filter(l => num(l.apprQty ?? l.qty) > 0 && S.items[l.itemId]).map(l => ({itemId: l.itemId, qty: String(l.apprQty ?? l.qty), cost: String(l.cost || costOf(l.itemId) || '')}));
+  if (!lines.length) return toast('No approved stock items on this PR. Use "Mark purchased" instead.', true);
+  D.purchase = newPurchase({book: p.book, eventId: p.eventId || '', prId: p.id, prNo: p.prNo, lines, buyer: D.purchase.buyer, advanceId: ''});
+  closeModal(); location.hash = 'purchases';
+  toast('Lines copied from ' + p.prNo + '. Change quantities and prices to what was actually bought.');
+}
+function purchasedModal(p) {
+  openModal(`<h3>Mark ${esc(p.prNo)} as purchased</h3><p class="mut">Use this for items that don't go into stock (e.g. supplies, repairs). Stock items should be entered with <b>Enter the purchase</b> so they can be received.</p><p>Approved estimate: <b>${peso(prTotal(p.lines, true))}</b></p>
+   <div class="grid"><label>Date purchased<input id="m-d" type="date" value="${today()}"></label><label>Purchased by<input id="m-by" list="dl-staff"></label><label>Actual amount ₱<input id="m-amt" type="number" step="any" min="0"></label><label>Receipt / OR no(s).<input id="m-or"></label></div>
+   <label>Note<input id="m-note"></label><div id="m-var" style="margin-top:10px"></div>
+   <div class="row end" style="margin-top:10px"><button data-mact="back">Back</button><button class="pri" data-mact="save">Save</button></div>`,
+   {back: () => openPR(p.id), save: () => {
+     const by = $('#m-by').value.trim(), amt = num($('#m-amt').value);
+     if (!by || !(amt > 0)) return toast('Enter who bought it and the actual amount.', true);
+     guard(async () => { await upd('prs/' + p.id, {status: 'purchased', actual: {date: $('#m-d').value, by, amount: r2(amt), receipt: $('#m-or').value.trim(), note: $('#m-note').value.trim(), at: Date.now()}}); closeModal(); }, 'Marked purchased');
+   }},
+   box => { const est = prTotal(p.lines, true); box.querySelector('#m-amt').addEventListener('input', e => { const a = num(e.target.value), dd = a - est; box.querySelector('#m-var').innerHTML = a ? `<div class="alert ${dd > est * 0.1 ? 'bad' : dd > 0 ? 'warn' : 'ok'}">${dd > 0 ? `Over the approved estimate by <b>${peso(dd)}</b>.` : `Within the approved estimate (${peso(-dd)} under).`}</div>` : ''; }); });
+}
+function cancelPR(p) {
+  openModal(`<h3>Cancel ${esc(p.prNo)}</h3><label>Reason<input id="m-r"></label><div class="row end" style="margin-top:12px"><button data-mact="back">Back</button><button class="pri" data-mact="save">Cancel PR</button></div>`,
+   {back: () => openPR(p.id), save: () => { const r = $('#m-r').value.trim(); if (!r) return toast('Give a reason.', true);
+     guard(async () => { await upd('prs/' + p.id, {status: 'cancelled', cancelledBy: S.me.name || S.me.username, cancelReason: r, cancelledAt: Date.now()}); closeModal(); }, 'Cancelled'); }});
+}
+
+/* ---------- printable requisition ---------- */
+function formModel(p) { const blank = !p; return {blank, lines: blank ? Array.from({length: 14}, () => null) : p.lines, showAppr: !blank && prApproved(p) && p.lines.some(l => l.apprQty != null && num(l.apprQty) !== num(l.qty))}; }
+function formHTML(p) {
+  const {blank, lines, showAppr} = formModel(p); p = p || {};
+  const c = S.config, f = v => blank ? '' : esc(v), appr = prApproved(p);
+  const stamp = !blank && !appr ? `<div class="stamp">${esc(PRST[p.status]?.[0] || '')}${p.status === 'submitted' ? ' — NOT YET APPROVED' : ''}</div>` : '';
+  return `<div class="pr">${stamp}
+  <div class="hd"><div><div class="co">${esc(c.company || "Romualdo's Catering")}</div><div class="ad">${esc(c.address || '')}</div></div><div class="ti">PURCHASE REQUISITION<div class="no">PR No. <b>${f(p.prNo) || '_______________'}</b></div></div></div>
+  <table class="meta"><tr><td><span>Date requested</span>${f(fmtD(p.date))}</td><td><span>Date needed</span>${f(fmtD(p.needed))}</td><td><span>Charge to</span>${blank ? '☐ Restaurant &nbsp; ☐ Catering' : esc(BOOK[p.book]?.name) + (p.eventId ? ' — ' + esc(evName(p.eventId)) : '')}</td></tr>
+   <tr><td><span>Department</span>${f(p.dept)}</td><td><span>Requested by</span>${f(p.requestedBy)}</td><td><span>Priority</span>${blank ? '☐ Normal &nbsp; ☐ Urgent' : esc(p.priority)}</td></tr>
+   <tr><td colspan="3"><span>Purpose</span>${f(p.purpose)}</td></tr></table>
+  <table class="it"><thead><tr><th style="width:28px">#</th><th>Item / description</th><th class="n">Qty</th><th>Unit</th>${showAppr ? '<th class="n">Approved qty</th>' : ''}<th class="n">On hand</th><th class="n">Est. unit cost</th><th class="n">Est. amount</th><th class="n">Actual cost</th></tr></thead><tbody>
+   ${lines.map((l, i) => l ? `<tr><td>${i + 1}</td><td>${esc(l.desc)}</td><td class="n">${fq(l.qty)}</td><td>${esc(l.unit)}</td>${showAppr ? `<td class="n">${fq(l.apprQty ?? l.qty)}</td>` : ''}<td class="n">${l.onHand !== '' && l.onHand != null ? fq(l.onHand) : ''}</td><td class="n">${peso(l.cost)}</td><td class="n">${peso(num(appr ? (l.apprQty ?? l.qty) : l.qty) * num(l.cost))}</td><td></td></tr>` : `<tr><td>${i + 1}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}
+  </tbody><tfoot><tr><td colspan="${showAppr ? 7 : 6}" class="n">Estimated total</td><td class="n">${blank ? '' : peso(prTotal(p.lines, appr))}</td><td></td></tr>
+   <tr><td colspan="${showAppr ? 7 : 6}" class="n">Actual total</td><td></td><td class="n">${!blank && p.actual ? peso(p.actual.amount) : ''}</td></tr></tfoot></table>
+  ${!blank && p.apprNote ? `<p class="note"><b>Approver's note:</b> ${esc(p.apprNote)}</p>` : ''}
+  <table class="sig"><tr>${[['Requested by', p.requestedBy, fmtD(p.date)], ['Stock checked by (storekeeper)', '', ''], ['Approved by', appr ? p.approvedBy : '', p.approvedAt ? fmtT(p.approvedAt) : ''], ['Cash received / purchased by', p.actual?.by || '', p.actual?.date ? fmtD(p.actual.date) : '']]
+     .map(([t, n, dd]) => `<td><div class="ln">${blank ? '' : esc(n || '')}</div><div class="lb">${t}</div><div class="dt">Date: ${blank ? '' : esc(dd || '')}</div></td>`).join('')}</tr></table>
+  <div class="ft">Attach official receipts to this form. Items bought without an approved PR are charged to the buyer unless authorized.${blank ? '' : ' · Printed ' + fmtT(Date.now()) + ' by ' + esc(S.me?.name || '')}</div></div>`;
+}
+const FORM_CSS = `.pr{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12px;position:relative;max-width:780px;margin:auto}
+.pr .hd{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111;padding-bottom:8px;margin-bottom:10px}
+.pr .co{font-size:18px;font-weight:700}.pr .ad{color:#444;font-size:11px}.pr .ti{text-align:right;font-weight:700;font-size:15px;letter-spacing:.04em}.pr .no{font-size:12px;font-weight:400;margin-top:4px}
+.pr table{width:100%;border-collapse:collapse}.pr .meta td{border:1px solid #999;padding:5px 7px;vertical-align:top;width:33%}.pr .meta span{display:block;font-size:9px;color:#555;text-transform:uppercase;letter-spacing:.04em}
+.pr .it{margin-top:10px}.pr .it th,.pr .it td{border:1px solid #999;padding:5px 6px;text-align:left;font-size:11.5px}.pr .it th{background:#eee;font-size:10px;text-transform:uppercase;color:#111;letter-spacing:0}.pr .it td{height:22px}.pr .n{text-align:right!important}.pr tfoot td{font-weight:700}
+.pr .note{margin:8px 0 0}.pr .sig{margin-top:26px}.pr .sig td{width:25%;padding:0 8px;vertical-align:bottom;border:0}.pr .ln{border-bottom:1px solid #111;height:30px;font-weight:600;padding-top:12px;text-align:center}.pr .lb{font-size:10px;text-align:center;margin-top:3px}.pr .dt{font-size:10px;color:#555;margin-top:6px}
+.pr .ft{margin-top:18px;font-size:9.5px;color:#555;border-top:1px solid #ccc;padding-top:6px}
+.pr .stamp{position:absolute;top:0;left:34%;border:3px solid #b42318;color:#b42318;font-weight:700;font-size:16px;padding:4px 10px;transform:rotate(-8deg);opacity:.75;text-transform:uppercase}
+.paper{border:1px solid var(--line,#ddd);border-radius:6px;padding:22px;background:#fff;overflow-x:auto;margin:10px 0}`;
+document.head.insertAdjacentHTML('beforeend', `<style>${FORM_CSS}</style>`);
+function printDoc(p) {
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${p ? esc(p.prNo) : 'Blank'} Purchase Requisition</title><style>@page{size:A4;margin:12mm}body{margin:0}${FORM_CSS}</style></head><body>${formHTML(p)}</body></html>`;
+  const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0'; document.body.appendChild(f);
+  const d = f.contentDocument; d.open(); d.write(html); d.close();
+  setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) { toast('Printing was blocked — use PDF instead.', true); } setTimeout(() => f.remove(), 60000); }, 300);
+}
+let pdfLib;
+function loadPdf() {
+  if (pdfLib) return pdfLib;
+  const load = src => new Promise((res, rej) => { const s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = () => rej(new Error('Could not load the PDF tool — check the internet connection, or use Print.')); document.head.appendChild(s); });
+  pdfLib = load('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js').then(() => load('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')).catch(e => { pdfLib = null; throw e; });
+  return pdfLib;
+}
+async function pdfDoc(p) {
+  try {
+    toast('Preparing PDF…'); await loadPdf();
+    const {jsPDF} = window.jspdf, doc = new jsPDF({unit: 'mm', format: 'a4'});
+    const {blank, lines, showAppr} = formModel(p); p = p || {}; const appr = prApproved(p);
+    const pm = n => 'PHP ' + (Number(n) || 0).toLocaleString('en-PH', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+    const W = 210, L = 14, Rt = W - 14; let y = 16;
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.text(S.config.company || "Romualdo's Catering", L, y);
+    doc.setFontSize(13); doc.text('PURCHASE REQUISITION', Rt, y, {align: 'right'});
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); if (S.config.address) doc.text(S.config.address, L, y + 5);
+    doc.setFontSize(10); doc.text('PR No. ' + (blank ? '________________' : p.prNo), Rt, y + 6, {align: 'right'});
+    y += 9; doc.setLineWidth(0.6); doc.line(L, y, Rt, y); y += 3;
+    const meta = [[['Date requested', blank ? '' : fmtD(p.date)], ['Date needed', blank ? '' : fmtD(p.needed)], ['Charge to', blank ? '[ ] Restaurant   [ ] Catering' : BOOK[p.book].name + (p.eventId ? ' - ' + evName(p.eventId) : '')]],
+      [['Department', blank ? '' : p.dept], ['Requested by', blank ? '' : p.requestedBy], ['Priority', blank ? '[ ] Normal   [ ] Urgent' : p.priority]]];
+    doc.autoTable({startY: y, theme: 'grid', margin: {left: L, right: 14}, styles: {fontSize: 9, cellPadding: 1.8, lineColor: 150, textColor: 20},
+      body: [...meta.map(r => r.map(([k, v]) => k.toUpperCase() + '\n' + (v || ' '))), [{content: 'PURPOSE\n' + (blank ? ' ' : (p.purpose || ' ')), colSpan: 3}]]});
+    y = doc.lastAutoTable.finalY + 4;
+    const head = ['#', 'Item / description', 'Qty', 'Unit', ...(showAppr ? ['Appr. qty'] : []), 'On hand', 'Est. unit cost', 'Est. amount', 'Actual cost'];
+    const body = lines.map((l, i) => l ? [i + 1, l.desc, fq(l.qty), l.unit, ...(showAppr ? [fq(l.apprQty ?? l.qty)] : []), l.onHand !== '' && l.onHand != null ? fq(l.onHand) : '', pm(l.cost), pm(num(appr ? (l.apprQty ?? l.qty) : l.qty) * num(l.cost)), ''] : [i + 1, '', '', '', ...(showAppr ? [''] : []), '', '', '', '']);
+    const span = showAppr ? 7 : 6;
+    const foot = [[{content: 'Estimated total', colSpan: span, styles: {halign: 'right'}}, blank ? '' : pm(prTotal(p.lines, appr)), ''], [{content: 'Actual total', colSpan: span, styles: {halign: 'right'}}, '', !blank && p.actual ? pm(p.actual.amount) : '']];
+    const right = {}; head.forEach((h, i) => { if (/qty|hand|cost|amount/i.test(h)) right[i] = {halign: 'right'}; });
+    doc.autoTable({startY: y, theme: 'grid', margin: {left: L, right: 14}, head: [head], body, foot, showFoot: 'lastPage',
+      styles: {fontSize: 8.5, cellPadding: 1.6, lineColor: 150, textColor: 20, minCellHeight: 6.5}, headStyles: {fillColor: [235, 235, 235], textColor: 20, fontStyle: 'bold'}, footStyles: {fillColor: [255, 255, 255], textColor: 20, fontStyle: 'bold'},
+      columnStyles: {0: {cellWidth: 7}, ...right}});
+    y = doc.lastAutoTable.finalY + 6;
+    if (!blank && p.apprNote) { doc.setFontSize(9); doc.text(doc.splitTextToSize("Approver's note: " + p.apprNote, Rt - L), L, y); y += 8; }
+    if (y > 250) { doc.addPage(); y = 20; }
+    y += 14; const cw = (Rt - L) / 4;
+    [['Requested by', blank ? '' : p.requestedBy, blank ? '' : fmtD(p.date)], ['Stock checked by (storekeeper)', '', ''], ['Approved by', appr ? p.approvedBy : '', p.approvedAt ? fmtT(p.approvedAt) : ''], ['Cash received / purchased by', p.actual?.by || '', p.actual?.date ? fmtD(p.actual.date) : '']]
+      .forEach(([t, n, dd], i) => { const x = L + i * cw + 3, w = cw - 6; doc.setFont('helvetica', 'bold'); doc.setFontSize(9); if (n) doc.text(String(n), x + w / 2, y - 1.5, {align: 'center'}); doc.setLineWidth(0.3); doc.line(x, y, x + w, y); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.text(t, x + w / 2, y + 4, {align: 'center'}); doc.text('Date: ' + (dd || ''), x, y + 10); });
+    y += 20; doc.setFontSize(7.5); doc.setTextColor(90);
+    doc.text('Attach official receipts to this form. Items bought without an approved PR are charged to the buyer unless authorized.' + (blank ? '' : '  Printed ' + fmtT(Date.now())), L, y);
+    if (!blank && !appr) { doc.setTextColor(180, 35, 24); doc.setFontSize(20); doc.setFont('helvetica', 'bold'); doc.text((PRST[p.status]?.[0] || '').toUpperCase() + (p.status === 'submitted' ? ' - NOT YET APPROVED' : ''), W / 2, 150, {align: 'center', angle: 15}); }
+    doc.save((p.prNo || 'Blank') + ' Purchase Requisition.pdf');
+  } catch (e) { toast(e.message || 'PDF failed', true); }
+}
+ACT.printBlank = () => printDoc(null);
+ACT.pdfBlank = () => pdfDoc(null);
+function downloadFile(name, text, type) { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], {type})); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+
+/* ============ modal & toast ============ */
+let MH = {};
+function openModal(html, handlers = {}, mount) { MH = handlers; $('#mbox').innerHTML = html; $('#modal').classList.add('open'); if (mount) mount($('#mbox')); const f = $('#mbox').querySelector('input:not([type=checkbox]),select,textarea'); if (f && window.innerWidth > 700) f.focus(); }
+function closeModal() { $('#modal').classList.remove('open'); $('#mbox').innerHTML = ''; MH = {}; }
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); const b = e.target.closest('[data-mact]'); if (!b) return; const k = b.dataset.mact; if (k === 'close') closeModal(); else MH[k]?.(b); });
+let tT; function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.className = err ? 'err' : ''; t.style.display = 'block'; clearTimeout(tT); tT = setTimeout(() => t.style.display = 'none', err ? 5000 : 2600); }
+const mBtns = (save = 'Save', extra = '') => `<div class="row end" style="margin-top:14px">${extra}<button data-mact="close">Cancel</button><button class="pri" data-mact="save">${save}</button></div>`;
+
+/* ============ writes ============ */
+function needDb() { if (!S.me) { toast('Please log in.', true); return false; } return true; }
+const genId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+async function opsWrite(ops) { const r = await api('opsWrite', {ops}); applyDocs(r.docs, false); return r; }
+async function addDoc(coll, data) { const id = genId(); await opsWrite([{op: 'add', path: coll + '/' + id, data}]); return id; }
+const upd = (path, data) => opsWrite([{op: 'update', path, data}]);
+const setDoc = (path, data) => opsWrite([{op: 'set', path, data}]);
+async function guard(fn, ok) {
+  if (S.busy || !needDb()) return false; S.busy = true; document.body.style.cursor = 'progress'; toast('Saving…');
+  try { await fn(); if (ok) toast(ok); return true; }
+  catch (e) { console.error(e); if (!e.auth) toast('Not saved: ' + (e?.message || e), true); return false; }
+  finally { S.busy = false; document.body.style.cursor = ''; render(); }
+}
+
+/* ============ actions ============ */
+ACT.set = a => { const i = a.indexOf('|'); setPath(D, a.slice(0, i), a.slice(i + 1)); render(); };
+ACT.more = k => { D.ui.showAll[k] = (D.ui.showAll[k] || 40) + 100; render(); };
+ACT.addLine = k => { D[k].lines.push({itemId: '', qty: '', ...(k === 'purchase' || k === 'req' ? {cost: ''} : {})}); render(); };
+ACT.rmLine = a => { const [k, i] = a.split('|'); D[k].lines.splice(+i, 1); if (!D[k].lines.length) ACT.addLine(k); else render(); };
+ACT.resetP = () => { D.purchase = newPurchase({book: D.purchase.book}); render(); };
+ACT.resetM = () => { D.move = newMove({book: D.move.book}); render(); };
+
+ACT.saveAdv = () => {
+  const d = D.advance;
+  if (!d.to.trim() || !(num(d.amount) > 0)) return toast('Enter who received the cash and the amount.', true);
+  guard(async () => { await addDoc('advances', {date: d.date, book: d.book, eventId: d.book === 'C' ? d.eventId : '', to: d.to.trim(), amount: r2(num(d.amount)), givenBy: d.givenBy.trim(), note: d.note.trim(), status: 'open'}); D.advance = newAdvance({book: d.book, givenBy: d.givenBy}); }, 'Cash advance recorded');
+};
+ACT.liquidate = id => {
+  const a = S.advances.find(x => x.id === id); if (!a) return;
+  const s = advanceSpent(id), expect = num(a.amount) - s.spent, done = a.status === 'liquidated';
+  openModal(`<h3>${done ? 'Liquidation' : 'Liquidate cash advance'}</h3>
+   <p class="mut">${esc(a.to)} · ${chipBook(a.book, a.eventId)} · ${fmtD(a.date)}</p>
+   <table><tbody>
+    ${s.ps.map(p => `<tr><td>Purchase · ${esc(p.supplier || '—')}${p.receiptNo ? '' : ' <span class="chip warn">no receipt</span>'}</td><td class="n">${peso(p.total)}</td></tr>`).join('')}
+    ${s.es.map(e => `<tr><td>Expense · ${esc(e.cat)} ${esc(e.desc)}${e.receiptNo ? '' : ' <span class="chip warn">no receipt</span>'}</td><td class="n">${peso(e.amount)}</td></tr>`).join('')}
+    ${!s.ps.length && !s.es.length ? '<tr><td colspan="2" class="mut">No purchases or expenses were recorded against this advance.</td></tr>' : ''}
+   </tbody><tfoot><tr><td>Cash advance</td><td class="n">${peso(a.amount)}</td></tr><tr><td>Less: recorded spending</td><td class="n">${peso(s.spent)}</td></tr><tr><td>Change that must be returned</td><td class="n">${peso(expect)}</td></tr></tfoot></table>
+   ${done ? `<p>Change returned: <b>${peso(a.change)}</b> · received by ${esc(a.liqBy || '—')} · ${fmtT(a.liqAt)}<br>Unaccounted: <b class="${Math.abs(num(a.diff)) >= 1 ? 'bad-t' : 'ok-t'}">${Math.abs(num(a.diff)) >= 1 ? peso(a.diff) : 'none — balanced'}</b></p>${a.liqNote ? `<p class="small">${esc(a.liqNote)}</p>` : ''}<div class="row end"><button data-mact="close">Close</button></div>` : `
+   <div class="grid" style="margin-top:12px"><label>Cash actually returned ₱<input id="m-chg" type="number" inputmode="decimal" step="any" min="0" value="${Math.max(0, r2(expect))}"></label><label>Received by<input id="m-by" list="dl-staff"></label></div>
+   <div id="m-diff" class="alert"></div>
+   <label>Explanation (required if it doesn't balance)<input id="m-note"></label>
+   ${mBtns('Liquidate')}`}`,
+   {save: () => {
+     const chg = num($('#m-chg').value), diff = r2(num(a.amount) - s.spent - chg), note = $('#m-note').value.trim(), by = $('#m-by').value.trim();
+     if (!by) return toast('Who received the change?', true);
+     if (Math.abs(diff) >= 1 && !note) return toast('It doesn\'t balance — add an explanation.', true);
+     guard(async () => { await upd('advances/' + id, {status: 'liquidated', change: r2(chg), spent: r2(s.spent), diff, liqNote: note, liqBy: by, liqAt: Date.now()}); closeModal(); }, Math.abs(diff) >= 1 ? 'Liquidated — flagged as not balanced' : 'Liquidated — balanced');
+   }},
+   box => { const upd = () => { const el = box.querySelector('#m-diff'); if (!el) return; const diff = r2(num(a.amount) - s.spent - num(box.querySelector('#m-chg').value)); el.className = 'alert ' + (Math.abs(diff) < 1 ? 'ok' : 'bad'); el.innerHTML = Math.abs(diff) < 1 ? '✓ Balanced' : diff > 0 ? `Short by <b>${peso(diff)}</b>: cash not returned and not covered by recorded purchases.` : `Over by <b>${peso(-diff)}</b>: recorded spending exceeds the advance (buyer used own money?).`; };
+     box.querySelector('#m-chg')?.addEventListener('input', upd); upd(); });
+};
+
+ACT.unlinkPR = () => { D.purchase.prId = ''; D.purchase.prNo = ''; render(); };
+ACT.saveP = () => {
+  const d = D.purchase, lines = d.lines.filter(l => l.itemId && num(l.qty) > 0);
+  if (!lines.length) return toast('Add at least one item with a quantity.', true);
+  if (lines.some(l => !(num(l.cost) > 0))) return toast('Enter the unit cost for every line.', true);
+  if (!d.buyer.trim()) return toast('Who bought it?', true);
+  if (d.lines.some(l => l.itemId && !(num(l.qty) > 0))) return toast('Some lines have no quantity.', true);
+  guard(async () => {
+    const id = genId(), total = r2(sum(lines, l => num(l.qty) * num(l.cost)));
+    const ops = [{op: 'add', path: 'purchases/' + id, data: {date: d.date, book: d.book, eventId: d.book === 'C' ? d.eventId : '', supplier: d.supplier.trim(), buyer: d.buyer.trim(), receiptNo: d.receiptNo.trim(), advanceId: d.advanceId, prId: d.prId || '', prNo: d.prNo || '',
+      lines: lines.map(l => ({itemId: l.itemId, qty: num(l.qty), cost: num(l.cost), prevCost: costOf(l.itemId)})), total, status: 'pending'}}];
+    const pr = d.prId && S.prs.find(x => x.id === d.prId);
+    if (pr && pr.status === 'approved') ops.push({op: 'update', path: 'prs/' + pr.id, data: {status: 'purchased', actual: {date: d.date, by: d.buyer.trim(), amount: total, receipt: d.receiptNo.trim(), purchaseId: id, at: Date.now()}}});
+    await opsWrite(ops);
+    D.purchase = newPurchase({book: d.book, date: d.date, buyer: d.buyer, advanceId: d.advanceId, eventId: d.eventId});
+  }, 'Purchase saved — waiting to be received');
+};
+function purchaseTable(p, recvInputs) {
+  return `<div class="tw"><table><thead><tr><th>Item</th><th class="n">Bought</th>${p.status !== 'pending' || recvInputs ? '<th class="n">Received</th>' : ''}<th class="n">Unit cost</th><th class="n">Amount</th></tr></thead><tbody>
+   ${p.lines.map((l, i) => { const j = priceJump(l, l.prevCost); const rq = recvQty(p, i); return `<tr><td>${esc(iname(l.itemId))}${Math.abs(j) > pctAlert() ? ` <span class="chip ${j > 0 ? 'bad' : 'info'}">${j > 0 ? '▲' : '▼'} ${Math.abs(j).toFixed(0)}% vs ${peso(l.prevCost)}</span>` : ''}</td><td class="n">${fq(l.qty)} ${esc(iunit(l.itemId))}</td>
+    ${recvInputs ? `<td><input class="m-rq" data-i="${i}" type="number" inputmode="decimal" step="any" min="0" value="${l.qty}" style="width:100px;text-align:right"></td>` : p.status === 'received' ? `<td class="n ${rq < l.qty - 0.001 ? 'bad-t' : ''}">${fq(rq)}</td>` : ''}
+    <td class="n">${peso(l.cost)}</td><td class="n">${peso(l.qty * l.cost)}</td></tr>`; }).join('')}
+  </tbody><tfoot><tr><td colspan="${p.status !== 'pending' || recvInputs ? 4 : 3}">Total</td><td class="n">${peso(p.total)}</td></tr></tfoot></table></div>`;
+}
+ACT.viewP = id => {
+  const p = S.purchases.find(x => x.id === id); if (!p) return;
+  openModal(`<h3>Purchase · ${esc(p.supplier || 'no supplier')}</h3>
+   <p class="mut">${fmtD(p.date)} · ${chipBook(p.book, p.eventId)} · bought by <b>${esc(p.buyer)}</b> · receipt ${p.receiptNo ? esc(p.receiptNo) : '<span class="chip warn">none</span>'}${p.advanceId ? ' · from cash advance' : ''}</p>
+   ${purchaseTable(p)}
+   <p class="small mut">Entered ${fmtT(p.createdAt)}${who(p.createdBy) ? ' by ' + esc(who(p.createdBy)) : ''}.
+   ${p.status === 'received' ? ` Received by <b>${esc(p.recv?.by)}</b> ${fmtT(p.recv?.at)}.${p.recv?.note ? ' Note: ' + esc(p.recv.note) : ''}` : ''}
+   ${p.status === 'void' ? ` <span class="bad-t">Voided:</span> ${esc(p.voidReason)} (${esc(p.voidByName || '')}, ${fmtT(p.voidAt)})` : ''}</p>
+   <div class="row end">${p.status === 'pending' ? `<button class="pri" data-mact="recv">Receive now</button>` : ''}<button data-mact="close">Close</button></div>`, {recv: () => ACT.receive(id)});
+};
+ACT.receive = id => {
+  const p = S.purchases.find(x => x.id === id); if (!p || p.status !== 'pending') return;
+  openModal(`<h3>Receive purchase</h3>
+   <p class="mut">${fmtD(p.date)} · ${chipBook(p.book, p.eventId)} · ${esc(p.supplier || '—')} · bought by <b>${esc(p.buyer)}</b></p>
+   <div class="alert info"><span class="ic">i</span><div>Weigh or count every item now. Change the received quantity if it's less than what the buyer recorded. Only the received quantity goes into stock.</div></div>
+   ${purchaseTable(p, true)}
+   <div class="grid" style="margin-top:10px"><label>Received by<input id="m-by" list="dl-staff"></label><label>Note<input id="m-note" placeholder="e.g. 0.3kg short on pork, wilted pechay"></label></div>
+   <div id="m-warn"></div>
+   ${mBtns('Confirm received')}`,
+   {save: () => {
+     const by = $('#m-by').value.trim(); if (!by) return toast('Enter who received the goods.', true);
+     const qty = [...document.querySelectorAll('.m-rq')].map(el => num(el.value));
+     guard(async () => {
+       const ops = [{op: 'update', path: 'purchases/' + id, data: {status: 'received', recv: {by, at: Date.now(), qty, note: $('#m-note').value.trim()}}}];
+       const seen = {}; p.lines.forEach(l => { if (S.items[l.itemId] && num(l.cost) > 0 && num(S.items[l.itemId].lastCost) !== num(l.cost)) seen[l.itemId] = num(l.cost); });
+       Object.entries(seen).forEach(([iid, c]) => ops.push({op: 'update', path: 'items/' + iid, data: {lastCost: c}}));
+       await opsWrite(ops);
+       closeModal();
+     }, 'Received into ' + BOOK[p.book].name + ' stock');
+   }},
+   box => { const by = box.querySelector('#m-by'); by.addEventListener('input', () => { box.querySelector('#m-warn').innerHTML = by.value.trim() && by.value.trim().toLowerCase() === (p.buyer || '').trim().toLowerCase() ? '<div class="alert warn"><span class="ic">⚠</span><div>The receiver is the same person as the buyer. This will be flagged for the owner.</div></div>' : ''; }); });
+};
+
+ACT.saveE = () => {
+  const d = D.expense;
+  if (!d.cat || !(num(d.amount) > 0)) return toast('Choose a category and enter the amount.', true);
+  guard(async () => { await addDoc('expenses', {date: d.date, book: d.book, eventId: d.book === 'C' ? d.eventId : '', cat: d.cat, desc: d.desc.trim(), amount: r2(num(d.amount)), paidBy: d.paidBy.trim(), receiptNo: d.receiptNo.trim(), advanceId: d.advanceId, status: 'ok'}); D.expense = newExpense({book: d.book, date: d.date, paidBy: d.paidBy, advanceId: d.advanceId, eventId: d.eventId}); }, 'Expense saved');
+};
+
+ACT.saveM = () => {
+  const d = D.move, lines = d.lines.filter(l => l.itemId && num(l.qty) > 0);
+  if (!lines.length) return toast('Add at least one item with a quantity.', true);
+  if (d.book === 'C' && (d.type === 'issue' || d.type === 'return') && !d.eventId) return toast('Choose the event.', true);
+  if (d.type === 'waste' && !d.reason) return toast('Choose a waste reason.', true);
+  if (!d.by.trim() || !d.receivedBy.trim()) return toast('Enter both names (released by and received / witnessed by).', true);
+  guard(async () => {
+    await addDoc('moves', {date: d.date, book: d.book, type: d.type, toBook: d.type === 'transfer' ? (d.book === 'R' ? 'C' : 'R') : '', eventId: d.book === 'C' && (d.type === 'issue' || d.type === 'return') ? d.eventId : '',
+      by: d.by.trim(), receivedBy: d.receivedBy.trim(), reason: d.type === 'waste' ? d.reason : '', note: d.note.trim(), lines: lines.map(l => ({itemId: l.itemId, qty: num(l.qty), cost: costOf(l.itemId)})), status: 'ok'});
+    D.move = newMove({book: d.book, type: d.type, date: d.date, by: d.by, eventId: d.eventId});
+  }, 'Saved');
+};
+
+ACT.void = a => {
+  const [coll, id] = a.split('|'); const x = (S[coll] || []).find(r => r.id === id); if (!x) return;
+  if (coll === 'purchases' && x.advanceId && S.advances.find(v => v.id === x.advanceId)?.status === 'liquidated') return toast('This purchase is part of a liquidated advance and can\'t be voided.', true);
+  openModal(`<h3>Void this record?</h3><p class="mut">It stays visible, struck through, with your reason and name. Its quantities and amounts stop counting.</p>
+   <label>Reason<input id="m-r" placeholder="e.g. Entered twice"></label><input id="m-n" type="hidden" value="${esc(S.me?.name || S.me?.username || '')}">${mBtns('Void record')}`,
+   {save: () => { const r = $('#m-r').value.trim(), n = $('#m-n').value.trim(); if (!r || !n) return toast('Reason and name are required.', true);
+     guard(async () => { await upd(coll + '/' + id, {status: 'void', voidReason: r, voidByName: n}); closeModal(); }, 'Voided'); }});
+};
+
+ACT.startCount = () => {
+  const b = D.ui.stockBook, {st} = stockFor(b);
+  D.count = {book: b, date: today(), by: '', witness: '', blind: true, q: '', lines: activeItems().map(i => ({itemId: i.id, system: r2(st[i.id] || 0), actual: ''}))};
+  if (!D.count.lines.length) { D.count = null; return toast('Add items in Setup first.', true); }
+  render(); window.scrollTo(0, 0);
+};
+ACT.cancelCount = () => { D.count = null; render(); };
+ACT.postCount = () => {
+  const c = D.count, lines = c.lines.filter(l => l.actual !== '' && l.actual != null);
+  if (!lines.length) return toast('Enter at least one counted quantity.', true);
+  if (!c.by.trim()) return toast('Enter who counted.', true);
+  const {st} = stockFor(c.book);  // recompute in case transactions came in meanwhile
+  const L = lines.map(l => ({itemId: l.itemId, system: r2(st[l.itemId] || 0), actual: num(l.actual), cost: costOf(l.itemId)}));
+  const vv = L.map(l => (l.actual - l.system) * l.cost), loss = r2(sum(vv.filter(v => v < 0), v => v)), gain = r2(sum(vv.filter(v => v > 0), v => v));
+  guard(async () => {
+    const id = await addDoc('counts', {date: c.date, book: c.book, by: c.by.trim(), witness: c.witness.trim(), lines: L, varianceValue: r2(loss + gain), lossValue: loss, gainValue: gain, status: 'ok'});
+    D.count = null; setTimeout(() => ACT.viewCount(id, {date: c.date, book: c.book, by: c.by, lines: L, lossValue: loss, gainValue: gain, varianceValue: r2(loss + gain)}), 100);
+  }, 'Count posted');
+};
+ACT.viewCount = (id, fallback) => {
+  const c = S.counts.find(x => x.id === id) || fallback; if (!c) return;
+  const v = (c.lines || []).map(l => ({...l, d: l.actual - l.system, val: (l.actual - l.system) * l.cost})).filter(l => Math.abs(l.d) > 0.001).sort((a, b) => a.val - b.val);
+  openModal(`<h3>Count result · ${BOOK[c.book].name} · ${fmtD(c.date)}</h3><p class="mut">Counted by ${esc(c.by)}${c.witness ? ', witness ' + esc(c.witness) : ''} · ${(c.lines || []).length} items</p>
+   <div class="kpis"><div class="kpi bad"><span>Missing</span><b>${peso(c.lossValue)}</b></div><div class="kpi"><span>Excess</span><b>${peso(c.gainValue)}</b></div><div class="kpi"><span>Net</span><b>${peso(c.varianceValue)}</b></div></div>
+   ${v.length ? `<div class="tw"><table><thead><tr><th>Item</th><th class="n">Expected</th><th class="n">Actual</th><th class="n">Difference</th><th class="n">Value</th></tr></thead><tbody>${v.map(l => `<tr><td>${esc(iname(l.itemId))}</td><td class="n">${fq(l.system)}</td><td class="n">${fq(l.actual)}</td><td class="n ${l.d < 0 ? 'bad-t' : 'ok-t'}">${l.d > 0 ? '+' : ''}${fq(l.d)} ${esc(iunit(l.itemId))}</td><td class="n">${peso(l.val)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="alert ok"><span class="ic">✓</span><div>Everything matched.</div></div>'}
+   <p class="small mut">Missing stock means it left the storeroom without an issue or waste record. Ask who had access, check for unrecorded issues, and recount big differences.</p>
+   <div class="row end"><button data-mact="close">Close</button></div>`);
+};
+
+ACT.saveEv = () => {
+  const d = D.event; if (!d.name.trim() || !d.date) return toast('Enter the event name and date.', true);
+  guard(async () => { const id = await addDoc('events', {name: d.name.trim(), client: d.client.trim(), date: d.date, pax: num(d.pax) || '', contract: r2(num(d.contract)), venue: d.venue.trim(), notes: d.notes.trim(), status: 'planned', plan: []}); D.event = newEvent(); D.ui.eventId = id; D.plan = null; }, 'Event created — now plan the menu quantities');
+};
+ACT.openEvent = id => { D.ui.eventId = id; D.plan = null; if (D.ui.tab !== 'events') location.hash = 'events'; else render(); window.scrollTo(0, 0); };
+ACT.closeEvent = () => { D.ui.eventId = ''; D.plan = null; render(); };
+ACT.evStatus = st => guard(async () => { await upd('events/' + D.ui.eventId, {status: st}); }, 'Event ' + st);
+ACT.savePlan = () => {
+  const lines = D.plan.lines.filter(l => l.itemId && num(l.qty) > 0).map(l => ({itemId: l.itemId, qty: num(l.qty)}));
+  guard(async () => { await upd('events/' + D.plan.eventId, {plan: lines}); }, 'Menu plan saved');
+};
+ACT.editEv = () => {
+  const e = S.events[D.ui.eventId]; if (!e) return;
+  openModal(`<h3>Edit event</h3><div class="grid"><label>Name<input id="m-name" value="${esc(e.name)}"></label><label>Client<input id="m-client" value="${esc(e.client)}"></label><label>Date<input id="m-date" type="date" value="${esc(e.date)}"></label><label>Pax<input id="m-pax" type="number" value="${esc(e.pax)}"></label><label>Contract ₱<input id="m-ct" type="number" step="any" value="${esc(e.contract)}"></label><label>Venue<input id="m-venue" value="${esc(e.venue)}"></label></div><label>Menu / notes<textarea id="m-notes">${esc(e.notes)}</textarea></label>${mBtns()}`,
+   {save: () => guard(async () => { await upd('events/' + e.id, {name: $('#m-name').value.trim() || e.name, client: $('#m-client').value.trim(), date: $('#m-date').value || e.date, pax: num($('#m-pax').value) || '', contract: r2(num($('#m-ct').value)), venue: $('#m-venue').value.trim(), notes: $('#m-notes').value}); closeModal(); }, 'Event updated')});
+};
+ACT.issueEvent = () => {
+  const e = S.events[D.ui.eventId]; const s = eventStats(e); const {st} = stockFor('C');
+  const lines = Object.entries(s.items).map(([id, x]) => ({itemId: id, qty: r2(x.bought - (x.issued - x.returned))})).filter(l => l.qty > 0.001 && S.items[l.itemId]);
+  if (!lines.length) return toast('Nothing received for this event is waiting to be issued.', true);
+  openModal(`<h3>Issue event purchases</h3><p class="mut">Issues everything received for “${esc(e.name)}” that hasn't been issued yet, from the catering storeroom to the event.</p>
+   <table><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">On hand</th></tr></thead><tbody>${lines.map(l => `<tr><td>${esc(iname(l.itemId))}</td><td class="n">${fq(l.qty)} ${esc(iunit(l.itemId))}</td><td class="n mut">${fq(st[l.itemId] || 0)}</td></tr>`).join('')}</tbody></table>
+   <div class="grid" style="margin-top:10px"><label>Released by<input id="m-by" list="dl-staff"></label><label>Received by (event head)<input id="m-rb" list="dl-staff"></label></div>${mBtns('Issue to event')}`,
+   {save: () => { const by = $('#m-by').value.trim(), rb = $('#m-rb').value.trim(); if (!by || !rb) return toast('Enter both names.', true);
+     guard(async () => { await addDoc('moves', {date: e.date <= today() ? e.date : today(), book: 'C', type: 'issue', toBook: '', eventId: e.id, by, receivedBy: rb, reason: '', note: 'Issued from event purchases', lines: lines.map(l => ({...l, cost: costOf(l.itemId)})), status: 'ok'}); closeModal(); }, 'Issued to event'); }});
+};
+ACT.marketList = () => {
+  const e = S.events[D.ui.eventId], {st} = stockFor('C');
+  const L = (D.plan?.lines || []).filter(l => l.itemId && num(l.qty) > 0).map(l => ({...l, need: Math.max(0, num(l.qty) - Math.max(0, st[l.itemId] || 0))})).filter(l => l.need > 0.001);
+  const txt = `MARKET LIST — ${e.name} (${fmtD(e.date)}, ${e.pax || '?'} pax)\n` + L.map(l => `• ${iname(l.itemId)} — ${fq(l.need)} ${iunit(l.itemId)}${costOf(l.itemId) ? ` (≈ ${peso(l.need * costOf(l.itemId))})` : ''}`).join('\n') + `\n\nEstimated total: ${peso(sum(L, l => l.need * costOf(l.itemId)))}`;
+  showText('Market list', L.length ? txt : 'Everything in the plan is already in the catering storeroom (or the plan is empty / unsaved).');
+};
+function showText(title, txt) {
+  openModal(`<h3>${esc(title)}</h3><textarea id="m-txt" style="min-height:260px;font-family:ui-monospace,monospace;font-size:12.5px" readonly>${esc(txt)}</textarea><div class="row end" style="margin-top:10px"><button data-mact="close">Close</button><button class="pri" data-mact="copy">Copy</button></div>`,
+   {copy: async () => { try { await navigator.clipboard.writeText(txt); toast('Copied'); } catch (e) { const t = $('#m-txt'); t.select(); toast('Press Ctrl/Cmd+C to copy'); } }});
+}
+ACT.csv = kind => {
+  const {rFrom: f, rTo: t} = D.ui, q = v => `"${String(v ?? '').replace(/"/g, '""')}"`, rows = [];
+  if (kind === 'purchases') { rows.push(['Date','Book','Event','Supplier','Buyer','Receipt','Item','Unit','Qty bought','Qty received','Unit cost','Amount','Status','Received by'].map(q).join(','));
+    S.purchases.filter(p => p.date >= f && p.date <= t).forEach(p => p.lines.forEach((l, i) => rows.push([p.date, BOOK[p.book].name, evName(p.eventId), p.supplier, p.buyer, p.receiptNo, iname(l.itemId), iunit(l.itemId), l.qty, p.status === 'received' ? recvQty(p, i) : '', l.cost, r2(l.qty * l.cost), p.status, p.recv?.by || ''].map(q).join(',')))); }
+  if (kind === 'expenses') { rows.push(['Date','Book','Event','Category','Description','Paid by','Receipt','Amount','Status'].map(q).join(','));
+    S.expenses.filter(e => e.date >= f && e.date <= t).forEach(e => rows.push([e.date, BOOK[e.book].name, evName(e.eventId), e.cat, e.desc, e.paidBy, e.receiptNo, e.amount, e.status].map(q).join(','))); }
+  if (kind === 'moves') { rows.push(['Date','Book','Type','Event','Reason','Released by','Received by','Item','Unit','Qty','Unit cost','Value','Status'].map(q).join(','));
+    S.moves.filter(m => m.date >= f && m.date <= t).forEach(m => (m.lines || []).forEach(l => rows.push([m.date, BOOK[m.book].name, MT[m.type]?.short + (m.type === 'transfer' ? ' to ' + BOOK[m.toBook]?.name : ''), evName(m.eventId), m.reason, m.by, m.receivedBy, iname(l.itemId), iunit(l.itemId), l.qty, l.cost, r2(l.qty * l.cost), m.status].map(q).join(',')))); }
+  downloadFile(`Romualdos ${kind} ${f} to ${t}.csv`, '\ufeff' + rows.join('\r\n'), 'text/csv;charset=utf-8'); toast('CSV downloaded — opens in Excel / Google Sheets');
+};
+ACT.saveSale = () => {
+  const d = D.sale; if (!d.date || d.amount === '') return toast('Enter date and amount.', true);
+  guard(async () => { await setDoc('sales/' + d.date, {date: d.date, R: r2(num(d.amount))}); D.sale = {date: today(), amount: ''}; }, 'Sales saved');
+};
+
+function itemModal(it, onSaved) {
+  openModal(`<h3>${it ? 'Edit item' : 'Add item'}</h3>
+   <div class="grid"><label>Name<input id="m-name" value="${esc(it?.name || '')}" placeholder="e.g. Pork liempo"></label>
+    <label>Category<select id="m-cat">${ITEM_CATS.map(c => opt(c, c)).join('')}</select></label>
+    <label>Unit<input id="m-unit" list="dl-units" value="${esc(it?.unit || 'kg')}"></label>
+    <label>Last cost per unit ₱<input id="m-cost" type="number" step="any" min="0" value="${esc(it?.lastCost ?? '')}"></label>
+    <label>Par · Restaurant<input id="m-pr" type="number" step="any" min="0" value="${esc(it?.par?.R ?? '')}"></label>
+    <label>Par · Catering<input id="m-pc" type="number" step="any" min="0" value="${esc(it?.par?.C ?? '')}"></label>
+    ${it ? `<label>Status<select id="m-act"><option value="1">Active</option><option value="0">Hidden (no longer bought)</option></select></label>` : ''}</div>
+   ${mBtns()}`,
+   {save: () => {
+     const name = $('#m-name').value.trim(), unit = $('#m-unit').value.trim();
+     if (!name || !unit) return toast('Name and unit are required.', true);
+     if (Object.values(S.items).some(x => x.id !== it?.id && x.name.trim().toLowerCase() === name.toLowerCase())) return toast('An item with that name already exists.', true);
+     const data = {name, cat: $('#m-cat').value, unit, lastCost: num($('#m-cost').value), par: {R: num($('#m-pr').value), C: num($('#m-pc').value)}, active: it ? $('#m-act').value === '1' : true};
+     guard(async () => { let id = it?.id; if (it) await upd('items/' + id, data); else id = await addDoc('items', data); S.items[id] = {id, ...data}; closeModal(); onSaved?.(id); }, it ? 'Item updated' : 'Item added');
+   }},
+   box => { box.querySelector('#m-cat').value = it?.cat || 'Vegetables'; if (it) box.querySelector('#m-act').value = it.active === false ? '0' : '1'; });
+}
+ACT.newItem = () => itemModal(null);
+ACT.editItem = id => itemModal(S.items[id]);
+ACT.saveCfg = () => {
+  const lines = s => [...new Set(String(s || '').split('\n').map(x => x.trim()).filter(Boolean))];
+  const data = {company: D.cfg.company.trim(), address: D.cfg.address.trim(), departments: lines(D.cfg.departments), staff: lines(D.cfg.staff), suppliers: lines(D.cfg.suppliers), expCats: lines(D.cfg.expCats), priceAlertPct: num(D.cfg.pct) || 10};
+  guard(async () => { await setDoc('config/main', {...S.config, ...data}); D.cfg = null; }, 'Lists saved');
+};
+
+/* ============ events wiring ============ */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b || !b.closest('#view') && !b.closest('#mbox')) return;
+  e.preventDefault(); ACT[b.dataset.act]?.(b.dataset.arg, b);
+});
+document.addEventListener('input', e => { const p = e.target.dataset?.b; if (!p || !e.target.closest('#view')) return; if (e.target.type === 'checkbox') return; setPath(D, p, e.target.value); live(); });
+document.addEventListener('change', e => {
+  const el = e.target, p = el.dataset?.b; if (!p || !el.closest('#view')) return;
+  if (el.type === 'checkbox') setPath(D, p, el.checked); else setPath(D, p, el.value);
+  if (el.value === '__new') { setPath(D, p, ''); render(); return itemModal(null, id => { setPath(D, p, id); const m = p.match(/^(purchase|req)\.lines\.(\d+)\.itemId$/); if (m && S.items[id]?.lastCost && !D[m[1]].lines[m[2]].cost) D[m[1]].lines[m[2]].cost = String(S.items[id].lastCost); render(); }); }
+  const m = p.match(/^(purchase|req)\.lines\.(\d+)\.itemId$/); if (m) { const l = D[m[1]].lines[m[2]]; if (!l.cost && S.items[l.itemId]?.lastCost) l.cost = String(S.items[l.itemId].lastCost); }
+  if ('rr' in el.dataset) render();
+});
+function route() { const h = location.hash.slice(1); D.ui.tab = TABS.some(t => t[0] === h) ? h : 'dash'; render(); window.scrollTo(0, 0); }
+window.addEventListener('hashchange', route);
+
+/* ============ backend (Google Apps Script — same logins as the inquiry dashboard) ============ */
+const API_URL = (window.ROMUALDOS_CONFIG && window.ROMUALDOS_CONFIG.API_URL) || '';
+const CACHE = new Map();
+let VER = 0, AFTER = 0;
+async function api(action, payload = {}) {
+  if (!API_URL || API_URL.includes('PASTE_')) throw new Error('The app is not connected yet (config.js has no API URL).');
+  let res;
+  try { res = await fetch(API_URL, {method: 'POST', body: JSON.stringify({action, token: S.token, ...payload})}); }
+  catch (e) { throw new Error('No internet connection'); }
+  let data; try { data = await res.json(); } catch (e) { throw new Error('The server did not answer properly. Has the new Apps Script version been deployed?'); }
+  if (data.auth && action !== 'login') { endSession(data.error); const er = new Error(data.error); er.auth = true; throw er; }
+  if (!data.ok) throw new Error(data.error || 'Server error');
+  return data;
+}
+function applyDocs(docs, fromSync) {
+  (docs || []).forEach(d => { CACHE.set(d.path, d); if (fromSync && d.updatedAt > AFTER) AFTER = d.updatedAt; });
+  rebuild();
+}
+function rebuild() {
+  const by = {config: [], items: [], events: [], advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: [], prs: []};
+  for (const [path, d] of CACHE) { const i = path.indexOf('/'); const c = path.slice(0, i); (by[c] ||= []).push({id: path.slice(i + 1), ...d.data}); }
+  const desc = a => a.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
+  const m = by.config.find(d => d.id === 'main');
+  S.config = {...DEFAULT_CONFIG, ...(m || {})};
+  S.items = Object.fromEntries(by.items.map(d => [d.id, d]));
+  S.events = Object.fromEntries(by.events.map(d => [d.id, d]));
+  S.advances = desc(by.advances); S.purchases = desc(by.purchases); S.expenses = desc(by.expenses);
+  S.moves = desc(by.moves); S.counts = desc(by.counts); S.prs = desc(by.prs);
+  S.sales = Object.fromEntries(by.sales.map(d => [d.date, d]));
+  schedule();
+}
+async function sync(full) {
+  if (!S.token || S.syncing) return; S.syncing = true; if (!S.lastSync) schedule();
+  try {
+    const r = await api('opsSync', {ver: full ? 0 : VER, after: full ? 0 : Math.max(0, AFTER - 15000)});
+    const wasAdmin = S.isAdmin;
+    S.me = r.me; S.isAdmin = r.me.role === 'Admin';
+    if (!r.unchanged) { if (r.users) S.users = r.users; applyDocs(r.docs, true); }
+    VER = r.ver; S.lastSync = Date.now(); S.syncErr = '';
+    if (wasAdmin !== S.isAdmin) schedule();
+  } catch (e) { if (!e.auth) S.syncErr = e.message; }
+  finally { S.syncing = false; schedule(); }
+}
+const TOKEN_KEY = 'rcs_ops_token';
+function saveToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} try { t ? sessionStorage.setItem('rcs_token', t) : sessionStorage.removeItem('rcs_token'); } catch (e) {} }
+function readToken() { try { return sessionStorage.getItem('rcs_token') || localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
+function endSession(msg) { S.token = ''; S.me = null; S.isAdmin = false; S.lastSync = 0; S.loginMsg = msg || ''; CACHE.clear(); VER = 0; AFTER = 0; saveToken(''); closeModal(); rebuild(); render(); }
+function loginView() {
+  return `<div class="card login"><h2>Staff login</h2>
+   <p class="lede" style="text-align:center">Use the same username and password as the inquiry dashboard.</p>
+   ${S.loginMsg ? `<div class="alert warn">${esc(S.loginMsg)}</div>` : ''}
+   <form id="loginForm"><label>Username<input id="lg-u" autocomplete="username" autocapitalize="none" required></label>
+   <label style="margin-top:10px">Password<input id="lg-p" type="password" autocomplete="current-password" required></label>
+   <button class="pri" style="width:100%;margin-top:14px" ${S.loggingIn ? 'disabled' : ''}>${S.loggingIn ? 'Checking…' : 'Log in'}</button></form>
+   <p class="small mut" style="text-align:center;margin-top:14px">Forgot your password or need an account? Ask the owner. Accounts are managed in the staff logins file.</p></div>`;
+}
+document.addEventListener('submit', async e => {
+  if (e.target.id !== 'loginForm') return; e.preventDefault();
+  const u = $('#lg-u').value.trim(), pw = $('#lg-p').value;
+  S.loggingIn = true; S.loginMsg = ''; render(); $('#lg-u').value = u;
+  try { const r = await api('login', {username: u, password: pw}); S.token = r.token; S.me = r.user; S.isAdmin = r.user.role === 'Admin'; saveToken(r.token); S.loggingIn = false; route(); sync(true); }
+  catch (er) { S.loggingIn = false; S.loginMsg = er.message; render(); }
+});
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act2]'); if (!b) return;
+  if (b.dataset.act2 === 'logout') { api('logout').catch(() => {}); endSession('You have logged out.'); }
+  if (b.dataset.act2 === 'refresh') { toast('Refreshing…'); sync(true); }
+});
+setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 20000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
+
+/* ============ boot ============ */
+function init() {
+  S.token = readToken();
+  if (S.token) { S.me = null; sync(true).then(() => route()); }
+  route();
+}
+init();
+</script>
+</body>
+</html>

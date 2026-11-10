@@ -49,6 +49,9 @@ function doPost(e) {
       case 'delete':    requireAdmin(req.token); return out(deleteInquiry(req.ref));
       case 'saveRates': requireAdmin(req.token); return out(saveRates(req.rates));
       case 'saveMenu':  requireAdmin(req.token); return out(saveMenu(req.menu));
+      // ---- operations app (purchasing, stock, requisitions) — see Ops.gs ----
+      case 'opsSync':
+      case 'opsWrite':  return out(handleOps(req));
       default:          return out({ ok: false, error: 'Unknown action.' });
     }
   } catch (err) {

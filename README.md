@@ -31,4 +31,23 @@ Customer-facing catering site with the 2026 packages, a build-your-own menu with
 - **Add, remove or block staff:** edit the Excel file and upload the new version to the Drive folder (*Manage versions* keeps the same file). Set **Active = No** to block someone; it takes effect on their next action.
 - **Changing `Code.gs` later:** after pasting the new code, go to **Deploy → Manage deployments → ✏️ → Version: New version → Deploy**. The URL stays the same.
 
+## Operations app — romualdos.ph/ops/
+
+Internal app for **purchase requisitions, cash advances, purchases & receiving, expenses, issues & waste, stock counts, catering event costing and reports**, with Restaurant and Catering kept in separate books. Staff log in with the **same usernames and passwords** as the inquiry dashboard (from the staff logins file).
+
+- **Staff** can file requisitions, record advances, purchases, receiving, expenses, issues, waste and counts, liquidate advances, and print requisitions.
+- **Admin** can also approve or reject requisitions, void records, change saved amounts, edit items and the Setup page. The rules are checked by the server (`apps-script/Ops.gs`), not only on screen.
+- **Records** are kept in a Google Sheet called **Romualdo's Ops Data**, created automatically in the Romualdo's Inquiry App folder. One row per record; nothing is ever deleted (Admins void with a reason). Don't edit that sheet by hand.
+
+### One-time setup (about 5 minutes)
+
+1. Open the **Romualdo's Inquiry API** project at <https://script.google.com>.
+2. Click **＋ (Add a file) → Script**, name it `Ops`, and paste the full contents of `apps-script/Ops.gs`. Save.
+3. Open `Code.gs` and replace it with the updated `apps-script/Code.gs` from this repository (it adds two lines that route the `opsSync` / `opsWrite` actions to Ops.gs). Save.
+4. In the function menu choose **testOps** and click **Run**. Approve access if asked. The log should say *Ops sheet OK* and *Added 30 starter items*.
+5. **Deploy → Manage deployments → ✏️ → Version: New version → Deploy.** The URL stays the same, so `config.js` doesn't change.
+6. Open **romualdos.ph/ops/** and log in with an Admin account. Go to **Setup** and add your address, departments and items, then do an opening stock count.
+
+Send staff the link **romualdos.ph/ops/**. Logins stay valid for 6 hours; deactivating someone in the staff file takes effect within 2 minutes.
+
 All prices shown on the site are estimates only. Final prices are confirmed in a formal quotation.
