@@ -67,6 +67,14 @@ tfoot td{font-weight:700;border-top:2px solid var(--line)}
 .lines input,.lines select{padding:7px 8px}
 .lines input[type=number]{min-width:78px}
 .lines select{min-width:170px}
+.acts{white-space:nowrap}.acts .sm+.sm{margin-left:4px}
+.wf-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.wf{display:flex;flex-direction:column;gap:2px;padding:12px;border:1px solid rgba(0,0,0,.1);border-radius:12px;text-decoration:none;color:inherit;background:#fff;position:relative}
+.wf:hover{border-color:currentColor}
+.wf .wf-n{width:24px;height:24px;border-radius:50%;background:#2f6f6a;color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;margin-bottom:4px}
+.wf .wf-t{font-weight:700}.wf .wf-h{font-size:12px;opacity:.7}
+.wf .wf-b{margin-top:6px;font-size:11.5px;font-weight:700;background:#f4f2ee;border-radius:999px;padding:2px 8px;align-self:flex-start}
+.wf.due{border-color:#c77d2c;box-shadow:0 0 0 1px #c77d2c inset}.wf.due .wf-b{background:#fbe7cf;color:#8a4b10}
 .stock-t tr.cat-h th{background:var(--bg,#f4f2ee);text-align:left;padding:10px 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;border-top:2px solid rgba(0,0,0,.08)}
 .stock-t tr.cat-h th span:first-child{margin-right:10px;font-weight:800}
 .stock-t tr.cat-h th span.small{text-transform:none;letter-spacing:0;font-weight:500}
@@ -370,6 +378,26 @@ const showMore = (key, n) => n > (D.ui.showAll[key] || 40) ? `<div class="row" s
 const take = (key, arr) => arr.slice(0, D.ui.showAll[key] || 40);
 
 /* ============ DASHBOARD ============ */
+function belowPar(b) {
+  const {st} = stockFor(b);
+  return activeItems().filter(i => num(i.par?.[b]) > 0 && (st[i.id] || 0) < num(i.par[b])).map(i => ({item: i, onHand: st[i.id] || 0, need: r2(num(i.par[b]) - Math.max(0, st[i.id] || 0))}));
+}
+function workflowStrip(pend, adv) {
+  const waiting = S.prs.filter(p => p.status === 'submitted').length, toBuy = S.prs.filter(p => p.status === 'approved').length;
+  const low = belowPar('R').length + belowPar('C').length;
+  const lastCount = S.counts.filter(live_).map(c => c.date).sort().pop();
+  const daysSince = lastCount ? Math.round((new Date(today()) - new Date(lastCount)) / 864e5) : null;
+  const step = (n, title, hint, badge, tab, act, bad) => `<a class="wf ${bad ? 'due' : ''}" href="#${tab}"${act ? ` data-act="${act}"` : ''}><span class="wf-n">${n}</span><span class="wf-t">${title}</span><span class="wf-h">${hint}</span>${badge ? `<span class="wf-b">${badge}</span>` : ''}</a>`;
+  return `<div class="card wf-card"><h3>What do you need to do?</h3><p class="small mut" style="margin:-4px 0 10px">Follow the steps in order. Numbers show what's waiting.</p><div class="wf-grid">
+    ${step(1, 'Request', 'Ask for what to buy (PR)', [waiting && waiting + ' waiting approval', low && low + ' below par'].filter(Boolean).join(' · '), 'prs', '', waiting || low)}
+    ${step(2, 'Release budget', 'Give the buyer a cash advance', toBuy ? toBuy + ' approved PR' + (toBuy === 1 ? '' : 's') + ' to buy' : '', 'advances', '', toBuy)}
+    ${step(3, 'Record purchase', 'Enter what was bought & receipts', '', 'purchases')}
+    ${step(4, 'Receive', 'Check & accept deliveries into stock', pend.length ? pend.length + ' to receive' : '', 'purchases', '', pend.length)}
+    ${step(5, 'Issue / waste', 'Release stock to kitchen or events', '', 'usage')}
+    ${step(6, 'Count stock', 'Check the shelf vs. the system', daysSince == null ? 'never counted' : daysSince + ' day' + (daysSince === 1 ? '' : 's') + ' ago', 'stock', '', daysSince == null || daysSince > 7)}
+    ${step('₱', 'Liquidate', 'Settle cash advances & change', adv.length ? adv.length + ' open' : '', 'advances', '', adv.length)}
+  </div></div>`;
+}
 V.dash = () => {
   const t = today(), fr = figures('R', t, t), fc = figures('C', t, t), A = alerts();
   const mr = figures('R', monthStart(), t), mc = figures('C', monthStart(), t);
@@ -380,6 +408,7 @@ V.dash = () => {
   const fcPct = mr.sales ? mr.used / mr.sales * 100 : null;
   return `<h2>Today · ${new Date().toLocaleDateString('en-PH', {weekday: 'long', month: 'long', day: 'numeric'})}</h2>
   <p class="lede">Every peso goes through four checkpoints: <b>cash advance → purchase → receiving → issue/waste</b>, and a physical count catches whatever slipped through. Restaurant and Catering are kept in separate books.</p>
+  ${workflowStrip(pend, adv)}
   ${!Object.keys(S.items).length && S.lastSync && S.isAdmin ? `<div class="alert info"><span class="ic">i</span><div>Start in <a href="#setup">Setup</a>: add your staff, suppliers and the items you buy. Then do an opening stock count in <a href="#stock">Stock & counts</a>.</div></div>` : ''}
   <div class="two">
    <div class="card"><div class="row"><h3>${chipBook('R')} Today</h3></div>
@@ -527,6 +556,8 @@ V.stock = () => {
   const b = D.ui.stockBook, {st, sinceDate} = stockFor(b), q = D.ui.stockQ.trim().toLowerCase();
   const rows = activeItems().filter(i => !q || i.name.toLowerCase().includes(q) || catOf(i).toLowerCase().includes(q));
   const missingCommon = S.isAdmin ? commonMissing().length : 0;
+  const low = belowPar(b);
+  const inReq = new Set((D.req?.lines || []).map(l => l.itemId).filter(Boolean));
   const totalVal = sum(activeItems(), i => Math.max(0, st[i.id] || 0) * costOf(i.id));
   const counts = S.counts.filter(c => c.book === b);
   if (D.count) return countSheet();
@@ -534,13 +565,14 @@ V.stock = () => {
   <p class="lede">Expected stock = last physical count + received purchases − issues − waste ± returns and transfers. A physical count compares this to what is actually on the shelf. The difference is <b>unexplained loss</b>: pilferage, unrecorded use, or wrong entries.</p>
   <div class="card"><div class="row" style="margin-bottom:10px">${filterSeg('ui.stockBook', [['R', 'Restaurant storeroom'], ['C', 'Catering storeroom']])}<span class="spacer"></span>
     <input data-b="ui.stockQ" data-rr placeholder="Search item…" style="max-width:200px">${S.isAdmin ? `<button data-act="newItem">＋ Add item</button>` : ''}<button class="pri" data-act="startCount">Start physical count</button></div>
+   ${low.length ? `<div class="alert warn"><span class="ic">⚠</span><div style="flex:1"><b>${low.length} item${low.length === 1 ? ' is' : 's are'} below par</b> in the ${BOOK[b].name.toLowerCase()}: ${low.slice(0, 6).map(x => esc(x.item.name)).join(', ')}${low.length > 6 ? '…' : ''}.</div><button class="sm pri" data-act="restockReq">Request restock</button></div>` : ''}
    ${missingCommon ? `<div class="alert info"><span class="ic">i</span><div>${missingCommon} common item${missingCommon === 1 ? ' is' : 's are'} not in your list yet (e.g. pork belly, chicken breast, special cut thigh, beef oxtail). <button class="sm pri" data-act="addCommonItems" style="margin-left:6px">Review &amp; add</button></div></div>` : ''}
    <div class="kpis"><div class="kpi"><span>Stock value (at last cost)</span><b>${peso(totalVal)}</b></div><div class="kpi"><span>Items below par</span><b>${activeItems().filter(i => num(i.par?.[b]) > 0 && (st[i.id] || 0) < num(i.par[b])).length}</b></div><div class="kpi"><span>Last count</span><b>${counts.find(live_) ? fmtD(counts.find(live_).date) : '—'}</b></div></div>
-   ${rows.length ? `<div class="tw"><table class="stock-t"><thead><tr><th>Item</th><th class="n">On hand</th><th>Unit</th><th class="n">Par</th><th class="n">Last cost</th><th class="n">Value</th><th>Counted</th>${S.isAdmin ? '<th style="width:70px"></th>' : ''}</tr></thead>
+   ${rows.length ? `<div class="tw"><table class="stock-t"><thead><tr><th>Item</th><th class="n">On hand</th><th>Unit</th><th class="n">Par</th><th class="n">Last cost</th><th class="n">Value</th><th>Counted</th><th style="width:${S.isAdmin ? 140 : 70}px">Actions</th></tr></thead>
     ${ITEM_CATS.map(cat => { const its = rows.filter(i => catOf(i) === cat); if (!its.length) return '';
       const val = sum(its, i => Math.max(0, st[i.id] || 0) * costOf(i.id));
-      return `<tbody><tr class="cat-h"><th colspan="${S.isAdmin ? 8 : 7}"><span>${esc(cat)}</span><span class="small mut">${its.length} item${its.length === 1 ? '' : 's'} · ${peso(val)}</span></th></tr>
-      ${its.map(i => { const oh = st[i.id] || 0, par = num(i.par?.[b]); return `<tr><td>${esc(i.name)}</td><td class="n ${oh < -0.001 ? 'bad-t' : par && oh < par ? 'warn-t' : ''}">${fq(oh)}</td><td class="mut">${esc(i.unit)}</td><td class="n mut">${par ? fq(par) : ''}</td><td class="n">${peso(i.lastCost)}</td><td class="n">${peso(Math.max(0, oh) * costOf(i.id))}</td><td class="small mut">${sinceDate[i.id] ? fmtD(sinceDate[i.id]) : 'never'}</td>${S.isAdmin ? `<td><button class="sm" data-act="editItem" data-arg="${i.id}" aria-label="Edit ${esc(i.name)}">✎ Edit</button></td>` : ''}</tr>`; }).join('')}</tbody>`; }).join('')}
+      return `<tbody><tr class="cat-h"><th colspan="8"><span>${esc(cat)}</span><span class="small mut">${its.length} item${its.length === 1 ? '' : 's'} · ${peso(val)}</span></th></tr>
+      ${its.map(i => { const oh = st[i.id] || 0, par = num(i.par?.[b]); return `<tr><td>${esc(i.name)}</td><td class="n ${oh < -0.001 ? 'bad-t' : par && oh < par ? 'warn-t' : ''}">${fq(oh)}</td><td class="mut">${esc(i.unit)}</td><td class="n mut">${par ? fq(par) : ''}</td><td class="n">${peso(i.lastCost)}</td><td class="n">${peso(Math.max(0, oh) * costOf(i.id))}</td><td class="small mut">${sinceDate[i.id] ? fmtD(sinceDate[i.id]) : 'never'}</td><td class="acts"><button class="sm" data-act="reqItem" data-arg="${i.id}" title="Add to a purchase request">${inReq.has(i.id) ? '✓ In PR' : '＋ PR'}</button>${S.isAdmin ? `<button class="sm" data-act="editItem" data-arg="${i.id}" aria-label="Edit ${esc(i.name)}">✎ Edit</button>` : ''}</td></tr>`; }).join('')}</tbody>`; }).join('')}
    </table></div>` : `<div class="empty">No items yet.${S.isAdmin ? ' Click <b>＋ Add item</b> to start.' : ''}</div>`}
   </div>
   <div class="card"><h3>Count history · ${BOOK[b].name}</h3>
@@ -551,7 +583,8 @@ V.stock = () => {
 };
 function countSheet() {
   const c = D.count, blind = c.blind;
-  const q = (c.q || '').toLowerCase();
+  const q = (c.q || '').toLowerCase(), only = c.cat || '';
+  const show = (l) => (!q || iname(l.itemId).toLowerCase().includes(q)) && (!only || catOf(S.items[l.itemId]) === only);
   return `<h2>Physical count · ${BOOK[c.book].name}</h2>
   <p class="lede">Count what is physically on the shelf, chiller and freezer. ${blind ? '<b>Blind count is on:</b> the expected quantity is hidden so the counter can\'t just copy it. Variances show after posting.' : ''} Items left blank are skipped and keep their expected quantity.</p>
   <div class="card"><div class="grid">
@@ -559,10 +592,12 @@ function countSheet() {
     <label>Counted by<input list="dl-staff" data-b="count.by"></label>
     <label>Witness<input list="dl-staff" data-b="count.witness" placeholder="Second person"></label>
     <label>Find item<input data-b="count.q" data-rr placeholder="Search…"></label>
+    <label>Count only<select data-b="count.cat" data-rr>${opt('', 'All categories')}${ITEM_CATS.filter(k => c.lines.some(l => catOf(S.items[l.itemId]) === k)).map(k => opt(k, k)).join('')}</select></label>
    </div>
    <div class="row" style="margin-bottom:8px"><label class="row" style="flex-direction:row;gap:6px"><input type="checkbox" data-b="count.blind" data-rr> Blind count (hide expected quantities)</label><span class="spacer"></span><span class="small mut"><b data-live="counted">${c.lines.filter(l => l.actual !== '').length}</b> of ${c.lines.length} counted</span></div>
-   <div class="tw"><table class="lines"><thead><tr><th>Item</th><th>Unit</th>${blind ? '' : '<th class="n">Expected</th>'}<th class="n" style="width:120px">Actual count</th>${blind ? '' : '<th class="n">Variance</th>'}</tr></thead><tbody>
-    ${c.lines.map((l, i) => (!q || iname(l.itemId).toLowerCase().includes(q)) ? `<tr><td>${esc(iname(l.itemId))}<div class="small mut">${esc(catOf(S.items[l.itemId]))}</div></td><td class="mut">${esc(iunit(l.itemId))}</td>${blind ? '' : `<td class="n">${fq(l.system)}</td>`}<td><input type="number" inputmode="decimal" step="any" min="0" data-b="count.lines.${i}.actual" style="text-align:right"></td>${blind ? '' : `<td class="n" data-live="cvar:${i}"></td>`}</tr>` : '').join('')}
+   <p class="small mut" style="margin:0 0 8px">Tip: count high-value items (Poultry, Pork, Beef, Fish/Seafood) often. Pantry Essentials can be counted less often; uncounted items keep their expected quantity.</p>
+   <div class="tw"><table class="lines stock-t"><thead><tr><th>Item</th><th>Unit</th>${blind ? '' : '<th class="n">Expected</th>'}<th class="n" style="width:120px">Actual count</th>${blind ? '' : '<th class="n">Variance</th>'}</tr></thead><tbody>
+    ${c.lines.map((l, i) => show(l) ? `${(i === 0 || catOf(S.items[c.lines[i - 1].itemId]) !== catOf(S.items[l.itemId])) ? `<tr class="cat-h"><th colspan="${blind ? 3 : 5}"><span>${esc(catOf(S.items[l.itemId]))}</span></th></tr>` : ''}<tr><td>${esc(iname(l.itemId))}</td><td class="mut">${esc(iunit(l.itemId))}</td>${blind ? '' : `<td class="n">${fq(l.system)}</td>`}<td><input type="number" inputmode="decimal" step="any" min="0" data-b="count.lines.${i}.actual" style="text-align:right"></td>${blind ? '' : `<td class="n" data-live="cvar:${i}"></td>`}</tr>` : '').join('')}
    </tbody></table></div>
    <div class="row end" style="margin-top:12px"><button class="ghost" data-act="cancelCount">Discard count</button><button class="pri" data-act="postCount">Post count</button></div>
   </div>`;
@@ -1145,6 +1180,25 @@ function itemModal(it, onSaved) {
 }
 ACT.newItem = () => itemModal(null);
 ACT.editItem = id => itemModal(S.items[id]);
+function reqWith(book) {
+  if (!D.req || (D.req.book !== book && D.req.lines.every(l => !l.itemId))) D.req = newReq({book});
+  if (D.req.book !== book) { toast('Your open request is for the ' + BOOK[D.req.book].name + '. Send or clear it first.', true); return null; }
+  D.req.lines = D.req.lines.filter(l => l.itemId);
+  return D.req;
+}
+ACT.reqItem = id => {
+  const b = D.ui.stockBook, r = reqWith(b); if (!r) return;
+  const it = S.items[id], par = num(it.par?.[b]), oh = stockFor(b).st[id] || 0;
+  if (r.lines.some(l => l.itemId === id)) { r.lines = r.lines.filter(l => l.itemId !== id); if (!r.lines.length) r.lines = [{itemId: '', qty: '', cost: ''}]; toast(it.name + ' removed from your request'); render(); return; }
+  r.lines.push({itemId: id, qty: par > oh ? String(r2(par - Math.max(0, oh))) : '', cost: it.lastCost ? String(it.lastCost) : ''});
+  toast(it.name + ' added to your request — open Requisitions to send it'); render();
+};
+ACT.restockReq = () => {
+  const b = D.ui.stockBook, low = belowPar(b), r = reqWith(b); if (!r) return;
+  low.forEach(x => { if (!r.lines.some(l => l.itemId === x.item.id)) r.lines.push({itemId: x.item.id, qty: String(x.need), cost: x.item.lastCost ? String(x.item.lastCost) : ''}); });
+  if (!r.purpose) r.purpose = 'Restock items below par';
+  toast(low.length + ' item' + (low.length === 1 ? '' : 's') + ' added. Check quantities, then send.'); location.hash = 'prs';
+};
 const normName = n => String(n || '').trim().toLowerCase().replace(/\s*\(.*?\)\s*/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
 function commonMissing() {
   const have = new Set(Object.values(S.items).map(i => normName(i.name)));
