@@ -141,19 +141,21 @@ const BOOK = {R: {name: 'Restaurant', cls: 'r'}, C: {name: 'Catering', cls: 'c'}
 const ITEM_CATS = ['Poultry','Pork','Beef','Fish/Seafood','Vegetables','Eggs/Dairy','Pantry Essentials','Others'];
 /* Older category names (from the first version) are shown under the new headers. */
 const OLD_CATS = {'Chicken & poultry':'Poultry','Seafood':'Fish/Seafood','Fruits':'Vegetables','Dairy & eggs':'Eggs/Dairy','Rice & grains':'Pantry Essentials','Dry goods / grocery':'Pantry Essentials','Condiments & spices':'Pantry Essentials','Oil & fats':'Pantry Essentials','Beverages':'Others','Bread & bakery':'Others'};
+/* Item names are shown with every word capitalized: "chicken thigh fillet" -> "Chicken Thigh Fillet". */
+const titleCase = n => String(n || '').trim().replace(/\s+/g, ' ').replace(/(^|[\s(\-\/])([a-zà-ÿñ])/g, (m, p, c) => p + c.toUpperCase());
 const catOf = i => { const c = (i && i.cat) || 'Others'; return ITEM_CATS.includes(c) ? c : (OLD_CATS[c] || 'Others'); };
 const catIdx = i => ITEM_CATS.indexOf(catOf(i));
 /* Common items an Admin can add in one click (only the ones not already in the list are added). */
 const COMMON_ITEMS = [
-  ['Chicken breast','Poultry','kg'],['Special cut thigh','Poultry','kg'],['Chicken wings','Poultry','kg'],['Chicken drumstick','Poultry','kg'],['Chicken leg quarter','Poultry','kg'],
-  ['Pork belly','Pork','kg'],['Pork chop','Pork','kg'],['Pork spare ribs','Pork','kg'],['Pork shoulder','Pork','kg'],
-  ['Beef oxtail','Beef','kg'],['Beef shank (bulalo)','Beef','kg'],['Ground beef','Beef','kg'],['Beef sirloin','Beef','kg'],['Beef tripe','Beef','kg'],
-  ['Tilapia','Fish/Seafood','kg'],['Squid','Fish/Seafood','kg'],['Tuna belly','Fish/Seafood','kg'],['Cream dory fillet','Fish/Seafood','kg'],
-  ['Eggplant','Vegetables','kg'],['Kangkong','Vegetables','bundle'],['Ampalaya','Vegetables','kg'],['Bell pepper','Vegetables','kg'],['Calamansi','Vegetables','kg'],['Lemongrass','Vegetables','bundle'],
-  ['Butter','Eggs/Dairy','kg'],['All-purpose cream','Eggs/Dairy','pack'],['Cheese','Eggs/Dairy','kg'],['Fresh milk','Eggs/Dairy','L'],
-  ['Soy sauce','Pantry Essentials','L'],['Vinegar','Pantry Essentials','L'],['Fish sauce (patis)','Pantry Essentials','L'],['Oyster sauce','Pantry Essentials','L'],['Banana ketchup','Pantry Essentials','kg'],
-  ['Cooking oil','Pantry Essentials','L'],['Brown sugar','Pantry Essentials','kg'],['Cornstarch','Pantry Essentials','kg'],['All-purpose flour','Pantry Essentials','kg'],
-  ['Bay leaves (laurel)','Pantry Essentials','pack'],['Whole peppercorns','Pantry Essentials','pack'],['Coconut milk','Pantry Essentials','L'],['Tomato sauce','Pantry Essentials','kg']
+  ['Chicken Breast','Poultry','kg'],['Special Cut Thigh','Poultry','kg'],['Chicken Wings','Poultry','kg'],['Chicken Drumstick','Poultry','kg'],['Chicken Leg Quarter','Poultry','kg'],
+  ['Pork Belly','Pork','kg'],['Pork Chop','Pork','kg'],['Pork Spare Ribs','Pork','kg'],['Pork Shoulder','Pork','kg'],
+  ['Beef Oxtail','Beef','kg'],['Beef Shank (Bulalo)','Beef','kg'],['Ground Beef','Beef','kg'],['Beef Sirloin','Beef','kg'],['Beef Tripe','Beef','kg'],
+  ['Tilapia','Fish/Seafood','kg'],['Squid','Fish/Seafood','kg'],['Tuna Belly','Fish/Seafood','kg'],['Cream Dory Fillet','Fish/Seafood','kg'],
+  ['Eggplant','Vegetables','kg'],['Kangkong','Vegetables','bundle'],['Ampalaya','Vegetables','kg'],['Bell Pepper','Vegetables','kg'],['Calamansi','Vegetables','kg'],['Lemongrass','Vegetables','bundle'],
+  ['Butter','Eggs/Dairy','kg'],['All-Purpose Cream','Eggs/Dairy','pack'],['Cheese','Eggs/Dairy','kg'],['Fresh Milk','Eggs/Dairy','L'],
+  ['Soy Sauce','Pantry Essentials','L'],['Vinegar','Pantry Essentials','L'],['Fish Sauce (Patis)','Pantry Essentials','L'],['Oyster Sauce','Pantry Essentials','L'],['Banana Ketchup','Pantry Essentials','kg'],
+  ['Cooking Oil','Pantry Essentials','L'],['Brown Sugar','Pantry Essentials','kg'],['Cornstarch','Pantry Essentials','kg'],['All-Purpose Flour','Pantry Essentials','kg'],
+  ['Bay Leaves (Laurel)','Pantry Essentials','pack'],['Whole Peppercorns','Pantry Essentials','pack'],['Coconut Milk','Pantry Essentials','L'],['Tomato Sauce','Pantry Essentials','kg']
 ];
 const UNITS = ['kg','g','pc','pack','bundle','tray','sack','L','bottle','can','box','dozen','gallon','head'];
 const WASTE_REASONS = ['Spoiled / rotten','Expired','Damaged / dropped','Cooking error','Over-production (cooked, unsold)','Other'];
@@ -1170,7 +1172,7 @@ function itemModal(it, onSaved) {
     ${it ? `<label>Status<select id="m-act"><option value="1">Active</option><option value="0">Hidden (no longer bought)</option></select></label>` : ''}</div>
    ${mBtns()}`,
    {save: () => {
-     const name = $('#m-name').value.trim(), unit = $('#m-unit').value.trim();
+     const name = titleCase($('#m-name').value), unit = $('#m-unit').value.trim();
      if (!name || !unit) return toast('Name and unit are required.', true);
      if (Object.values(S.items).some(x => x.id !== it?.id && x.name.trim().toLowerCase() === name.toLowerCase())) return toast('An item with that name already exists.', true);
      const data = {name, cat: $('#m-cat').value, unit, lastCost: num($('#m-cost').value), par: {R: num($('#m-pr').value), C: num($('#m-pc').value)}, active: it ? $('#m-act').value === '1' : true};
@@ -1219,7 +1221,7 @@ ACT.addCommonItems = () => {
      if (!list.length) return toast('Tick at least one item.', true);
      guard(async () => {
        for (let k = 0; k < list.length; k += 40) {
-         const ops = list.slice(k, k + 40).map(([name, cat, unit]) => ({op: 'add', path: 'items/' + genId(), data: {name, cat, unit, lastCost: 0, par: {R: 0, C: 0}, active: true}}));
+         const ops = list.slice(k, k + 40).map(([name, cat, unit]) => ({op: 'add', path: 'items/' + genId(), data: {name: titleCase(name), cat, unit, lastCost: 0, par: {R: 0, C: 0}, active: true}}));
          await opsWrite(ops);
        }
        closeModal();
@@ -1273,7 +1275,7 @@ function rebuild() {
   const desc = a => a.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
   const m = by.config.find(d => d.id === 'main');
   S.config = {...DEFAULT_CONFIG, ...(m || {})};
-  S.items = Object.fromEntries(by.items.map(d => [d.id, d]));
+  S.items = Object.fromEntries(by.items.map(d => [d.id, {...d, name: titleCase(d.name)}]));
   S.events = Object.fromEntries(by.events.map(d => [d.id, d]));
   S.advances = desc(by.advances); S.purchases = desc(by.purchases); S.expenses = desc(by.expenses);
   S.moves = desc(by.moves); S.counts = desc(by.counts); S.prs = desc(by.prs);

@@ -209,16 +209,16 @@ function testOps() {
   console.log('Ops sheet OK — ' + rows.length + ' record(s). ' + sh.getParent().getUrl());
   if (!rows.some(function (r) { return r.coll === 'items'; })) {
     const now = Date.now();
-    const seed = [['chicken-breast','Chicken breast','Poultry','kg'],['special-cut-thigh','Special cut thigh','Poultry','kg'],['whole-chicken','Whole chicken','Poultry','kg'],['chicken-thigh','Chicken thigh fillet','Poultry','kg'],
-      ['pork-belly','Pork belly','Pork','kg'],['pork-liempo','Pork liempo','Pork','kg'],['pork-kasim','Pork kasim','Pork','kg'],['pork-pata','Pork pata','Pork','kg'],['ground-pork','Ground pork','Pork','kg'],
-      ['beef-oxtail','Beef oxtail','Beef','kg'],['beef-brisket','Beef brisket','Beef','kg'],
+    const seed = [['chicken-breast','Chicken Breast','Poultry','kg'],['special-cut-thigh','Special Cut Thigh','Poultry','kg'],['whole-chicken','Whole Chicken','Poultry','kg'],['chicken-thigh','Chicken Thigh Fillet','Poultry','kg'],
+      ['pork-belly','Pork Belly','Pork','kg'],['pork-liempo','Pork Liempo','Pork','kg'],['pork-kasim','Pork Kasim','Pork','kg'],['pork-pata','Pork Pata','Pork','kg'],['ground-pork','Ground Pork','Pork','kg'],
+      ['beef-oxtail','Beef Oxtail','Beef','kg'],['beef-brisket','Beef Brisket','Beef','kg'],
       ['bangus','Bangus','Fish/Seafood','kg'],['shrimp','Shrimp','Fish/Seafood','kg'],
-      ['onion-red','Red onion','Vegetables','kg'],['garlic','Garlic','Vegetables','kg'],['tomato','Tomato','Vegetables','kg'],['ginger','Ginger','Vegetables','kg'],['potato','Potato','Vegetables','kg'],
+      ['onion-red','Red Onion','Vegetables','kg'],['garlic','Garlic','Vegetables','kg'],['tomato','Tomato','Vegetables','kg'],['ginger','Ginger','Vegetables','kg'],['potato','Potato','Vegetables','kg'],
       ['carrot','Carrot','Vegetables','kg'],['cabbage','Cabbage','Vegetables','kg'],['pechay','Pechay','Vegetables','bundle'],['sitaw','Sitaw','Vegetables','bundle'],['kalamansi','Kalamansi','Vegetables','kg'],
-      ['eggs','Eggs','Eggs/Dairy','tray'],['evap-milk','Evaporated milk','Eggs/Dairy','can'],
-      ['rice','Rice','Pantry Essentials','sack'],['cooking-oil','Cooking oil','Pantry Essentials','L'],['soy-sauce','Soy sauce','Pantry Essentials','L'],['vinegar','Vinegar','Pantry Essentials','L'],
-      ['fish-sauce','Fish sauce (patis)','Pantry Essentials','L'],['sugar','Sugar','Pantry Essentials','kg'],['salt','Salt','Pantry Essentials','kg'],['black-pepper','Black pepper (ground)','Pantry Essentials','pack'],
-      ['bihon','Bihon noodles','Pantry Essentials','pack']];
+      ['eggs','Eggs','Eggs/Dairy','tray'],['evap-milk','Evaporated Milk','Eggs/Dairy','can'],
+      ['rice','Rice','Pantry Essentials','sack'],['cooking-oil','Cooking Oil','Pantry Essentials','L'],['soy-sauce','Soy Sauce','Pantry Essentials','L'],['vinegar','Vinegar','Pantry Essentials','L'],
+      ['fish-sauce','Fish Sauce (Patis)','Pantry Essentials','L'],['sugar','Sugar','Pantry Essentials','kg'],['salt','Salt','Pantry Essentials','kg'],['black-pepper','Black Pepper (Ground)','Pantry Essentials','pack'],
+      ['bihon','Bihon Noodles','Pantry Essentials','pack']];
     const vals = seed.map(function (s) {
       const d = { name: s[1], cat: s[2], unit: s[3], lastCost: 0, par: { R: 0, C: 0 }, active: true, createdAt: now, createdBy: 'setup' };
       return ['items/' + s[0], 'items', JSON.stringify(d), now, 'setup', now, 'setup'];
