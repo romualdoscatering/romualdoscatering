@@ -261,10 +261,12 @@ const ABOUT_TEXT_FIELDS = {
   kicker: 60, headline: 120, story: 2500, heroAlt: 140, badgeYear: 20, badgeText: 60, btnPackages: 40, btnGallery: 40,
   visionTitle: 60, vision: 600, missionTitle: 60, servicesTitle: 60, teamKicker: 60, teamTitle: 80, team: 1500, teamCaption: 120,
   customTitle: 80, custom: 1200, customButton: 40, clientsKicker: 60, clientsTitle: 80, galleryTitle: 80, galleryIntro: 200,
-  labelAll: 20, labelFood: 20, labelEvents: 20, ctaTitle: 80, ctaText: 400, ctaButton: 40
+  labelAll: 20, labelFood: 20, labelEvents: 20, ctaTitle: 80, ctaText: 400, ctaButton: 40,
+  homeKicker: 60, homeTitle: 120, homeText: 1200, homePhotoAlt: 140, homeBtn1: 40, homeBtn2: 40, homeStepsTitle: 80, homePhotosTitle: 80,
+  contactTitle: 80, contactText: 800, contactAddress: 200, contactEmail: 120, contactHours: 120, facebookUrl: 200, instagramUrl: 200, contactMap: 3
 };
-const ABOUT_LIST_FIELDS = { services: 12, mission: 12, clients: 30 };
-const ABOUT_PHOTO_FIELDS = ['heroPhoto', 'teamPhoto'];
+const ABOUT_LIST_FIELDS = { services: 12, mission: 12, clients: 30, homeHighlights: 8, contactPhones: 6 };
+const ABOUT_PHOTO_FIELDS = ['heroPhoto', 'teamPhoto', 'homePhoto'];
 const PHOTO_CATS = ['food', 'events'];
 
 /** A photo reference: a file shipped with the website, or a photo uploaded through the About page editor. */
@@ -296,6 +298,8 @@ function saveAbout(a) {
       c = c || {};
       return { name: str(c.name, 60), subtitle: str(c.subtitle, 100), photo: cleanRef(c.photo, known) };
     });
+    if (clean.facebookUrl && !/^https:\/\/(www\.|m\.|web\.)?(facebook\.com|fb\.com|fb\.me)\/[^\s"<>]+$/i.test(clean.facebookUrl)) return { ok: false, error: 'The Facebook link must start with https://facebook.com/' };
+    if (clean.instagramUrl && !/^https:\/\/(www\.)?instagram\.com\/[^\s"<>]+$/i.test(clean.instagramUrl)) return { ok: false, error: 'The Instagram link must start with https://instagram.com/' };
     if (!clean.headline || !clean.vision || !clean.mission.length) return { ok: false, error: 'Headline, vision and at least one mission point are required.' };
     db.about = clean; writeDb(db);
     return { ok: true, about: clean };

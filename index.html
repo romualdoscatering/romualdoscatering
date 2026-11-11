@@ -149,6 +149,40 @@ td.num{text-align:right;white-space:nowrap}
 .detail ul{margin:6px 0;padding-left:18px}
 .rates td input{width:84px;padding:6px 8px;border:1.5px solid var(--line);border-radius:6px;text-align:right}
 /* About page */
+.home-hero{display:grid;grid-template-columns:1.05fr 1fr;gap:34px;align-items:center;margin:6px 0 22px}
+.home-copy .kicker,.contact-head .kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:8px}
+.home-copy h1{font-size:38px;line-height:1.2}
+.home-copy p{color:var(--muted);font-size:16px}
+.home-btns{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px}
+.home-photo{border-radius:18px;overflow:hidden;aspect-ratio:4/3;background:var(--custard);box-shadow:0 18px 40px -22px rgba(26,44,84,.45)}
+.home-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.home-highlights{list-style:none;margin:0 0 30px;padding:14px 18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px;background:var(--navy);color:#fff;border-radius:14px}
+.home-highlights li{display:flex;gap:8px;align-items:flex-start;font-weight:600;font-size:14px}
+.home-highlights li:before{content:"✦";color:var(--gold)}
+.home-steps h2{text-align:center;margin-bottom:16px}
+.steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:30px}
+.step-card{text-align:left;background:var(--paper);border:1px solid var(--line);border-top:5px solid var(--gold);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:6px;color:var(--navy);font-size:14px;transition:transform .15s,box-shadow .15s}
+.step-card:hover{transform:translateY(-3px);box-shadow:0 12px 24px -16px rgba(26,44,84,.5)}
+.step-card .n{width:30px;height:30px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font-weight:700}
+.step-card b{font-family:"Libre Baskerville",serif;font-size:17px}
+.step-card span{color:var(--muted)}
+.step-card .go{margin-top:auto;color:var(--gold);font-weight:700}
+.gallery.four{grid-template-columns:repeat(4,1fr)}
+.next-band{margin:30px 0 6px;background:var(--paper);border:1px solid var(--line);border-left:6px solid var(--gold);border-radius:14px;padding:16px 20px;display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;font-weight:600}
+.contact-head{max-width:760px;margin-bottom:16px}
+.contact-head p{color:var(--muted);font-size:16px}
+.social{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:20px}
+.soc{display:inline-flex;align-items:center;gap:10px;padding:12px 18px;border-radius:12px;color:#fff;text-decoration:none;font-weight:700}
+.soc.fb{background:#1877F2}.soc.ig{background:linear-gradient(45deg,#F58529,#DD2A7B 55%,#8134AF)}
+.soc:hover{filter:brightness(1.08)}
+.contact-grid{display:grid;grid-template-columns:1fr 1.2fr;gap:18px;align-items:stretch}
+.contact-card{margin:0;display:flex;flex-direction:column;gap:16px}
+.contact-card .label{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:4px}
+.contact-card .ci a{display:block;color:var(--navy);font-weight:700;font-size:17px;text-decoration:none}
+.contact-card .ci a.small-link{font-size:13px;color:var(--blue);margin-top:4px}
+.map{border-radius:14px;overflow:hidden;border:1px solid var(--line);min-height:320px;background:var(--custard)}
+.map iframe{width:100%;height:100%;min-height:320px;border:0;display:block}
+@media (max-width:960px){.home-hero,.contact-grid{grid-template-columns:1fr}.steps-grid,.gallery.four{grid-template-columns:repeat(2,1fr)}.home-copy h1{font-size:30px}}
 .about-top{display:grid;grid-template-columns:1fr 1.05fr;gap:34px;align-items:center;margin-bottom:34px}
 .about-photo{position:relative;border-radius:18px;overflow:hidden;aspect-ratio:4/3;background:var(--custard)}
 .about-photo img{width:100%;height:100%;object-fit:cover;display:block}
@@ -259,12 +293,14 @@ footer{border-top:1px solid var(--line);padding:18px 0;font-size:12.5px;color:va
   <div class="wrap bar">
     <img src="assets/logo.png" alt="Romualdo's">
     <nav>
-      <button data-nav="packages">Packages</button>
+      <button data-nav="home">Home</button>
       <button data-nav="about">About Us</button>
+      <button data-nav="packages">Packages</button>
       <button data-nav="custom">Build Your Own Menu</button>
+      <button data-nav="contact">Contact Us</button>
       <button data-nav="admin" class="staff hidden" id="navAdmin">Inquiries</button>
       <button data-nav="menu" class="staff hidden" id="navMenu">Menu items</button>
-      <button data-nav="aboutEdit" class="staff hidden" id="navAboutEdit">About page</button>
+      <button data-nav="aboutEdit" class="staff hidden" id="navAboutEdit">Edit pages</button>
       <button data-nav="rates" class="staff hidden" id="navRates">Custom rates</button>
       <button data-nav="logout" class="staff hidden" id="navLogout">Log out</button>
     </nav>
@@ -364,7 +400,7 @@ const STATUSES = ["New","Contacted","Quoted","Booked","Declined"];
 
 /* ============ STATE ============ */
 const state = {
-  view:"packages", pax:50, pkg:null, pkgSel:{}, chefPick:false,
+  view:"home", pax:50, pkg:null, pkgSel:{}, chefPick:false,
   custom:new Set(), customTier:"standard",
   form:{name:"",phone:"",email:"",date:"",time:"",type:"",venue:"",notes:""},
   rates:structuredClone(DEFAULT_RATES),
@@ -406,13 +442,16 @@ function closestPackageHint(perHead){
 }
 
 /* ============ NAV ============ */
-function go(view){state.view=view;render();window.scrollTo({top:0,behavior:"smooth"})}
+const PAGE_HASH={home:"",about:"about",packages:"packages",custom:"custom",contact:"contact"};
+function go(view){state.view=view;
+  if(view in PAGE_HASH){const h=PAGE_HASH[view];if((location.hash||"").slice(1)!==h)history.pushState(null,"",h?"#"+h:location.pathname)}
+  render();window.scrollTo({top:0,behavior:"smooth"})}
 document.querySelectorAll("header nav button").forEach(b=>b.addEventListener("click",()=>{
   const v=b.dataset.nav; if(v==="packages"){state.pkg=null}
   if(v==="logout"){logout();return}
   if(v==="menu"&&(!state.menuDraft||!state.menuDirty))startMenuDraft();
   if(v==="aboutEdit")startAboutDraft();
-  if(v==="admin"){location.hash="staff";loadInquiries()} else if(v==="about"){history.replaceState(null,"","#about")} else if(location.hash){history.replaceState(null,"",location.pathname)}
+  if(v==="admin"){location.hash="staff";loadInquiries()} else if(!(v in PAGE_HASH)&&location.hash){history.replaceState(null,"",location.pathname)}
   go(v);
 }));
 
@@ -430,9 +469,11 @@ function render(){
   $("#navLogout").classList.toggle("hidden",!state.isStaff);
   $("#staffLink").classList.toggle("hidden",state.isStaff);
   const v=$("#view");
-  if(state.view==="packages") v.innerHTML=viewPackages();
+  if(state.view==="home") v.innerHTML=viewHome();
+  else if(state.view==="contact") v.innerHTML=viewContact();
+  else if(state.view==="packages") v.innerHTML=viewPackages()+nextBand("custom");
   else if(state.view==="choose") v.innerHTML=viewChoose();
-  else if(state.view==="custom") v.innerHTML=viewCustom();
+  else if(state.view==="custom") v.innerHTML=viewCustom()+nextBand("contact");
   else if(state.view==="done") v.innerHTML=viewDone();
   else if(state.view==="login") v.innerHTML=viewLogin();
   else if(state.view==="admin") v.innerHTML=state.isStaff?viewAdmin():viewLogin();
@@ -824,10 +865,26 @@ const ABOUT_DEFAULT={
   labelAll:"All", labelFood:"Food", labelEvents:"Events",
   ctaTitle:"Ready to elevate your next event?",
   ctaText:"Browse our 2026 packages or build your own menu for an instant estimate — or call 0995 540 0308 to start planning.",
-  ctaButton:"See packages"
+  ctaButton:"See packages",
+  homeKicker:"Welcome to Romualdo's",
+  homeTitle:"Exceptional food for every celebration in Davao",
+  homeText:"From intimate birthdays to grand weddings and corporate events, Romualdo's Catering Services has been bringing exceptional food and warm hospitality to Davao City since 2020.",
+  homePhoto:P("gallery/buffet-setup.jpg"), homePhotoAlt:"Romualdo's buffet setup for an evening celebration",
+  homeBtn1:"See our packages", homeBtn2:"Get to know us",
+  homeHighlights:["Serving Davao City since 2020","Packages from ₱500 per head","Weddings · Birthdays · Debuts · Corporate events","Build your own menu with an instant estimate"],
+  homeStepsTitle:"Plan your event in four easy steps",
+  homePhotosTitle:"A taste of our work",
+  contactTitle:"How to contact us",
+  contactText:"Tell us your event date, number of guests and venue, and we'll prepare a written quotation. Message us on Facebook or Instagram, call or text us, or send an inquiry through this website.",
+  contactAddress:"13 Juna Avenue, Juna Subdivision, Davao City",
+  contactPhones:["0995 540 0308","0915 677 4958"],
+  contactEmail:"romualdoscatering@gmail.com",
+  contactHours:"",
+  facebookUrl:"", instagramUrl:"",
+  contactMap:"yes"
 };
-const ABOUT_LISTS=["services","mission","clients"];
-const ABOUT_PHOTOS=["heroPhoto","teamPhoto"];
+const ABOUT_LISTS=["services","mission","clients","homeHighlights","contactPhones"];
+const ABOUT_PHOTOS=["heroPhoto","teamPhoto","homePhoto"];
 const DEFAULT_GALLERY=[
   ["buffet-setup.jpg","events","Buffet setup for an evening celebration"],["roast-beef.jpg","food","Sliced roast beef with gravy"],
   ["filipino-feast.jpg","food","A Filipino feast, served family-style"],["garden-table-setting.jpg","events","Garden reception table setting"],
@@ -865,6 +922,55 @@ function photoUrl(p,w){return p.src?p.src:`https://lh3.googleusercontent.com/d/$
 function photoFallback(img){if(img.dataset.id&&!img.dataset.fb){img.dataset.fb=1;img.src=`https://drive.google.com/thumbnail?id=${encodeURIComponent(img.dataset.id)}&sz=w1200`}}
 function imgTag(p,w,extra,alt){if(!p)return "";return `<img ${extra||""} src="${esc(photoUrl(p,w))}" ${p.id?`data-id="${esc(p.id)}" onerror="photoFallback(this)"`:""} alt="${esc(alt!=null?alt:(p.caption||""))}">`}
 function paras(t){return String(t||"").split(/\n\s*\n/).filter(x=>x.trim()).map(p=>`<p>${esc(p.trim())}</p>`).join("")}
+
+const SOCIAL_RE={facebookUrl:/^https:\/\/(www\.|m\.|web\.)?(facebook\.com|fb\.com|fb\.me)\/[^\s"<>]+$/i,instagramUrl:/^https:\/\/(www\.)?instagram\.com\/[^\s"<>]+$/i};
+function socialUrl(k){const u=String(state.about[k]||"").trim();return SOCIAL_RE[k].test(u)?u:""}
+const ICON_FB='<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M13.5 21v-7.5h2.5l.4-3h-2.9V8.6c0-.9.3-1.5 1.5-1.5h1.5V4.4c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v2.4H8v3h2.6V21h2.9z"/></svg>';
+const ICON_IG='<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M12 7.3A4.7 4.7 0 1 0 12 16.7 4.7 4.7 0 0 0 12 7.3zm0 7.7a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm4.9-7.9a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0zM21 8.3c-.1-1.5-.4-2.8-1.5-3.8S17.2 3 15.7 3H8.3C6.8 3 5.5 3.4 4.5 4.5S3 6.8 3 8.3v7.4c0 1.5.4 2.8 1.5 3.8s2.3 1.5 3.8 1.5h7.4c1.5 0 2.8-.4 3.8-1.5s1.5-2.3 1.5-3.8V8.3zm-2 9.2a3 3 0 0 1-1.7 1.7c-1.2.5-4 .4-5.3.4s-4.1.1-5.3-.4a3 3 0 0 1-1.7-1.7c-.5-1.2-.4-4-.4-5.3s-.1-4.1.4-5.3A3 3 0 0 1 6.7 5.2C7.9 4.7 10.7 4.8 12 4.8s4.1-.1 5.3.4a3 3 0 0 1 1.7 1.7c.5 1.2.4 4 .4 5.3s.1 4.1-.4 5.3z"/></svg>';
+const STEPS=[["about","1","About Us","Who we are, our chefs and our work."],["packages","2","Packages","Ready-made menus with prices per head."],["custom","3","Build Your Own","Pick every dish and get an instant estimate."],["contact","4","Contact Us","Call, message or visit us to book."]];
+function nextBand(to){
+  const t={custom:["Want to choose every dish yourself?","Build your own menu →"],contact:["Have questions or ready to book?","How to contact us →"]}[to];
+  return `<div class="next-band"><span>${t[0]}</span><button class="btn gold" data-go="${to}">${t[1]}</button></div>`;
+}
+function viewHome(){
+  const a=state.about;
+  const pics=state.gallery.slice(0,4);
+  return `<section class="home-hero">
+    <div class="home-copy">
+      ${a.homeKicker?`<div class="kicker">${esc(a.homeKicker)}</div>`:""}
+      <h1>${esc(a.homeTitle)}</h1>
+      ${paras(a.homeText)}
+      <div class="home-btns">${a.homeBtn1?`<button class="btn gold" data-go="packages">${esc(a.homeBtn1)}</button>`:""}${a.homeBtn2?`<button class="btn ghost" data-go="about">${esc(a.homeBtn2)}</button>`:""}</div>
+    </div>
+    <div class="home-photo">${a.homePhoto?imgTag(a.homePhoto,1400,"",a.homePhotoAlt):""}</div>
+  </section>
+  ${a.homeHighlights.length?`<ul class="home-highlights">${a.homeHighlights.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
+  <section class="home-steps"><h2>${esc(a.homeStepsTitle)}</h2>
+    <div class="steps-grid">${STEPS.map(([v,n,t,d])=>`<button class="step-card" data-go="${v}"><span class="n">${n}</span><b>${t}</b><span>${d}</span><span class="go">Open →</span></button>`).join("")}</div>
+  </section>
+  ${pics.length?`<section class="home-pics"><div class="gallery-head"><h2 style="margin:0">${esc(a.homePhotosTitle)}</h2><button class="btn ghost small" data-go="about">See all photos →</button></div>
+    <div class="gallery four">${pics.map(p=>`<figure data-photo="${esc(photoKey(p))}" tabindex="0">${imgTag(p,700,'loading="lazy"',p.caption||catLabel(p.category))}${p.caption?`<figcaption>${esc(p.caption)}</figcaption>`:""}</figure>`).join("")}</div></section>`:""}
+  <div class="next-band"><span>Start by getting to know us.</span><button class="btn gold" data-go="about">Next: About Us →</button></div>`;
+}
+function viewContact(){
+  const a=state.about, fb=socialUrl("facebookUrl"), ig=socialUrl("instagramUrl");
+  const tel=n=>String(n).replace(/[^\d+]/g,"").replace(/^0/,"+63");
+  const social=(fb||ig)?`<div class="social">${fb?`<a class="soc fb" href="${esc(fb)}" target="_blank" rel="noopener">${ICON_FB}<span>Message us on Facebook</span></a>`:""}${ig?`<a class="soc ig" href="${esc(ig)}" target="_blank" rel="noopener">${ICON_IG}<span>Follow us on Instagram</span></a>`:""}</div>`
+    :(state.canEdit?`<div class="hint" style="margin:6px 0 0">Admins: add your Facebook and Instagram links in <b>Edit pages → Contact page</b> to show the buttons here.</div>`:"");
+  const map=a.contactMap&&a.contactAddress?`<div class="map"><iframe title="Map to Romualdo's" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="https://maps.google.com/maps?q=${encodeURIComponent(a.contactAddress)}&z=15&output=embed"></iframe></div>`:"";
+  return `<div class="contact-head">${a.contactTitle?`<h1>${esc(a.contactTitle)}</h1>`:""}${paras(a.contactText)}</div>
+  ${social}
+  <div class="contact-grid">
+    <div class="panel contact-card">
+      ${a.contactPhones.length?`<div class="ci"><div class="label">Call or text</div>${a.contactPhones.map(n=>`<a href="tel:${esc(tel(n))}">${esc(n)}</a>`).join("")}</div>`:""}
+      ${a.contactEmail?`<div class="ci"><div class="label">Email</div><a href="mailto:${esc(a.contactEmail)}">${esc(a.contactEmail)}</a></div>`:""}
+      ${a.contactAddress?`<div class="ci"><div class="label">Visit us</div><span>${esc(a.contactAddress)}</span><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.contactAddress)}" target="_blank" rel="noopener" class="small-link">Open in Google Maps →</a></div>`:""}
+      ${a.contactHours?`<div class="ci"><div class="label">Hours</div><span>${esc(a.contactHours)}</span></div>`:""}
+      <div class="ci"><div class="label">Send an inquiry online</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn gold small" data-go="packages">Choose a package</button><button class="btn ghost small" data-go="custom">Build your own menu</button></div></div>
+    </div>
+    ${map}
+  </div>`;
+}
 function viewAbout(){
   const a=state.about;
   const list=state.gallery.filter(p=>state.galleryFilter==="all"||p.category===state.galleryFilter);
@@ -945,8 +1051,12 @@ function viewAboutEdit(){
         <div class="row"><button class="btn small ghost" data-pup="${i}" ${i===0?"disabled":""} aria-label="Move earlier">←</button><button class="btn small ghost" data-pdown="${i}" ${i===state.galleryDraft.length-1?"disabled":""} aria-label="Move later">→</button><button class="btn small danger" data-pdel="${i}" style="flex:1">${state.confirmPhotoDel===photoKey(p)?"Click again":"Remove"}</button></div>
       </div></div>`).join("");
   const sec=(t,body)=>`<details class="panel ed sec" ${state.openSecs?.[t]===false?"":"open"} data-sec="${esc(t)}"><summary><h3 style="display:inline">${t}</h3></summary><div style="margin-top:12px">${body}</div></details>`;
-  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>About page</h1><span class="who">Admin only · every word and photo on the public About Us page is editable here · <a href="#about" data-go="about">view the public page</a></span></div>
+  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>Edit pages</h1><span class="who">Admin only · every word and photo on the Welcome, About Us and Contact pages is editable here · <a href="#about" data-go="about">view the public page</a></span></div>
   <div class="formmsg" id="upMsg" style="color:var(--blue);min-height:0;margin-bottom:8px">${esc(state.upMsg||"")}</div>
+  ${sec("Welcome page",`${slot("homePhoto","Welcome photo",a.homePhoto)}${inp("homePhotoAlt","Photo description (for screen readers)",140)}
+    ${inp("homeKicker","Small heading",60)}${inp("homeTitle","Headline",120)}${ta("homeText","Welcome text (blank line between paragraphs)",4,1200)}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${inp("homeBtn1","Gold button → Packages (leave empty to hide)",40)}${inp("homeBtn2","Second button → About Us (leave empty to hide)",40)}</div>
+    ${ta("homeHighlights","Highlights strip (one per line; leave empty to hide)",4,600)}${inp("homeStepsTitle","Steps heading",80)}${inp("homePhotosTitle","Photo strip heading (shows the first 4 gallery photos)",80)}`)}
   ${sec("1. Top section",`${slot("heroPhoto","Main photo",a.heroPhoto)}${inp("heroAlt","Main photo description (for screen readers)",140)}
     <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px">${inp("badgeYear","Badge — big text",20)}${inp("badgeText","Badge — small text",60)}</div>
     ${inp("kicker","Small heading",60)}${inp("headline","Headline",120)}${ta("story","Our story (leave a blank line between paragraphs)",6,2500)}
@@ -968,6 +1078,11 @@ function viewAboutEdit(){
     <p class="hint" style="margin-top:0">New photos are saved in your Google Drive (Romualdo's Inquiry App → Website Photos). Edit captions, types and order here, then click <b>Save changes</b>.</p>
     ${items?`<div class="ph-list">${items}</div>`:`<div class="gallery-empty">No photos in the gallery.</div>`}`)}
   ${sec("8. Closing message",`${inp("ctaTitle","Heading",80)}${ta("ctaText","Text",3,400)}${inp("ctaButton","Button text (leave empty to hide)",40)}`)}
+  ${sec("Contact page",`${inp("contactTitle","Heading",80)}${ta("contactText","Intro text",3,800)}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${inp("facebookUrl","Facebook page link (https://facebook.com/…)",200)}${inp("instagramUrl","Instagram link (https://instagram.com/…)",200)}</div>
+    <p class="hint" style="margin-top:0">Open your Facebook page or Instagram profile, copy the address from the browser, and paste it here. The buttons appear only when a link is filled in.</p>
+    ${ta("contactPhones","Phone numbers (one per line)",3,200)}${inp("contactEmail","Email",120)}${inp("contactAddress","Address",200)}${inp("contactHours","Business hours (optional, e.g. Mon–Sat 8 AM–6 PM)",120)}
+    <label style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" data-afc="contactMap" ${a.contactMap?"checked":""} style="width:auto"> Show a Google map of the address</label>`)}
   <div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:sticky;bottom:10px;z-index:5;border-color:${state.aboutDirty?"var(--gold)":"var(--line)"}">
     <button class="btn gold" id="saveAbout" ${state.aboutDirty?"":"disabled"}>Save changes</button>
     <button class="btn ghost" id="discardAbout" ${state.aboutDirty?"":"disabled"}>Discard changes</button>
@@ -1010,17 +1125,19 @@ function slotGet(key){const a=state.aboutDraft;if(key.startsWith("chef:"))return
 async function saveAbout(){
   const d=state.aboutDraft;
   if(!String(d.headline).trim()||!String(d.vision).trim()||!d.mission.length){state.aboutMsg="Headline, vision and at least one mission point are required.";keepScroll(render);return}
+  for(const [k,label] of [["facebookUrl","Facebook"],["instagramUrl","Instagram"]]){d[k]=String(d[k]||"").trim();if(d[k]&&!/^https:\/\//i.test(d[k]))d[k]="https://"+d[k].replace(/^http:\/\//i,"");if(d[k]&&!SOCIAL_RE[k].test(d[k])){state.aboutMsg=`The ${label} link doesn't look right. Copy it from your ${label} page (it starts with https://${k==="facebookUrl"?"facebook.com":"instagram.com"}/).`;keepScroll(render);return}}
   state.aboutMsg="Saving…";keepScroll(render);
   const r1=await api("saveAbout",{about:d});
   if(!r1.ok){state.aboutMsg=r1.error==="Unknown action."?"About page saving isn't switched on yet: update the Google script (paste the new Code.gs and deploy a New version).":(r1.error||"Couldn't save.");keepScroll(render);return}
   const r2=await api("saveGallery",{gallery:state.galleryDraft.map(p=>p.id?{id:p.id,caption:p.caption,category:p.category}:{src:p.src,caption:p.caption,category:p.category})});
   if(!r2.ok){state.aboutMsg=r2.error||"Text saved, but photo changes couldn't be saved.";keepScroll(render);return}
-  applyAbout(r1.about||d,r2.gallery||state.galleryDraft);startAboutDraft();toast("About page saved — live for customers now");keepScroll(render);
+  applyAbout(r1.about||d,r2.gallery||state.galleryDraft);startAboutDraft();toast("Pages saved — live for customers now");keepScroll(render);
 }
 function bindAboutEdit(v){
   const d=state.aboutDraft;
   state.openSecs=state.openSecs||{};
   v.querySelectorAll("details[data-sec]").forEach(el=>el.addEventListener("toggle",()=>{state.openSecs[el.dataset.sec]=el.open}));
+  v.querySelectorAll("[data-afc]").forEach(el=>el.onchange=()=>{d[el.dataset.afc]=el.checked?"yes":"";aboutDirty()});
   v.querySelectorAll("[data-af]").forEach(el=>el.oninput=()=>{const k=el.dataset.af;d[k]=ABOUT_LISTS.includes(k)?el.value.split("\n").map(x=>x.trim()).filter(Boolean):el.value;aboutDirty()});
   v.querySelectorAll("[data-chef]").forEach(el=>el.oninput=()=>{d.chefs[+el.dataset.chef][el.dataset.cf]=el.value;aboutDirty()});
   v.querySelectorAll("[data-chef-del]").forEach(b=>b.onclick=()=>{d.chefs.splice(+b.dataset.chefDel,1);state.aboutDirty=true;keepScroll(render)});
@@ -1049,7 +1166,7 @@ function bindAboutEdit(v){
 function bind(){
   const v=$("#view");
   if(state.view==="menu")bindMenu(v);
-  if(state.view==="about")bindAbout(v);
+  if(state.view==="about"||state.view==="home")bindAbout(v);
   if(state.view==="aboutEdit")bindAboutEdit(v);
   v.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{if(b.dataset.go==="packages")state.pkg=null;go(b.dataset.go)});
   v.querySelectorAll("[data-pax]").forEach(b=>b.onclick=()=>{state.pax=Number(b.dataset.pax);render()});
@@ -1302,7 +1419,8 @@ function downloadExcel(){
 function applyRates(r){if(!r)return;state.rates={base:Number(r.base)||0,minPax:Number(r.minPax)||50,standard:{...DEFAULT_RATES.standard,...(r.standard||{})},premium:{...DEFAULT_RATES.premium,...(r.premium||{})}}}
 function route(){
   if(location.hash==="#staff"){go(state.isStaff?"admin":"login");if(state.isStaff&&!state.inqLoaded)loadInquiries()}
-  else if(location.hash==="#about"&&state.view!=="about")go("about");
+  else{const h=location.hash.slice(1);const v=Object.keys(PAGE_HASH).find(k=>PAGE_HASH[k]===h);
+    if(v&&state.view!==v&&!(v==="packages"&&state.view==="choose")){state.view=v;render();window.scrollTo(0,0)}}
 }
 window.addEventListener("hashchange",route);
 window.addEventListener("beforeunload",e=>{if(state.menuDirty||state.aboutDirty){e.preventDefault();e.returnValue=""}});
