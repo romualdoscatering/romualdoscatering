@@ -359,7 +359,7 @@ function eventOptions(general = 'General catering stock (no specific event)') {
 function linesEditor(key, o = {}) {
   const d = D[key], st = o.stock ? stockFor(o.stockBook || d.book).st : null;
   return `<div class="tw"><table class="lines"><thead><tr><th style="min-width:190px">Item</th><th class="n" style="width:95px">${o.qtyLabel || 'Qty'}</th><th style="width:48px">Unit</th>
-    ${o.cost ? '<th class="n" style="width:110px">Unit cost ₱</th><th class="n" style="width:120px">Amount</th>' : ''}
+    ${o.cost ? '<th class="n" style="width:110px">Price per unit ₱</th><th class="n" style="width:120px">Amount</th>' : ''}
     ${st ? '<th class="n">On hand</th>' : ''}${o.plan ? '<th class="n">To buy</th>' : ''}<th style="width:30px"></th></tr></thead><tbody>
     ${d.lines.map((l, i) => {
       const oh = st && l.itemId ? (st[l.itemId] || 0) : null;
@@ -428,7 +428,7 @@ V.dash = () => {
     ${pend.length ? `<div class="tw"><table><tbody>${pend.slice(0, 12).map(p => `<tr><td>${fmtD(p.date)}</td><td>${chipBook(p.book)}</td><td>${esc(p.supplier || '—')}<div class="small mut">by ${esc(p.buyer)}</div></td><td class="n">${peso(p.total)}</td><td><button class="sm pri" data-act="receive" data-arg="${p.id}">Receive</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">All purchases have been received.</div>'}
    </div>
    <div class="card"><h3>Open cash advances (${adv.length})</h3>
-    ${adv.length ? `<div class="tw"><table><tbody>${adv.map(a => { const s = advanceSpent(a.id); return `<tr><td>${fmtD(a.date)}</td><td>${chipBook(a.book)}</td><td>${esc(a.to)}</td><td class="n">${peso(a.amount)}<div class="small mut">spent ${peso(s.spent)}</div></td><td><button class="sm" data-act="liquidate" data-arg="${a.id}">Liquidate</button></td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">No open advances.</div>'}
+    ${adv.length ? `<div class="tw"><table><tbody>${adv.map(a => { const s = advanceSpent(a.id); return `<tr><td>${fmtD(a.date)}</td><td>${chipBook(a.book)}</td><td>${esc(a.to)}</td><td class="n">${peso(a.amount)}<div class="small mut">spent ${peso(s.spent)}</div></td><td class="row"><button class="sm" data-act="buyFor" data-arg="${a.id}">＋ Items</button><button class="sm" data-act="liquidate" data-arg="${a.id}">Liquidate</button></td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">No open advances.</div>'}
    </div>
   </div>
   <div class="card"><h3>Upcoming catering events (next 3 weeks)</h3>
@@ -441,6 +441,7 @@ V.advances = () => {
   const d = D.advance, list = S.advances;
   return `<h2>Cash advances</h2>
   <p class="lede">Record every peso handed to a buyer before they go to the market. When they come back, liquidate: the app adds up the purchases and expenses they recorded against the advance and tells you how much change must be returned. Anything left over is flagged as unaccounted.</p>
+  <ol class="steps small" style="margin:-4px 0 14px 18px;padding:0"><li>Record the advance below.</li><li>When the buyer is back, tap <b>＋ Items bought</b> on their advance and encode each item from the receipt: item, quantity, price per unit.</li><li>Tap <b>Liquidate</b>, count the change, done.</li></ol>
   <div class="card"><div class="row"><h3>Give a cash advance</h3><span class="spacer"></span>${bookSeg('advance.book')}</div>
    <div class="grid">
     <label>Date<input type="date" data-b="advance.date"></label>
@@ -460,7 +461,7 @@ V.advances = () => {
     <td class="n">${a.status === 'liquidated' ? peso(a.change) : `<span class="mut">expect ${peso(exp)}</span>`}</td>
     <td class="n">${a.status === 'liquidated' ? (Math.abs(num(a.diff)) >= 1 ? `<span class="bad-t">${peso(a.diff)}</span>` : '<span class="ok-t">balanced</span>') : ''}</td>
     <td>${a.status === 'open' ? '<span class="chip warn">open</span>' : a.status === 'liquidated' ? '<span class="chip ok">liquidated</span>' : ''}</td>
-    <td class="row">${a.status === 'open' ? `<button class="sm pri" data-act="liquidate" data-arg="${a.id}">Liquidate</button>` : a.status === 'liquidated' ? `<button class="sm" data-act="liquidate" data-arg="${a.id}">View</button>` : ''}${a.status === 'open' || a.status === 'void' ? voidBtn('advances', a) : ''}</td></tr>`; }).join('')}
+    <td class="row">${a.status === 'open' ? `<button class="sm" data-act="buyFor" data-arg="${a.id}">＋ Items bought</button><button class="sm pri" data-act="liquidate" data-arg="${a.id}">Liquidate</button>` : a.status === 'liquidated' ? `<button class="sm" data-act="liquidate" data-arg="${a.id}">View</button>` : ''}${a.status === 'open' || a.status === 'void' ? voidBtn('advances', a) : ''}</td></tr>`; }).join('')}
    </tbody></table></div>${showMore('adv', list.length)}` : '<div class="empty">No cash advances yet.</div>'}
   </div>`;
 };
@@ -473,6 +474,7 @@ V.purchases = () => {
   return `<h2>Purchases</h2>
   <p class="lede">The buyer records what was bought, from whom and at what price. Every purchase is charged to <b>Restaurant</b> or to <b>Catering</b> (and to a specific event when it's for one). Nothing enters stock until someone else receives it.</p>
   <div class="card"><div class="row"><h3>New purchase</h3><span class="spacer"></span>${bookSeg('purchase.book')}</div>
+   ${d.advanceId && S.advances.find(x => x.id === d.advanceId) ? (a => `<div class="pr-from">Encoding for <b>${esc(a.to)}'s cash advance</b> · ${peso(a.amount)} · ${fmtD(a.date)}<span class="spacer"></span><button class="sm" data-act="liquidate" data-arg="${a.id}">Back to liquidation</button></div>`)(S.advances.find(x => x.id === d.advanceId)) : ''}
    ${d.prId ? `<div class="pr-from">From approved requisition <b>${esc(d.prNo)}</b><span class="spacer"></span><button class="sm" data-act="openPR" data-arg="${d.prId}">View PR</button><button class="sm ghost" data-act="unlinkPR">Unlink</button></div>` : `<p class="small mut" style="margin-top:0">Buying against a requisition? Open it in <a href="#prs">Requisitions</a> and tap <b>Enter the purchase</b>.</p>`}
    <div class="grid">
     <label>Date<input type="date" data-b="purchase.date"></label>
@@ -971,16 +973,29 @@ ACT.saveAdv = () => {
   if (!d.to.trim() || !(num(d.amount) > 0)) return toast('Enter who received the cash and the amount.', true);
   guard(async () => { await addDoc('advances', {date: d.date, book: d.book, eventId: d.book === 'C' ? d.eventId : '', to: d.to.trim(), amount: r2(num(d.amount)), givenBy: d.givenBy.trim(), note: d.note.trim(), status: 'open'}); D.advance = newAdvance({book: d.book, givenBy: d.givenBy}); }, 'Cash advance recorded');
 };
+ACT.buyFor = id => {
+  const a = S.advances.find(x => x.id === id); if (!a) return;
+  D.purchase = newPurchase({book: a.book, eventId: a.eventId || '', buyer: a.to, advanceId: a.id, date: a.date >= today() ? today() : a.date});
+  closeModal(); location.hash = 'purchases'; setTimeout(() => window.scrollTo(0, 0), 50);
+  toast('Encode each item from the receipt: item, quantity and price per unit.');
+};
+ACT.expFor = id => {
+  const a = S.advances.find(x => x.id === id); if (!a) return;
+  D.expense = newExpense({book: a.book, eventId: a.eventId || '', paidBy: a.to, advanceId: a.id, date: a.date >= today() ? today() : a.date});
+  closeModal(); location.hash = 'expenses';
+};
 ACT.liquidate = id => {
   const a = S.advances.find(x => x.id === id); if (!a) return;
   const s = advanceSpent(id), expect = num(a.amount) - s.spent, done = a.status === 'liquidated';
   openModal(`<h3>${done ? 'Liquidation' : 'Liquidate cash advance'}</h3>
-   <p class="mut">${esc(a.to)} · ${chipBook(a.book, a.eventId)} · ${fmtD(a.date)}</p>
-   <table><tbody>
-    ${s.ps.map(p => `<tr><td>Purchase · ${esc(p.supplier || '—')}${p.receiptNo ? '' : ' <span class="chip warn">no receipt</span>'}</td><td class="n">${peso(p.total)}</td></tr>`).join('')}
-    ${s.es.map(e => `<tr><td>Expense · ${esc(e.cat)} ${esc(e.desc)}${e.receiptNo ? '' : ' <span class="chip warn">no receipt</span>'}</td><td class="n">${peso(e.amount)}</td></tr>`).join('')}
-    ${!s.ps.length && !s.es.length ? '<tr><td colspan="2" class="mut">No purchases or expenses were recorded against this advance.</td></tr>' : ''}
-   </tbody><tfoot><tr><td>Cash advance</td><td class="n">${peso(a.amount)}</td></tr><tr><td>Less: recorded spending</td><td class="n">${peso(s.spent)}</td></tr><tr><td>Change that must be returned</td><td class="n">${peso(expect)}</td></tr></tfoot></table>
+   <p class="mut">${esc(a.to)} · ${chipBook(a.book, a.eventId)} · ${fmtD(a.date)} · advance ${peso(a.amount)}</p>
+   ${done ? '' : `<div class="alert" style="margin:10px 0;display:block"><div><b>Step 1 — encode what was bought.</b> Every item from the receipt goes in as a line: item, quantity and price per unit. The app computes the amounts.</div><div class="row" style="margin-top:8px"><button class="sm pri" data-act="buyFor" data-arg="${a.id}">＋ Encode items bought</button><button class="sm" data-act="expFor" data-arg="${a.id}">＋ Add other expense (fare, ice, LPG)</button></div></div>`}
+   <div class="tw"><table><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Price / unit</th><th class="n">Amount</th></tr></thead><tbody>
+    ${s.ps.map(p => `<tr class="cat-h"><th colspan="4"><span>${esc(p.supplier || 'Purchase')} · ${fmtD(p.date)}${p.receiptNo ? ' · OR ' + esc(p.receiptNo) : ' <span class="chip warn">no receipt</span>'}</span></th></tr>${(p.lines || []).map(l => `<tr><td>${esc(iname(l.itemId))}</td><td class="n">${fq(l.qty)} ${esc(iunit(l.itemId))}</td><td class="n">${peso(l.cost)}</td><td class="n">${peso(num(l.qty) * num(l.cost))}</td></tr>`).join('')}<tr><td colspan="3" class="small mut">Subtotal</td><td class="n"><b>${peso(p.total)}</b></td></tr>`).join('')}
+    ${s.es.length ? `<tr class="cat-h"><th colspan="4"><span>Other expenses</span></th></tr>` + s.es.map(e => `<tr><td colspan="3">${esc(e.cat)} · ${esc(e.desc)}${e.receiptNo ? '' : ' <span class="chip warn">no receipt</span>'}</td><td class="n">${peso(e.amount)}</td></tr>`).join('') : ''}
+    ${!s.ps.length && !s.es.length ? '<tr><td colspan="4" class="mut">Nothing encoded yet. Tap <b>Encode items bought</b> above first.</td></tr>' : ''}
+   </tbody><tfoot><tr><td colspan="3">Cash advance</td><td class="n">${peso(a.amount)}</td></tr><tr><td colspan="3">Less: total bought &amp; spent</td><td class="n">${peso(s.spent)}</td></tr><tr><td colspan="3">Change that must be returned</td><td class="n">${peso(expect)}</td></tr></tfoot></table></div>
+   ${done ? '' : '<p class="small mut" style="margin:10px 0 0"><b>Step 2 — count the change</b> the buyer hands back and enter it below.</p>'}
    ${done ? `<p>Change returned: <b>${peso(a.change)}</b> · received by ${esc(a.liqBy || '—')} · ${fmtT(a.liqAt)}<br>Unaccounted: <b class="${Math.abs(num(a.diff)) >= 1 ? 'bad-t' : 'ok-t'}">${Math.abs(num(a.diff)) >= 1 ? peso(a.diff) : 'none — balanced'}</b></p>${a.liqNote ? `<p class="small">${esc(a.liqNote)}</p>` : ''}<div class="row end"><button data-mact="close">Close</button></div>` : `
    <div class="grid" style="margin-top:12px"><label>Cash actually returned ₱<input id="m-chg" type="number" inputmode="decimal" step="any" min="0" value="${Math.max(0, r2(expect))}"></label><label>Received by<input id="m-by" list="dl-staff"></label></div>
    <div id="m-diff" class="alert"></div>
