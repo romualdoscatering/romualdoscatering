@@ -67,6 +67,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--line)}
 .lines input,.lines select{padding:7px 8px}
 .lines input[type=number]{min-width:78px}
 .lines select{min-width:170px}
+.stock-t tr.cat-h th{background:var(--bg,#f4f2ee);text-align:left;padding:10px 8px;font-size:13px;letter-spacing:.06em;text-transform:uppercase;border-top:2px solid rgba(0,0,0,.08)}
+.stock-t tr.cat-h th span:first-child{margin-right:10px;font-weight:800}
+.stock-t tr.cat-h th span.small{text-transform:none;letter-spacing:0;font-weight:500}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px}
 .kpi{background:#fbf9f6;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
 .kpi b{display:block;font-size:19px;font-variant-numeric:tabular-nums;margin-top:2px}
@@ -127,7 +130,23 @@ const fmtT = t => t ? new Date(t).toLocaleString('en-PH', {month: 'short', day: 
 const sum = (arr, f) => arr.reduce((a, x) => a + (f(x) || 0), 0);
 
 const BOOK = {R: {name: 'Restaurant', cls: 'r'}, C: {name: 'Catering', cls: 'c'}};
-const ITEM_CATS = ['Vegetables','Fruits','Pork','Beef','Chicken & poultry','Seafood','Rice & grains','Dry goods / grocery','Condiments & spices','Dairy & eggs','Oil & fats','Beverages','Bread & bakery','Others'];
+const ITEM_CATS = ['Poultry','Pork','Beef','Fish/Seafood','Vegetables','Eggs/Dairy','Pantry Essentials','Others'];
+/* Older category names (from the first version) are shown under the new headers. */
+const OLD_CATS = {'Chicken & poultry':'Poultry','Seafood':'Fish/Seafood','Fruits':'Vegetables','Dairy & eggs':'Eggs/Dairy','Rice & grains':'Pantry Essentials','Dry goods / grocery':'Pantry Essentials','Condiments & spices':'Pantry Essentials','Oil & fats':'Pantry Essentials','Beverages':'Others','Bread & bakery':'Others'};
+const catOf = i => { const c = (i && i.cat) || 'Others'; return ITEM_CATS.includes(c) ? c : (OLD_CATS[c] || 'Others'); };
+const catIdx = i => ITEM_CATS.indexOf(catOf(i));
+/* Common items an Admin can add in one click (only the ones not already in the list are added). */
+const COMMON_ITEMS = [
+  ['Chicken breast','Poultry','kg'],['Special cut thigh','Poultry','kg'],['Chicken wings','Poultry','kg'],['Chicken drumstick','Poultry','kg'],['Chicken leg quarter','Poultry','kg'],
+  ['Pork belly','Pork','kg'],['Pork chop','Pork','kg'],['Pork spare ribs','Pork','kg'],['Pork shoulder','Pork','kg'],
+  ['Beef oxtail','Beef','kg'],['Beef shank (bulalo)','Beef','kg'],['Ground beef','Beef','kg'],['Beef sirloin','Beef','kg'],['Beef tripe','Beef','kg'],
+  ['Tilapia','Fish/Seafood','kg'],['Squid','Fish/Seafood','kg'],['Tuna belly','Fish/Seafood','kg'],['Cream dory fillet','Fish/Seafood','kg'],
+  ['Eggplant','Vegetables','kg'],['Kangkong','Vegetables','bundle'],['Ampalaya','Vegetables','kg'],['Bell pepper','Vegetables','kg'],['Calamansi','Vegetables','kg'],['Lemongrass','Vegetables','bundle'],
+  ['Butter','Eggs/Dairy','kg'],['All-purpose cream','Eggs/Dairy','pack'],['Cheese','Eggs/Dairy','kg'],['Fresh milk','Eggs/Dairy','L'],
+  ['Soy sauce','Pantry Essentials','L'],['Vinegar','Pantry Essentials','L'],['Fish sauce (patis)','Pantry Essentials','L'],['Oyster sauce','Pantry Essentials','L'],['Banana ketchup','Pantry Essentials','kg'],
+  ['Cooking oil','Pantry Essentials','L'],['Brown sugar','Pantry Essentials','kg'],['Cornstarch','Pantry Essentials','kg'],['All-purpose flour','Pantry Essentials','kg'],
+  ['Bay leaves (laurel)','Pantry Essentials','pack'],['Whole peppercorns','Pantry Essentials','pack'],['Coconut milk','Pantry Essentials','L'],['Tomato sauce','Pantry Essentials','kg']
+];
 const UNITS = ['kg','g','pc','pack','bundle','tray','sack','L','bottle','can','box','dozen','gallon','head'];
 const WASTE_REASONS = ['Spoiled / rotten','Expired','Damaged / dropped','Cooking error','Over-production (cooked, unsold)','Other'];
 const DEFAULT_CONFIG = {company: "Romualdo's Catering", address: '', departments: ['Kitchen', 'Catering operations', 'Dining / service', 'Bar', 'Admin / office', 'Maintenance'], staff: [], suppliers: [], expCats: ['Transportation / fare','LPG / fuel','Ice','Packaging / disposables','Cleaning supplies','Utilities','Equipment rental','Repairs & maintenance','Extra labor / helpers','Permits & fees','Miscellaneous'], priceAlertPct: 10};
@@ -158,7 +177,7 @@ const getPath = (o, p) => p.split('.').reduce((a, k) => a?.[k], o);
 const setPath = (o, p, v) => { const k = p.split('.'); let x = o; for (let i = 0; i < k.length - 1; i++) x = x[k[i]]; x[k[k.length - 1]] = v; };
 
 /* ============ lookups ============ */
-const activeItems = () => Object.values(S.items).filter(i => i.active !== false).sort((a, b) => (ITEM_CATS.indexOf(a.cat) - ITEM_CATS.indexOf(b.cat)) || String(a.name).localeCompare(b.name));
+const activeItems = () => Object.values(S.items).filter(i => i.active !== false).sort((a, b) => (catIdx(a) - catIdx(b)) || String(a.name).localeCompare(b.name));
 const iname = id => S.items[id]?.name || (id ? '(removed item)' : '');
 const iunit = id => S.items[id]?.unit || '';
 const evName = id => id ? (S.events[id]?.name || '(event)') : '';
@@ -320,7 +339,7 @@ const opt = (v, l) => `<option value="${esc(v)}">${esc(l)}</option>`;
 const bookSeg = path => `<div class="seg">${['R', 'C'].map(b => `<button type="button" class="${getPath(D, path) === b ? 'on ' + BOOK[b].cls : ''}" data-act="set" data-arg="${path}|${b}">${BOOK[b].name}</button>`).join('')}</div>`;
 const filterSeg = (path, choices) => `<div class="seg">${choices.map(([v, l]) => `<button type="button" class="${getPath(D, path) === v ? 'on' + (v === 'R' ? ' r' : v === 'C' ? ' c' : '') : ''}" data-act="set" data-arg="${path}|${v}">${l}</button>`).join('')}</div>`;
 function itemOptions() {
-  const groups = {}; activeItems().forEach(i => (groups[i.cat || 'Others'] ||= []).push(i));
+  const groups = {}; activeItems().forEach(i => (groups[catOf(i)] ||= []).push(i));
   return opt('', '— choose item —') + Object.entries(groups).map(([g, is]) => `<optgroup label="${esc(g)}">${is.map(i => opt(i.id, `${i.name} (${i.unit})`)).join('')}</optgroup>`).join('') + opt('__new', '＋ Add a new item…');
 }
 function eventOptions(general = 'General catering stock (no specific event)') {
@@ -506,18 +525,23 @@ V.usage = () => {
 /* ============ STOCK & COUNTS ============ */
 V.stock = () => {
   const b = D.ui.stockBook, {st, sinceDate} = stockFor(b), q = D.ui.stockQ.trim().toLowerCase();
-  const rows = activeItems().filter(i => !q || i.name.toLowerCase().includes(q) || (i.cat || '').toLowerCase().includes(q));
+  const rows = activeItems().filter(i => !q || i.name.toLowerCase().includes(q) || catOf(i).toLowerCase().includes(q));
+  const missingCommon = S.isAdmin ? commonMissing().length : 0;
   const totalVal = sum(activeItems(), i => Math.max(0, st[i.id] || 0) * costOf(i.id));
   const counts = S.counts.filter(c => c.book === b);
   if (D.count) return countSheet();
   return `<h2>Stock & counts</h2>
   <p class="lede">Expected stock = last physical count + received purchases − issues − waste ± returns and transfers. A physical count compares this to what is actually on the shelf. The difference is <b>unexplained loss</b>: pilferage, unrecorded use, or wrong entries.</p>
   <div class="card"><div class="row" style="margin-bottom:10px">${filterSeg('ui.stockBook', [['R', 'Restaurant storeroom'], ['C', 'Catering storeroom']])}<span class="spacer"></span>
-    <input data-b="ui.stockQ" data-rr placeholder="Search item…" style="max-width:200px"><button class="pri" data-act="startCount">Start physical count</button></div>
+    <input data-b="ui.stockQ" data-rr placeholder="Search item…" style="max-width:200px">${S.isAdmin ? `<button data-act="newItem">＋ Add item</button>` : ''}<button class="pri" data-act="startCount">Start physical count</button></div>
+   ${missingCommon ? `<div class="alert info"><span class="ic">i</span><div>${missingCommon} common item${missingCommon === 1 ? ' is' : 's are'} not in your list yet (e.g. pork belly, chicken breast, special cut thigh, beef oxtail). <button class="sm pri" data-act="addCommonItems" style="margin-left:6px">Review &amp; add</button></div></div>` : ''}
    <div class="kpis"><div class="kpi"><span>Stock value (at last cost)</span><b>${peso(totalVal)}</b></div><div class="kpi"><span>Items below par</span><b>${activeItems().filter(i => num(i.par?.[b]) > 0 && (st[i.id] || 0) < num(i.par[b])).length}</b></div><div class="kpi"><span>Last count</span><b>${counts.find(live_) ? fmtD(counts.find(live_).date) : '—'}</b></div></div>
-   ${rows.length ? `<div class="tw"><table><thead><tr><th>Item</th><th>Category</th><th class="n">On hand</th><th>Unit</th><th class="n">Par</th><th class="n">Last cost</th><th class="n">Value</th><th>Counted</th></tr></thead><tbody>
-    ${rows.map(i => { const oh = st[i.id] || 0, par = num(i.par?.[b]); return `<tr><td>${esc(i.name)}</td><td class="small mut">${esc(i.cat)}</td><td class="n ${oh < -0.001 ? 'bad-t' : par && oh < par ? 'warn-t' : ''}">${fq(oh)}</td><td class="mut">${esc(i.unit)}</td><td class="n mut">${par ? fq(par) : ''}</td><td class="n">${peso(i.lastCost)}</td><td class="n">${peso(Math.max(0, oh) * costOf(i.id))}</td><td class="small mut">${sinceDate[i.id] ? fmtD(sinceDate[i.id]) : 'never'}</td></tr>`; }).join('')}
-   </tbody></table></div>` : '<div class="empty">No items yet. Add them in Setup.</div>'}
+   ${rows.length ? `<div class="tw"><table class="stock-t"><thead><tr><th>Item</th><th class="n">On hand</th><th>Unit</th><th class="n">Par</th><th class="n">Last cost</th><th class="n">Value</th><th>Counted</th>${S.isAdmin ? '<th style="width:70px"></th>' : ''}</tr></thead>
+    ${ITEM_CATS.map(cat => { const its = rows.filter(i => catOf(i) === cat); if (!its.length) return '';
+      const val = sum(its, i => Math.max(0, st[i.id] || 0) * costOf(i.id));
+      return `<tbody><tr class="cat-h"><th colspan="${S.isAdmin ? 8 : 7}"><span>${esc(cat)}</span><span class="small mut">${its.length} item${its.length === 1 ? '' : 's'} · ${peso(val)}</span></th></tr>
+      ${its.map(i => { const oh = st[i.id] || 0, par = num(i.par?.[b]); return `<tr><td>${esc(i.name)}</td><td class="n ${oh < -0.001 ? 'bad-t' : par && oh < par ? 'warn-t' : ''}">${fq(oh)}</td><td class="mut">${esc(i.unit)}</td><td class="n mut">${par ? fq(par) : ''}</td><td class="n">${peso(i.lastCost)}</td><td class="n">${peso(Math.max(0, oh) * costOf(i.id))}</td><td class="small mut">${sinceDate[i.id] ? fmtD(sinceDate[i.id]) : 'never'}</td>${S.isAdmin ? `<td><button class="sm" data-act="editItem" data-arg="${i.id}" aria-label="Edit ${esc(i.name)}">✎ Edit</button></td>` : ''}</tr>`; }).join('')}</tbody>`; }).join('')}
+   </table></div>` : `<div class="empty">No items yet.${S.isAdmin ? ' Click <b>＋ Add item</b> to start.' : ''}</div>`}
   </div>
   <div class="card"><h3>Count history · ${BOOK[b].name}</h3>
    ${counts.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Counted by</th><th class="n">Items</th><th class="n">Missing (value)</th><th class="n">Excess (value)</th><th class="n">Net variance</th><th></th></tr></thead><tbody>
@@ -538,7 +562,7 @@ function countSheet() {
    </div>
    <div class="row" style="margin-bottom:8px"><label class="row" style="flex-direction:row;gap:6px"><input type="checkbox" data-b="count.blind" data-rr> Blind count (hide expected quantities)</label><span class="spacer"></span><span class="small mut"><b data-live="counted">${c.lines.filter(l => l.actual !== '').length}</b> of ${c.lines.length} counted</span></div>
    <div class="tw"><table class="lines"><thead><tr><th>Item</th><th>Unit</th>${blind ? '' : '<th class="n">Expected</th>'}<th class="n" style="width:120px">Actual count</th>${blind ? '' : '<th class="n">Variance</th>'}</tr></thead><tbody>
-    ${c.lines.map((l, i) => (!q || iname(l.itemId).toLowerCase().includes(q)) ? `<tr><td>${esc(iname(l.itemId))}<div class="small mut">${esc(S.items[l.itemId]?.cat || '')}</div></td><td class="mut">${esc(iunit(l.itemId))}</td>${blind ? '' : `<td class="n">${fq(l.system)}</td>`}<td><input type="number" inputmode="decimal" step="any" min="0" data-b="count.lines.${i}.actual" style="text-align:right"></td>${blind ? '' : `<td class="n" data-live="cvar:${i}"></td>`}</tr>` : '').join('')}
+    ${c.lines.map((l, i) => (!q || iname(l.itemId).toLowerCase().includes(q)) ? `<tr><td>${esc(iname(l.itemId))}<div class="small mut">${esc(catOf(S.items[l.itemId]))}</div></td><td class="mut">${esc(iunit(l.itemId))}</td>${blind ? '' : `<td class="n">${fq(l.system)}</td>`}<td><input type="number" inputmode="decimal" step="any" min="0" data-b="count.lines.${i}.actual" style="text-align:right"></td>${blind ? '' : `<td class="n" data-live="cvar:${i}"></td>`}</tr>` : '').join('')}
    </tbody></table></div>
    <div class="row end" style="margin-top:12px"><button class="ghost" data-act="cancelCount">Discard count</button><button class="pri" data-act="postCount">Post count</button></div>
   </div>`;
@@ -642,13 +666,13 @@ V.reports = () => {
 
 /* ============ SETUP ============ */
 V.setup = () => {
-  const items = Object.values(S.items).sort((a, b) => (ITEM_CATS.indexOf(a.cat) - ITEM_CATS.indexOf(b.cat)) || a.name.localeCompare(b.name));
+  const items = Object.values(S.items).sort((a, b) => (catIdx(a) - catIdx(b)) || a.name.localeCompare(b.name));
   if (!D.cfg) D.cfg = {company: S.config.company || '', address: S.config.address || '', departments: (S.config.departments || []).join('\n'), staff: (S.config.staff || []).join('\n'), suppliers: (S.config.suppliers || []).join('\n'), expCats: (S.config.expCats || []).join('\n'), pct: String(S.config.priceAlertPct ?? 10)};
   return `<h2>Setup</h2>
   <div class="card"><div class="row"><h3>Items you buy (${items.length})</h3><span class="spacer"></span><button class="pri sm" data-act="newItem">＋ Add item</button></div>
    <p class="small mut" style="margin-top:0">One master list for both books. Use the unit you buy and count in (kg for meat and vegetables, pc for eggs, pack for noodles). Par level is the minimum you want on hand in each storeroom.</p>
    ${items.length ? `<div class="tw"><table><thead><tr><th>Item</th><th>Category</th><th>Unit</th><th class="n">Last cost</th><th class="n">Par · Rest.</th><th class="n">Par · Cater.</th><th></th></tr></thead><tbody>
-    ${items.map(i => `<tr class="${i.active === false ? 'void' : ''}"><td>${esc(i.name)}</td><td class="small">${esc(i.cat)}</td><td>${esc(i.unit)}</td><td class="n">${peso(i.lastCost)}</td><td class="n">${num(i.par?.R) ? fq(i.par.R) : ''}</td><td class="n">${num(i.par?.C) ? fq(i.par.C) : ''}</td><td><button class="sm" data-act="editItem" data-arg="${i.id}">Edit</button></td></tr>`).join('')}
+    ${items.map(i => `<tr class="${i.active === false ? 'void' : ''}"><td>${esc(i.name)}</td><td class="small">${esc(catOf(i))}</td><td>${esc(i.unit)}</td><td class="n">${peso(i.lastCost)}</td><td class="n">${num(i.par?.R) ? fq(i.par.R) : ''}</td><td class="n">${num(i.par?.C) ? fq(i.par.C) : ''}</td><td><button class="sm" data-act="editItem" data-arg="${i.id}">Edit</button></td></tr>`).join('')}
    </tbody></table></div>` : '<div class="empty">No items yet.</div>'}
   </div>
   <div class="card"><h3>Lists</h3>
@@ -1117,10 +1141,38 @@ function itemModal(it, onSaved) {
      const data = {name, cat: $('#m-cat').value, unit, lastCost: num($('#m-cost').value), par: {R: num($('#m-pr').value), C: num($('#m-pc').value)}, active: it ? $('#m-act').value === '1' : true};
      guard(async () => { let id = it?.id; if (it) await upd('items/' + id, data); else id = await addDoc('items', data); S.items[id] = {id, ...data}; closeModal(); onSaved?.(id); }, it ? 'Item updated' : 'Item added');
    }},
-   box => { box.querySelector('#m-cat').value = it?.cat || 'Vegetables'; if (it) box.querySelector('#m-act').value = it.active === false ? '0' : '1'; });
+   box => { box.querySelector('#m-cat').value = it ? catOf(it) : (D.ui.newItemCat || 'Vegetables'); if (it) box.querySelector('#m-act').value = it.active === false ? '0' : '1'; });
 }
 ACT.newItem = () => itemModal(null);
 ACT.editItem = id => itemModal(S.items[id]);
+const normName = n => String(n || '').trim().toLowerCase().replace(/\s*\(.*?\)\s*/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+function commonMissing() {
+  const have = new Set(Object.values(S.items).map(i => normName(i.name)));
+  if (have.has('kalamansi')) have.add('calamansi');
+  return COMMON_ITEMS.filter(([n]) => !have.has(normName(n)));
+}
+ACT.addCommonItems = () => {
+  const miss = commonMissing();
+  if (!miss.length) return toast('All common items are already in your list.');
+  openModal(`<h3>Add common items</h3>
+   <p class="small mut" style="margin-top:0">Tick the items you buy. They're added with a cost of ₱0 and no par level; set those later with <b>✎ Edit</b> or by recording a purchase.</p>
+   <div class="row" style="margin-bottom:8px"><button class="sm" type="button" id="ci-all">Select all</button><button class="sm" type="button" id="ci-none">Clear</button></div>
+   <div style="max-height:50vh;overflow:auto">${ITEM_CATS.map(cat => { const its = miss.filter(m => m[1] === cat); return its.length ? `<div class="small" style="font-weight:700;margin:10px 0 4px">${esc(cat)}</div>${its.map(([n, c, u]) => `<label class="row" style="flex-direction:row;gap:8px;font-weight:400;margin:2px 0"><input type="checkbox" class="ci" value="${esc(n)}" checked> ${esc(n)} <span class="small mut">(${esc(u)})</span></label>`).join('')}` : ''; }).join('')}</div>
+   ${mBtns()}`,
+   {save: () => {
+     const picked = [...document.querySelectorAll('.ci:checked')].map(x => x.value);
+     const list = miss.filter(([n]) => picked.includes(n));
+     if (!list.length) return toast('Tick at least one item.', true);
+     guard(async () => {
+       for (let k = 0; k < list.length; k += 40) {
+         const ops = list.slice(k, k + 40).map(([name, cat, unit]) => ({op: 'add', path: 'items/' + genId(), data: {name, cat, unit, lastCost: 0, par: {R: 0, C: 0}, active: true}}));
+         await opsWrite(ops);
+       }
+       closeModal();
+     }, list.length + ' item' + (list.length === 1 ? '' : 's') + ' added');
+   }},
+   box => { box.querySelector('#ci-all').onclick = () => box.querySelectorAll('.ci').forEach(x => x.checked = true); box.querySelector('#ci-none').onclick = () => box.querySelectorAll('.ci').forEach(x => x.checked = false); });
+};
 ACT.saveCfg = () => {
   const lines = s => [...new Set(String(s || '').split('\n').map(x => x.trim()).filter(Boolean))];
   const data = {company: D.cfg.company.trim(), address: D.cfg.address.trim(), departments: lines(D.cfg.departments), staff: lines(D.cfg.staff), suppliers: lines(D.cfg.suppliers), expCats: lines(D.cfg.expCats), priceAlertPct: num(D.cfg.pct) || 10};
