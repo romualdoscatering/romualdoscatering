@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /ops/
+Allow: /
+
+Sitemap: https://romualdos.ph/sitemap.xml
