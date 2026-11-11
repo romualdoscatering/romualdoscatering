@@ -19,7 +19,9 @@ const CONFIG = {
   SESSION_SECONDS: 6 * 60 * 60,                        // staff stay logged in up to 6 hours
   MAX_LOGIN_FAILS: 5,                                  // wrong passwords before a lock
   LOCK_SECONDS: 15 * 60,                               // lock length
-  MAX_SUBMITS_PER_HOUR: 60                             // spam guard for the public form
+  MAX_SUBMITS_PER_HOUR: 60,                            // spam guard for the public form
+  ALERT_EMAILS: ['romualdoscatering@gmail.com'],       // who gets an email for every new website inquiry
+  SITE_URL: 'https://romualdos.ph'
 };
 
 const STATUSES = ['New', 'Contacted', 'Quoted', 'Booked', 'Declined'];
@@ -138,7 +140,7 @@ function submitInquiry(q, source, honeypot) {
   }
   let inq;
   try { inq = cleanInquiry(q, source); } catch (e) { return { ok: false, error: e.message }; }
-  return withLock(function () {
+  const res = withLock(function () {
     const db = readDb();
     if (source === 'message' && db.inquiries.some(function (x) { return x.ref === inq.ref; }))
       return { ok: false, error: inq.ref + ' is already in the list.' };
@@ -147,6 +149,47 @@ function submitInquiry(q, source, honeypot) {
     writeDb(db);
     return { ok: true, ref: inq.ref, inquiry: inq };
   });
+  // Email alert for inquiries sent from the website. A failed email never blocks saving the inquiry.
+  if (res.ok && source === 'web') { try { sendInquiryAlert(inq); } catch (e) { console.error('Alert email failed: ' + e); } }
+  return res;
+}
+
+/* ===================== EMAIL ALERTS ===================== */
+const COURSE_NAMES = { soup: 'Soup', appetizer: 'Appetizer', chicken: 'Chicken', pork: 'Pork', beef: 'Beef', fish: 'Fish / Seafood', veg: 'Vegetables / Salad', pasta: 'Pasta / Noodles', dessert: 'Dessert' };
+function h(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function pesoTxt(n) { return '₱' + Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+function niceDate(d) { if (!d) return '—'; try { return Utilities.formatDate(new Date(d + 'T00:00:00+08:00'), 'Asia/Manila', 'EEE, MMM d, yyyy'); } catch (e) { return d; } }
+function niceTime(t) { if (!t) return ''; const p = t.split(':'); const hr = Number(p[0]); return ((hr + 11) % 12 + 1) + ':' + p[1] + (hr < 12 ? ' AM' : ' PM'); }
+
+/** Emails everyone in CONFIG.ALERT_EMAILS about a new inquiry. */
+function sendInquiryAlert(q) {
+  if (!CONFIG.ALERT_EMAILS.length || MailApp.getRemainingDailyQuota() < 1) return;
+  const c = q.customer || {}, ev = q.event || {}, p = q.plan || {}, es = q.estimate || {};
+  const plan = p.kind === 'package' ? (p.packageName + ' Package (' + pesoTxt(p.pricePerHead) + '/head)') : 'Custom menu';
+  const items = p.chefPick ? ['Chef to recommend the menu'] : (q.items || []).map(function (i) { return (COURSE_NAMES[i.cat] || i.cat) + ': ' + i.dish; });
+  const subject = 'New inquiry: ' + c.name + ' · ' + (ev.type || 'Event') + ' · ' + niceDate(ev.date) + ' · ' + ev.pax + ' pax';
+  const rows = [['Reference', q.ref], ['Customer', c.name], ['Mobile', c.phone], ['Email', c.email || '—'], ['Event', (ev.type || 'Event') + ' on ' + niceDate(ev.date) + (ev.time ? ' at ' + niceTime(ev.time) : '')],
+    ['Venue', ev.venue || '—'], ['Guests', ev.pax + ' pax'], ['Plan', plan], ['Estimated total', pesoTxt(es.total) + ' (' + pesoTxt(es.perHead) + '/head) — estimate only'], ['Notes', q.notes || '—']];
+  const html = '<div style="font-family:Arial,sans-serif;color:#1A2C54;max-width:560px">' +
+    '<div style="background:#1A2C54;color:#fff;padding:14px 18px;border-radius:10px 10px 0 0"><b style="font-size:17px">New catering inquiry</b><div style="font-size:12px;color:#E5DEB2">from romualdos.ph · ' + h(q.ref) + '</div></div>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:14px;border:1px solid #E4DFC8;border-top:0">' +
+    rows.map(function (r) { return '<tr><td style="padding:8px 12px;border-bottom:1px solid #E4DFC8;color:#5B6478;width:130px;vertical-align:top">' + h(r[0]) + '</td><td style="padding:8px 12px;border-bottom:1px solid #E4DFC8;font-weight:600">' + h(r[1]) + '</td></tr>'; }).join('') +
+    '<tr><td style="padding:8px 12px;color:#5B6478;vertical-align:top">Menu</td><td style="padding:8px 12px">' + (items.length ? '<ul style="margin:0;padding-left:18px">' + items.map(function (x) { return '<li>' + h(x) + '</li>'; }).join('') + '</ul>' : '—') + '</td></tr></table>' +
+    '<p style="margin:16px 0"><a href="' + CONFIG.SITE_URL + '/#staff" style="background:#E89908;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:700">Open the Inquiries list</a></p>' +
+    '<p style="font-size:12px;color:#5B6478">Call or text the customer at ' + h(c.phone) + '. Reply to this email to write to the customer' + (c.email ? '' : ' (no email given)') + '.</p></div>';
+  const text = 'New catering inquiry ' + q.ref + '\n\n' + rows.map(function (r) { return r[0] + ': ' + r[1]; }).join('\n') + '\nMenu:\n- ' + (items.join('\n- ') || '—') + '\n\nOpen the Inquiries list: ' + CONFIG.SITE_URL + '/#staff';
+  const opts = { name: "Romualdo's Website", htmlBody: html };
+  if (c.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) opts.replyTo = c.email;
+  MailApp.sendEmail(CONFIG.ALERT_EMAILS.join(','), subject, text, opts);
+}
+
+/** Run once from the editor (choose "testAlertEmail" > Run) to approve email sending and receive a sample alert. Nothing is saved. */
+function testAlertEmail() {
+  sendInquiryAlert({ ref: 'RCS-TEST', customer: { name: 'Sample Customer', phone: '0917 000 0000', email: '' },
+    event: { date: Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd'), time: '18:00', type: 'Birthday', venue: 'Test only — please ignore', pax: 50 },
+    plan: { kind: 'package', packageName: 'Signature', pricePerHead: 650 }, items: [{ cat: 'soup', dish: 'Creamy Corn' }, { cat: 'pork', dish: 'Humba' }],
+    estimate: { perHead: 650, total: 32500 }, notes: 'This is a test alert from the Google script.' });
+  console.log('Test alert sent to ' + CONFIG.ALERT_EMAILS.join(', ') + '. Remaining email quota today: ' + MailApp.getRemainingDailyQuota());
 }
 
 function setStatus(ref, status) {
