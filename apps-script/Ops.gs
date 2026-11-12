@@ -17,7 +17,7 @@ const OPS = {
   SHEET: 'docs',
   HEAD: ['path', 'coll', 'data', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'],
   STAFF_RECHECK_SECONDS: 120,      // how often an active session is re-checked against the staff file
-  COLLS: ['config', 'items', 'events', 'advances', 'purchases', 'expenses', 'moves', 'counts', 'sales', 'prs'],
+  COLLS: ['config', 'items', 'events', 'advances', 'purchases', 'expenses', 'moves', 'counts', 'sales', 'prs', 'recipes'],
   MAX_OPS: 50,
   MAX_DOC_CHARS: 45000
 };
@@ -142,6 +142,7 @@ function checkStaff(coll, before, after) {
     if (after.status !== before.status && ['approved', 'rejected'].indexOf(after.status) >= 0) forbid('Only Admin accounts can approve or reject requisitions.');
     if (before.status === 'approved' && after.status === 'cancelled') forbid('Only Admin accounts can cancel an approved requisition.');
   }
+  if (coll === 'recipes') return;                 // the small team keeps recipes up to date together
   if (coll === 'advances' && before.status === 'liquidated' && !same(before, after)) forbid('A liquidated advance can only be changed by an Admin.');
   if (coll === 'counts' && !same(before.lines, after.lines)) forbid('Posted counts cannot be changed.');
   ['lines', 'total', 'amount', 'book', 'date', 'createdBy', 'createdAt', 'prNo'].forEach(function (k) {

@@ -22,6 +22,10 @@ header{position:sticky;top:0;z-index:5;background:#1f1d1a;color:#fff}
 .who{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#e9e2d6;margin-left:10px}.who b{font-weight:600}.who button{background:transparent;color:#e9e2d6;border-color:#5a544b;padding:4px 10px;font-size:12px}
 .login{max-width:380px;margin:60px auto}.login h2{text-align:center}
 .pr-from{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;background:var(--infobg);margin-bottom:12px}
+h4.sub{font-size:13px;margin:16px 0 8px;color:var(--ink)}
+.adv-left{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;padding:10px 14px;border-radius:10px;background:var(--infobg);margin:4px 0 6px;font-size:13px}
+.adv-left .left{margin-left:auto;font-size:15px}
+.item-in{min-width:180px}
 nav{display:flex;gap:2px;overflow-x:auto;padding:0 10px;max-width:1150px;margin:auto;scrollbar-width:none}
 nav::-webkit-scrollbar{display:none}
 nav a{color:#d8cfc0;text-decoration:none;padding:9px 11px;white-space:nowrap;border-bottom:3px solid transparent;font-weight:500;font-size:13.5px}
@@ -143,6 +147,24 @@ const ITEM_CATS = ['Poultry','Pork','Beef','Fish/Seafood','Vegetables','Eggs/Dai
 /* Older category names (from the first version) are shown under the new headers. */
 const OLD_CATS = {'Chicken & poultry':'Poultry','Seafood':'Fish/Seafood','Fruits':'Vegetables','Dairy & eggs':'Eggs/Dairy','Rice & grains':'Pantry Essentials','Dry goods / grocery':'Pantry Essentials','Condiments & spices':'Pantry Essentials','Oil & fats':'Pantry Essentials','Beverages':'Others','Bread & bakery':'Others'};
 /* Item names are shown with every word capitalized: "chicken thigh fillet" -> "Chicken Thigh Fillet". */
+const capWords = n => String(n || '').replace(/(^|[\s(\-\/])([a-zà-ÿñ])/g, (m, p, c) => p + c.toUpperCase());
+const CAT_GUESS = [['Poultry', /chicken|manok|turkey|duck|quail|wings?|drumstick|thigh|breast/i], ['Pork', /pork|baboy|liempo|belly|pigue|kasim|lechon|ham|bacon|chorizo|longganisa/i], ['Beef', /beef|baka|oxtail|brisket|sirloin|tenderloin|shank|tripe|tuwalya/i], ['Fish/Seafood', /fish|isda|tuna|tilapia|bangus|salmon|shrimp|hipon|squid|pusit|crab|mussel|tahong|clam|lapu|seafood/i], ['Eggs/Dairy', /egg|itlog|milk|cream|cheese|butter|yogurt|gatas/i], ['Pantry Essentials', /sauce|vinegar|suka|toyo|soy|patis|salt|asin|sugar|asukal|pepper|oil|mantika|flour|cornstarch|rice|bigas|noodle|pasta|spaghetti|pancit|seasoning|msg|ketchup|mayonnaise|vinegar|broth|cube|powder|spice|bay leaf|laurel/i], ['Vegetables', /onion|sibuyas|garlic|bawang|ginger|luya|tomato|kamatis|carrot|cabbage|repolyo|potato|patatas|pechay|kangkong|string beans|sitaw|eggplant|talong|squash|kalabasa|pepper|sili|celery|lettuce|calamansi|kalamansi|lemon|mushroom|corn|mais|ampalaya|okra|malunggay|spring onion|leeks|cucumber|pipino/i]];
+const guessCat = n => (CAT_GUESS.find(([, re]) => re.test(n)) || ['Others'])[0];
+const findItem = n => { const k = String(n || '').trim().toLowerCase(); return k ? Object.values(S.items).find(i => i.name.trim().toLowerCase() === k) : null; };
+/* Lines may hold an existing item (itemId) or a typed new name (newName + newUnit). This turns new names into item records saved in the same batch. */
+function resolveLines(lines) {
+  const ops = [], made = {};
+  const out = lines.map(l => {
+    if (l.itemId && S.items[l.itemId]) return {...l};
+    const name = titleCase(l.newName); if (!name) return null;
+    const ex = findItem(name); if (ex) return {...l, itemId: ex.id};
+    const key = name.toLowerCase();
+    if (!made[key]) { made[key] = genId(); const data = {name, cat: guessCat(name), unit: (l.newUnit || 'kg').trim(), lastCost: num(l.cost) || 0, par: {R: 0, C: 0}, active: true}; ops.push({op: 'add', path: 'items/' + made[key], data}); S.items[made[key]] = {id: made[key], ...data}; }
+    return {...l, itemId: made[key]};
+  }).filter(Boolean);
+  return {ops, lines: out};
+}
+const hasItem = l => !!(l.itemId || String(l.newName || '').trim());
 const titleCase = n => String(n || '').trim().replace(/\s+/g, ' ').replace(/(^|[\s(\-\/])([a-zà-ÿñ])/g, (m, p, c) => p + c.toUpperCase());
 const catOf = i => { const c = (i && i.cat) || 'Others'; return ITEM_CATS.includes(c) ? c : (OLD_CATS[c] || 'Others'); };
 const catIdx = i => ITEM_CATS.indexOf(catOf(i));
@@ -173,7 +195,7 @@ const ACT = {};
 const S = {state: 'login', prs: [], token: '', me: null, isAdmin: false, users: [], lastSync: 0, syncErr: '', syncing: false, loginMsg: '',
   config: {...DEFAULT_CONFIG}, items: {}, events: {}, advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: {}, names: {}, busy: false};
 
-const newPurchase = (o = {}) => ({date: today(), book: 'R', eventId: '', supplier: '', buyer: '', receiptNo: '', advanceId: '', prId: '', prNo: '', lines: [{itemId: '', qty: '', cost: ''}], ...o});
+const newPurchase = (o = {}) => ({date: today(), book: 'R', eventId: '', supplier: '', buyer: '', receiptNo: '', advanceId: '', prId: '', prNo: '', lines: [{itemId: '', qty: '', cost: ''}], other: [], ...o});
 const newExpense = (o = {}) => ({date: today(), book: 'R', eventId: '', cat: '', desc: '', amount: '', paidBy: '', receiptNo: '', advanceId: '', ...o});
 const newAdvance = (o = {}) => ({date: today(), book: 'R', eventId: '', to: '', amount: '', givenBy: '', note: '', ...o});
 const newMove = (o = {}) => ({date: today(), book: 'R', type: 'issue', eventId: '', by: '', receivedBy: '', reason: '', note: '', lines: [{itemId: '', qty: ''}], ...o});
@@ -273,7 +295,7 @@ function alerts() {
   else if (pend.length) A.push(['warn', `${pend.length} purchase${pend.length > 1 ? 's' : ''} today waiting to be received and weighed.`, 'purchases']);
   const shorts = S.purchases.filter(p => p.date >= daysAgo(30) && shortValue(p) > 0.5);
   if (shorts.length) A.push(['bad', `Short deliveries in the last 30 days: ${shorts.length} purchase${shorts.length > 1 ? 's' : ''}, ${peso(sum(shorts, shortValue))} paid for but not received.`, 'purchases']);
-  const self = S.purchases.filter(p => p.date >= wk && p.status === 'received' && p.recv?.by && p.buyer && p.recv.by.trim().toLowerCase() === p.buyer.trim().toLowerCase());
+  const self = S.purchases.filter(p => p.date >= wk && p.status === 'received' && !p.recv?.auto && p.recv?.by && p.buyer && p.recv.by.trim().toLowerCase() === p.buyer.trim().toLowerCase());
   if (self.length) A.push(['warn', `${self.length} purchase${self.length > 1 ? 's were' : ' was'} received by the same person who bought ${self.length > 1 ? 'them' : 'it'} this week. Receiving should be done by someone else.`, 'purchases']);
   let jumps = 0; S.purchases.filter(p => p.date >= wk && live_(p)).forEach(p => p.lines.forEach(l => { if (priceJump(l, l.prevCost) > pct) jumps++; }));
   if (jumps) A.push(['warn', `${jumps} item price${jumps > 1 ? 's' : ''} this week came in more than ${pct}% above the last price paid. Check with the buyer or compare stalls.`, 'purchases']);
@@ -291,8 +313,8 @@ function alerts() {
     if (last.date < daysAgo(7)) A.push(['warn', `${BOOK[b].name} has not been counted since ${fmtD(last.date)}. Count at least weekly (meats daily).`, 'stock']);
     const {st} = stockFor(b); const neg = Object.entries(st).filter(([id, q]) => q < -0.001 && S.items[id]);
     if (neg.length) A.push(['warn', `${BOOK[b].name}: ${neg.length} item${neg.length > 1 ? 's show' : ' shows'} negative stock (more issued than received). Purchases may be unrecorded or not yet received.`, 'stock']);
-    const low = activeItems().filter(i => num(i.par?.[b]) > 0 && (st[i.id] || 0) < num(i.par[b]));
-    if (low.length) A.push(['info', `${BOOK[b].name}: ${low.length} item${low.length > 1 ? 's' : ''} below par level — ${low.slice(0, 5).map(i => esc(i.name)).join(', ')}${low.length > 5 ? '…' : ''}.`, 'stock']);
+    const low = activeItems().filter(i => isLow(i, b, st));
+    if (low.length) A.push(['warn', `${BOOK[b].name}: ${low.length} item${low.length > 1 ? 's are' : ' is'} running low (2 or less left) — ${low.slice(0, 5).map(i => esc(i.name)).join(', ')}${low.length > 5 ? '…' : ''}.`, 'stock']);
   });
   const voids = [...S.purchases, ...S.expenses, ...S.moves].filter(x => x.status === 'void' && x.voidAt > Date.now() - 7 * 864e5);
   if (voids.length) A.push(['info', `${voids.length} record${voids.length > 1 ? 's were' : ' was'} voided in the last 7 days. Review the reasons.`, 'reports']);
@@ -304,7 +326,7 @@ function alerts() {
 }
 
 /* ============ rendering infra ============ */
-const TABS_ALL = [['dash', 'Dashboard'], ['prs', 'Requisitions'], ['advances', 'Cash advances'], ['purchases', 'Purchases'], ['expenses', 'Expenses'], ['usage', 'Issue & waste'], ['stock', 'Stock & counts'], ['events', 'Catering events'], ['reports', 'Reports'], ['setup', 'Setup']];
+const TABS_ALL = [['dash', 'Dashboard'], ['prs', 'Requests'], ['advances', 'Cash advances'], ['purchases', 'Purchases & expenses'], ['stock', 'Stock'], ['usage', 'Use & waste'], ['recipes', 'Recipes & production'], ['events', 'Catering events'], ['reports', 'Reports'], ['setup', 'Setup']];
 const tabsFor = () => TABS_ALL.filter(t => t[0] !== 'setup' || S.isAdmin);
 let TABS = TABS_ALL;
 const V = {};
@@ -330,6 +352,7 @@ function render() {
   else if (!S.lastSync) banner = `<div class="banner" style="background:var(--infobg);color:var(--info)">Loading records…</div>`;
   const dl = `<datalist id="dl-staff">${staffList().map(s => `<option value="${esc(s)}">`).join('')}</datalist>
     <datalist id="dl-sup">${supplierList().map(s => `<option value="${esc(s)}">`).join('')}</datalist>
+    <datalist id="dl-items">${activeItems().map(i => `<option value="${esc(i.name)}">${esc(i.unit + ' · ' + catOf(i))}</option>`).join('')}</datalist>
     <datalist id="dl-units">${UNITS.map(s => `<option value="${s}">`).join('')}</datalist>`;
   $('#view').innerHTML = banner + (V[tab] ? V[tab]() : '') + dl;
   $('#view').querySelectorAll('[data-b]').forEach(el => { const v = getPath(D, el.dataset.b); if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? ''; });
@@ -340,6 +363,9 @@ function live() {
     if (k === 'line') { const l = D[a].lines[b]; h = peso(num(l.qty) * num(l.cost)); }
     else if (k === 'flag') h = priceFlag(D[a].lines[b]);
     else if (k === 'total') h = peso(sum(D[a].lines, l => num(l.qty) * num(l.cost)));
+    else if (k === 'rcpt') h = peso(itemsTotal(D.purchase) + otherTotal(D.purchase));
+    else if (k === 'advleft') { const L = advLeft(D.purchase); h = L ? `<span class="${L.after < -0.5 ? 'bad-t' : ''}">${peso(L.after)}</span>` : ''; }
+    else if (k === 'rcost') h = peso(recipeCost(D.recipe));
     else if (k === 'cvar') { const l = D.count.lines[a]; if (l.actual === '' || l.actual == null) h = ''; else { const v = num(l.actual) - l.system; h = `<span class="${v < -0.001 ? 'bad-t' : v > 0.001 ? 'ok-t' : 'mut'}">${v > 0 ? '+' : ''}${fq(v)}</span>`; } }
     else if (k === 'counted') h = D.count.lines.filter(l => l.actual !== '' && l.actual != null).length;
     if (h !== undefined) el.innerHTML = h;
@@ -365,9 +391,11 @@ function linesEditor(key, o = {}) {
     ${d.lines.map((l, i) => {
       const oh = st && l.itemId ? (st[l.itemId] || 0) : null;
       const short = oh != null && !o.plan && num(l.qty) > oh + 0.001;
-      return `<tr><td>${sel(`${key}.lines.${i}.itemId`, itemOptions())}</td>
+      const known = l.itemId && S.items[l.itemId], typed = !known && String(l.newName || '').trim();
+      return `<tr><td><input class="item-in" list="dl-items" data-item="${key}|${i}" value="${esc(known ? iname(l.itemId) : (l.newName || ''))}" placeholder="Type or choose an item" autocomplete="off" autocapitalize="words" spellcheck="false">
+        ${typed ? `<div class="small" style="margin-top:4px"><span class="chip info">new item</span> unit <select data-b="${key}.lines.${i}.newUnit" style="width:auto;padding:2px 6px">${UNITS.map(u => opt(u, u)).join('')}</select></div>` : ''}</td>
       <td><input type="number" inputmode="decimal" step="any" min="0" data-b="${key}.lines.${i}.qty" style="text-align:right"></td>
-      <td class="mut small" style="padding-top:12px">${esc(iunit(l.itemId))}</td>
+      <td class="mut small" style="padding-top:12px">${esc(known ? iunit(l.itemId) : (typed ? (l.newUnit || 'kg') : ''))}</td>
       ${o.cost ? `<td><input type="number" inputmode="decimal" step="any" min="0" data-b="${key}.lines.${i}.cost" style="text-align:right" placeholder="${S.items[l.itemId]?.lastCost ? 'last ' + fq(S.items[l.itemId].lastCost) : ''}"></td>
         <td class="n" style="padding-top:12px"><span data-live="line:${key}:${i}">${peso(num(l.qty) * num(l.cost))}</span><div data-live="flag:${key}:${i}">${priceFlag(l)}</div></td>` : ''}
       ${st ? `<td class="n ${short ? 'bad-t' : 'mut'}" style="padding-top:12px">${oh == null ? '' : fq(oh)}${short ? ' ⚠' : ''}</td>` : ''}
@@ -381,24 +409,27 @@ const showMore = (key, n) => n > (D.ui.showAll[key] || 40) ? `<div class="row" s
 const take = (key, arr) => arr.slice(0, D.ui.showAll[key] || 40);
 
 /* ============ DASHBOARD ============ */
+const LOW_DEFAULT = 2;
+const lowLimit = (i, b) => num(i.par?.[b]) > 0 ? num(i.par[b]) : LOW_DEFAULT;
+/* Low stock: on hand at or below the item's par, or at/below 2 (kg, pc…) when no par is set. Only items this storeroom has stocked are flagged. */
+const isLow = (i, b, st) => (i.id in st) && (st[i.id] || 0) <= lowLimit(i, b) + 1e-9;
 function belowPar(b) {
   const {st} = stockFor(b);
-  return activeItems().filter(i => num(i.par?.[b]) > 0 && (st[i.id] || 0) < num(i.par[b])).map(i => ({item: i, onHand: st[i.id] || 0, need: r2(num(i.par[b]) - Math.max(0, st[i.id] || 0))}));
+  return activeItems().filter(i => isLow(i, b, st)).map(i => ({item: i, onHand: st[i.id] || 0, need: num(i.par?.[b]) > 0 ? r2(num(i.par[b]) - Math.max(0, st[i.id] || 0)) : ''}));
 }
 function workflowStrip(pend, adv) {
   const waiting = S.prs.filter(p => p.status === 'submitted').length, toBuy = S.prs.filter(p => p.status === 'approved').length;
   const low = belowPar('R').length + belowPar('C').length;
   const lastCount = S.counts.filter(live_).map(c => c.date).sort().pop();
   const daysSince = lastCount ? Math.round((new Date(today()) - new Date(lastCount)) / 864e5) : null;
-  const step = (n, title, hint, badge, tab, act, bad) => `<a class="wf ${bad ? 'due' : ''}" href="#${tab}"${act ? ` data-act="${act}"` : ''}><span class="wf-n">${n}</span><span class="wf-t">${title}</span><span class="wf-h">${hint}</span>${badge ? `<span class="wf-b">${badge}</span>` : ''}</a>`;
-  return `<div class="card wf-card"><h3>What do you need to do?</h3><p class="small mut" style="margin:-4px 0 10px">Follow the steps in order. Numbers show what's waiting.</p><div class="wf-grid">
-    ${step(1, 'Request', 'Ask for what to buy (PR)', [waiting && waiting + ' waiting approval', low && low + ' below par'].filter(Boolean).join(' · '), 'prs', '', waiting || low)}
-    ${step(2, 'Release budget', 'Give the buyer a cash advance', toBuy ? toBuy + ' approved PR' + (toBuy === 1 ? '' : 's') + ' to buy' : '', 'advances', '', toBuy)}
-    ${step(3, 'Record purchase', 'Enter what was bought & receipts', '', 'purchases')}
-    ${step(4, 'Receive', 'Check & accept deliveries into stock', pend.length ? pend.length + ' to receive' : '', 'purchases', '', pend.length)}
-    ${step(5, 'Issue / waste', 'Release stock to kitchen or events', '', 'usage')}
-    ${step(6, 'Count stock', 'Check the shelf vs. the system', daysSince == null ? 'never counted' : daysSince + ' day' + (daysSince === 1 ? '' : 's') + ' ago', 'stock', '', daysSince == null || daysSince > 7)}
-    ${step('₱', 'Liquidate', 'Settle cash advances & change', adv.length ? adv.length + ' open' : '', 'advances', '', adv.length)}
+  const left = sum(adv, a => num(a.amount) - advanceSpent(a.id).spent);
+  const step = (n, title, hint, badge, tab, bad) => `<a class="wf ${bad ? 'due' : ''}" href="#${tab}"><span class="wf-n">${n}</span><span class="wf-t">${title}</span><span class="wf-h">${hint}</span>${badge ? `<span class="wf-b">${badge}</span>` : ''}</a>`;
+  return `<div class="card wf-card"><h3>What do you need to do?</h3><p class="small mut" style="margin:-4px 0 10px">Five steps. Numbers show what's waiting.</p><div class="wf-grid">
+    ${step(1, 'Request', 'List what to buy', [waiting && waiting + ' to approve', low && low + ' low stock'].filter(Boolean).join(' · '), 'prs', waiting || low)}
+    ${step(2, 'Cash advance', 'Release money to the buyer', toBuy ? toBuy + ' request' + (toBuy === 1 ? '' : 's') + ' to buy' : '', 'advances', toBuy)}
+    ${step(3, 'Encode receipt', 'Items go into stock, amount is deducted', adv.length ? peso(left) + ' not yet declared' : '', 'purchases', adv.length)}
+    ${step(4, 'Liquidate', 'Return the change', adv.length ? adv.length + ' open' : '', 'advances', adv.length)}
+    ${step(5, 'Count stock', 'Shelf vs. system, weekly', daysSince == null ? 'never counted' : daysSince + ' day' + (daysSince === 1 ? '' : 's') + ' ago', 'stock', daysSince == null || daysSince > 7)}
   </div></div>`;
 }
 V.dash = () => {
@@ -410,7 +441,7 @@ V.dash = () => {
   const kp = (l, v, cls = '') => `<div class="kpi ${cls}"><span>${l}</span><b>${v}</b></div>`;
   const fcPct = mr.sales ? mr.used / mr.sales * 100 : null;
   return `<h2>Today · ${new Date().toLocaleDateString('en-PH', {weekday: 'long', month: 'long', day: 'numeric'})}</h2>
-  <p class="lede">Every peso goes through four checkpoints: <b>cash advance → purchase → receiving → issue/waste</b>, and a physical count catches whatever slipped through. Restaurant and Catering are kept in separate books.</p>
+  <p class="lede">Every peso follows one path: <b>request → cash advance → receipt (into stock) → liquidation</b>, and a weekly count catches whatever slipped through. Restaurant and Catering are kept in separate books.</p>
   ${workflowStrip(pend, adv)}
   ${!Object.keys(S.items).length && S.lastSync && S.isAdmin ? `<div class="alert info"><span class="ic">i</span><div>Start in <a href="#setup">Setup</a>: add your staff, suppliers and the items you buy. Then do an opening stock count in <a href="#stock">Stock & counts</a>.</div></div>` : ''}
   <div class="two">
@@ -425,10 +456,10 @@ V.dash = () => {
    ${A.length ? A.map(([lvl, msg, tab]) => `<div class="alert ${lvl}"><span class="ic">${lvl === 'bad' ? '!' : lvl === 'warn' ? '⚠' : 'i'}</span><div style="flex:1">${msg}</div><a href="#${tab}" class="small">Open</a></div>`).join('') : `<div class="alert ok"><span class="ic">✓</span><div>Nothing needs attention right now.</div></div>`}
   </div>
   <div class="two">
-   <div class="card"><h3>Waiting to be received (${pend.length})</h3>
+   ${pend.length ? '' : '<!--'}<div class="card"><h3>Waiting to be received (${pend.length})</h3>
     ${pend.length ? `<div class="tw"><table><tbody>${pend.slice(0, 12).map(p => `<tr><td>${fmtD(p.date)}</td><td>${chipBook(p.book)}</td><td>${esc(p.supplier || '—')}<div class="small mut">by ${esc(p.buyer)}</div></td><td class="n">${peso(p.total)}</td><td><button class="sm pri" data-act="receive" data-arg="${p.id}">Receive</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">All purchases have been received.</div>'}
    </div>
-   <div class="card"><h3>Open cash advances (${adv.length})</h3>
+   ${pend.length ? '' : '-->'}<div class="card"><h3>Open cash advances (${adv.length})</h3>
     ${adv.length ? `<div class="tw"><table><tbody>${adv.map(a => { const s = advanceSpent(a.id); return `<tr><td>${fmtD(a.date)}</td><td>${chipBook(a.book)}</td><td>${esc(a.to)}</td><td class="n">${peso(a.amount)}<div class="small mut">spent ${peso(s.spent)}</div></td><td class="row"><button class="sm" data-act="buyFor" data-arg="${a.id}">＋ Items</button><button class="sm" data-act="liquidate" data-arg="${a.id}">Liquidate</button></td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">No open advances.</div>'}
    </div>
   </div>
@@ -442,7 +473,7 @@ V.advances = () => {
   const d = D.advance, list = S.advances;
   return `<h2>Cash advances</h2>
   <p class="lede">Record every peso handed to a buyer before they go to the market. When they come back, liquidate: the app adds up the purchases and expenses they recorded against the advance and tells you how much change must be returned. Anything left over is flagged as unaccounted.</p>
-  <ol class="steps small" style="margin:-4px 0 14px 18px;padding:0"><li>Record the advance below.</li><li>When the buyer is back, tap <b>＋ Items bought</b> on their advance and encode each item from the receipt: item, quantity, price per unit.</li><li>Tap <b>Liquidate</b>, count the change, done.</li></ol>
+  <ol class="steps small" style="margin:-4px 0 14px 18px;padding:0"><li>Record the advance below.</li><li>When the buyer is back, tap <b>＋ Encode receipt</b> on their advance and enter each item (quantity, price per unit) and any other costs. The remaining balance updates by itself.</li><li>Tap <b>Liquidate</b>, count the change, done.</li></ol>
   <div class="card"><div class="row"><h3>Give a cash advance</h3><span class="spacer"></span>${bookSeg('advance.book')}</div>
    <div class="grid">
     <label>Date<input type="date" data-b="advance.date"></label>
@@ -455,76 +486,68 @@ V.advances = () => {
    <div class="row end"><button class="pri" data-act="saveAdv">Record advance</button></div>
   </div>
   <div class="card"><div class="row" style="margin-bottom:8px"><h3>All advances</h3></div>
-   ${list.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Book</th><th>Buyer</th><th class="n">Advance</th><th class="n">Spent (recorded)</th><th class="n">Change returned</th><th class="n">Unaccounted</th><th>Status</th><th></th></tr></thead><tbody>
+   ${list.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Book</th><th>Buyer</th><th class="n">Advance</th><th class="n">Declared (spent)</th><th class="n">Remaining / returned</th><th class="n">Unaccounted</th><th>Status</th><th></th></tr></thead><tbody>
    ${take('adv', list).map(a => { const s = advanceSpent(a.id); const exp = num(a.amount) - s.spent; return `<tr class="${a.status === 'void' ? 'void' : ''}">
     <td>${fmtD(a.date)}</td><td>${chipBook(a.book, a.eventId)}</td><td>${esc(a.to)}<div class="small mut">released by ${esc(a.givenBy || '—')}</div></td>
     <td class="n">${peso(a.amount)}</td><td class="n">${peso(s.spent)}<div class="small mut">${s.ps.length} purch · ${s.es.length} exp</div></td>
-    <td class="n">${a.status === 'liquidated' ? peso(a.change) : `<span class="mut">expect ${peso(exp)}</span>`}</td>
+    <td class="n">${a.status === 'liquidated' ? peso(a.change) + '<div class="small mut">returned</div>' : `<b class="${exp < -0.5 ? 'bad-t' : ''}">${peso(exp)}</b><div class="small mut">remaining</div>`}</td>
     <td class="n">${a.status === 'liquidated' ? (Math.abs(num(a.diff)) >= 1 ? `<span class="bad-t">${peso(a.diff)}</span>` : '<span class="ok-t">balanced</span>') : ''}</td>
     <td>${a.status === 'open' ? '<span class="chip warn">open</span>' : a.status === 'liquidated' ? '<span class="chip ok">liquidated</span>' : ''}</td>
-    <td class="row">${a.status === 'open' ? `<button class="sm" data-act="buyFor" data-arg="${a.id}">＋ Items bought</button><button class="sm pri" data-act="liquidate" data-arg="${a.id}">Liquidate</button>` : a.status === 'liquidated' ? `<button class="sm" data-act="liquidate" data-arg="${a.id}">View</button>` : ''}${a.status === 'open' || a.status === 'void' ? voidBtn('advances', a) : ''}</td></tr>`; }).join('')}
+    <td class="row">${a.status === 'open' ? `<button class="sm" data-act="buyFor" data-arg="${a.id}">＋ Encode receipt</button><button class="sm pri" data-act="liquidate" data-arg="${a.id}">Liquidate</button>` : a.status === 'liquidated' ? `<button class="sm" data-act="liquidate" data-arg="${a.id}">View</button>` : ''}${a.status === 'open' || a.status === 'void' ? voidBtn('advances', a) : ''}</td></tr>`; }).join('')}
    </tbody></table></div>${showMore('adv', list.length)}` : '<div class="empty">No cash advances yet.</div>'}
   </div>`;
 };
 
-/* ============ PURCHASES ============ */
+/* ============ SPENDING (purchases + expenses in one place) ============ */
+const otherTotal = d => sum(d.other || [], o => num(o.amount));
+const itemsTotal = d => sum(d.lines, l => num(l.qty) * num(l.cost));
+function advLeft(d) { const a = d.advanceId && S.advances.find(x => x.id === d.advanceId); if (!a) return null; return {a, before: num(a.amount) - advanceSpent(a.id).spent, after: num(a.amount) - advanceSpent(a.id).spent - itemsTotal(d) - otherTotal(d)}; }
 V.purchases = () => {
   const d = D.purchase, f = D.ui;
+  d.other ||= [];
   const advs = openAdvances(d.book);
-  const list = S.purchases.filter(p => (!f.pBook || p.book === f.pBook) && (!f.pStatus || (f.pStatus === 'short' ? shortValue(p) > 0.5 : p.status === f.pStatus)));
-  return `<h2>Purchases</h2>
-  <p class="lede">The buyer records what was bought, from whom and at what price. Every purchase is charged to <b>Restaurant</b> or to <b>Catering</b> (and to a specific event when it's for one). Nothing enters stock until someone else receives it.</p>
-  <div class="card"><div class="row"><h3>New purchase</h3><span class="spacer"></span>${bookSeg('purchase.book')}</div>
-   ${d.advanceId && S.advances.find(x => x.id === d.advanceId) ? (a => `<div class="pr-from">Encoding for <b>${esc(a.to)}'s cash advance</b> · ${peso(a.amount)} · ${fmtD(a.date)}<span class="spacer"></span><button class="sm" data-act="liquidate" data-arg="${a.id}">Back to liquidation</button></div>`)(S.advances.find(x => x.id === d.advanceId)) : ''}
-   ${d.prId ? `<div class="pr-from">From approved requisition <b>${esc(d.prNo)}</b><span class="spacer"></span><button class="sm" data-act="openPR" data-arg="${d.prId}">View PR</button><button class="sm ghost" data-act="unlinkPR">Unlink</button></div>` : `<p class="small mut" style="margin-top:0">Buying against a requisition? Open it in <a href="#prs">Requisitions</a> and tap <b>Enter the purchase</b>.</p>`}
+  const rows = [
+    ...S.purchases.filter(p => (!f.pBook || p.book === f.pBook)).map(p => ({k: 'p', x: p, date: p.date, t: p.createdAt || 0})),
+    ...S.expenses.filter(e => (!f.pBook || e.book === f.pBook)).map(e => ({k: 'e', x: e, date: e.date, t: e.createdAt || 0}))
+  ].filter(r => !f.pStatus || (f.pStatus === 'p' ? r.k === 'p' : f.pStatus === 'e' ? r.k === 'e' : f.pStatus === 'pending' ? r.x.status === 'pending' : r.x.status === 'void'))
+   .sort((a, b) => b.date.localeCompare(a.date) || b.t - a.t);
+  const L = advLeft(d);
+  return `<h2>Purchases &amp; expenses</h2>
+  <p class="lede">Encode one receipt at a time: <b>items for stock</b> (they go straight into the storeroom) and <b>other costs</b> like fare, ice or LPG. If it was paid from a cash advance, the amount is deducted from that advance automatically.</p>
+  <div class="card"><div class="row"><h3>Record a receipt</h3><span class="spacer"></span>${bookSeg('purchase.book')}</div>
+   ${d.prId ? `<div class="pr-from">From approved requisition <b>${esc(d.prNo)}</b><span class="spacer"></span><button class="sm" data-act="openPR" data-arg="${d.prId}">View PR</button><button class="sm ghost" data-act="unlinkPR">Unlink</button></div>` : ''}
    <div class="grid">
+    <label>Paid from${sel('purchase.advanceId', opt('', 'Paid directly (no cash advance)') + advs.map(a => { const left = num(a.amount) - advanceSpent(a.id).spent; return opt(a.id, `${a.to}'s advance · ${peso(left)} left of ${peso(a.amount)}`); }).join(''))}</label>
     <label>Date<input type="date" data-b="purchase.date"></label>
     ${d.book === 'C' ? `<label>For event${sel('purchase.eventId', eventOptions(), false)}</label>` : ''}
-    <label>Supplier / stall<input list="dl-sup" data-b="purchase.supplier" placeholder="e.g. Aling Nena, Stall 12"></label>
+    <label>Supplier / stall<input list="dl-sup" data-b="purchase.supplier" placeholder="e.g. Aling Nena, Stall 12" autocapitalize="words"></label>
     <label>Bought by<input list="dl-staff" data-b="purchase.buyer" placeholder="Name"></label>
     <label>Receipt / OR no.<input data-b="purchase.receiptNo" placeholder="Blank if none"></label>
-    <label>Paid from${sel('purchase.advanceId', opt('', 'Paid directly (no advance)') + advs.map(a => opt(a.id, `${a.to} · ${peso(a.amount)} · ${fmtD(a.date)}`)).join(''), false)}</label>
    </div>
+   ${L ? `<div class="adv-left"><span>${esc(L.a.to)}'s cash advance</span><span>Released <b>${peso(L.a.amount)}</b></span><span>Already declared <b>${peso(num(L.a.amount) - L.before)}</b></span><span>This receipt <b data-live="rcpt">${peso(itemsTotal(d) + otherTotal(d))}</b></span><span class="left">Remaining <b data-live="advleft">${peso(L.after)}</b></span></div>` : ''}
+   <h4 class="sub">Items for stock</h4>
    ${linesEditor('purchase', {cost: true})}
-   <div class="row" style="margin-top:12px"><span>Total&nbsp; <b style="font-size:17px" data-live="total:purchase">${peso(sum(d.lines, l => num(l.qty) * num(l.cost)))}</b></span><span class="spacer"></span><button class="ghost" data-act="resetP">Clear</button><button class="pri" data-act="saveP">Save purchase</button></div>
+   <h4 class="sub">Other costs on this receipt <span class="small mut">(not stock: fare, ice, LPG, packaging…)</span></h4>
+   ${d.other.length ? `<div class="tw"><table class="lines"><thead><tr><th style="width:170px">Type</th><th>Description</th><th class="n" style="width:130px">Amount ₱</th><th style="width:30px"></th></tr></thead><tbody>
+    ${d.other.map((o, i) => `<tr><td>${sel(`purchase.other.${i}.cat`, (S.config.expCats || []).map(c => opt(c, c)).join(''), false)}</td><td><input data-b="purchase.other.${i}.desc" placeholder="e.g. Tricycle to Bankerohan" autocapitalize="sentences"></td>
+      <td><input type="number" inputmode="decimal" step="any" min="0" data-b="purchase.other.${i}.amount" style="text-align:right"></td><td><button class="sm ghost" data-act="rmOther" data-arg="${i}" title="Remove">✕</button></td></tr>`).join('')}
+   </tbody></table></div>` : ''}
+   <div class="row" style="margin-top:6px"><button class="sm" data-act="addOther">＋ Add other cost</button></div>
+   <div class="row" style="margin-top:14px"><span>Receipt total&nbsp; <b style="font-size:17px" data-live="rcpt">${peso(itemsTotal(d) + otherTotal(d))}</b></span><span class="spacer"></span><button class="ghost" data-act="resetP">Clear</button><button class="pri" data-act="saveP">Save receipt</button></div>
   </div>
-  <div class="card"><div class="row" style="margin-bottom:10px"><h3>Purchase register</h3><span class="spacer"></span>
+  <div class="card"><div class="row" style="margin-bottom:10px"><h3>Register</h3><span class="spacer"></span>
     ${filterSeg('ui.pBook', [['', 'Both'], ['R', 'Restaurant'], ['C', 'Catering']])}
-    ${filterSeg('ui.pStatus', [['', 'All'], ['pending', 'To receive'], ['received', 'Received'], ['short', 'Short'], ['void', 'Void']])}</div>
-   ${list.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Book</th><th>Supplier</th><th>Buyer</th><th>Receipt</th><th class="n">Total</th><th>Status</th><th></th></tr></thead><tbody>
-    ${take('pur', list).map(p => { const sv = shortValue(p); const jump = p.lines.some(l => priceJump(l, l.prevCost) > pctAlert());
-      return `<tr class="click ${p.status === 'void' ? 'void' : ''}" data-act="viewP" data-arg="${p.id}"><td>${fmtD(p.date)}</td><td>${chipBook(p.book, p.eventId)}</td><td>${esc(p.supplier || '—')}<div class="small mut">${p.lines.length} item${p.lines.length > 1 ? 's' : ''}${jump ? ' · <span class="bad-t">price ▲</span>' : ''}${p.prNo ? ' · ' + esc(p.prNo) : ' · <span class="warn-t">no PR</span>'}</div></td><td>${esc(p.buyer)}</td><td>${p.receiptNo ? esc(p.receiptNo) : '<span class="chip warn">none</span>'}</td><td class="n">${peso(p.total)}</td>
-      <td>${p.status === 'pending' ? '<span class="chip warn">to receive</span>' : p.status === 'received' ? (sv > 0.5 ? `<span class="chip bad">short ${peso(sv)}</span>` : '<span class="chip ok">received</span>') + `<div class="small mut">by ${esc(p.recv?.by || '')}</div>` : ''}</td>
-      <td class="row">${p.status === 'pending' ? `<button class="sm pri" data-act="receive" data-arg="${p.id}">Receive</button>` : ''}${voidBtn('purchases', p)}</td></tr>`; }).join('')}
-   </tbody></table></div>${showMore('pur', list.length)}` : '<div class="empty">No purchases match.</div>'}
+    ${filterSeg('ui.pStatus', [['', 'All'], ['p', 'Stock items'], ['e', 'Other costs'], ['void', 'Void']])}</div>
+   ${rows.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Book</th><th>What</th><th>By</th><th>Receipt</th><th class="n">Amount</th><th>Paid from</th><th></th></tr></thead><tbody>
+    ${take('pur', rows).map(({k, x}) => { const adv = x.advanceId && S.advances.find(a => a.id === x.advanceId);
+      return k === 'p'
+      ? `<tr class="click ${x.status === 'void' ? 'void' : ''}" data-act="viewP" data-arg="${x.id}"><td>${fmtD(x.date)}</td><td>${chipBook(x.book, x.eventId)}</td><td>${esc(x.supplier || 'Purchase')}<div class="small mut">${x.lines.length} item${x.lines.length > 1 ? 's' : ''}: ${x.lines.slice(0, 3).map(l => esc(iname(l.itemId))).join(', ')}${x.lines.length > 3 ? '…' : ''}</div></td><td>${esc(x.buyer)}</td><td>${x.receiptNo ? esc(x.receiptNo) : '<span class="chip warn">none</span>'}</td><td class="n">${peso(x.total)}</td><td class="small">${adv ? esc(adv.to) + "'s advance" : 'direct'}</td>
+        <td class="row">${x.status === 'pending' ? `<button class="sm pri" data-act="receive" data-arg="${x.id}">Receive</button>` : ''}${voidBtn('purchases', x)}</td></tr>`
+      : `<tr class="${x.status === 'void' ? 'void' : ''}"><td>${fmtD(x.date)}</td><td>${chipBook(x.book, x.eventId)}</td><td><span class="chip mut">${esc(x.cat || 'Expense')}</span> ${esc(x.desc)}</td><td>${esc(x.paidBy)}</td><td>${x.receiptNo ? esc(x.receiptNo) : '<span class="chip warn">none</span>'}</td><td class="n">${peso(x.amount)}</td><td class="small">${adv ? esc(adv.to) + "'s advance" : 'direct'}</td><td>${voidBtn('expenses', x)}</td></tr>`; }).join('')}
+   </tbody></table></div>${showMore('pur', rows.length)}` : '<div class="empty">Nothing recorded yet.</div>'}
   </div>`;
 };
-
-/* ============ EXPENSES ============ */
-V.expenses = () => {
-  const d = D.expense, advs = openAdvances(d.book);
-  const list = S.expenses.filter(e => !D.ui.eBook || e.book === D.ui.eBook);
-  return `<h2>Expenses</h2>
-  <p class="lede">Money spent on things that are <b>not ingredients</b> and never go into stock: fare, LPG, ice, packaging, rentals, extra helpers. Keeping them out of purchases means your stock counts stay clean.</p>
-  <div class="card"><div class="row"><h3>Record an expense</h3><span class="spacer"></span>${bookSeg('expense.book')}</div>
-   <div class="grid">
-    <label>Date<input type="date" data-b="expense.date"></label>
-    ${d.book === 'C' ? `<label>For event${sel('expense.eventId', eventOptions('General catering (no specific event)'), false)}</label>` : ''}
-    <label>Category${sel('expense.cat', opt('', '— choose —') + (S.config.expCats || []).map(c => opt(c, c)).join(''), false)}</label>
-    <label>Description<input data-b="expense.desc" placeholder="e.g. Tricycle to Farmers market"></label>
-    <label>Amount ₱<input type="number" inputmode="decimal" step="any" min="0" data-b="expense.amount"></label>
-    <label>Paid by<input list="dl-staff" data-b="expense.paidBy"></label>
-    <label>Receipt / OR no.<input data-b="expense.receiptNo" placeholder="Blank if none"></label>
-    <label>Paid from${sel('expense.advanceId', opt('', 'Paid directly (no advance)') + advs.map(a => opt(a.id, `${a.to} · ${peso(a.amount)} · ${fmtD(a.date)}`)).join(''), false)}</label>
-   </div>
-   <div class="row end"><button class="pri" data-act="saveE">Save expense</button></div>
-  </div>
-  <div class="card"><div class="row" style="margin-bottom:10px"><h3>Expense register</h3><span class="spacer"></span>${filterSeg('ui.eBook', [['', 'Both'], ['R', 'Restaurant'], ['C', 'Catering']])}</div>
-   ${list.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Book</th><th>Category</th><th>Description</th><th>Paid by</th><th>Receipt</th><th class="n">Amount</th><th></th></tr></thead><tbody>
-    ${take('exp', list).map(e => `<tr class="${e.status === 'void' ? 'void' : ''}"><td>${fmtD(e.date)}</td><td>${chipBook(e.book, e.eventId)}</td><td>${esc(e.cat)}</td><td>${esc(e.desc)}</td><td>${esc(e.paidBy)}</td><td>${e.receiptNo ? esc(e.receiptNo) : '<span class="chip warn">none</span>'}</td><td class="n">${peso(e.amount)}</td><td>${voidBtn('expenses', e)}</td></tr>`).join('')}
-   </tbody></table></div>${showMore('exp', list.length)}` : '<div class="empty">No expenses yet.</div>'}
-  </div>`;
-};
+V.expenses = V.purchases;
 
 /* ============ ISSUE & WASTE ============ */
 V.usage = () => {
@@ -556,6 +579,83 @@ V.usage = () => {
   </div>`;
 };
 
+
+/* ============ RECIPES & PRODUCTION ============
+   A recipe lists the raw ingredients needed for ONE kilogram of the finished dish.
+   Production: dishes × kilos (or × guests) → total ingredients → minus stock on hand → what to buy → one-tap request. */
+const newRecipe = (o = {}) => ({id: '', name: '', servingG: '150', notes: '', lines: [{itemId: '', qty: ''}], ...o});
+const newProd = (o = {}) => ({book: 'C', eventId: '', rows: [{recipeId: '', mode: 'kg', amt: ''}], ...o});
+const recipeCost = r => sum((r?.lines || []), l => num(l.qty) * costOf(l.itemId));
+const rowKg = r => { const rc = S.recipes.find(x => x.id === r.recipeId); if (!rc) return 0; return r.mode === 'pax' ? num(r.amt) * num(rc.servingG || 150) / 1000 : num(r.amt); };
+function prodNeeds(P) {
+  const need = {};
+  P.rows.forEach(r => { const rc = S.recipes.find(x => x.id === r.recipeId), kg = rowKg(r); if (!rc || !kg) return;
+    (rc.lines || []).forEach(l => { if (S.items[l.itemId]) need[l.itemId] = (need[l.itemId] || 0) + num(l.qty) * kg; }); });
+  const {st} = stockFor(P.book);
+  return Object.entries(need).map(([id, q]) => { const oh = Math.max(0, st[id] || 0), buy = Math.max(0, q - oh); return {item: S.items[id], need: r2(q), onHand: r2(oh), buy: r2(buy), cost: buy * costOf(id)}; })
+    .sort((a, b) => (catIdx(a.item) - catIdx(b.item)) || a.item.name.localeCompare(b.item.name));
+}
+V.recipes = () => {
+  D.recipe ||= newRecipe(); D.prod ||= newProd();
+  const r = D.recipe, P = D.prod, N = prodNeeds(P), kgTotal = sum(P.rows, rowKg);
+  const rOpts = opt('', '— choose dish —') + S.recipes.map(x => opt(x.id, x.name)).join('');
+  return `<h2>Recipes &amp; production</h2>
+  <p class="lede">Write each dish once as a <b>recipe per 1 kilogram of cooked food</b>. Then tell the planner how many kilos (or guests) you'll cook, and it works out every ingredient to buy, after subtracting what's already in stock.</p>
+  <div class="card"><div class="row" style="margin-bottom:10px"><h3 style="margin:0">Production planner</h3><span class="spacer"></span>${bookSeg('prod.book')}</div>
+   ${S.recipes.length ? `<div class="grid">${P.book === 'C' ? `<label>For event${sel('prod.eventId', eventOptions('— not for a specific event —'), false)}</label>` : ''}</div>
+   <div class="tw"><table class="lines"><thead><tr><th style="min-width:200px">Dish</th><th style="width:150px">Plan by</th><th class="n" style="width:110px">Amount</th><th class="n">= kg cooked</th><th style="width:30px"></th></tr></thead><tbody>
+    ${P.rows.map((x, i) => `<tr><td>${sel(`prod.rows.${i}.recipeId`, rOpts)}</td><td>${sel(`prod.rows.${i}.mode`, opt('kg', 'Kilos of dish') + opt('pax', 'Number of guests'))}</td>
+      <td><input type="number" inputmode="decimal" step="any" min="0" data-b="prod.rows.${i}.amt" data-rr style="text-align:right"></td><td class="n" style="padding-top:12px">${rowKg(x) ? fq(r2(rowKg(x))) + ' kg' : ''}</td>
+      <td><button class="sm ghost" data-act="rmProd" data-arg="${i}">✕</button></td></tr>`).join('')}
+   </tbody></table></div><div class="row" style="margin-top:6px"><button class="sm" data-act="addProd">＋ Add dish</button><span class="spacer"></span><span class="small mut">Total ${fq(r2(kgTotal))} kg</span></div>
+   ${N.length ? `<h4 class="sub">Ingredients needed</h4><div class="tw"><table><thead><tr><th>Item</th><th class="n">Needed</th><th class="n">In stock</th><th class="n">To buy</th><th class="n">Est. cost</th></tr></thead><tbody>
+    ${N.map(x => `<tr><td>${esc(x.item.name)}</td><td class="n">${fq(x.need)} ${esc(x.item.unit)}</td><td class="n mut">${fq(x.onHand)}</td><td class="n ${x.buy > 0 ? '' : 'mut'}"><b>${x.buy > 0 ? fq(x.buy) + ' ' + esc(x.item.unit) : '—'}</b></td><td class="n">${x.buy > 0 ? peso(x.cost) : ''}</td></tr>`).join('')}
+   </tbody><tfoot><tr><td colspan="4">Estimated cost of what to buy</td><td class="n">${peso(sum(N, x => x.cost))}</td></tr></tfoot></table></div>
+   <div class="row end" style="margin-top:10px">${N.some(x => x.buy > 0) ? `<button class="pri" data-act="prodToReq">Create request for these →</button>` : '<span class="chip ok">Everything is in stock</span>'}</div>` : ''}`
+   : '<div class="empty">Add your first recipe below, then plan production here.</div>'}
+  </div>
+  <div class="card"><div class="row" style="margin-bottom:6px"><h3 style="margin:0">${r.id ? 'Edit recipe' : 'New recipe'}</h3><span class="spacer"></span>${r.id ? '<button class="sm ghost" data-act="newRecipe">＋ Start a new one instead</button>' : ''}</div>
+   <div class="grid">
+    <label>Dish name<input data-b="recipe.name" placeholder="e.g. Chicken Curry" autocapitalize="words"></label>
+    <label>Serving per guest (grams)<input type="number" inputmode="decimal" step="any" min="0" data-b="recipe.servingG" placeholder="150"></label>
+    <label>Notes / method (optional)<input data-b="recipe.notes" placeholder="e.g. Yield checked 12 Nov"></label>
+   </div>
+   <p class="small mut" style="margin:0 0 6px">Raw ingredients for <b>1 kg of the finished dish</b>, in each item's buying unit (kg, pc, L…). Type a new ingredient if it's not on the list.</p>
+   ${linesEditor('recipe', {qtyLabel: 'Qty for 1 kg'})}
+   <div class="row" style="margin-top:12px"><span>Ingredient cost per kg&nbsp; <b style="font-size:17px" data-live="rcost">${peso(recipeCost(r))}</b> <span class="small mut">(at last prices)</span></span><span class="spacer"></span>${r.id && S.isAdmin ? '<button class="ghost danger" data-act="delRecipe">Delete</button>' : ''}<button class="ghost" data-act="newRecipe">Clear</button><button class="pri" data-act="saveRecipe">${r.id ? 'Save changes' : 'Save recipe'}</button></div>
+  </div>
+  <div class="card"><h3>Recipe book (${S.recipes.length})</h3>
+   ${S.recipes.length ? `<div class="tw"><table><thead><tr><th>Dish</th><th class="n">Ingredients</th><th class="n">Cost per kg</th><th class="n">Serving</th><th class="n">Cost per serving</th><th></th></tr></thead><tbody>
+    ${S.recipes.map(x => { const c = recipeCost(x), sg = num(x.servingG || 150); return `<tr class="click" data-act="editRecipe" data-arg="${x.id}"><td><b>${esc(x.name)}</b>${x.notes ? `<div class="small mut">${esc(x.notes)}</div>` : ''}</td><td class="n">${(x.lines || []).length}</td><td class="n">${peso(c)}</td><td class="n">${fq(sg)} g</td><td class="n">${peso(c * sg / 1000)}</td><td><button class="sm">Edit</button></td></tr>`; }).join('')}
+   </tbody></table></div>` : '<div class="empty">No recipes yet.</div>'}
+   <p class="small mut" style="margin:10px 0 0">Prices come from the last price paid for each ingredient, so costs update every time a receipt is encoded.</p>
+  </div>`;
+};
+ACT.addProd = () => { D.prod.rows.push({recipeId: '', mode: 'kg', amt: ''}); render(); };
+ACT.rmProd = i => { D.prod.rows.splice(+i, 1); if (!D.prod.rows.length) ACT.addProd(); else render(); };
+ACT.newRecipe = () => { D.recipe = newRecipe(); render(); window.scrollTo(0, document.querySelector('[data-b="recipe.name"]')?.getBoundingClientRect().top + scrollY - 120 || 0); };
+ACT.editRecipe = id => { const x = S.recipes.find(r => r.id === id); if (!x) return; D.recipe = newRecipe({...JSON.parse(JSON.stringify(x)), servingG: String(x.servingG ?? ''), lines: (x.lines || []).map(l => ({itemId: l.itemId, qty: String(l.qty)}))}); render(); document.querySelector('[data-b="recipe.name"]')?.scrollIntoView({behavior: 'smooth', block: 'center'}); };
+ACT.saveRecipe = () => {
+  const r = D.recipe, name = titleCase(r.name), raw = r.lines.filter(l => hasItem(l) && num(l.qty) > 0);
+  if (!name) return toast('Enter the dish name.', true);
+  if (!raw.length) return toast('Add at least one ingredient with a quantity.', true);
+  if (S.recipes.some(x => x.id !== r.id && x.name.toLowerCase() === name.toLowerCase())) return toast('A recipe with that name already exists.', true);
+  guard(async () => {
+    const R = resolveLines(raw), id = r.id || genId();
+    const data = {name, servingG: num(r.servingG) || 150, notes: (r.notes || '').trim(), yieldKg: 1, lines: R.lines.map(l => ({itemId: l.itemId, qty: num(l.qty)})), status: 'active'};
+    await opsWrite([...R.ops, {op: r.id ? 'update' : 'add', path: 'recipes/' + id, data}]);
+    D.recipe = newRecipe();
+  }, r.id ? 'Recipe updated' : 'Recipe saved');
+};
+ACT.delRecipe = () => { const r = D.recipe; if (!r.id || !confirm('Delete the recipe "' + r.name + '"?')) return; guard(async () => { await upd('recipes/' + r.id, {status: 'void', voidReason: 'Deleted', voidAt: Date.now()}); D.recipe = newRecipe(); }, 'Recipe deleted'); };
+ACT.prodToReq = () => {
+  const P = D.prod, N = prodNeeds(P).filter(x => x.buy > 0); if (!N.length) return;
+  if (D.req && D.req.lines.some(l => hasItem(l)) && !confirm('Replace the request you are writing now with this list?')) return;
+  const dishes = P.rows.filter(rowKg).map(x => `${S.recipes.find(r => r.id === x.recipeId)?.name} ${fq(r2(rowKg(x)))}kg`).join(', ');
+  D.req = newReq({book: P.book, eventId: P.book === 'C' ? P.eventId : '', purpose: 'Production: ' + dishes, lines: N.map(x => ({itemId: x.item.id, qty: String(x.buy), cost: x.item.lastCost ? String(x.item.lastCost) : ''}))});
+  location.hash = 'prs'; toast(N.length + ' ingredients added to a new request. Check, then send.');
+};
+
 /* ============ STOCK & COUNTS ============ */
 V.stock = () => {
   const b = D.ui.stockBook, {st, sinceDate} = stockFor(b), q = D.ui.stockQ.trim().toLowerCase();
@@ -572,12 +672,12 @@ V.stock = () => {
     <input data-b="ui.stockQ" data-rr placeholder="Search item…" style="max-width:200px">${S.isAdmin ? `<button data-act="newItem">＋ Add item</button>` : ''}<button class="pri" data-act="startCount">Start physical count</button></div>
    ${low.length ? `<div class="alert warn"><span class="ic">⚠</span><div style="flex:1"><b>${low.length} item${low.length === 1 ? ' is' : 's are'} below par</b> in the ${BOOK[b].name.toLowerCase()}: ${low.slice(0, 6).map(x => esc(x.item.name)).join(', ')}${low.length > 6 ? '…' : ''}.</div><button class="sm pri" data-act="restockReq">Request restock</button></div>` : ''}
    ${missingCommon ? `<div class="alert info"><span class="ic">i</span><div>${missingCommon} common item${missingCommon === 1 ? ' is' : 's are'} not in your list yet (e.g. pork belly, chicken breast, special cut thigh, beef oxtail). <button class="sm pri" data-act="addCommonItems" style="margin-left:6px">Review &amp; add</button></div></div>` : ''}
-   <div class="kpis"><div class="kpi"><span>Stock value (at last cost)</span><b>${peso(totalVal)}</b></div><div class="kpi"><span>Items below par</span><b>${activeItems().filter(i => num(i.par?.[b]) > 0 && (st[i.id] || 0) < num(i.par[b])).length}</b></div><div class="kpi"><span>Last count</span><b>${counts.find(live_) ? fmtD(counts.find(live_).date) : '—'}</b></div></div>
+   <div class="kpis"><div class="kpi"><span>Stock value (at last cost)</span><b>${peso(totalVal)}</b></div><div class="kpi ${low.length ? 'bad' : ''}"><span>Low stock (≤ 2 left)</span><b>${low.length}</b></div><div class="kpi"><span>Last count</span><b>${counts.find(live_) ? fmtD(counts.find(live_).date) : '—'}</b></div></div>
    ${rows.length ? `<div class="tw"><table class="stock-t"><thead><tr><th>Item</th><th class="n">On hand</th><th>Unit</th><th class="n">Par</th><th class="n">Last cost</th><th class="n">Value</th><th>Counted</th><th style="width:${S.isAdmin ? 140 : 70}px">Actions</th></tr></thead>
     ${ITEM_CATS.map(cat => { const its = rows.filter(i => catOf(i) === cat); if (!its.length) return '';
       const val = sum(its, i => Math.max(0, st[i.id] || 0) * costOf(i.id));
       return `<tbody><tr class="cat-h"><th colspan="8"><span>${esc(cat)}</span><span class="small mut">${its.length} item${its.length === 1 ? '' : 's'} · ${peso(val)}</span></th></tr>
-      ${its.map(i => { const oh = st[i.id] || 0, par = num(i.par?.[b]); return `<tr><td>${esc(i.name)}</td><td class="n ${oh < -0.001 ? 'bad-t' : par && oh < par ? 'warn-t' : ''}">${fq(oh)}</td><td class="mut">${esc(i.unit)}</td><td class="n mut">${par ? fq(par) : ''}</td><td class="n">${peso(i.lastCost)}</td><td class="n">${peso(Math.max(0, oh) * costOf(i.id))}</td><td class="small mut">${sinceDate[i.id] ? fmtD(sinceDate[i.id]) : 'never'}</td><td class="acts"><button class="sm" data-act="reqItem" data-arg="${i.id}" title="Add to a purchase request">${inReq.has(i.id) ? '✓ In PR' : '＋ PR'}</button>${S.isAdmin ? `<button class="sm" data-act="editItem" data-arg="${i.id}" aria-label="Edit ${esc(i.name)}">✎ Edit</button>` : ''}</td></tr>`; }).join('')}</tbody>`; }).join('')}
+      ${its.map(i => { const oh = st[i.id] || 0, par = num(i.par?.[b]), lw = isLow(i, b, st); return `<tr><td>${esc(i.name)}${lw ? ' <span class="chip bad">low</span>' : ''}</td><td class="n ${oh < -0.001 ? 'bad-t' : lw ? 'bad-t' : ''}">${fq(oh)}</td><td class="mut">${esc(i.unit)}</td><td class="n mut">${par ? fq(par) : ''}</td><td class="n">${peso(i.lastCost)}</td><td class="n">${peso(Math.max(0, oh) * costOf(i.id))}</td><td class="small mut">${sinceDate[i.id] ? fmtD(sinceDate[i.id]) : 'never'}</td><td class="acts"><button class="sm" data-act="reqItem" data-arg="${i.id}" title="Add to a purchase request">${inReq.has(i.id) ? '✓ In PR' : '＋ PR'}</button>${S.isAdmin ? `<button class="sm" data-act="editItem" data-arg="${i.id}" aria-label="Edit ${esc(i.name)}">✎ Edit</button>` : ''}</td></tr>`; }).join('')}</tbody>`; }).join('')}
    </table></div>` : `<div class="empty">No items yet.${S.isAdmin ? ' Click <b>＋ Add item</b> to start.' : ''}</div>`}
   </div>
   <div class="card"><h3>Count history · ${BOOK[b].name}</h3>
@@ -790,17 +890,20 @@ function prTable(list) {
 }
 ACT.resetReq = () => { D.req = newReq({book: D.req.book}); render(); };
 ACT.submitReq = () => {
-  const d = D.req, lines = d.lines.filter(l => l.itemId && num(l.qty) > 0);
+  const d = D.req, raw = d.lines.filter(l => hasItem(l) && num(l.qty) > 0);
   if (!d.requestedBy.trim()) return toast('Enter who is requesting.', true);
-  if (!lines.length) return toast('Add at least one item with a quantity.', true);
-  if (d.lines.some(l => l.itemId && !(num(l.qty) > 0))) return toast('Some items have no quantity.', true);
+  if (!raw.length) return toast('Add at least one item with a quantity.', true);
+  if (d.lines.some(l => hasItem(l) && !(num(l.qty) > 0))) return toast('Some items have no quantity.', true);
   const {st} = stockFor(d.book);
-  const L = lines.map(l => ({itemId: l.itemId, desc: iname(l.itemId), unit: iunit(l.itemId), qty: num(l.qty), cost: num(l.cost) || costOf(l.itemId), onHand: r2(st[l.itemId] || 0)}));
   guard(async () => {
-    const id = await addDoc('prs', {date: d.date, needed: d.needed, book: d.book, eventId: d.book === 'C' ? d.eventId : '', dept: d.dept, requestedBy: d.requestedBy.trim(), purpose: d.purpose.trim(), priority: d.priority, lines: L, total: r2(prTotal(L)), status: 'submitted'});
+    const R = resolveLines(raw);
+    const L = R.lines.map(l => ({itemId: l.itemId, desc: iname(l.itemId), unit: iunit(l.itemId), qty: num(l.qty), cost: num(l.cost) || costOf(l.itemId), onHand: r2(st[l.itemId] || 0)}));
+    const auto = S.isAdmin, id = genId();
+    await opsWrite([...R.ops, {op: 'add', path: 'prs/' + id, data: {date: d.date, needed: d.needed, book: d.book, eventId: d.book === 'C' ? d.eventId : '', dept: d.dept, requestedBy: d.requestedBy.trim(), purpose: d.purpose.trim(), priority: d.priority, lines: L, total: r2(prTotal(L)),
+      status: auto ? 'approved' : 'submitted', ...(auto ? {approvedBy: S.me.name || S.me.username, approvedAt: Date.now(), apprNote: 'Requested by an Admin — approved automatically'} : {})}}]);
     D.req = newReq({book: d.book, dept: d.dept, requestedBy: d.requestedBy});
     setTimeout(() => openPR(id), 200);
-  }, 'Submitted for approval');
+  }, S.isAdmin ? 'Request saved — approved (you are an Admin)' : 'Submitted for approval');
 };
 ACT.openPR = id => openPR(id);
 function openPR(id) {
@@ -964,9 +1067,10 @@ async function guard(fn, ok) {
 /* ============ actions ============ */
 ACT.set = a => { const i = a.indexOf('|'); setPath(D, a.slice(0, i), a.slice(i + 1)); render(); };
 ACT.more = k => { D.ui.showAll[k] = (D.ui.showAll[k] || 40) + 100; render(); };
-ACT.addLine = k => { D[k].lines.push({itemId: '', qty: '', ...(k === 'purchase' || k === 'req' ? {cost: ''} : {})}); render(); };
-ACT.rmLine = a => { const [k, i] = a.split('|'); D[k].lines.splice(+i, 1); if (!D[k].lines.length) ACT.addLine(k); else render(); };
+ACT.addLine = k => { D[k].lines.push({itemId: '', qty: '', ...(k === 'purchase' || k === 'req' ? {cost: ''} : {})}); render(); setTimeout(() => { const ins = document.querySelectorAll(`[data-item^="${k}|"]`); ins[ins.length - 1]?.focus(); }, 30); };
+ACT.rmLine = a => { const [k, i] = a.split('|'); D[k].lines.splice(+i, 1); if (!D[k].lines.length && k !== 'purchase') ACT.addLine(k); else render(); };
 ACT.resetP = () => { D.purchase = newPurchase({book: D.purchase.book}); render(); };
+ACT.rmLineOk = 1;
 ACT.resetM = () => { D.move = newMove({book: D.move.book}); render(); };
 
 ACT.saveAdv = () => {
@@ -982,8 +1086,8 @@ ACT.buyFor = id => {
 };
 ACT.expFor = id => {
   const a = S.advances.find(x => x.id === id); if (!a) return;
-  D.expense = newExpense({book: a.book, eventId: a.eventId || '', paidBy: a.to, advanceId: a.id, date: a.date >= today() ? today() : a.date});
-  closeModal(); location.hash = 'expenses';
+  D.purchase = newPurchase({book: a.book, eventId: a.eventId || '', buyer: a.to, advanceId: a.id, date: a.date >= today() ? today() : a.date, lines: [], other: [{cat: (S.config.expCats || [])[0] || 'Others', desc: '', amount: ''}]});
+  closeModal(); location.hash = 'purchases';
 };
 ACT.liquidate = id => {
   const a = S.advances.find(x => x.id === id); if (!a) return;
@@ -1013,21 +1117,33 @@ ACT.liquidate = id => {
 };
 
 ACT.unlinkPR = () => { D.purchase.prId = ''; D.purchase.prNo = ''; render(); };
+ACT.addOther = () => { (D.purchase.other ||= []).push({cat: (S.config.expCats || [])[0] || 'Others', desc: '', amount: ''}); render(); };
+ACT.rmOther = i => { D.purchase.other.splice(+i, 1); render(); };
 ACT.saveP = () => {
-  const d = D.purchase, lines = d.lines.filter(l => l.itemId && num(l.qty) > 0);
-  if (!lines.length) return toast('Add at least one item with a quantity.', true);
-  if (lines.some(l => !(num(l.cost) > 0))) return toast('Enter the unit cost for every line.', true);
+  const d = D.purchase, raw = d.lines.filter(l => hasItem(l) && num(l.qty) > 0), other = (d.other || []).filter(o => num(o.amount) > 0);
+  if (!raw.length && !other.length) return toast('Add at least one item or other cost.', true);
+  if (raw.some(l => !(num(l.cost) > 0))) return toast('Enter the price per unit for every item.', true);
+  if (d.lines.some(l => hasItem(l) && !(num(l.qty) > 0))) return toast('Some items have no quantity.', true);
+  if ((d.other || []).some(o => (o.desc || '').trim() && !(num(o.amount) > 0))) return toast('Some other costs have no amount.', true);
   if (!d.buyer.trim()) return toast('Who bought it?', true);
-  if (d.lines.some(l => l.itemId && !(num(l.qty) > 0))) return toast('Some lines have no quantity.', true);
+  const L = advLeft(d);
+  if (L && L.after < -0.5 && !confirm(`This is ${peso(-L.after)} more than what is left of ${L.a.to}'s cash advance. Save anyway?`)) return;
   guard(async () => {
-    const id = genId(), total = r2(sum(lines, l => num(l.qty) * num(l.cost)));
-    const ops = [{op: 'add', path: 'purchases/' + id, data: {date: d.date, book: d.book, eventId: d.book === 'C' ? d.eventId : '', supplier: d.supplier.trim(), buyer: d.buyer.trim(), receiptNo: d.receiptNo.trim(), advanceId: d.advanceId, prId: d.prId || '', prNo: d.prNo || '',
-      lines: lines.map(l => ({itemId: l.itemId, qty: num(l.qty), cost: num(l.cost), prevCost: costOf(l.itemId)})), total, status: 'pending'}}];
+    const R = resolveLines(raw), ops = [...R.ops], now = Date.now(), base = {date: d.date, book: d.book, eventId: d.book === 'C' ? d.eventId : '', receiptNo: d.receiptNo.trim(), advanceId: d.advanceId};
+    let pid = '';
+    if (R.lines.length) {
+      pid = genId(); const total = r2(sum(R.lines, l => num(l.qty) * num(l.cost)));
+      ops.push({op: 'add', path: 'purchases/' + pid, data: {...base, supplier: d.supplier.trim(), buyer: d.buyer.trim(), prId: d.prId || '', prNo: d.prNo || '',
+        lines: R.lines.map(l => ({itemId: l.itemId, qty: num(l.qty), cost: num(l.cost), prevCost: costOf(l.itemId)})), total, status: 'received', recv: {by: d.buyer.trim(), at: now, qty: R.lines.map(l => num(l.qty)), auto: true}}});
+      const seen = {}; R.lines.forEach(l => { if (num(l.cost) > 0 && num(S.items[l.itemId]?.lastCost) !== num(l.cost) && !R.ops.some(o => o.path === 'items/' + l.itemId)) seen[l.itemId] = num(l.cost); });
+      Object.entries(seen).forEach(([iid, c]) => ops.push({op: 'update', path: 'items/' + iid, data: {lastCost: c}}));
+    }
+    other.forEach(o => ops.push({op: 'add', path: 'expenses/' + genId(), data: {...base, cat: o.cat || 'Others', desc: (o.desc || '').trim() || d.supplier.trim(), amount: r2(num(o.amount)), paidBy: d.buyer.trim(), purchaseId: pid}}));
     const pr = d.prId && S.prs.find(x => x.id === d.prId);
-    if (pr && pr.status === 'approved') ops.push({op: 'update', path: 'prs/' + pr.id, data: {status: 'purchased', actual: {date: d.date, by: d.buyer.trim(), amount: total, receipt: d.receiptNo.trim(), purchaseId: id, at: Date.now()}}});
+    if (pr && pr.status === 'approved') ops.push({op: 'update', path: 'prs/' + pr.id, data: {status: 'purchased', actual: {date: d.date, by: d.buyer.trim(), amount: r2(itemsTotal({lines: R.lines}) + sum(other, o => num(o.amount))), receipt: d.receiptNo.trim(), purchaseId: pid, at: now}}});
     await opsWrite(ops);
     D.purchase = newPurchase({book: d.book, date: d.date, buyer: d.buyer, advanceId: d.advanceId, eventId: d.eventId});
-  }, 'Purchase saved — waiting to be received');
+  }, d.advanceId ? 'Saved — added to stock and deducted from the cash advance' : 'Saved — items added to stock');
 };
 function purchaseTable(p, recvInputs) {
   return `<div class="tw"><table><thead><tr><th>Item</th><th class="n">Bought</th>${p.status !== 'pending' || recvInputs ? '<th class="n">Received</th>' : ''}<th class="n">Unit cost</th><th class="n">Amount</th></tr></thead><tbody>
@@ -1076,7 +1192,8 @@ ACT.saveE = () => {
 };
 
 ACT.saveM = () => {
-  const d = D.move, lines = d.lines.filter(l => l.itemId && num(l.qty) > 0);
+  const d = D.move; { const R0 = d.lines.filter(l => !l.itemId && hasItem(l)); if (R0.length) return toast('“' + R0[0].newName + '” is not in stock yet. Choose an item from the list.', true); }
+  const lines = d.lines.filter(l => l.itemId && num(l.qty) > 0);
   if (!lines.length) return toast('Add at least one item with a quantity.', true);
   if (d.book === 'C' && (d.type === 'issue' || d.type === 'return') && !d.eventId) return toast('Choose the event.', true);
   if (d.type === 'waste' && !d.reason) return toast('Choose a waste reason.', true);
@@ -1256,15 +1373,25 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-act]'); if (!b || !b.closest('#view') && !b.closest('#mbox')) return;
   e.preventDefault(); ACT[b.dataset.act]?.(b.dataset.arg, b);
 });
-document.addEventListener('input', e => { const p = e.target.dataset?.b; if (!p || !e.target.closest('#view')) return; if (e.target.type === 'checkbox') return; setPath(D, p, e.target.value); live(); });
+document.addEventListener('input', e => {
+  const it = e.target.dataset?.item;
+  if (it && e.target.closest('#view')) { const el = e.target, pos = el.selectionStart, v = capWords(el.value); if (v !== el.value) { el.value = v; try { el.setSelectionRange(pos, pos); } catch (x) {} } return; }
+  const p = e.target.dataset?.b; if (!p || !e.target.closest('#view')) return; if (e.target.type === 'checkbox') return; setPath(D, p, e.target.value); live(); });
 document.addEventListener('change', e => {
-  const el = e.target, p = el.dataset?.b; if (!p || !el.closest('#view')) return;
+  const el = e.target;
+  if (el.dataset?.item && el.closest('#view')) {
+    const [k, i] = el.dataset.item.split('|'), l = D[k].lines[+i], name = titleCase(el.value), ex = findItem(name);
+    if (ex) { l.itemId = ex.id; l.newName = ''; if ('cost' in l && !l.cost && ex.lastCost) l.cost = String(ex.lastCost); }
+    else { l.itemId = ''; l.newName = name; l.newUnit = l.newUnit || (/(egg|itlog)/i.test(name) ? 'pc' : 'kg'); }
+    render(); return;
+  }
+  const p = el.dataset?.b; if (!p || !el.closest('#view')) return;
   if (el.type === 'checkbox') setPath(D, p, el.checked); else setPath(D, p, el.value);
   if (el.value === '__new') { setPath(D, p, ''); render(); return itemModal(null, id => { setPath(D, p, id); const m = p.match(/^(purchase|req)\.lines\.(\d+)\.itemId$/); if (m && S.items[id]?.lastCost && !D[m[1]].lines[m[2]].cost) D[m[1]].lines[m[2]].cost = String(S.items[id].lastCost); render(); }); }
   const m = p.match(/^(purchase|req)\.lines\.(\d+)\.itemId$/); if (m) { const l = D[m[1]].lines[m[2]]; if (!l.cost && S.items[l.itemId]?.lastCost) l.cost = String(S.items[l.itemId].lastCost); }
   if ('rr' in el.dataset) render();
 });
-function route() { const h = location.hash.slice(1); D.ui.tab = TABS.some(t => t[0] === h) ? h : 'dash'; render(); window.scrollTo(0, 0); }
+function route() { let h = location.hash.slice(1); if (h === 'expenses') { h = 'purchases'; history.replaceState(null, '', '#purchases'); } D.ui.tab = TABS.some(t => t[0] === h) ? h : 'dash'; render(); window.scrollTo(0, 0); }
 window.addEventListener('hashchange', route);
 
 /* ============ backend (Google Apps Script — same logins as the inquiry dashboard) ============ */
@@ -1286,7 +1413,7 @@ function applyDocs(docs, fromSync) {
   rebuild();
 }
 function rebuild() {
-  const by = {config: [], items: [], events: [], advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: [], prs: []};
+  const by = {config: [], items: [], events: [], advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: [], prs: [], recipes: []};
   for (const [path, d] of CACHE) { const i = path.indexOf('/'); const c = path.slice(0, i); (by[c] ||= []).push({id: path.slice(i + 1), ...d.data}); }
   const desc = a => a.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
   const m = by.config.find(d => d.id === 'main');
@@ -1295,6 +1422,7 @@ function rebuild() {
   S.events = Object.fromEntries(by.events.map(d => [d.id, d]));
   S.advances = desc(by.advances); S.purchases = desc(by.purchases); S.expenses = desc(by.expenses);
   S.moves = desc(by.moves); S.counts = desc(by.counts); S.prs = desc(by.prs);
+  S.recipes = by.recipes.filter(r => r.status !== 'void').sort((a, b) => String(a.name).localeCompare(b.name));
   S.sales = Object.fromEntries(by.sales.map(d => [d.date, d]));
   schedule();
 }
