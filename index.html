@@ -220,6 +220,7 @@ td.num{text-align:right;white-space:nowrap}
 .tray-chips{display:flex;gap:8px;overflow-x:auto;padding:6px 0 14px;position:sticky;top:0;z-index:4;background:var(--cream)}
 .tray-chips button{border:1px solid var(--line);background:var(--paper);color:var(--blue);border-radius:999px;padding:8px 14px;font-weight:600;white-space:nowrap}
 .tray-chips button[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+.tray-photo-note{margin:-4px 0 12px;font-size:13px;color:var(--muted);font-style:italic}
 .tray-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start}
 .tray-card{background:var(--paper);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 10px 24px -20px rgba(26,44,84,.6)}
 .tray-card img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block;background:var(--custard)}
@@ -1080,6 +1081,7 @@ function viewTrays(){
     <div class="tray-hero-t">${a.trayKicker?`<div class="kicker">${esc(a.trayKicker)}</div>`:""}<h1>${esc(a.trayTitle)}</h1>${a.trayPax?`<span class="pax-pill">${esc(a.trayPax)}</span>`:""}${paras(a.trayIntro)}
       <div class="home-btns"><button class="btn gold" data-scroll="trayOrder">How to order</button></div></div></section>
   <div class="tray-chips" role="group" aria-label="Choose a category"><button data-tc="all" aria-pressed="${state.trayCat==="all"}">All</button>${cats.map(c=>`<button data-tc="${c.k}" aria-pressed="${state.trayCat===c.k}">${esc(c.l)}</button>`).join("")}</div>
+  <p class="tray-photo-note">📷 Photos are for reference only. Actual dishes, portions and presentation may vary.</p>
   <div class="tray-grid">${shown.map(c=>{const open=state.trayCat!=="all"||state.trayOpen[c.k];const list=open?c.items:c.items.slice(0,SHOW);
     return `<section class="tray-card"><img src="${trayImg(c.k)}" alt="${esc(c.l)} tray" loading="lazy" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/trays/${c.k}.jpg'}"><div class="tray-b"><h2>${esc(c.l)}</h2>
       <ul>${list.map(i=>`<li><span>${esc(i.name)}</span><i></i><b>${i.price?"₱"+i.price.toLocaleString("en-PH"):""}</b></li>`).join("")}</ul>
