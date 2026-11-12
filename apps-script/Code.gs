@@ -115,19 +115,31 @@ function cleanInquiry(q, source) {
     event: { date: str(ev.date, 10), time: str(ev.time, 5), type: str(ev.type, 60), venue: str(ev.venue, 200), pax: Math.floor(num(ev.pax)) },
     notes: str(q.notes, 2000),
     plan: {
-      kind: p.kind === 'package' ? 'package' : 'custom',
+      kind: p.kind === 'package' ? 'package' : p.kind === 'tray' ? 'tray' : 'custom',
+      fulfil: p.fulfil === 'Delivery' ? 'Delivery' : 'Pick-up', payment: ['Bank transfer', 'Bank deposit', 'GCash'].indexOf(p.payment) >= 0 ? p.payment : '',
       packageId: str(p.packageId, 20), packageName: str(p.packageName, 40),
       pricePerHead: num(p.pricePerHead), basePerHead: num(p.basePerHead), chefPick: !!p.chefPick
     },
     items: (Array.isArray(q.items) ? q.items : []).slice(0, 80).map(function (i) {
-      return { cat: str(i.cat, 20), dish: str(i.dish, 120), tier: str(i.tier, 10), perHead: num(i.perHead) };
+      const o = { cat: str(i.cat, 20), dish: str(i.dish, 120), tier: str(i.tier, 10), perHead: num(i.perHead) };
+      if (i.qty != null) o.qty = Math.max(1, Math.min(50, Math.floor(num(i.qty))));
+      return o;
     }),
     estimate: { perHead: num(es.perHead), total: num(es.total) }
   };
   if (source === 'message' && q.createdAt && !isNaN(new Date(q.createdAt))) clean.createdAt = new Date(q.createdAt).toISOString();
   if (!clean.customer.name || !clean.customer.phone || !clean.event.date) throw new Error('Name, mobile number and event date are required.');
+  if (clean.plan.kind === 'tray') {
+    if (!clean.items.length) throw new Error('Please add at least one tray.');
+    if (source === 'web' && clean.event.date < Utilities.formatDate(new Date(Date.now() + TRAY_LEAD_DAYS * 864e5), 'Asia/Manila', 'yyyy-MM-dd'))
+      throw new Error('Food trays need to be ordered at least ' + TRAY_LEAD_DAYS + ' days ahead. Please choose a later date.');
+    if (!clean.plan.payment) throw new Error('Please choose how you will pay.');
+    clean.estimate = { perHead: 0, total: clean.items.reduce(function (a, i) { return a + i.perHead * (i.qty || 1); }, 0) };
+  } else { delete clean.plan.fulfil; delete clean.plan.payment; }
   return clean;
 }
+
+const TRAY_LEAD_DAYS = 2;
 
 function submitInquiry(q, source, honeypot) {
   if (honeypot) return { ok: true, ref: newRef() };            // silently ignore bots
@@ -165,6 +177,7 @@ function niceTime(t) { if (!t) return ''; const p = t.split(':'); const hr = Num
 function sendInquiryAlert(q) {
   if (!CONFIG.ALERT_EMAILS.length || MailApp.getRemainingDailyQuota() < 1) return;
   const c = q.customer || {}, ev = q.event || {}, p = q.plan || {}, es = q.estimate || {};
+  if (p.kind === 'tray') return sendTrayAlert(q);
   const plan = p.kind === 'package' ? (p.packageName + ' Package (' + pesoTxt(p.pricePerHead) + '/head)') : 'Custom menu';
   const items = p.chefPick ? ['Chef to recommend the menu'] : (q.items || []).map(function (i) { return (COURSE_NAMES[i.cat] || i.cat) + ': ' + i.dish; });
   const subject = 'New inquiry: ' + c.name + ' · ' + (ev.type || 'Event') + ' · ' + niceDate(ev.date) + ' · ' + ev.pax + ' pax';
@@ -178,6 +191,27 @@ function sendInquiryAlert(q) {
     '<p style="margin:16px 0"><a href="' + CONFIG.SITE_URL + '/#staff" style="background:#E89908;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:700">Open the Inquiries list</a></p>' +
     '<p style="font-size:12px;color:#5B6478">Call or text the customer at ' + h(c.phone) + '. Reply to this email to write to the customer' + (c.email ? '' : ' (no email given)') + '.</p></div>';
   const text = 'New catering inquiry ' + q.ref + '\n\n' + rows.map(function (r) { return r[0] + ': ' + r[1]; }).join('\n') + '\nMenu:\n- ' + (items.join('\n- ') || '—') + '\n\nOpen the Inquiries list: ' + CONFIG.SITE_URL + '/#staff';
+  const opts = { name: "Romualdo's Website", htmlBody: html };
+  if (c.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) opts.replyTo = c.email;
+  MailApp.sendEmail(CONFIG.ALERT_EMAILS.join(','), subject, text, opts);
+}
+
+function sendTrayAlert(q) {
+  const c = q.customer || {}, ev = q.event || {}, p = q.plan || {}, es = q.estimate || {};
+  const trays = (q.items || []).reduce(function (a, i) { return a + (i.qty || 1); }, 0);
+  const subject = 'New tray order: ' + c.name + ' · ' + trays + ' tray' + (trays > 1 ? 's' : '') + ' · ' + p.fulfil + ' ' + niceDate(ev.date);
+  const rows = [['Reference', q.ref], ['Customer', c.name], ['Mobile', c.phone], ['Email', c.email || '—'],
+    [p.fulfil, niceDate(ev.date) + (ev.time ? ' at ' + niceTime(ev.time) : '')], ['Address', p.fulfil === 'Delivery' ? (ev.venue || '—') : 'Pick-up'],
+    ['Payment', (p.payment || '—') + ' — send the customer the payment details'], ['Total', pesoTxt(es.total) + (p.fulfil === 'Delivery' ? ' + delivery fee' : '')], ['Notes', q.notes || '—']];
+  const items = (q.items || []).map(function (i) { return (i.qty || 1) + ' × ' + i.dish + ' (' + pesoTxt(i.perHead) + ' each)'; });
+  const html = '<div style="font-family:Arial,sans-serif;color:#1A2C54;max-width:560px">' +
+    '<div style="background:#631B1C;color:#fff;padding:14px 18px;border-radius:10px 10px 0 0"><b style="font-size:17px">New food tray order</b><div style="font-size:12px;color:#E5DEB2">from romualdos.ph · ' + h(q.ref) + ' · not yet paid</div></div>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:14px;border:1px solid #E4DFC8;border-top:0">' +
+    rows.map(function (r) { return '<tr><td style="padding:8px 12px;border-bottom:1px solid #E4DFC8;color:#5B6478;width:130px;vertical-align:top">' + h(r[0]) + '</td><td style="padding:8px 12px;border-bottom:1px solid #E4DFC8"><b>' + h(r[1]) + '</b></td></tr>'; }).join('') +
+    '<tr><td style="padding:8px 12px;color:#5B6478;vertical-align:top">Trays</td><td style="padding:8px 12px"><ul style="margin:0;padding-left:18px">' + items.map(function (x) { return '<li>' + h(x) + '</li>'; }).join('') + '</ul></td></tr></table>' +
+    '<p style="margin:16px 0"><a href="' + CONFIG.SITE_URL + '/#staff" style="background:#E89908;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:700">Open the Inquiries list</a></p>' +
+    '<p style="font-size:12px;color:#5B6478">Next: call or text ' + h(c.phone) + ' to confirm, then send the ' + h(p.payment) + ' details. The order is confirmed once payment is received.</p></div>';
+  const text = 'New food tray order ' + q.ref + '\n\n' + rows.map(function (r) { return r[0] + ': ' + r[1]; }).join('\n') + '\nTrays:\n- ' + items.join('\n- ') + '\n\nOpen the Inquiries list: ' + CONFIG.SITE_URL + '/#staff';
   const opts = { name: "Romualdo's Website", htmlBody: html };
   if (c.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(c.email)) opts.replyTo = c.email;
   MailApp.sendEmail(CONFIG.ALERT_EMAILS.join(','), subject, text, opts);

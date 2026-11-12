@@ -221,6 +221,24 @@ td.num{text-align:right;white-space:nowrap}
 .tray-chips button{border:1px solid var(--line);background:var(--paper);color:var(--blue);border-radius:999px;padding:8px 14px;font-weight:600;white-space:nowrap}
 .tray-chips button[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
 .tray-photo-note{margin:-4px 0 12px;font-size:13px;color:var(--muted);font-style:italic}
+.tray-b li .add,.stp button{border:1.5px solid var(--gold);background:#fff;color:var(--gold);width:26px;height:26px;border-radius:50%;font-weight:700;line-height:1;padding:0;flex:none}
+.tray-b li .add:hover,.stp button:hover{background:var(--gold);color:#fff}
+.tray-b li.in{background:#FFF6E4;margin:0 -8px;padding:5px 8px;border-radius:8px}
+.stp{display:inline-flex;align-items:center;gap:6px;flex:none}.stp em{font-style:normal;font-weight:700;min-width:16px;text-align:center}
+.tray-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:20;background:var(--navy);color:#fff;border-radius:999px;padding:8px 8px 8px 20px;display:flex;gap:14px;align-items:center;box-shadow:0 12px 30px -10px rgba(0,0,0,.45);max-width:calc(100% - 24px)}
+.tray-order.form{display:block}.tray-order-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}.tray-order-h h2{margin:0}
+.pill-note{background:var(--wine);color:#fff;border-radius:999px;padding:4px 12px;font-size:12.5px;font-weight:700}
+.tray-sum{width:100%;border-collapse:collapse;margin-bottom:14px}.tray-sum td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tray-sum td.n{text-align:right;white-space:nowrap;font-weight:700}.tray-sum td.q{width:110px}.tray-sum tfoot td{font-weight:700;border-bottom:0;font-size:16px}
+#trayForm label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:13px;margin-bottom:10px}
+#trayForm input:not([type=radio]):not([type=checkbox]),#trayForm textarea{border:1.5px solid var(--line);border-radius:8px;padding:10px;font:inherit;font-weight:400}
+#trayForm .err{border-color:var(--wine)!important}
+.tf-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:0 12px}
+.tf-row{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin:4px 0 10px}.tf-l{font-weight:700;font-size:13px;min-width:150px}
+#trayForm label.opt{flex-direction:row;align-items:center;gap:6px;font-weight:500;margin:0}#trayForm label.ack{margin:6px 0 12px;align-items:flex-start}
+.tf-foot{display:flex;gap:12px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
+.tray-order.done{border-left-color:var(--ok)}
+@media (max-width:760px){.tf-grid{grid-template-columns:1fr}}
 .tray-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start}
 .tray-card{background:var(--paper);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 10px 24px -20px rgba(26,44,84,.6)}
 .tray-card img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block;background:var(--custard)}
@@ -731,7 +749,7 @@ function viewDone(){
 }
 
 /* ---------- Staff: inquiries ---------- */
-function planName(q){return q.plan?.kind==="package"?`${q.plan.packageName} Package`:"Custom Menu"}
+function planName(q){return q.plan?.kind==="package"?`${q.plan.packageName} Package`:q.plan?.kind==="tray"?"Food Tray Order":"Custom Menu"}
 function viewAdmin(){
   const list=state.inquiries;
   const now=list.filter(q=>q.status==="New").length;
@@ -745,7 +763,7 @@ function viewAdmin(){
       <td><b>${esc(q.customer?.name)}</b><div class="hint">${esc(q.customer?.phone)}</div></td>
       <td>${esc(fmtDate(q.event?.date))}<div class="hint">${esc(q.event?.type||"")}</div></td>
       <td>${esc(planName(q))}</td>
-      <td class="num">${esc(q.event?.pax)}</td>
+      <td class="num">${q.plan?.kind==="tray"?`${(q.items||[]).reduce((t,i)=>t+(Number(i.qty)||1),0)} tray${(q.items||[]).reduce((t,i)=>t+(Number(i.qty)||1),0)>1?"s":""}`:esc(q.event?.pax)}</td>
       <td class="num">${peso(q.estimate?.total||0)}</td>
       <td><select class="status" data-status="${esc(q._id)}">${STATUSES.map(s=>`<option ${q.status===s?"selected":""}>${s}</option>`).join("")}</select></td>
       <td style="white-space:nowrap"><button class="btn small ghost" data-open="${esc(q._id)}">${open?"Hide":"Menu"}</button></td>
@@ -775,6 +793,19 @@ function viewAdmin(){
   </div>`;
 }
 function detailHtml(q){
+  if(q.plan?.kind==="tray"){
+    const its=(q.items||[]).map(i=>`<li>${Number(i.qty)||1} × <b>${esc(i.dish)}</b> <span class="hint">(${esc(i.cat)} · ${peso(i.perHead)} each = ${peso((Number(i.qty)||1)*(Number(i.perHead)||0))})</span></li>`).join("");
+    return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+    <div><b>Trays ordered</b><ul>${its||"<li>None</li>"}</ul><p><b>Total: ${peso(q.estimate?.total||0)}</b> <span class="hint">(before delivery fee)</span></p></div>
+    <div><b>Details</b><ul>
+      <li>Email: ${esc(q.customer?.email||"—")}</li>
+      <li>${esc(q.plan.fulfil||"Pick-up")} on ${esc(fmtDate(q.event?.date))}${q.event?.time?" at "+esc(fmtTime(q.event.time)):""}</li>
+      ${q.plan.fulfil==="Delivery"?`<li>Deliver to: ${esc(q.event?.venue||"—")}</li>`:""}
+      <li>Payment: <b>${esc(q.plan.payment||"—")}</b> — send payment details to the customer</li>
+      <li>Notes: ${esc(q.notes||"—")}</li>
+    </ul>
+    ${state.canEdit?`<button class="btn small danger" data-del="${esc(q._id)}">${state.confirmDel===q._id?"Click again to delete":"Delete inquiry"}</button>`:""}</div></div>`;
+  }
   const items=(q.items||[]).map(i=>`<li>${esc(COURSES[i.cat]||i.cat)}: <b>${esc(i.dish)}</b>${i.tier?` <span class="hint">(${i.tier==="premium"?"Premium":"Standard"}${i.perHead?` · ${peso(i.perHead)}/head`:""})</span>`:""}</li>`).join("");
   return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div><b>Menu</b>${q.plan?.chefPick?"<p>Chef to recommend the menu.</p>":`<ul>${items||"<li>No dishes listed</li>"}</ul>`}</div>
@@ -1070,7 +1101,13 @@ function viewHome(){
 }
 
 function trayItems(k){return String(state.about["tray_"+k]||"").split("\n").map(l=>{const m=l.split("|");const name=(m[0]||"").trim();const price=Number(String(m[1]||"").replace(/[^\d.]/g,""))||0;return name?{name,price}:null}).filter(Boolean)}
-state.trayCat=state.trayCat||"all";state.trayOpen=state.trayOpen||{};
+state.trayCat=state.trayCat||"all";state.trayOpen=state.trayOpen||{};state.trayCart=state.trayCart||{};
+state.trayForm=state.trayForm||{name:"",phone:"",email:"",date:"",time:"",fulfil:"Pick-up",address:"",payment:"",notes:""};
+const TRAY_LEAD_DAYS=2;
+const phDate=(addDays=0)=>new Date(Date.now()+addDays*864e5).toLocaleDateString("en-CA",{timeZone:"Asia/Manila"});
+const PAYMENTS=[["Bank transfer","Online bank transfer"],["Bank deposit","Over-the-counter bank deposit"],["GCash","GCash"]];
+function trayLines(){const L=[];for(const [k,q] of Object.entries(state.trayCart)){if(!(q>0))continue;const [cat,name]=k.split("|");const it=trayItems(cat).find(i=>i.name===name);if(it)L.push({cat,label:(TRAY_CATS.find(c=>c[0]===cat)||[cat,cat])[1],name,price:it.price,qty:q})}return L}
+const trayTotal=L=>L.reduce((a,l)=>a+l.price*l.qty,0);
 function viewTrays(){
   const a=state.about, fb=socialUrl("facebookUrl"), ph=(a.contactPhones||[])[0]||"";
   const tel=n=>String(n).replace(/[^\d+]/g,"").replace(/^0/,"+63");
@@ -1079,17 +1116,80 @@ function viewTrays(){
   const SHOW=6;
   return `<section class="tray-hero"><img src="https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261112_090410_98969a06-2daf-4da0-aa01-4c43c23d2cdc.jpeg" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/trays/cover.jpg'}" alt="Romualdo's food trays">
     <div class="tray-hero-t">${a.trayKicker?`<div class="kicker">${esc(a.trayKicker)}</div>`:""}<h1>${esc(a.trayTitle)}</h1>${a.trayPax?`<span class="pax-pill">${esc(a.trayPax)}</span>`:""}${paras(a.trayIntro)}
-      <div class="home-btns"><button class="btn gold" data-scroll="trayOrder">How to order</button></div></div></section>
+      <div class="home-btns"><button class="btn gold" data-scroll="trayOrder">Order online</button></div></div></section>
   <div class="tray-chips" role="group" aria-label="Choose a category"><button data-tc="all" aria-pressed="${state.trayCat==="all"}">All</button>${cats.map(c=>`<button data-tc="${c.k}" aria-pressed="${state.trayCat===c.k}">${esc(c.l)}</button>`).join("")}</div>
   <p class="tray-photo-note">📷 Photos are for reference only. Actual dishes, portions and presentation may vary.</p>
   <div class="tray-grid">${shown.map(c=>{const open=state.trayCat!=="all"||state.trayOpen[c.k];const list=open?c.items:c.items.slice(0,SHOW);
     return `<section class="tray-card"><img src="${trayImg(c.k)}" alt="${esc(c.l)} tray" loading="lazy" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/trays/${c.k}.jpg'}"><div class="tray-b"><h2>${esc(c.l)}</h2>
-      <ul>${list.map(i=>`<li><span>${esc(i.name)}</span><i></i><b>${i.price?"₱"+i.price.toLocaleString("en-PH"):""}</b></li>`).join("")}</ul>
+      <ul>${list.map(i=>{const key=c.k+"|"+i.name,q=state.trayCart[key]||0;return `<li class="${q?"in":""}"><span>${esc(i.name)}</span><i></i><b>${i.price?"₱"+i.price.toLocaleString("en-PH"):""}</b>
+        ${q?`<span class="stp"><button data-tq="${esc(key)}" data-d="-1" aria-label="Remove one ${esc(i.name)}">−</button><em>${q}</em><button data-tq="${esc(key)}" data-d="1" aria-label="Add one more ${esc(i.name)}">＋</button></span>`:`<button class="add" data-tq="${esc(key)}" data-d="1" aria-label="Add ${esc(i.name)}">＋</button>`}</li>`}).join("")}</ul>
       ${c.items.length>SHOW&&state.trayCat==="all"?`<button class="more" data-tmore="${c.k}">${open?"Show less ▴":`See all ${c.items.length} ▾`}</button>`:""}</div></section>`}).join("")}</div>
-  <section class="tray-order" id="trayOrder"><div><h2>How to order</h2>${paras(a.trayOrder)}${a.trayNote?`<p class="hint">${esc(a.trayNote)}</p>`:""}</div>
-    <div class="tray-order-b">${fb?`<a class="soc fb" href="${esc(fb)}" target="_blank" rel="noopener">${ICON_FB}<span>Message us on Facebook</span></a>`:""}${ph?`<a class="btn gold" href="tel:${esc(tel(ph))}">Call ${esc(ph)}</a>`:""}</div></section>`;
+  ${trayOrderHtml()}
+  ${(()=>{const L=trayLines();return L.length&&!state.trayDone?`<div class="tray-bar"><span><b>${L.reduce((a,l)=>a+l.qty,0)} tray${L.reduce((a,l)=>a+l.qty,0)>1?"s":""}</b> · ${peso(trayTotal(L))}</span><button class="btn gold" data-scroll="trayOrder">Review &amp; order →</button></div>`:""})()}`;
+}
+function trayOrderHtml(){
+  const a=state.about, f=state.trayForm, L=trayLines(), fb=socialUrl("facebookUrl"), ph=(a.contactPhones||[])[0]||"";
+  const tel=n=>String(n).replace(/[^\d+]/g,"").replace(/^0/,"+63");
+  if(state.trayDone){const d=state.trayDone;return `<section class="tray-order done" id="trayOrder"><div>
+    <h2>Thank you, ${esc(d.name)}! Your order request is in.</h2>
+    <p>Reference <b>${esc(d.ref)}</b> · ${esc(d.fulfil)} on <b>${esc(fmtDate(d.date))}</b>${d.time?" at "+esc(fmtTime(d.time)):""} · Total <b>${peso(d.total)}</b>${d.fulfil==="Delivery"?" + delivery fee":""}</p>
+    <p>Our staff will contact you at <b>${esc(d.phone)}</b> to confirm your order and send the ${esc(d.payment)} payment details. <b>Your order is confirmed once payment is received.</b></p>
+    ${d.saved?"":`<p class="formmsg">We couldn't reach our server just now, so please send us this reference by Messenger or call ${esc(ph)}.</p>`}
+    <div class="tray-order-b" style="margin-top:10px">${fb?`<a class="soc fb" href="${esc(fb)}" target="_blank" rel="noopener">${ICON_FB}<span>Message us</span></a>`:""}<button class="btn ghost" id="trayNew">Start a new order</button></div></div></section>`}
+  const minD=phDate(TRAY_LEAD_DAYS);
+  const lines=L.length?`<table class="tray-sum"><tbody>${L.map(l=>`<tr><td>${esc(l.name)}<div class="hint">${esc(l.label)} · ${peso(l.price)} each</div></td><td class="q"><span class="stp"><button data-tq="${esc(l.cat+"|"+l.name)}" data-d="-1">−</button><em>${l.qty}</em><button data-tq="${esc(l.cat+"|"+l.name)}" data-d="1">＋</button></span></td><td class="n">${peso(l.price*l.qty)}</td></tr>`).join("")}</tbody>
+    <tfoot><tr><td colspan="2">Total for ${L.reduce((a,l)=>a+l.qty,0)} large tray${L.reduce((a,l)=>a+l.qty,0)>1?"s":""}</td><td class="n">${peso(trayTotal(L))}</td></tr></tfoot></table>`
+    :`<p class="hint" style="margin:0 0 6px">Tap <b>＋</b> beside any dish above to add it to your order.</p>`;
+  return `<section class="tray-order form" id="trayOrder">
+   <div class="tray-order-h"><h2>Order online</h2><span class="pill-note">Order at least ${TRAY_LEAD_DAYS}–3 days ahead</span></div>
+   ${lines}
+   ${L.length?`<form id="trayForm" novalidate>
+    <div class="tf-grid">
+      <label>Your name<input name="name" value="${esc(f.name)}" autocomplete="name" required></label>
+      <label>Mobile number<input name="phone" value="${esc(f.phone)}" inputmode="tel" autocomplete="tel" placeholder="09XX XXX XXXX" required></label>
+      <label>Email (optional)<input name="email" type="email" value="${esc(f.email)}" autocomplete="email"></label>
+      <label>Date needed<input name="date" type="date" min="${minD}" value="${esc(f.date)}" required><small class="hint">Earliest: ${esc(fmtDate(minD))}</small></label>
+      <label>Time<input name="time" type="time" value="${esc(f.time)}"></label>
+    </div>
+    <div class="tf-row"><span class="tf-l">Pick-up or delivery</span>${["Pick-up","Delivery"].map(o=>`<label class="opt"><input type="radio" name="fulfil" value="${o}" ${f.fulfil===o?"checked":""}> ${o}</label>`).join("")}</div>
+    ${f.fulfil==="Delivery"?`<label>Delivery address<input name="address" value="${esc(f.address)}" placeholder="House no., street, barangay, Davao City" required><small class="hint">A delivery fee applies depending on the location. Our staff will tell you the amount.</small></label>`:`<p class="hint" style="margin:4px 0 10px">Pick-up at ${esc(a.contactAddress||"our kitchen")}.</p>`}
+    <div class="tf-row"><span class="tf-l">How you'll pay</span>${PAYMENTS.map(([v,l])=>`<label class="opt"><input type="radio" name="payment" value="${v}" ${f.payment===v?"checked":""}> ${l}</label>`).join("")}</div>
+    <p class="hint" style="margin:0 0 10px">No payment is taken on this website. Our staff will send you the account details for your chosen option.</p>
+    <label>Notes (optional)<textarea name="notes" rows="2" placeholder="e.g. less spicy, extra sauce, gate code">${esc(f.notes)}</textarea></label>
+    <label class="opt ack"><input type="checkbox" name="ack"> I understand my order is confirmed only after Romualdo's staff contacts me and my payment is received.</label>
+    <input name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
+    <div class="tf-foot"><span class="formmsg" id="trayMsg"></span><button class="btn gold" type="submit">Send my order</button></div>
+   </form>`:""}
+   <p class="hint" style="margin:12px 0 0">Prefer to talk to us? ${fb?`<a href="${esc(fb)}" target="_blank" rel="noopener">Message us on Facebook</a> or `:""}${ph?`call <a href="tel:${esc(tel(ph))}">${esc(ph)}</a>`:""}. ${esc(a.trayNote||"")}</p>
+  </section>`;
+}
+async function submitTrayOrder(form){
+  const f=state.trayForm, L=trayLines(), msg=$("#trayMsg");msg.textContent="";
+  form.querySelectorAll(".err").forEach(el=>el.classList.remove("err"));
+  const need=["name","phone","date"].concat(f.fulfil==="Delivery"?["address"]:[]).filter(n=>!String(f[n]||"").trim());
+  need.forEach(n=>form.elements[n]?.classList.add("err"));
+  if(!L.length){msg.textContent="Please add at least one tray.";return}
+  if(need.length){msg.textContent="Please fill in the highlighted fields.";form.elements[need[0]]?.focus();return}
+  if(f.date<phDate(TRAY_LEAD_DAYS)){form.elements.date.classList.add("err");msg.textContent=`Trays need to be ordered at least ${TRAY_LEAD_DAYS} days ahead. The earliest date is ${fmtDate(phDate(TRAY_LEAD_DAYS))}.`;return}
+  if(!f.payment){msg.textContent="Please choose how you'll pay.";return}
+  if(!form.elements.ack.checked){msg.textContent="Please tick the box to confirm you understand how orders are confirmed.";return}
+  const btn=form.querySelector("button[type=submit]");btn.disabled=true;btn.textContent="Sending…";
+  const total=trayTotal(L);
+  const q={ref:newRef(),customer:{name:f.name.trim(),phone:f.phone.trim(),email:f.email.trim()},
+    event:{date:f.date,time:f.time,type:"Food tray order",venue:f.fulfil==="Delivery"?f.address.trim():"Pick-up",pax:0},notes:f.notes.trim(),
+    plan:{kind:"tray",fulfil:f.fulfil,payment:f.payment},items:L.map(l=>({cat:l.label,dish:l.name,tier:"tray",perHead:l.price,qty:l.qty})),estimate:{perHead:0,total}};
+  const r=await api("submit",{inquiry:q,website:form.elements.website?.value||""});
+  if(!r.ok&&!r.network&&r.error){btn.disabled=false;btn.textContent="Send my order";msg.textContent=r.error;return}
+  state.trayDone={ref:r.ref||q.ref,name:f.name.trim(),phone:f.phone.trim(),date:f.date,time:f.time,fulfil:f.fulfil,payment:f.payment,total,saved:!!r.ok};
+  state.trayCart={};render();document.getElementById("trayOrder")?.scrollIntoView({behavior:"smooth",block:"start"});
 }
 function bindTrays(v){
+  v.querySelectorAll("[data-tq]").forEach(b=>b.onclick=e=>{e.preventDefault();const k=b.dataset.tq;const n=Math.max(0,Math.min(50,(state.trayCart[k]||0)+Number(b.dataset.d)));if(n)state.trayCart[k]=n;else delete state.trayCart[k];state.trayDone=null;keepScroll(render)});
+  const tf=$("#trayForm",v);
+  if(tf){tf.addEventListener("input",e=>{const n=e.target.name;if(n&&n in state.trayForm&&e.target.type!=="radio")state.trayForm[n]=e.target.value});
+    tf.addEventListener("change",e=>{const n=e.target.name;if(e.target.type==="radio"){state.trayForm[n]=e.target.value;if(n==="fulfil")keepScroll(render)}});
+    tf.onsubmit=e=>{e.preventDefault();submitTrayOrder(tf)}}
+  const nw=$("#trayNew",v);if(nw)nw.onclick=()=>{state.trayDone=null;keepScroll(render)};
   v.querySelectorAll("[data-tc]").forEach(b=>b.onclick=()=>{state.trayCat=b.dataset.tc;keepScroll(render)});
   v.querySelectorAll("[data-tmore]").forEach(b=>b.onclick=()=>{const k=b.dataset.tmore;state.trayOpen[k]=!state.trayOpen[k];keepScroll(render)});
   v.querySelectorAll("[data-scroll]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.scroll)?.scrollIntoView({behavior:"smooth"}));
@@ -1548,7 +1648,8 @@ function buildWorkbook(list){
         ["Course","Dish","Menu List","Est. ₱/Head"]);
       if(q.plan?.kind==="custom"&&q.plan.basePerHead)rows.push(["Rice & softdrinks","Included","—",Number(q.plan.basePerHead)]);
       if(q.plan?.chefPick)rows.push(["—","Chef to recommend","",""]);
-      (q.items||[]).forEach(i=>rows.push([COURSES[i.cat]||i.cat,i.dish,i.tier==="premium"?"Premium":"Standard",q.plan?.kind==="custom"?Number(i.perHead)||0:"Included"]));
+      if(q.plan?.kind==="tray"){rows.push(["Pick-up / delivery",q.plan.fulfil||"",q.plan.payment?"Payment: "+q.plan.payment:"",""]);(q.items||[]).forEach(i=>rows.push([i.cat,i.dish,`${Number(i.qty)||1} tray(s)`,(Number(i.qty)||1)*(Number(i.perHead)||0)]));}
+      else (q.items||[]).forEach(i=>rows.push([COURSES[i.cat]||i.cat,i.dish,i.tier==="premium"?"Premium":"Standard",q.plan?.kind==="custom"?Number(i.perHead)||0:"Included"]));
       rows.push([],["* Estimate only — final price to be confirmed in a formal quotation."],[]);
     });
     const ws=XLSX.utils.aoa_to_sheet(rows);fmtCells(ws);ws["!cols"]=[{wch:26},{wch:46},{wch:14},{wch:14}];
