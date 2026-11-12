@@ -227,6 +227,7 @@ td.num{text-align:right;white-space:nowrap}
 .stp{display:inline-flex;align-items:center;gap:6px;flex:none}.stp em{font-style:normal;font-weight:700;min-width:16px;text-align:center}
 .tray-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:14px;z-index:20;background:var(--navy);color:#fff;border-radius:999px;padding:8px 8px 8px 20px;display:flex;gap:14px;align-items:center;box-shadow:0 12px 30px -10px rgba(0,0,0,.45);max-width:calc(100% - 24px)}
 .tray-order.form{display:block}.tray-order-h{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}.tray-order-h h2{margin:0}
+.rush-note{background:#FFF6E4;border:1px solid #F3D9A4;border-radius:10px;padding:10px 14px;margin:0 0 14px;font-size:14px}.rush-note a{color:var(--wine);font-weight:700}
 .pill-note{background:var(--wine);color:#fff;border-radius:999px;padding:4px 12px;font-size:12.5px;font-weight:700}
 .tray-sum{width:100%;border-collapse:collapse;margin-bottom:14px}.tray-sum td{padding:8px 4px;border-bottom:1px solid var(--line);vertical-align:middle}
 .tray-sum td.n{text-align:right;white-space:nowrap;font-weight:700}.tray-sum td.q{width:110px}.tray-sum tfoot td{font-weight:700;border-bottom:0;font-size:16px}
@@ -1142,13 +1143,14 @@ function trayOrderHtml(){
     :`<p class="hint" style="margin:0 0 6px">Tap <b>＋</b> beside any dish above to add it to your order.</p>`;
   return `<section class="tray-order form" id="trayOrder">
    <div class="tray-order-h"><h2>Order online</h2><span class="pill-note">Order at least ${TRAY_LEAD_DAYS}–3 days ahead</span></div>
+   <div class="rush-note"><b>Need it tomorrow, or have a special request?</b> Please ${fb?`<a href="${esc(fb)}" target="_blank" rel="noopener">message us on Facebook</a>`:"message us"}${ph?` or call <a href="tel:${esc(tel(ph))}">${esc(ph)}</a>`:""} directly and we'll do our best to accommodate you.</div>
    ${lines}
    ${L.length?`<form id="trayForm" novalidate>
     <div class="tf-grid">
       <label>Your name<input name="name" value="${esc(f.name)}" autocomplete="name" required></label>
       <label>Mobile number<input name="phone" value="${esc(f.phone)}" inputmode="tel" autocomplete="tel" placeholder="09XX XXX XXXX" required></label>
       <label>Email (optional)<input name="email" type="email" value="${esc(f.email)}" autocomplete="email"></label>
-      <label>Date needed<input name="date" type="date" min="${minD}" value="${esc(f.date)}" required><small class="hint">Earliest: ${esc(fmtDate(minD))}</small></label>
+      <label>Date needed<input name="date" type="date" min="${minD}" value="${esc(f.date)}" required><small class="hint">Earliest: ${esc(fmtDate(minD))}. Sooner? Message or call us.</small></label>
       <label>Time<input name="time" type="time" value="${esc(f.time)}"></label>
     </div>
     <div class="tf-row"><span class="tf-l">Pick-up or delivery</span>${["Pick-up","Delivery"].map(o=>`<label class="opt"><input type="radio" name="fulfil" value="${o}" ${f.fulfil===o?"checked":""}> ${o}</label>`).join("")}</div>
@@ -1170,7 +1172,7 @@ async function submitTrayOrder(form){
   need.forEach(n=>form.elements[n]?.classList.add("err"));
   if(!L.length){msg.textContent="Please add at least one tray.";return}
   if(need.length){msg.textContent="Please fill in the highlighted fields.";form.elements[need[0]]?.focus();return}
-  if(f.date<phDate(TRAY_LEAD_DAYS)){form.elements.date.classList.add("err");msg.textContent=`Trays need to be ordered at least ${TRAY_LEAD_DAYS} days ahead. The earliest date is ${fmtDate(phDate(TRAY_LEAD_DAYS))}.`;return}
+  if(f.date<phDate(TRAY_LEAD_DAYS)){form.elements.date.classList.add("err");const ph=(state.about.contactPhones||[])[0]||"";msg.textContent=`Online orders need at least ${TRAY_LEAD_DAYS} days. The earliest date is ${fmtDate(phDate(TRAY_LEAD_DAYS))}. For an earlier date, please message us on Facebook${ph?" or call "+ph:""}.`;return}
   if(!f.payment){msg.textContent="Please choose how you'll pay.";return}
   if(!form.elements.ack.checked){msg.textContent="Please tick the box to confirm you understand how orders are confirmed.";return}
   const btn=form.querySelector("button[type=submit]");btn.disabled=true;btn.textContent="Sending…";
