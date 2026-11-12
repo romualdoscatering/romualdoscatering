@@ -210,6 +210,31 @@ td.num{text-align:right;white-space:nowrap}
 .map{border-radius:14px;overflow:hidden;border:1px solid var(--line);min-height:320px;background:var(--custard)}
 .map iframe{width:100%;height:100%;min-height:320px;border:0;display:block}
 @media (max-width:960px){.home-hero,.contact-grid{grid-template-columns:1fr}.steps-grid,.gallery.four{grid-template-columns:repeat(2,1fr)}.home-copy h1{font-size:30px}}
+.tray-hero{position:relative;border-radius:18px;overflow:hidden;margin:4px 0 18px;background:var(--navy);min-height:320px;display:flex;align-items:flex-end}
+.tray-hero img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.42}
+.tray-hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(26,44,84,.85),rgba(26,44,84,.25))}
+.tray-hero-t{position:relative;z-index:1;padding:34px;max-width:640px;color:#fff}
+.tray-hero-t h1{color:#fff;font-size:36px}.tray-hero-t p{color:#f3efe0;font-size:16px}
+.tray-hero-t .kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--custard);font-weight:700;margin-bottom:8px}
+.pax-pill{display:inline-block;background:var(--gold);color:#fff;font-weight:700;border-radius:999px;padding:6px 14px;margin:2px 0 6px;font-size:14px}
+.tray-chips{display:flex;gap:8px;overflow-x:auto;padding:6px 0 14px;position:sticky;top:0;z-index:4;background:var(--cream)}
+.tray-chips button{border:1px solid var(--line);background:var(--paper);color:var(--blue);border-radius:999px;padding:8px 14px;font-weight:600;white-space:nowrap}
+.tray-chips button[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+.tray-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.tray-card{background:var(--paper);border:1px solid var(--line);border-radius:16px;overflow:hidden;display:flex;gap:0}
+.tray-card img{width:150px;object-fit:cover;flex:none;background:var(--custard)}
+.tray-b{padding:16px 18px;flex:1;min-width:0}.tray-b h2{font-size:20px;margin-bottom:8px}
+.tray-b ul{list-style:none;margin:0;padding:0}
+.tray-b li{display:flex;align-items:baseline;gap:6px;padding:5px 0;font-size:14.5px}
+.tray-b li span{min-width:0}.tray-b li i{flex:1;border-bottom:1px dotted #cfc7a8;transform:translateY(-3px)}
+.tray-b li b{white-space:nowrap;color:var(--wine)}
+.tray-b .more{border:0;background:none;color:var(--gold);font-weight:700;padding:6px 0 0}
+.tray-order{margin-top:22px;background:var(--paper);border:1px solid var(--line);border-left:6px solid var(--gold);border-radius:14px;padding:20px 22px;display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.tray-order>div:first-child{flex:1;min-width:260px}.tray-order p{margin:4px 0;color:var(--muted)}
+.tray-order-b{display:flex;gap:10px;flex-wrap:wrap}.tray-order-b a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.tray-ed{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:960px){.tray-grid{grid-template-columns:1fr}.tray-ed{grid-template-columns:1fr}}
+@media (max-width:560px){.tray-card{flex-direction:column}.tray-card img{width:100%;height:120px}.tray-hero-t{padding:22px}.tray-hero-t h1{font-size:28px}}
 .about-top{display:grid;grid-template-columns:1fr 1.05fr;gap:34px;align-items:center;margin-bottom:34px}
 .about-photo{position:relative;border-radius:18px;overflow:hidden;aspect-ratio:4/3;background:var(--custard)}
 .about-photo img{width:100%;height:100%;object-fit:cover;display:block}
@@ -324,6 +349,7 @@ footer{border-top:1px solid var(--line);padding:18px 0;font-size:12.5px;color:va
       <button data-nav="about">About Us</button>
       <button data-nav="packages">Packages</button>
       <button data-nav="custom">Build Your Own Menu</button>
+      <button data-nav="trays">Food Trays</button>
       <button data-nav="contact">Contact Us</button>
       <button data-nav="admin" class="staff hidden" id="navAdmin">Inquiries</button>
       <button data-nav="menu" class="staff hidden" id="navMenu">Menu items</button>
@@ -347,6 +373,8 @@ footer{border-top:1px solid var(--line);padding:18px 0;font-size:12.5px;color:va
       <li><b>Grand</b> — ₱990 per head. Grand weddings and milestone events.</li>
     </ul>
     <p>Minimum of 50 guests. Prices are estimates; your final price is confirmed in a written quotation.</p>
+    <h2>Food trays</h2>
+    <p>Large party trays good for 10–12 guests: beef, pork, chicken, seafood, vegetables, pasta, salads, rice and desserts.</p>
     <h2>What we cater</h2>
     <p>Weddings, corporate events, birthdays, debuts, christenings, family reunions, anniversaries and memorials, with customized menus for every theme and dietary need.</p>
     <h2>Contact</h2>
@@ -469,7 +497,7 @@ function closestPackageHint(perHead){
 }
 
 /* ============ NAV ============ */
-const PAGE_HASH={home:"",about:"about",packages:"packages",custom:"custom",contact:"contact"};
+const PAGE_HASH={home:"",about:"about",packages:"packages",custom:"custom",trays:"trays",contact:"contact"};
 function go(view){state.view=view;
   if(view in PAGE_HASH){const h=PAGE_HASH[view];if((location.hash||"").slice(1)!==h)history.pushState(null,"",h?"#"+h:location.pathname)}
   render();window.scrollTo({top:0,behavior:"smooth"})}
@@ -498,6 +526,7 @@ function render(){
   const v=$("#view");
   if(state.view==="home") v.innerHTML=viewHome();
   else if(state.view==="contact") v.innerHTML=viewContact();
+  else if(state.view==="trays") v.innerHTML=viewTrays();
   else if(state.view==="packages") v.innerHTML=viewPackages()+nextBand("custom");
   else if(state.view==="choose") v.innerHTML=viewChoose();
   else if(state.view==="custom") v.innerHTML=viewCustom()+nextBand("contact");
@@ -907,9 +936,25 @@ const ABOUT_DEFAULT={
   contactEmail:"romualdoscatering@gmail.com",
   contactHours:"",
   facebookUrl:"https://www.facebook.com/romualdoscatering", instagramUrl:"https://www.instagram.com/romualdosdavao/",
-  contactMap:"yes"
+  contactMap:"yes",
+  trayKicker:"Romualdo's Food Trays",
+  trayTitle:"Party trays, ready to share",
+  trayPax:"Large tray · good for 10–12 guests",
+  trayIntro:"Freshly cooked trays for birthdays, office lunches and family gatherings. Pick your favorites, and we'll have them hot and ready.",
+  trayOrder:"Message us on Facebook or call us with the dishes you want, how many trays, and the date and time of pick-up or delivery.",
+  trayNote:"Prices are per large tray. Prices may change without prior notice; your order confirmation shows the final price.",
+  tray_beef:"Ossobuco Milanese | 2,350\n3-Cheese Caldereta | 2,250\nBeef Stew in Red Wine | 2,200\nBeef in Mushroom Sauce | 2,140\nBistek Tagalog | 1,800\nKimchi Sinigang | 2,140\nBeef Rendang | 2,090\nBeef Stir-Fry Veggies | 1,750\nRoast Beef | 2,300\nBeef Salpicao | 1,950\nBeef with Broccoli | 1,650\nOxtail Kare-Kare | 2,250\nLengua in Mushroom Sauce | 2,090",
+  tray_pork:"Triple Chili Bicol Express | 1,750\nLumpiang Shanghai | 1,650\nPork Pata Kare-Kare | 1,950\nCrispy Pata | 1,040\nMenudo Overload | 1,650\nSinuglaw | 1,540\nLechon Kawali | 1,700\nSalt & Pepper Spare Ribs | 2,300\nSweet & Sour Pork | 1,650\nHumba Binisaya | 1,650\nPork Hamonado | 1,800\nPork BBQ | 1,350\nPatatim | 2,750",
+  tray_chicken:"Chicken Teriyaki | 1,650\nChicken Inasal | 1,850\nBuffalo Bites | 1,750\nSalted Chicken | 1,650\nGarlic Fried Chicken | 1,570\nThai Red Curry Chicken | 1,650\nRosemary Chicken | 1,700\nCordon Bleu | 1,410\nChicken Croquettes | 1,520\nOrange Chicken | 1,650\nChicken Afritada | 1,300\nChicken Parmesan | 1,800\nButtermilk Chicken | 1,800",
+  tray_seafood:"Tuna Bicol Express | 1,850\nSpicy Seafood Red Curry | 1,950\nSteamed Pompano in Soy Ginger | 1,900\nCajun Seafood | 2,350\nGarlic Bangus Steak | 1,430\nSpicy Asian Mixed Seafood | 2,090\nSalted Egg Shrimp | 1,750\nSweet & Sour Lapu-Lapu | 2,400\nFish Fingers with Lemon Capers | 1,950\nBaked Salmon | 3,500\nBaked Scallops | 2,350\nBaked Prawns | 2,400",
+  tray_vegetables:"Roasted Veggies | 1,350\nButtered Veggies | 1,300\nStir-Fried Veggies | 1,200\nLumpia Ubod | 1,430\nBroccoli with Mushroom | 1,480\nRoasted Potatoes | 1,300\nChicken Chopsuey | 1,350\nSeafood Chopsuey | 1,480",
+  tray_pasta:"Truffle Penne | 1,700\nShrimp Aglio Olio | 1,570\nSignature Baked Lasagna | 1,750\nBacon Carbonara | 1,460\nBaked Creamy Spaghetti | 1,520\nSeafood Marinara | 1,950\nChicken Enchilada | 1,900\nBaked Macaroni | 1,520\nSpaghetti alla Puttanesca | 1,700\nBeef Stroganoff | 1,850",
+  tray_salads:"Chopped Asian Salad | 1,100\nGrilled Chicken Salad | 1,200\nChicken Macaroni Salad | 1,200\nThai Noodle Salad | 1,700\nCaesar Salad | 1,030",
+  tray_rice:"Garlic Rice | 490\nJava Rice | 600\nBagoong Rice | 650",
+  tray_desserts:"Mango Lychee | 1,030\nBuko Pandan | 920\nDouble Dark Choco Fudge | 2,300\nBlueberry Cheesecake | 2,200\nPistachio Sans Rival | 2,400"
 };
 const ABOUT_LISTS=["services","mission","clients","homeHighlights","contactPhones"];
+const TRAY_CATS=[["beef","Beef"],["pork","Pork"],["chicken","Chicken"],["seafood","Seafood"],["vegetables","Vegetables"],["pasta","Pasta"],["salads","Salads"],["rice","Rice"],["desserts","Desserts"]];
 const ABOUT_PHOTOS=["heroPhoto","teamPhoto","homePhoto"];
 const DEFAULT_GALLERY=[
   ["buffet-setup.jpg","events","Buffet setup for an evening celebration"],["roast-beef.jpg","food","Sliced roast beef with gravy"],
@@ -1018,6 +1063,31 @@ function viewHome(){
     <div class="gallery four">${pics.map(p=>`<figure data-photo="${esc(photoKey(p))}" tabindex="0">${imgTag(p,700,'loading="lazy"',p.caption||catLabel(p.category))}${p.caption?`<figcaption>${esc(p.caption)}</figcaption>`:""}</figure>`).join("")}</div></section>`:""}
   <div class="next-band"><span>Start by getting to know us.</span><button class="btn gold" data-go="about">Next: About Us →</button></div>`;
 }
+
+function trayItems(k){return String(state.about["tray_"+k]||"").split("\n").map(l=>{const m=l.split("|");const name=(m[0]||"").trim();const price=Number(String(m[1]||"").replace(/[^\d.]/g,""))||0;return name?{name,price}:null}).filter(Boolean)}
+state.trayCat=state.trayCat||"all";state.trayOpen=state.trayOpen||{};
+function viewTrays(){
+  const a=state.about, fb=socialUrl("facebookUrl"), ph=(a.contactPhones||[])[0]||"";
+  const tel=n=>String(n).replace(/[^\d+]/g,"").replace(/^0/,"+63");
+  const cats=TRAY_CATS.map(([k,l])=>({k,l,items:trayItems(k)})).filter(c=>c.items.length);
+  const shown=state.trayCat==="all"?cats:cats.filter(c=>c.k===state.trayCat);
+  const SHOW=6;
+  return `<section class="tray-hero"><img src="assets/trays/cover.jpg" alt="Romualdo's food trays">
+    <div class="tray-hero-t">${a.trayKicker?`<div class="kicker">${esc(a.trayKicker)}</div>`:""}<h1>${esc(a.trayTitle)}</h1>${a.trayPax?`<span class="pax-pill">${esc(a.trayPax)}</span>`:""}${paras(a.trayIntro)}
+      <div class="home-btns"><button class="btn gold" data-scroll="trayOrder">How to order</button></div></div></section>
+  <div class="tray-chips" role="group" aria-label="Choose a category"><button data-tc="all" aria-pressed="${state.trayCat==="all"}">All</button>${cats.map(c=>`<button data-tc="${c.k}" aria-pressed="${state.trayCat===c.k}">${esc(c.l)}</button>`).join("")}</div>
+  <div class="tray-grid">${shown.map(c=>{const open=state.trayCat!=="all"||state.trayOpen[c.k];const list=open?c.items:c.items.slice(0,SHOW);
+    return `<section class="tray-card">${c.k!=="rice"?`<img src="assets/trays/${c.k}.jpg" alt="" loading="lazy">`:""}<div class="tray-b"><h2>${esc(c.l)}</h2>
+      <ul>${list.map(i=>`<li><span>${esc(i.name)}</span><i></i><b>${i.price?"₱"+i.price.toLocaleString("en-PH"):""}</b></li>`).join("")}</ul>
+      ${c.items.length>SHOW&&state.trayCat==="all"?`<button class="more" data-tmore="${c.k}">${open?"Show less ▴":`See all ${c.items.length} ▾`}</button>`:""}</div></section>`}).join("")}</div>
+  <section class="tray-order" id="trayOrder"><div><h2>How to order</h2>${paras(a.trayOrder)}${a.trayNote?`<p class="hint">${esc(a.trayNote)}</p>`:""}</div>
+    <div class="tray-order-b">${fb?`<a class="soc fb" href="${esc(fb)}" target="_blank" rel="noopener">${ICON_FB}<span>Message us on Facebook</span></a>`:""}${ph?`<a class="btn gold" href="tel:${esc(tel(ph))}">Call ${esc(ph)}</a>`:""}</div></section>`;
+}
+function bindTrays(v){
+  v.querySelectorAll("[data-tc]").forEach(b=>b.onclick=()=>{state.trayCat=b.dataset.tc;keepScroll(render)});
+  v.querySelectorAll("[data-tmore]").forEach(b=>b.onclick=()=>{const k=b.dataset.tmore;state.trayOpen[k]=!state.trayOpen[k];keepScroll(render)});
+  v.querySelectorAll("[data-scroll]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.scroll)?.scrollIntoView({behavior:"smooth"}));
+}
 function viewContact(){
   const a=state.about, fb=socialUrl("facebookUrl"), ig=socialUrl("instagramUrl");
   const tel=n=>String(n).replace(/[^\d+]/g,"").replace(/^0/,"+63");
@@ -1036,7 +1106,7 @@ function viewContact(){
       ${a.contactEmail?`<div class="ci"><div class="label">Email</div><a href="mailto:${esc(a.contactEmail)}">${esc(a.contactEmail)}</a></div>`:""}
       ${a.contactAddress?`<div class="ci"><div class="label">Visit us</div><span>${esc(a.contactAddress)}</span><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(a.contactAddress)}" target="_blank" rel="noopener" class="small-link">Open in Google Maps →</a></div>`:""}
       ${a.contactHours?`<div class="ci"><div class="label">Hours</div><span>${esc(a.contactHours)}</span></div>`:""}
-      <div class="ci"><div class="label">Send an inquiry online</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn gold small" data-go="packages">Choose a package</button><button class="btn ghost small" data-go="custom">Build your own menu</button></div></div>
+      <div class="ci"><div class="label">Send an inquiry online</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn gold small" data-go="packages">Choose a package</button><button class="btn ghost small" data-go="custom">Build your own menu</button><button class="btn ghost small" data-go="trays">Order food trays</button></div></div>
     </div>
     ${map}
   </div>`;
@@ -1148,6 +1218,9 @@ function viewAboutEdit(){
     <p class="hint" style="margin-top:0">New photos are saved in your Google Drive (Romualdo's Inquiry App → Website Photos). Edit captions, types and order here, then click <b>Save changes</b>.</p>
     ${items?`<div class="ph-list">${items}</div>`:`<div class="gallery-empty">No photos in the gallery.</div>`}`)}
   ${sec("8. Closing message",`${inp("ctaTitle","Heading",80)}${ta("ctaText","Text",3,400)}${inp("ctaButton","Button text (leave empty to hide)",40)}`)}
+  ${sec("Food trays page",`${inp("trayKicker","Small heading",60)}${inp("trayTitle","Headline",120)}${inp("trayPax","Tray size line",80)}${ta("trayIntro","Intro text",3,800)}${ta("trayOrder","How to order",3,800)}${inp("trayNote","Small note under 'How to order'",200)}
+    <p class="hint" style="margin:6px 0">One dish per line, written as <b>Dish name | price</b> (e.g. <i>Oxtail Kare-Kare | 2,250</i>). Leave a category empty to hide it.</p>
+    <div class="tray-ed">${TRAY_CATS.map(([k,l])=>ta("tray_"+k,l,6,3000)).join("")}</div>`)}
   ${sec("Contact page",`${inp("contactTitle","Heading",80)}${ta("contactText","Intro text",3,800)}
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${inp("facebookUrl","Facebook page link (https://facebook.com/…)",200)}${inp("instagramUrl","Instagram link (https://instagram.com/…)",200)}</div>
     <p class="hint" style="margin-top:0">Open your Facebook page or Instagram profile, copy the address from the browser, and paste it here. The buttons appear only when a link is filled in.</p>
@@ -1237,6 +1310,7 @@ function bind(){
   const v=$("#view");
   if(state.view==="menu")bindMenu(v);
   if(state.view==="about"||state.view==="home")bindAbout(v);
+  if(state.view==="trays")bindTrays(v);
   if(state.view==="home")bindFilm(v);
   if(state.view==="aboutEdit")bindAboutEdit(v);
   v.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>{if(b.dataset.go==="packages")state.pkg=null;go(b.dataset.go)});

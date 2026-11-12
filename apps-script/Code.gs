@@ -263,7 +263,9 @@ const ABOUT_TEXT_FIELDS = {
   customTitle: 80, custom: 1200, customButton: 40, clientsKicker: 60, clientsTitle: 80, galleryTitle: 80, galleryIntro: 200,
   labelAll: 20, labelFood: 20, labelEvents: 20, ctaTitle: 80, ctaText: 400, ctaButton: 40,
   homeKicker: 60, homeTitle: 120, homeText: 1200, homePhotoAlt: 140, homeBtn1: 40, homeBtn2: 40, homeStepsTitle: 80, homePhotosTitle: 80,
-  contactTitle: 80, contactText: 800, contactAddress: 200, contactEmail: 120, contactHours: 120, facebookUrl: 200, instagramUrl: 200, contactMap: 3
+  contactTitle: 80, contactText: 800, contactAddress: 200, contactEmail: 120, contactHours: 120, facebookUrl: 200, instagramUrl: 200, contactMap: 3,
+  trayKicker: 60, trayTitle: 120, trayPax: 80, trayIntro: 800, trayOrder: 800, trayNote: 200,
+  tray_beef: 3000, tray_pork: 3000, tray_chicken: 3000, tray_seafood: 3000, tray_vegetables: 3000, tray_pasta: 3000, tray_salads: 3000, tray_rice: 3000, tray_desserts: 3000
 };
 const ABOUT_LIST_FIELDS = { services: 12, mission: 12, clients: 30, homeHighlights: 8, contactPhones: 6 };
 const ABOUT_PHOTO_FIELDS = ['heroPhoto', 'teamPhoto', 'homePhoto'];
