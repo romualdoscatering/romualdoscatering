@@ -725,13 +725,13 @@ function offerList(){
   const tp=TRAY_CATS.flatMap(([k])=>trayItems(k).map(i=>i.price)).filter(Boolean),pk=Math.min(...PACKAGES.map(x=>x.price).filter(Boolean));
   const hp=state.about.homePhoto?photoUrl(state.about.homePhoto,900):"";
   return [
-    {v:"packages",t:"Catering Packages",d:"Full buffet catering for weddings, debuts, christenings and company events.",p:isFinite(pk)?`from ${peso(pk)}/head`:"",img:hp},
-    {v:"kaarawan",t:K.title.replace(/\s*package\s*$/i,"")+" Package",d:"Ready-made Pinoy birthday handaan, menu all set. Book in a minute.",p:kp.length?`${peso(Math.min(...kp))} for ${K.options.find(kReady)?.pax||50} guests`:"",img:kRef(K.options.find(o=>o.show)?.photo)?.url||kRef(K.heroPhoto)?.url||""},
-    {v:"grazing",t:G.title,d:"Elegant grazing tables and a live street-food station for parties and launches.",p:gp.length?`from ${peso(Math.min(...gp))}`:"",img:kRef(G.paths[0]?.photo)?.url||kRef(G.heroPhoto)?.url||""},
-    {v:"trays",t:"Food Trays",d:"Large party trays good for 10–12 guests. Order online 2–3 days ahead.",p:tp.length?`from ${peso(Math.min(...tp))}/tray`:"",img:trayImg("chicken")},
-    {v:"custom",t:"Build Your Own Menu",d:"Pick your own dishes and get an instant estimate.",p:"",img:trayImg("pasta")}];
+    {v:"packages",s:"Buffet catering for weddings, debuts and big events",t:"Catering Packages",d:"Full buffet catering for weddings, debuts, christenings and company events.",p:isFinite(pk)?`from ${peso(pk)}/head`:"",img:hp},
+    {v:"kaarawan",s:"Ready-made Pinoy birthday handaan",t:K.title.replace(/\s*package\s*$/i,"")+" Package",d:"Ready-made Pinoy birthday handaan, menu all set. Book in a minute.",p:kp.length?`${peso(Math.min(...kp))} for ${K.options.find(kReady)?.pax||50} guests`:"",img:kRef(K.options.find(o=>o.show)?.photo)?.url||kRef(K.heroPhoto)?.url||""},
+    {v:"grazing",s:"Grazing tables and a live street-food station",t:G.title,d:"Elegant grazing tables and a live street-food station for parties and launches.",p:gp.length?`from ${peso(Math.min(...gp))}`:"",img:kRef(G.paths[0]?.photo)?.url||kRef(G.heroPhoto)?.url||""},
+    {v:"trays",s:"Party trays for 10–12 guests",t:"Food Trays",d:"Large party trays good for 10–12 guests. Order online 2–3 days ahead.",p:tp.length?`from ${peso(Math.min(...tp))}/tray`:"",img:trayImg("chicken")},
+    {v:"custom",s:"Pick your own dishes, instant estimate",t:"Build Your Own Menu",d:"Pick your own dishes and get an instant estimate.",p:"",img:trayImg("pasta")}];
 }
-function offersPanel(){return offerList().map(o=>`<button class="dd-item" data-to="${o.v}" role="menuitem"><span class="dd-img">${o.img?`<img src="${esc(o.img)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span><span class="dd-t"><b>${esc(o.t)}</b><small>${esc(o.p||o.d)}</small></span></button>`).join("")+`<button class="dd-all" data-to="offers">See all offers →</button>`}
+function offersPanel(){return offerList().map(o=>`<button class="dd-item" data-to="${o.v}" role="menuitem"><span class="dd-img">${o.img?`<img src="${esc(o.img)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span><span class="dd-t"><b>${esc(o.t)}</b><small>${esc(o.s||o.d)}</small></span></button>`).join("")+`<button class="dd-all" data-to="offers">See all offers →</button>`}
 function goOffer(v){closeNav();document.activeElement?.blur?.();if(v==="packages")state.pkg=null;if(v==="offers")state.offersBook=false;go(v)}
 function viewOffers(){
   const L=offerList(),bk=state.offersBook;
