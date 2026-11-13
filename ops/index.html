@@ -370,6 +370,8 @@ function live() {
     else if (k === 'advleft') { const L = advLeft(D.purchase); h = L ? `<span class="${L.after < -0.5 ? 'bad-t' : ''}">${peso(L.after)}</span>` : ''; }
     else if (k === 'rcost') h = peso(recipeCost(D.recipe));
     else if (k === 'cvar') { const l = D.count.lines[a]; if (l.actual === '' || l.actual == null) h = ''; else { const v = num(l.actual) - l.system; h = `<span class="${v < -0.001 ? 'bad-t' : v > 0.001 ? 'ok-t' : 'mut'}">${v > 0 ? '+' : ''}${fq(v)}</span>`; } }
+    else if (k === 'osum') { const d = D.sheet, kk = d.kind || 'catering', o = orderSum(d.menu, kk), px = num(d.pax);
+      h = !o.main && !o.drink && !o.addon ? '' : `Counts as <b>${esc(orderLabel(o, kk) || '0')}</b>${o.drink ? ' · ' + plural(o.drink, 'drink') : ''}${kk === 'packs' && px && o.main !== px ? ` <span class="bad-t">· ${o.main} packs vs ${px} pax, please check</span>` : ''}`; }
     else if (k === 'counted') h = D.count.lines.filter(l => l.actual !== '' && l.actual != null).length;
     if (h !== undefined) el.innerHTML = h;
   });
@@ -668,6 +670,19 @@ const EV_TYPES = ['Wedding', 'Birthday', 'Debut', 'Christening', 'Corporate', 'A
 const SHEET_STATUS = [['draft', 'Draft'], ['approval', 'For client approval'], ['approved', 'Approved by client'], ['cancelled', 'Cancelled']];
 const SHEET_KINDS = [['catering', 'Catering / buffet event'], ['trays', 'Food trays'], ['packs', 'Food packs']];
 const sheetKindLabel = k => ({trays: 'Food trays', packs: 'Food packs'})[k] || 'Catering';
+/* Order lines for trays/packs: 'main' = the meal pack or tray itself (this is what is counted), 'drink' and 'addon' are listed but not counted.
+   A blank type is guessed: drinks by name; for packs, anything called a tray is an add-on. */
+const DRINK_RE = /\b(water|juice|soda|soft ?drinks?|coke|sprite|royal|pepsi|7.?up|mountain dew|iced tea|tea|coffee|lemonade|drinks?|beverages?|c2|zesto|milk ?tea|shakes?|calamansi)\b/i;
+const lineType = (m, k) => m.t || (DRINK_RE.test(m.dish || '') ? 'drink' : k === 'packs' && /\btrays?\b/i.test(m.dish || '') ? 'addon' : 'main');
+const LINE_TYPES = k => [['', 'Auto'], ['main', k === 'packs' ? 'Meal pack' : 'Tray'], ['drink', 'Drink'], ['addon', 'Add-on']];
+function orderSum(menu, k) {
+  const L = (menu || []).filter(m => (m.dish || '').trim()), q = m => parseFloat(m.qty) || 1, by = t => L.filter(m => lineType(m, k) === t);
+  const o = {mains: by('main'), drinks: by('drink'), addons: by('addon')};
+  o.main = o.mains.reduce((t, m) => t + q(m), 0); o.drink = o.drinks.reduce((t, m) => t + q(m), 0); o.addon = o.addons.reduce((t, m) => t + q(m), 0);
+  return o;
+}
+const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+const orderLabel = (o, k) => (o.main ? plural(o.main, k === 'packs' ? 'pack' : 'tray') : '') + (o.addon ? (o.main ? ' + ' : '') + plural(o.addon, 'add-on') : '');
 const orderRows = (n = 5) => Array.from({length: n}, () => ({course: '', dish: '', qty: '', note: ''}));
 const newSheet = (o = {}) => ({id: '', ref: '', kind: 'catering', fulfil: '', client: '', contact: '', mobile: '', email: '', source: '', type: '', date: daysAhead(30), serve: '', call: '', pull: '', venue: '', coord: '', pax: '',
   pkg: '', menu: SHEET_COURSES.map(c => ({course: c, dish: '', note: ''})), motif: '', setup: '', equip: '', staff: '', allergy: '', special: '', status: 'draft', approvedOn: '', preparedBy: '', ...o});
@@ -711,10 +726,11 @@ V.sheets = () => {
    <div class="grid">${lab('Pick-up or delivery', sel('sheet.fulfil', opt('', '— choose —') + opt('Pick-up', 'Pick-up') + opt('Delivery', 'Delivery'), true))}${lab(d.fulfil === 'Delivery' ? 'Delivery date' : 'Pick-up date', inp('date', '', 'date'))}${lab(d.fulfil === 'Delivery' ? 'Delivery time' : 'Ready by (time)', inp('serve', '', 'time'))}
     ${lab(d.fulfil === 'Delivery' ? 'Delivery address & landmark' : 'Pick-up location', inp('venue', d.fulfil === 'Delivery' ? '' : "Romualdo's, 13 Juna Ave. (leave blank)", 'text', 'autocapitalize="words"'))}${lab('Good for (pax, optional)', inp('pax', '', 'number', 'inputmode="numeric" min="0"'))}</div>
    <h4 class="sub">3. ${k === 'packs' ? 'Food packs' : 'Trays'} ordered</h4>
-   <div class="tw"><table class="lines"><thead><tr><th>Item</th><th style="width:90px">Qty</th><th style="width:240px">Note <span class="small mut">(e.g. less spicy)</span></th><th style="width:30px"></th></tr></thead><tbody>
-    ${d.menu.map((m, i) => `<tr><td><input data-b="sheet.menu.${i}.dish" placeholder="${k === 'packs' ? 'e.g. Chicken Pastel with rice' : 'e.g. Baked Rosemary Chicken (large tray)'}" autocapitalize="words"></td><td><input data-b="sheet.menu.${i}.qty" type="number" inputmode="numeric" min="0" placeholder="1"></td><td><input data-b="sheet.menu.${i}.note"></td><td><button class="sm ghost" data-act="rmCourse" data-arg="${i}" title="Remove">✕</button></td></tr>`).join('')}
+   <p class="small mut" style="margin:0 0 6px">${k === 'packs' ? 'One line per meal-pack variant (e.g. 24 Chicken Teriyaki + 1 Fried Chicken = 25 packs). Put drinks and extra trays on their own lines; they are listed but not counted as packs. Mixed drinks: one line each, e.g. 13 Sprite and 12 Royal, or one line "Softdrinks" with a note "half Sprite, half Royal".' : 'One line per tray. Drinks and other extras go on their own lines and are not counted as trays.'}</p>
+   <div class="tw"><table class="lines"><thead><tr><th>Item</th><th style="width:130px">Type</th><th style="width:80px">Qty</th><th style="width:220px">Note <span class="small mut">(e.g. less spicy)</span></th><th style="width:30px"></th></tr></thead><tbody>
+    ${d.menu.map((m, i) => `<tr><td><input data-b="sheet.menu.${i}.dish" placeholder="${k === 'packs' ? 'e.g. Chicken Teriyaki, Yasai Itame, Lumpia Shanghai, Rice' : 'e.g. Baked Rosemary Chicken (large tray)'}" autocapitalize="words"></td><td>${sel(`sheet.menu.${i}.t`, LINE_TYPES(k).map(([v, l]) => opt(v, l)).join(''), false)}</td><td><input data-b="sheet.menu.${i}.qty" type="number" inputmode="numeric" min="0" placeholder="1"></td><td><input data-b="sheet.menu.${i}.note"></td><td><button class="sm ghost" data-act="rmCourse" data-arg="${i}" title="Remove">✕</button></td></tr>`).join('')}
    </tbody></table></div>
-   <div class="row" style="margin-top:6px"><button class="sm" data-act="addCourse">＋ Add item</button></div>`}
+   <div class="row" style="margin-top:6px"><button class="sm" data-act="addCourse">＋ Add item</button><span class="spacer"></span><span class="small" data-live="osum"></span></div>`}
    <h4 class="sub">${cat ? 5 : 4}. Notes</h4>
    <div class="grid">${lab('Allergies / dietary needs', `<textarea data-b="sheet.allergy" rows="2"></textarea>`)}${lab('Special requests', `<textarea data-b="sheet.special" rows="2"></textarea>`)}</div>
    <h4 class="sub">${cat ? 6 : 5}. Approval</h4>
@@ -758,7 +774,7 @@ function sheetTouched() {
 }
 function sheetPayload(d) {
   const client = titleCase(d.client);
-  const sheet = {...d, client, pax: num(d.pax) || '', kind: d.kind || 'catering', menu: d.menu.filter(m => (m.dish || '').trim() || (m.note || '').trim()).map(m => ({course: (m.course || '').trim(), dish: (m.dish || '').trim(), qty: String(m.qty || '').trim(), note: (m.note || '').trim()})), savedAt: Date.now()};
+  const sheet = {...d, client, pax: num(d.pax) || '', kind: d.kind || 'catering', menu: d.menu.filter(m => (m.dish || '').trim() || (m.note || '').trim()).map(m => ({course: (m.course || '').trim(), dish: (m.dish || '').trim(), qty: String(m.qty || '').trim(), ...(d.kind && d.kind !== 'catering' ? {t: lineType(m, d.kind)} : {}), note: (m.note || '').trim()})), savedAt: Date.now()};
   delete sheet.id;
   return {client, sheet, base: {name: client, client, date: d.date, pax: num(d.pax) || '', venue: (d.venue || '').trim()}};
 }
@@ -849,12 +865,12 @@ function printSheet(id, w) {
   const logo = new URL('../assets/logo.png', location.href).href;
   const row = (l, v) => v ? `<tr><th>${esc(l)}</th><td>${esc(v)}</td></tr>` : '';
   const menu = (d.menu || []).filter(m => m.dish);
-  const qtyTotal = menu.reduce((t, m) => t + (parseFloat(m.qty) || 0), 0);
+  const os = orderSum(menu, k);
   const times = cat ? [['Call time', d.call], ['Serving', d.serve], ['Pull-out', d.pull]].filter(x => x[1]) : [];
   const setup = cat ? [['Motif / theme', d.motif], ['Table setup', d.setup], ['Service staff', d.staff], ['Equipment', d.equip]] : [];
   const notes = [['Allergies & dietary', d.allergy], ['Special requests', d.special]];
   const hero = cat ? [['Date', fmtLong(d.date)], ['Guests', d.pax ? d.pax + ' pax' : 'To be confirmed'], ['Occasion', d.type || 'To be confirmed']]
-    : [[d.fulfil === 'Delivery' ? 'Delivery date' : 'Pick-up date', fmtLong(d.date)], [d.fulfil === 'Delivery' ? 'Delivery time' : 'Ready by', d.serve ? fmtClock(d.serve) : 'To be confirmed'], ['Order', (qtyTotal ? qtyTotal + ' ' + (k === 'packs' ? 'pack' : 'tray') + (qtyTotal === 1 ? '' : 's') : kl) + (d.fulfil ? ' · ' + d.fulfil : '')]];
+    : [[d.fulfil === 'Delivery' ? 'Delivery date' : 'Pick-up date', fmtLong(d.date)], [d.fulfil === 'Delivery' ? 'Delivery time' : 'Ready by', d.serve ? fmtClock(d.serve) : 'To be confirmed'], ['Order', (orderLabel(os, k) || kl) + (d.fulfil ? ' · ' + d.fulfil : '')]];
   const docTitle = cat ? 'Event Details' : k === 'packs' ? 'Food Pack Order' : 'Food Tray Order';
   const title = `${cat ? 'Event Sheet' : docTitle} - ${d.client} - ${fmtLong(d.date).replace(/^\w+, /, '')}`;
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title>
@@ -914,7 +930,7 @@ ${setup.some(x => x[1]) ? `<section><h2>Setup &amp; service<small>On site</small
 ${notes.some(x => x[1]) ? `<section><h2>Notes<small>Please note</small></h2><table class="kv">${notes.map(([l, v]) => row(l, v)).join('')}</table></section>` : ''}
 </div><div>
 ${menu.length ? (cat ? `<div class="menu"><h2>The Menu</h2>${menu.map(m => `<div class="c">${esc(m.course)}</div><div class="d">${esc(m.dish)}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}`).join('')}</div>`
-  : `<div class="menu" style="text-align:left"><h2>The Order</h2><table class="items"><thead><tr><th>Item</th><th class="q">Qty</th></tr></thead><tbody>${menu.map(m => `<tr><td><div class="d" style="font-family:'Playfair Display',serif;font-style:italic;font-size:10pt">${esc(m.dish)}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}</td><td class="q">${esc(m.qty || '1')}</td></tr>`).join('')}</tbody></table></div>`) : ''}
+  : `<div class="menu" style="text-align:left"><h2>The Order</h2><table class="items"><thead><tr><th>Item</th><th class="q">Qty</th></tr></thead><tbody>${[[os.mains, k === 'packs' ? 'Meal packs' : 'Trays', os.main], [os.drinks, 'Drinks', os.drink], [os.addons, 'Add-ons', os.addon]].filter(g => g[0].length).map(([L, h, n]) => `<tr><td colspan="2" style="font-size:6pt;letter-spacing:.24em;text-transform:uppercase;color:#E89908;padding-top:2.5mm;border:0">${h} · ${n}</td></tr>` + L.map(m => `<tr><td><div class="d" style="font-family:'Playfair Display',serif;font-style:italic;font-size:10pt">${esc(m.dish)}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}</td><td class="q">${esc(m.qty || '1')}</td></tr>`).join('')).join('')}</tbody></table></div>`) : ''}
 </div></div>
 <div class="foot"><p class="ack">By signing below, the client confirms the ${cat ? 'event details and menu' : 'order details'} above.</p>
 <div class="sign"><div><b>${esc(d.client)}</b>Client signature over printed name · Date</div><div><b>${esc(d.preparedBy || "Romualdo's Catering Services")}</b>Prepared by · Romualdo's Catering Services</div></div>

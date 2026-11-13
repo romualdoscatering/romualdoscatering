@@ -281,12 +281,22 @@ function bookKind(sh) { return sh.kind === 'trays' ? 'Food trays' : sh.kind === 
 function bookHash(o) { return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(o), Utilities.Charset.UTF_8)); }
 function bookContent(ev) { const sh = ev.sheet || {}; const c = JSON.parse(JSON.stringify(sh)); delete c.savedAt; c._v = ev.status; return c; }
 function clock12(t) { if (!t) return ''; const p = String(t).split(':'); const h = Number(p[0]), m = p[1] || '00'; return ((h % 12) || 12) + ':' + m + (h < 12 ? ' AM' : ' PM'); }
-function qtyTotal(sh) { return (sh.menu || []).filter(function (m) { return m.dish; }).reduce(function (t, m) { return t + (parseFloat(m.qty) || 0); }, 0); }
+/* Trays/packs: only 'main' lines (the meal pack or tray itself) are counted; drinks and add-ons are listed separately. */
+const DRINK_RE = /\b(water|juice|soda|soft ?drinks?|coke|sprite|royal|pepsi|7.?up|mountain dew|iced tea|tea|coffee|lemonade|drinks?|beverages?|c2|zesto|milk ?tea|shakes?|calamansi)\b/i;
+function lineType(m, k) { return m.t || (DRINK_RE.test(m.dish || '') ? 'drink' : (k === 'packs' && /\btrays?\b/i.test(m.dish || '')) ? 'addon' : 'main'); }
+function orderSum(sh) {
+  const k = sh.kind || 'catering', L = (sh.menu || []).filter(function (m) { return m.dish; });
+  const o = { mains: [], drinks: [], addons: [], main: 0, drink: 0, addon: 0 };
+  L.forEach(function (m) { const t = lineType(m, k), q = parseFloat(m.qty) || 1; o[t + 's'].push(m); o[t] += q; });
+  return o;
+}
+function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
+function orderLabel(sh) { const o = orderSum(sh); return (o.main ? plural(o.main, sh.kind === 'packs' ? 'pack' : 'tray') : '') + (o.addon ? (o.main ? ' + ' : '') + plural(o.addon, 'add-on') : ''); }
 function bookTitle(sh) {
   const k = sh.kind || 'catering';
   if (k === 'catering') return 'Catering: ' + sh.client + (sh.type ? ' – ' + sh.type : '') + (sh.pax ? ' (' + sh.pax + ' pax)' : '');
-  const q = qtyTotal(sh), unit = k === 'packs' ? 'pack' : 'tray';
-  return bookKind(sh) + (sh.fulfil ? ' (' + sh.fulfil + ')' : '') + ': ' + sh.client + (q ? ' – ' + q + ' ' + unit + (q === 1 ? '' : 's') : '');
+  const lab = orderLabel(sh);
+  return bookKind(sh) + (sh.fulfil ? ' (' + sh.fulfil + ')' : '') + ': ' + sh.client + (lab ? ' – ' + lab : '');
 }
 /** Plain-text booking details (calendar description + email text). */
 function bookText(sh, ref) {
@@ -298,7 +308,12 @@ function bookText(sh, ref) {
   if (cat) { add('Event type', sh.type); add('Guests', sh.pax ? sh.pax + ' pax' : ''); add('Call time', clock12(sh.call)); add('Serving time', clock12(sh.serve)); add('Pull-out', clock12(sh.pull)); add('Venue', sh.venue); add('Venue coordinator', sh.coord); add('Package', sh.pkg); }
   else { add('Pick-up / delivery', sh.fulfil); add(sh.fulfil === 'Delivery' ? 'Delivery time' : 'Ready by', clock12(sh.serve)); add(sh.fulfil === 'Delivery' ? 'Deliver to' : 'Pick-up at', sh.venue); add('Good for', sh.pax ? sh.pax + ' pax' : ''); }
   const menu = (sh.menu || []).filter(function (m) { return m.dish; });
-  if (menu.length) { L.push(''); L.push(cat ? 'MENU' : 'ORDER'); menu.forEach(function (m) { L.push('• ' + (cat ? (m.course ? m.course + ': ' : '') : (m.qty || 1) + ' × ') + m.dish + (m.note ? ' (' + m.note + ')' : '')); }); }
+  const line = function (m) { L.push('• ' + (cat ? (m.course ? m.course + ': ' : '') : (m.qty || 1) + ' × ') + m.dish + (m.note ? ' (' + m.note + ')' : '')); };
+  if (menu.length && cat) { L.push(''); L.push('MENU'); menu.forEach(line); }
+  else if (menu.length) {
+    const o = orderSum(sh);
+    [[o.mains, k === 'packs' ? 'MEAL PACKS' : 'TRAYS', o.main], [o.drinks, 'DRINKS', o.drink], [o.addons, 'ADD-ONS', o.addon]].forEach(function (g) { if (g[0].length) { L.push(''); L.push(g[1] + ' (' + g[2] + ')'); g[0].forEach(line); } });
+  }
   if (cat && (sh.motif || sh.setup || sh.staff || sh.equip)) { L.push(''); L.push('SETUP & SERVICE'); add('Motif / theme', sh.motif); add('Table setup', sh.setup); add('Staff', sh.staff); add('Equipment', sh.equip); }
   if (sh.allergy || sh.special) { L.push(''); add('Allergies / dietary', sh.allergy); add('Special requests', sh.special); }
   add('Prepared by', sh.preparedBy);
@@ -407,6 +422,12 @@ function bookRows(sh) {
 function bookMenuHtml(sh) {
   const cat = (sh.kind || 'catering') === 'catering', menu = (sh.menu || []).filter(function (m) { return m.dish; });
   if (!menu.length) return '';
+  if (!cat) {
+    const o = orderSum(sh), row = function (m) { return '<tr><td style="border-bottom:1px solid #E4DFC8;font-weight:bold;width:14%;text-align:center">' + hx(m.qty || 1) + '</td><td style="border-bottom:1px solid #E4DFC8;font-family:Georgia,serif;font-style:italic;font-size:14px">' + hx(m.dish) + (m.note ? '<br><span style="font-size:11px;color:#631B1C">' + hx(m.note) + '</span>' : '') + '</td></tr>'; };
+    return '<table width="100%" cellpadding="5" style="border-collapse:collapse;font-size:12px">' + [[o.mains, sh.kind === 'packs' ? 'Meal packs' : 'Trays', o.main], [o.drinks, 'Drinks', o.drink], [o.addons, 'Add-ons', o.addon]].filter(function (g) { return g[0].length; }).map(function (g) {
+      return '<tr><td colspan="2" style="color:#B07A0A;font-size:10px;letter-spacing:1px;text-transform:uppercase;padding-top:9px">' + g[1] + ' · ' + g[2] + '</td></tr>' + g[0].map(row).join('');
+    }).join('') + '</table>';
+  }
   return '<table width="100%" cellpadding="5" style="border-collapse:collapse;font-size:12px">' + menu.map(function (m) {
     return '<tr><td style="border-bottom:1px solid #E4DFC8;color:#B07A0A;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:32%">' + hx(cat ? m.course : (m.qty || 1) + ' ×') + '</td><td style="border-bottom:1px solid #E4DFC8;font-family:Georgia,serif;font-style:italic;font-size:14px">' + hx(m.dish) + (m.note ? '<br><span style="font-size:11px;color:#631B1C">' + hx(m.note) + '</span>' : '') + '</td></tr>';
   }).join('') + '</table>';
@@ -439,7 +460,7 @@ function bookPdf(sh, ref) {
     '<hr style="border:0;border-top:1px solid #C9A24A;margin:8px 0 10px">' +
     '<table width="100%" cellspacing="0" cellpadding="8" style="background:#1A2C54;color:#fff;text-align:center"><tr><td><span style="font-size:8px;letter-spacing:2px;color:#E5DEB2;font-family:Arial">DATE</span><br><span style="font-size:14px">' + hx(niceDate(sh.date)) + '</span></td>' +
     (cat ? '<td><span style="font-size:8px;letter-spacing:2px;color:#E5DEB2;font-family:Arial">GUESTS</span><br><span style="font-size:14px">' + hx(sh.pax ? sh.pax + ' pax' : 'TBC') + '</span></td><td><span style="font-size:8px;letter-spacing:2px;color:#E5DEB2;font-family:Arial">OCCASION</span><br><span style="font-size:14px">' + hx(sh.type || 'TBC') + '</span></td>'
-      : '<td><span style="font-size:8px;letter-spacing:2px;color:#E5DEB2;font-family:Arial">' + (sh.fulfil === 'Delivery' ? 'DELIVERY TIME' : 'READY BY') + '</span><br><span style="font-size:14px">' + hx(clock12(sh.serve) || 'TBC') + '</span></td><td><span style="font-size:8px;letter-spacing:2px;color:#E5DEB2;font-family:Arial">ORDER</span><br><span style="font-size:14px">' + hx((qtyTotal(sh) || '') + ' ' + (sh.kind === 'packs' ? 'packs' : 'trays') + (sh.fulfil ? ' · ' + sh.fulfil : '')) + '</span></td>') +
+      : '<td><span style="font-size:8px;letter-spacing:2px;color:#E5DEB2;font-family:Arial">' + (sh.fulfil === 'Delivery' ? 'DELIVERY TIME' : 'READY BY') + '</span><br><span style="font-size:14px">' + hx(clock12(sh.serve) || 'TBC') + '</span></td><td><span style="font-size:8px;letter-spacing:2px;color:#E5DEB2;font-family:Arial">ORDER</span><br><span style="font-size:14px">' + hx((orderLabel(sh) || bookKind(sh)) + (sh.fulfil ? ' · ' + sh.fulfil : '')) + '</span></td>') +
     '</tr></table><br>' +
     '<table width="100%"><tr><td width="54%" style="padding-right:14px"><table width="100%" cellpadding="3" style="font-family:Arial;font-size:10.5px">' +
     bookRows(sh).map(function (r) { return '<tr><td width="34%" style="color:#8A8F9C;font-size:8.5px;letter-spacing:1px;border-bottom:1px solid #EFEBDD">' + hx(r[0].toUpperCase()) + '</td><td style="border-bottom:1px solid #EFEBDD;white-space:pre-wrap">' + hx(r[1]) + '</td></tr>'; }).join('') +
