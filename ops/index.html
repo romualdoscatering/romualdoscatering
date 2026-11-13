@@ -843,7 +843,7 @@ async function bookingSync(id, notify) {
     if (r.emailed) bits.push('booking copy emailed');
     if (r.calendar === 'error' || r.mailError) toast('Saved, but ' + (r.calendar === 'error' ? 'the calendar could not be updated' : 'the email could not be sent') + ': ' + (r.calError || r.mailError), true);
     else if (bits.length) toast('Saved · ' + bits.join(' · '));
-  } catch (e) { if (notify) toast('Saved. Calendar/email will catch up at 3 PM (' + (e.message || e) + ')', true); }
+  } catch (e) { if (notify) toast('Saved. Calendar/email will catch up at 12 noon (' + (e.message || e) + ')', true); }
 }
 function pdfWindow() {
   const w = window.open('', '_blank');

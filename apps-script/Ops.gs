@@ -241,9 +241,9 @@ function testOps() {
      "Catering and Events" calendar and kept up to date.
    • When staff press Save, a copy of the booking details (with a PDF)
      goes to BOOK.EMAILS — only if something changed since the last copy.
-   • Every day at about 3:00 PM (Manila) everyone in BOOK.EMAILS gets an
+   • Every day at about 12:00 noon (Manila) everyone in BOOK.EMAILS gets an
      alert for bookings 2 days away. Calendar events also carry a pop-up
-     reminder at exactly 3:00 PM two days before.
+     reminder at exactly 12:00 noon two days before.
    Run setupBookings() once from the editor (and approve access).
    ===================================================================== */
 const BOOK = {
@@ -251,19 +251,19 @@ const BOOK = {
   CAL_NAME: 'Catering and Events',
   EMAILS: ['events@romualdos.ph', 'romualdoscatering@gmail.com', 'jasperpatrickdomingo@gmail.com'],
   TZ: 'Asia/Manila',
-  ALERT_HOUR: 15,
+  ALERT_HOUR: 12,
   DAYS_BEFORE: 2,
   OPS_URL: 'https://romualdos.ph/ops/#sheets',
   LOGO_URL: 'https://romualdos.ph/assets/logo.png'
 };
 
-/** Run once from the editor: approves Calendar access and creates the daily 3 PM job. */
+/** Run once from the editor: approves Calendar access and creates the daily noon job. */
 function setupBookings() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'dailyBookingJob') ScriptApp.deleteTrigger(t); });
   ScriptApp.newTrigger('dailyBookingJob').timeBased().atHour(BOOK.ALERT_HOUR).nearMinute(0).everyDays(1).inTimezone(BOOK.TZ).create();
   Logger.log('Calendar: ' + bookCal().getName());
   const n = syncAllBookings(true);
-  Logger.log('Daily 3 PM job set. Calendar entries checked: ' + n);
+  Logger.log('Daily 12 noon job set. Calendar entries checked: ' + n);
 }
 
 function bookCal() {
@@ -332,7 +332,7 @@ function bookTimes(sh) {
   if (!sh.serve) return null;
   const st = at(sh.serve); return { start: new Date(st.getTime() - 30 * 6e4), end: st };
 }
-/** Minutes before the event start that equals 3:00 PM, two days before the event date. */
+/** Minutes before the event start that equals 12:00 noon, two days before the event date (drafts, for-approval and approved alike). */
 function alertMinutes(sh, start) {
   const alertAt = new Date(new Date(sh.date + 'T00:00:00+08:00').getTime() - BOOK.DAYS_BEFORE * 864e5 + BOOK.ALERT_HOUR * 36e5);
   return Math.max(0, Math.round((start.getTime() - alertAt.getTime()) / 6e4));
@@ -472,7 +472,7 @@ function bookPdf(sh, ref) {
   return HtmlService.createHtmlOutput(html).getAs('application/pdf').setName(name);
 }
 
-/* ---------- daily job (about 3:00 PM Manila) ---------- */
+/* ---------- daily job (about 12:00 noon Manila) ---------- */
 function syncAllBookings(force) {
   const rows = readAll(opsSheet()).filter(function (r) { return r.coll === 'events'; });
   let n = 0;
