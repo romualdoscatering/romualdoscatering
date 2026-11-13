@@ -731,14 +731,53 @@ function offerList(){
     {v:"trays",s:"Party trays for 10–12 guests",t:"Food Trays",d:"Large party trays good for 10–12 guests. Order online 2–3 days ahead.",p:tp.length?`from ${peso(Math.min(...tp))}/tray`:"",img:trayImg("chicken")},
     {v:"custom",s:"Pick your own dishes, instant estimate",t:"Build Your Own Menu",d:"Pick your own dishes and get an instant estimate.",p:"",img:trayImg("pasta")}];
 }
-function offersPanel(){return offerList().map(o=>`<button class="dd-item" data-to="${o.v}" role="menuitem"><span class="dd-img">${o.img?`<img src="${esc(o.img)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span><span class="dd-t"><b>${esc(o.t)}</b><small>${esc(o.s||o.d)}</small></span></button>`).join("")+`<button class="dd-all" data-to="offers">See all offers →</button>`}
+function offerListEdited(){const o=sitePhotos().offers||{};return offerList().map(x=>{const e=o[x.v]||{},ph=kRef(e.photo);return {...x,t:e.title||x.t,d:e.desc||x.d,s:e.short||x.s,img:ph?(ph.url||photoUrl(ph,900)):x.img}})}
+function offersPanel(){return offerListEdited().map(o=>`<button class="dd-item" data-to="${o.v}" role="menuitem"><span class="dd-img">${o.img?`<img src="${esc(o.img)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span><span class="dd-t"><b>${esc(o.t)}</b><small>${esc(o.s||o.d)}</small></span></button>`).join("")+`<button class="dd-all" data-to="offers">See all offers →</button>`}
 function goOffer(v){closeNav();document.activeElement?.blur?.();if(v==="packages")state.pkg=null;if(v==="offers")state.offersBook=false;go(v)}
 function viewOffers(){
-  const L=offerList(),bk=state.offersBook;
+  const L=offerListEdited(),bk=state.offersBook;
   return `<div class="offers"><div class="off-head"><div class="kicker" style="color:var(--gold)">${bk?"Book with Romualdo's":"Romualdo's Catering · Davao City"}</div><h1>${bk?"What would you like to book?":"Our Offers"}</h1>
     <p>${bk?"Choose what fits your event. Each one takes you straight to its booking form.":"From full catering to ready-made birthday packages, grazing stations and party trays. Pick what fits your event."}</p></div>
-    <div class="off-grid">${L.map(o=>`<button class="off-card" data-to="${o.v}"><span class="off-img">${o.img?`<img src="${esc(o.img)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>
+    ${state.canEdit?`<div style="text-align:right;margin:-8px 0 10px"><button class="btn small ghost" data-go="photosEdit">✎ Edit photos &amp; text</button></div>`:""}<div class="off-grid">${L.map(o=>`<button class="off-card" data-to="${o.v}"><span class="off-img">${o.img?`<img src="${esc(o.img)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>
       <span class="off-b"><b>${esc(o.t)}</b><small>${esc(o.d)}</small>${o.p?`<span class="off-p">${esc(o.p)}</span>`:""}<span class="off-go">${bk?"Book this →":"View →"}</span></span></button>`).join("")}</div></div>`;
+}
+/* ---------- site photos: food tray category photos + Our Offers cards (admin-editable, stored in about.sitePhotos) ---------- */
+function sitePhotos(){try{const x=JSON.parse(state.about.sitePhotos||"{}");return x&&typeof x==="object"?x:{}}catch(e){return {}}}
+function trayPhotoUrl(k){const r=kRef((sitePhotos().tray||{})[k]);return r?(r.url||photoUrl(r,1000)):trayImg(k)}
+function startPhotosDraft(){const sp=sitePhotos();state.pDraft={tray:{...(sp.tray||{})},offers:JSON.parse(JSON.stringify(sp.offers||{}))};state.pDirty=false;state.pMsg=""}
+function viewPhotosEdit(){
+  if(!state.pDraft)startPhotosDraft();
+  const D=state.pDraft,base=offerList();
+  const slot=(path,ref,fallback,label)=>{const r=kRef(ref),src=r?(r.url||photoUrl(r,500)):fallback;return `<div class="kslot"><div class="kslot-img">${src?`<img src="${esc(src)}" alt="">`:`<span class="hint">No photo</span>`}</div><div class="kslot-b"><b>${label}</b>${r?"":`<span class="hint" style="font-size:12px">Showing the sample photo</span>`}
+    <label class="btn small" style="cursor:pointer;margin:0;flex-direction:row;color:#fff">${r?"Replace photo":"＋ Upload our photo"}<input type="file" accept="image/*" data-pup="${path}" style="display:none"></label>${r?`<button class="btn small ghost" data-pclr="${path}">Use sample photo</button>`:""}</div></div>`};
+  const sec=(t,body)=>`<details class="panel ed sec" open><summary><h3 style="display:inline">${t}</h3></summary><div style="margin-top:12px">${body}</div></details>`;
+  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>Photos &amp; offer cards</h1><span class="who">Admin only · photos for the Food Trays page and the Our Offers menu and page</span></div>
+  <p class="hint">Other photos are edited where they appear: <a href="#" data-go="aboutEdit">Edit pages</a> (home, about, team, chefs, gallery), <a href="#" data-go="kaarEdit">Kaarawan page</a>, <a href="#" data-go="grazEdit">Grazing page</a>.</p>
+  <div class="formmsg" style="color:var(--blue);min-height:0;margin-bottom:8px">${esc(state.pUpMsg||"")}</div>
+  ${sec("Our Offers cards (menu dropdown + Our Offers page)",base.map(o=>{const e=D.offers[o.v]||{};return `<div class="kopt-ed"><div class="kopt-h"><b>${esc(o.t)}</b></div>
+    ${slot(`offers.${o.v}.photo`,e.photo,o.img,"Card photo")}
+    <div class="g2"><label>Name<input data-pp="offers.${o.v}.title" value="${esc(e.title||"")}" placeholder="${esc(o.t)}" maxlength="60"></label><label>Line in the dropdown menu<input data-pp="offers.${o.v}.short" value="${esc(e.short||"")}" placeholder="${esc(o.s)}" maxlength="80"></label></div>
+    <label>Description on the Our Offers page<input data-pp="offers.${o.v}.desc" value="${esc(e.desc||"")}" placeholder="${esc(o.d)}" maxlength="160"></label>
+    <p class="hint" style="margin:-4px 0 0;font-size:12px">Leave a box empty to keep the text shown in grey.</p></div>`}).join(""))}
+  ${sec("Food Trays photos (one per category)",`<div class="g2">${TRAY_CATS.map(([k,l])=>slot(`tray.${k}`,D.tray[k],trayImg(k),l)).join("")}</div>`)}
+  <div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:sticky;bottom:10px;z-index:5;border-color:${state.pDirty?"var(--gold)":"var(--line)"}">
+    <button class="btn gold" id="savePhotos" ${state.pDirty?"":"disabled"}>Save changes</button><button class="btn ghost" id="discardPhotos" ${state.pDirty?"":"disabled"}>Discard changes</button>
+    <span class="formmsg" id="pMsg" style="margin:0">${esc(state.pMsg||(state.pDirty?"You have unsaved changes.":""))}</span></div>`;
+}
+function pSet(path,val){const ks=path.split(".");let o=state.pDraft;for(let i=0;i<ks.length-1;i++){o[ks[i]]=o[ks[i]]||{};o=o[ks[i]]}if(val===null||val==="")delete o[ks[ks.length-1]];else o[ks[ks.length-1]]=val}
+function bindPhotosEdit(v){
+  const mark=()=>{if(!state.pDirty){state.pDirty=true;const s=$("#savePhotos"),x=$("#discardPhotos"),m=$("#pMsg");if(s)s.disabled=false;if(x)x.disabled=false;if(m)m.textContent="You have unsaved changes."}};
+  v.querySelectorAll("[data-pp]").forEach(el=>el.oninput=()=>{pSet(el.dataset.pp,el.value.trim());mark()});
+  v.querySelectorAll("[data-pup]").forEach(el=>el.onchange=async()=>{const f=el.files[0];el.value="";if(!f)return;state.pUpMsg="Uploading photo…";keepScroll(render);
+    try{const r=await uploadOne(f,{slot:true});const ref=r.ok&&cleanRef(r.photo);if(ref){pSet(el.dataset.pup,ref);state.pUpMsg="Photo uploaded. Click Save changes to publish.";state.pDirty=true}else state.pUpMsg="Photo not uploaded: "+upErr(r)}catch(e){state.pUpMsg="That file isn't a photo the browser can read."}keepScroll(render)});
+  v.querySelectorAll("[data-pclr]").forEach(b=>b.onclick=()=>{pSet(b.dataset.pclr,null);state.pDirty=true;keepScroll(render)});
+  const sv=$("#savePhotos",v);if(sv)sv.onclick=async()=>{const json=JSON.stringify(state.pDraft);state.pMsg="Saving…";keepScroll(render);
+    let r;try{r=await api("saveAbout",{about:{...state.about,sitePhotos:json}})}catch(e){r={ok:false,error:"No internet connection"}}
+    if(!r.ok){state.pMsg=r.error||"Couldn't save.";keepScroll(render);return}
+    applyAbout(r.about||{...state.about,sitePhotos:json},state.gallery);
+    if(!state.about.sitePhotos&&json!=="{}"&&json!=='{"tray":{},"offers":{}}'){state.pMsg="Saved, but the server didn't keep it (the Google script needs updating).";keepScroll(render);return}
+    if(state.aboutDraft)state.aboutDraft.sitePhotos=state.about.sitePhotos;state.pUpMsg="";startPhotosDraft();toast("Photos saved — live now");keepScroll(render)};
+  const dx=$("#discardPhotos",v);if(dx)dx.onclick=()=>{startPhotosDraft();state.pUpMsg="";keepScroll(render)};
 }
 function closeNav(){document.body.classList.remove("nav-open");const b=document.getElementById("navBurger");if(b)b.setAttribute("aria-expanded","false")}
 document.getElementById("navBurger").addEventListener("click",()=>{const o=document.body.classList.toggle("nav-open");document.getElementById("navBurger").setAttribute("aria-expanded",o?"true":"false")});
@@ -763,6 +802,7 @@ function render(){
   else if(state.view==="contact") v.innerHTML=viewContact();
   else if(state.view==="trays") v.innerHTML=viewTrays();
   else if(state.view==="offers") v.innerHTML=viewOffers();
+  else if(state.view==="photosEdit") v.innerHTML=state.canEdit?viewPhotosEdit():viewOffers();
   else if(state.view==="kaarawan") v.innerHTML=viewKaarawan();
   else if(state.view==="grazing") v.innerHTML=viewGrazing();
   else if(state.view==="grazEdit") v.innerHTML=state.canEdit?viewGrazEdit():viewGrazing();
@@ -1206,6 +1246,7 @@ const ABOUT_DEFAULT={
   tray_salads:"Chopped Asian Salad | 1,100\nGrilled Chicken Salad | 1,200\nChicken Macaroni Salad | 1,200\nThai Noodle Salad | 1,700\nCaesar Salad | 1,030",
   tray_rice:"Garlic Rice | 490\nJava Rice | 600\nBagoong Rice | 650",
   kaarawan:"",
+  sitePhotos:"",
   grazing:"",
   tray_desserts:"Mango Lychee | 1,030\nBuko Pandan | 920\nDouble Dark Choco Fudge | 2,300\nBlueberry Cheesecake | 2,200\nPistachio Sans Rival | 2,400"
 };
@@ -1346,10 +1387,10 @@ function viewTrays(){
     <div class="tray-hero-t">${a.trayKicker?`<div class="kicker">${esc(a.trayKicker)}</div>`:""}<h1>${esc(a.trayTitle)}</h1>${a.trayPax?`<span class="pax-pill">${esc(a.trayPax)}</span>`:""}${paras(a.trayIntro)}
       <div class="home-btns"><button class="btn gold" data-scroll="trayOrder">Order online</button></div></div></section>
   <div class="tray-chips" role="group" aria-label="Choose a category"><button data-tc="all" aria-pressed="${state.trayCat==="all"}">All</button>${cats.map(c=>`<button data-tc="${c.k}" aria-pressed="${state.trayCat===c.k}">${esc(c.l)}</button>`).join("")}</div>
-  ${state.canEdit?`<div style="text-align:center;margin:-4px 0 10px"><button class="btn small ghost" data-go="trayEdit">✎ Edit tray items &amp; prices</button></div>`:""}
+  ${state.canEdit?`<div style="text-align:center;margin:-4px 0 10px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap"><button class="btn small ghost" data-go="trayEdit">✎ Edit tray items &amp; prices</button><button class="btn small ghost" data-go="photosEdit">✎ Edit tray photos</button></div>`:""}
   <p class="tray-photo-note">📷 Photos are for reference only. Actual dishes, portions and presentation may vary.</p>
   <div class="tray-grid">${shown.map(c=>{const open=state.trayCat!=="all"||state.trayOpen[c.k];const list=open?c.items:c.items.slice(0,SHOW);
-    return `<section class="tray-card"><img src="${trayImg(c.k)}" alt="${esc(c.l)} tray" loading="lazy" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/trays/${c.k}.jpg'}"><div class="tray-b"><h2>${esc(c.k==="desserts"?"Desserts and Whole Cakes":c.l)}</h2>
+    return `<section class="tray-card"><img src="${esc(trayPhotoUrl(c.k))}" alt="${esc(c.l)} tray" loading="lazy" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/trays/${c.k}.jpg'}"><div class="tray-b"><h2>${esc(c.k==="desserts"?"Desserts and Whole Cakes":c.l)}</h2>
       <ul>${list.map(i=>{const base=c.k+"|"+i.name;
         if(i.opts.length){const sz=state.traySize[base]&&i.opts.find(o=>o.label===state.traySize[base])?state.traySize[base]:i.opts[0].label,o=i.opts.find(x=>x.label===sz),key=base+"|"+sz,q=state.trayCart[key]||0;
           const inCart=i.opts.map(x=>[x,state.trayCart[base+"|"+x.label]||0]).filter(x=>x[1]);
@@ -2121,14 +2162,15 @@ function bind(){
   if(state.view==="about"||state.view==="home")bindAbout(v);
   if(state.view==="trays")bindTrays(v);
   if(state.view==="kaarawan")bindKaarawan(v);
-  if(state.view==="offers")v.querySelectorAll("[data-to]").forEach(b=>b.onclick=()=>goOffer(b.dataset.to));
+  if(state.view==="offers")v.querySelectorAll(".off-card[data-to]").forEach(b=>b.onclick=()=>goOffer(b.dataset.to));
+  if(state.view==="photosEdit")bindPhotosEdit(v);
   if(state.view==="grazing")bindGrazing(v);
   if(state.view==="grazEdit")bindGrazEdit(v);
   if(state.view==="home")bindFilm(v);
   if(state.view==="aboutEdit")bindAboutEdit(v);
   if(state.view==="trayEdit")bindTrayEdit(v);
   if(state.view==="kaarEdit")bindKaarEdit(v);
-  v.querySelectorAll("[data-go]").forEach(b=>b.onclick=e=>{e.preventDefault();if(b.dataset.go==="packages")state.pkg=null;if(b.dataset.go==="trayEdit"&&!state.trayDirty)startTrayDraft();if(b.dataset.go==="kaarEdit"&&!state.kDirty)startKaarDraft();if(b.dataset.go==="grazEdit"&&!state.gDirty)startGrazDraft();go(b.dataset.go)});
+  v.querySelectorAll("[data-go]").forEach(b=>b.onclick=e=>{e.preventDefault();if(b.dataset.go==="packages")state.pkg=null;if(b.dataset.go==="trayEdit"&&!state.trayDirty)startTrayDraft();if(b.dataset.go==="kaarEdit"&&!state.kDirty)startKaarDraft();if(b.dataset.go==="grazEdit"&&!state.gDirty)startGrazDraft();if(b.dataset.go==="photosEdit"&&!state.pDirty)startPhotosDraft();if(b.dataset.go==="aboutEdit"&&!state.aboutDirty)startAboutDraft();go(b.dataset.go)});
   v.querySelectorAll("[data-pax]").forEach(b=>b.onclick=()=>{state.pax=Number(b.dataset.pax);render()});
   const pax=$("#pax",v);
   if(pax){
