@@ -291,6 +291,16 @@ td.num{text-align:right;white-space:nowrap}
 .kaar-menu{list-style:none;margin:12px 0 0;padding:0}
 .kaar-menu li{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px dashed #E2CFAE;font:600 16px Montserrat,sans-serif}
 .kaar-menu li:last-child{border-bottom:0}
+.kaar-menu li{position:relative}
+.mthumb{position:relative;flex:0 0 58px;width:58px;height:58px;border-radius:12px;cursor:zoom-in;outline:none}
+.mthumb>img{width:58px;height:58px;object-fit:cover;border-radius:12px;display:block;box-shadow:0 1px 3px rgba(58,36,24,.25);transition:transform .15s}
+.mthumb .zoom{position:absolute;left:70px;top:50%;width:260px;height:260px;transform:translateY(-50%) scale(.55);transform-origin:left center;opacity:0;pointer-events:none;z-index:30;transition:opacity .15s,transform .18s;border-radius:16px;overflow:hidden;box-shadow:0 14px 34px rgba(58,36,24,.35);border:4px solid #fff;background:#fff}
+.mthumb .zoom img{width:100%;height:100%;object-fit:cover;display:block}
+.mthumb:hover>img,.mthumb:focus>img{transform:scale(1.06)}
+.mthumb:hover .zoom,.mthumb:focus .zoom,.mthumb:focus-within .zoom{opacity:1;transform:translateY(-50%) scale(1)}
+.mthumb.empty{display:grid;place-items:center;background:repeating-linear-gradient(45deg,#FCEBD0,#FCEBD0 6px,#F8E1BC 6px,#F8E1BC 12px);border:1.5px dashed #E0BF8A;cursor:default;font-size:20px;opacity:.85}
+@media (max-width:560px){.mthumb .zoom{left:-4px;right:auto;top:auto;bottom:64px;transform:scale(.55);transform-origin:bottom left;width:220px;height:220px}.mthumb:hover .zoom,.mthumb:focus .zoom{transform:scale(1)}}
+@media (hover:none){.mthumb .zoom{display:block}}
 .kaar-menu .dot{flex:0 0 34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:17px;background:#FCEBD0}
 .kaar-menu small{display:block;font:500 12px Montserrat,sans-serif;color:#8A7260}
 .kaar-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:22px 0}
@@ -321,8 +331,8 @@ td.num{text-align:right;white-space:nowrap}
 .kslot{display:flex;gap:12px;align-items:center;margin:0 0 12px}.kslot-img{width:150px;height:96px;border-radius:10px;overflow:hidden;background:#f2ede0;display:grid;place-items:center;flex:0 0 auto}.kslot-img img{width:100%;height:100%;object-fit:cover}.kslot-b{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media (max-width:640px){.g2{grid-template-columns:1fr}}
 .kopt-ed{border:1.5px solid var(--line);border-radius:12px;padding:14px;margin:0 0 14px;background:#fffdf8}.kopt-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.kopt-h .inl{display:flex!important;flex-direction:row!important;align-items:center;gap:6px;margin:0!important}.kopt-h .inl input{width:auto}
-.kmenu-row{display:grid;grid-template-columns:52px 1.6fr 1fr auto;gap:6px;align-items:center;margin:4px 0}.kmenu-row input{margin:0;width:100%;box-sizing:border-box;min-width:0;text-align:left}.kmenu-row input:first-child{text-align:center;font-size:18px}.kmenu-row .acts{display:flex;gap:3px}
-@media (max-width:640px){.kmenu-row{grid-template-columns:48px 1fr}.kmenu-row input:nth-child(3){grid-column:2}.kmenu-row .acts{grid-column:1/-1;justify-content:flex-end}}
+.kmenu-row{display:grid;grid-template-columns:118px 1.6fr 1fr auto;gap:6px;align-items:center;margin:6px 0}.kmenu-row input{margin:0;width:100%;box-sizing:border-box;min-width:0;text-align:left}.kmph{display:flex;align-items:center;gap:4px}.kmph>img,.kmph>span{width:44px;height:44px;border-radius:8px;object-fit:cover;background:#f2ede0;display:grid;place-items:center;flex:0 0 44px}.kmph label{font:600 11.5px inherit;color:var(--blue);cursor:pointer;text-decoration:underline;margin:0!important;display:inline!important}.kmph button{border:0;background:none;color:#9B1C1C;cursor:pointer;font-size:12px;padding:0 2px}.kmenu-row .acts{display:flex;gap:3px}
+@media (max-width:640px){.kmenu-row{grid-template-columns:1fr 1fr}.kmenu-row .kmph{grid-column:1/-1}.kmenu-row .acts{grid-column:1/-1;justify-content:flex-end}}
 .kaar-promo{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:#FFF2DC;border:2px solid #F2B33D;border-radius:16px;padding:14px 20px;margin:0 0 18px;color:#3A2418}
 .kaar-promo .fiesta{font-family:Shrikhand,serif;font-size:24px;color:#C8372D}
 .kaar-promo span{flex:1;min-width:220px;font-size:14.5px}
@@ -1394,9 +1404,12 @@ function kaarData(){
   for(const k of Object.keys(d)){if(k==="options"||k==="steps")continue;if(k==="heroPhoto"){if("heroPhoto" in x)d.heroPhoto=kRef(x.heroPhoto);continue}if(k==="minDays"){if(x.minDays!=null&&x.minDays!=="")d.minDays=Math.max(0,Math.min(60,Math.round(Number(x.minDays))||0));continue}if(typeof x[k]==="string")d[k]=x[k]}
   if(Array.isArray(x.steps))d.steps=x.steps.slice(0,3).map(s=>({t:String(s?.t||""),d:String(s?.d||"")}));
   if(Array.isArray(x.options)&&x.options.length)d.options=x.options.slice(0,6).map((o,i)=>({id:String(o?.id||"o"+(i+1)),name:String(o?.name||""),tagline:String(o?.tagline||""),perHead:Math.max(0,Number(o?.perHead)||0),pax:Math.max(1,Math.round(Number(o?.pax))||50),show:o?.show!==false,photo:kRef(o?.photo),caption:String(o?.caption||""),
-    menu:Array.isArray(o?.menu)?o.menu.map(m=>({icon:String(m?.icon||""),dish:String(m?.dish||""),cat:String(m?.cat||"")})).filter(m=>m.dish.trim()):[]}));
+    menu:Array.isArray(o?.menu)?o.menu.map(m=>({icon:String(m?.icon||""),dish:String(m?.dish||""),cat:String(m?.cat||""),...(m&&"photo" in m?{photo:m.photo===null?null:kRef(m.photo)}:{})})).filter(m=>m.dish.trim()):[]}));
   return d;
 }
+const KAAR_DISH_IMG={"lumpia shanghai":"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_152300_69dca484-5de5-4296-b22c-788025507d5a.png","fried chicken":"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_152258_1ed4ffc7-49be-4ada-9e5e-e244c1f4556b.png","pork bbq":"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_152300_665a386e-4831-4177-a690-54c7ab2505db.png","sweet & sour fish":"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_152258_0aceed79-9d96-4a9b-a72c-b41f94100533.png","filipino spaghetti":"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_152258_87f8b204-216d-41af-ae46-1c1d03c0ac86.png","rice":"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_152300_a6374a21-3b2d-47b3-b92f-9ea42271e850.png","macaroni salad and fresh fruits":"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_152259_c85f2d82-17a8-4235-b8dc-ab74e12c27b7.png","softdrinks":"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_152259_a7998e01-d5ca-4f83-9a1d-0b0dc50d3b3c.png"};
+const kDishPhoto=m=>kRef(m.photo)||(m.photo===null?null:(KAAR_DISH_IMG[String(m.dish||"").trim().toLowerCase()]?{url:KAAR_DISH_IMG[String(m.dish||"").trim().toLowerCase()]}:null));
+const kThumb=m=>{const ph=kDishPhoto(m);return ph?`<span class="mthumb" tabindex="0" aria-label="Photo of ${esc(m.dish)}">${kImg(ph,240,m.dish,'loading="lazy"')}<span class="zoom">${kImg(ph,800,"",'loading="lazy"')}</span></span>`:`<span class="mthumb empty" aria-hidden="true"><span>📷</span></span>`};
 const kReady=o=>o.perHead>0&&o.menu.length>0;
 state.kForm=state.kForm||{name:"",phone:"",email:"",date:"",time:"",venue:"",celebrant:"",notes:""};
 function kaarPromo(){const K=kaarData(),ready=K.options.filter(o=>o.show&&kReady(o));if(!ready.length)return "";const lo=Math.min(...ready.map(o=>o.perHead*o.pax));
@@ -1424,7 +1437,7 @@ function viewKaarawan(){
   ${o?`<div class="kaar-grid">
     <section class="kaar-card"><h2 class="fiesta">${esc(K.menuTitle)}</h2><p class="hint" style="margin:0">${esc(o.name)}${ready?` · good for ${o.pax} guests`:""}</p>
       ${o.photo&&o.caption?`<figure class="kaar-fig">${kImg(o.photo,900,o.caption)}<figcaption>${esc(o.caption)}</figcaption></figure>`:""}
-      ${o.menu.length?`<ul class="kaar-menu">${o.menu.map(m=>`<li><span class="dot" aria-hidden="true">${esc(m.icon||"🍽️")}</span><span>${esc(m.dish)}${m.cat?`<small>${esc(m.cat)}</small>`:""}</span></li>`).join("")}</ul>`
+      ${o.menu.length?`<ul class="kaar-menu">${o.menu.map(m=>`<li>${kThumb(m)}<span>${esc(m.dish)}${m.cat?`<small>${esc(m.cat)}</small>`:""}</span></li>`).join("")}</ul>`
         :`<div class="kaar-tbf"><b class="fiesta">Menu to follow</b><p>We're finalizing this package. Message us${fb?` on <a href="${esc(fb)}" target="_blank" rel="noopener">Facebook</a>`:""}${ph?` or call ${esc(ph)}`:""} and we'll tell you as soon as it's ready.</p></div>`}
       ${K.note?`<p class="fine" style="margin:12px 0 0">${esc(K.note)}</p>`:""}</section>
     <section class="kaar-card" id="kaarBook"><h2 class="fiesta">${esc(K.bookTitle)}</h2><p class="hint" style="margin:0 0 10px">${esc(K.bookIntro)}</p>
@@ -1502,7 +1515,7 @@ function viewKaarEdit(){
       <p class="hint" style="margin:-4px 0 10px">Package total: <b>₱${((Number(o.perHead)||0)*(Number(o.pax)||0)).toLocaleString("en-PH")}</b></p>
       ${photo(`options.${i}.photo`,o.photo,"Package photo")}${inp(`options.${i}.caption`,"Photo caption (shown above the menu)",o.caption,120)}
       <b style="display:block;margin:10px 0 4px">Menu</b>
-      ${o.menu.map((m,j)=>`<div class="kmenu-row"><input data-kp="options.${i}.menu.${j}.icon" value="${esc(m.icon)}" maxlength="4" aria-label="Icon" title="Icon (emoji)"><input data-kp="options.${i}.menu.${j}.dish" value="${esc(m.dish)}" maxlength="80" placeholder="Dish" aria-label="Dish"><input data-kp="options.${i}.menu.${j}.cat" value="${esc(m.cat)}" maxlength="30" placeholder="Category, e.g. Pork" aria-label="Category">
+      ${o.menu.map((m,j)=>`<div class="kmenu-row"><span class="kmph">${(()=>{const ph=kDishPhoto(m);return ph?kImg(ph,160,m.dish):`<span>📷</span>`})()}<label title="${kDishPhoto(m)?"Replace photo":"Add photo"}">${kDishPhoto(m)?"Change":"＋ Photo"}<input type="file" accept="image/*" data-kup="options.${i}.menu.${j}.photo" style="display:none"></label>${kDishPhoto(m)?`<button type="button" data-kclr="options.${i}.menu.${j}.photo" title="Remove photo">✕</button>`:""}</span><input data-kp="options.${i}.menu.${j}.dish" value="${esc(m.dish)}" maxlength="80" placeholder="Dish" aria-label="Dish"><input data-kp="options.${i}.menu.${j}.cat" value="${esc(m.cat)}" maxlength="30" placeholder="Category, e.g. Pork" aria-label="Category">
         <span class="acts"><button class="btn small ghost" data-kmu="${i}.${j}" ${j===0?"disabled":""}>↑</button><button class="btn small ghost" data-kmd="${i}.${j}" ${j===o.menu.length-1?"disabled":""}>↓</button><button class="btn small danger" data-kmx="${i}.${j}">✕</button></span></div>`).join("")||`<p class="hint">No dishes yet, so customers see "Menu to follow".</p>`}
       <button class="btn small ghost" data-kma="${i}">＋ Add dish</button></div>`).join("")}
     ${D.options.length<6?`<button class="btn small" id="kAddOpt">＋ Add another package</button>`:""}`)}
@@ -1528,7 +1541,7 @@ function bindKaarEdit(v){
   v.querySelectorAll("[data-kou]").forEach(b=>b.onclick=()=>{const i=+b.dataset.kou;sw(D.options,i,i-1)});
   v.querySelectorAll("[data-kod]").forEach(b=>b.onclick=()=>{const i=+b.dataset.kod;sw(D.options,i,i+1)});
   v.querySelectorAll("[data-kox]").forEach(b=>b.onclick=()=>{const i=+b.dataset.kox;if(!confirm(`Remove the package "${D.options[i].name}"?`))return;D.options.splice(i,1);re()});
-  v.querySelectorAll("[data-kma]").forEach(b=>b.onclick=()=>{D.options[+b.dataset.kma].menu.push({icon:"🍽️",dish:"",cat:""});re()});
+  v.querySelectorAll("[data-kma]").forEach(b=>b.onclick=()=>{D.options[+b.dataset.kma].menu.push({icon:"",dish:"",cat:"",photo:null});re()});
   const ij=s=>s.split(".").map(Number);
   v.querySelectorAll("[data-kmu]").forEach(b=>b.onclick=()=>{const [i,j]=ij(b.dataset.kmu);sw(D.options[i].menu,j,j-1)});
   v.querySelectorAll("[data-kmd]").forEach(b=>b.onclick=()=>{const [i,j]=ij(b.dataset.kmd);sw(D.options[i].menu,j,j+1)});
