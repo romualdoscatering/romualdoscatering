@@ -1144,7 +1144,7 @@ function viewTrays(){
   ${state.canEdit?`<div style="text-align:center;margin:-4px 0 10px"><button class="btn small ghost" data-go="trayEdit">✎ Edit tray items &amp; prices</button></div>`:""}
   <p class="tray-photo-note">📷 Photos are for reference only. Actual dishes, portions and presentation may vary.</p>
   <div class="tray-grid">${shown.map(c=>{const open=state.trayCat!=="all"||state.trayOpen[c.k];const list=open?c.items:c.items.slice(0,SHOW);
-    return `<section class="tray-card"><img src="${trayImg(c.k)}" alt="${esc(c.l)} tray" loading="lazy" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/trays/${c.k}.jpg'}"><div class="tray-b"><h2>${esc(c.l)}</h2>
+    return `<section class="tray-card"><img src="${trayImg(c.k)}" alt="${esc(c.l)} tray" loading="lazy" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/trays/${c.k}.jpg'}"><div class="tray-b"><h2>${esc(c.k==="desserts"?"Desserts and Whole Cakes":c.l)}</h2>
       <ul>${list.map(i=>{const base=c.k+"|"+i.name;
         if(i.opts.length){const sz=state.traySize[base]&&i.opts.find(o=>o.label===state.traySize[base])?state.traySize[base]:i.opts[0].label,o=i.opts.find(x=>x.label===sz),key=base+"|"+sz,q=state.trayCart[key]||0;
           const inCart=i.opts.map(x=>[x,state.trayCart[base+"|"+x.label]||0]).filter(x=>x[1]);
