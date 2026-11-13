@@ -301,7 +301,8 @@ const ABOUT_TEXT_FIELDS = {
   contactTitle: 80, contactText: 800, contactAddress: 200, contactEmail: 120, contactHours: 120, facebookUrl: 200, instagramUrl: 200, contactMap: 3,
   trayKicker: 60, trayTitle: 120, trayPax: 80, trayIntro: 800, trayOrder: 800, trayNote: 200,
   tray_beef: 3000, tray_pork: 3000, tray_chicken: 3000, tray_seafood: 3000, tray_vegetables: 3000, tray_pasta: 3000, tray_salads: 3000, tray_rice: 3000, tray_desserts: 3000,
-  kaarawan: 20000
+  kaarawan: 20000,
+  grazing: 20000
 };
 const ABOUT_LIST_FIELDS = { services: 12, mission: 12, clients: 30, homeHighlights: 8, contactPhones: 6 };
 const ABOUT_PHOTO_FIELDS = ['heroPhoto', 'teamPhoto', 'homePhoto'];

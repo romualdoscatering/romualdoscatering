@@ -20,7 +20,7 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <meta name="theme-color" content="#1A2C54">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Shrikhand&family=Montserrat:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Playfair+Display:ital,wght@0,500;0,600;1,400;1,500&family=Shrikhand&family=Montserrat:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js"></script>
 <style>
@@ -340,6 +340,54 @@ header nav button.nav-kaar[aria-current="true"]{color:#F2B33D!important}
 .kaar-promo span{flex:1;min-width:220px;font-size:14.5px}
 .kaar-promo button{background:#C8372D;color:#fff;border:0;border-radius:999px;padding:10px 18px;font:700 14px Montserrat,sans-serif;cursor:pointer}
 @media (max-width:860px){.kaar-hero .in,.kaar-grid{grid-template-columns:1fr}.kaar-hero .ph{min-height:220px;order:-1}.kaar-steps{grid-template-columns:1fr}.kaar-hero .txt{padding:20px 20px 24px}.kaar-card{padding:18px}}
+
+/* ===== Grazing & Pica-Pica page: elegant Romualdo's navy/gold/cream ===== */
+.graz{--g-navy:#1A2C54;--g-gold:#C9962B;--g-gold2:#E89908;--g-cream:#FBF7EC;--g-ink:#1F2433;color:var(--g-ink)}
+.graz h1,.graz-h2,.graz h3,.graz-path b,.graz-opt b,.gs-price{font-family:"Playfair Display","Libre Baskerville",serif}
+.graz-hero{display:grid;grid-template-columns:1fr 1.1fr;background:var(--g-navy);color:#F4EEDC;border-radius:18px;overflow:hidden;margin-bottom:26px}
+.graz-hero .txt{padding:34px 36px;display:flex;flex-direction:column;justify-content:center}
+.graz-hero .kick{font:600 11.5px Montserrat,sans-serif;letter-spacing:.26em;text-transform:uppercase;color:var(--g-gold2)}
+.graz-hero h1{font-size:clamp(34px,4.6vw,54px);font-weight:500;font-style:italic;line-height:1.08;margin:10px 0 14px;color:#fff}
+.graz-hero p{line-height:1.65;margin:0 0 18px;color:#E6DFC8;max-width:32em}
+.graz-hero .ph{margin:0;position:relative;min-height:340px;background:#263a66}.graz-hero .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.graz-hero .ph figcaption{position:absolute;left:12px;bottom:12px;right:12px;background:rgba(26,44,84,.8);color:#fff;font:500 13px Montserrat,sans-serif;padding:6px 12px;border-radius:8px}
+.gbtn{display:inline-block;align-self:flex-start;background:var(--g-gold2);color:var(--g-navy);border:0;border-radius:999px;padding:13px 26px;font:700 14.5px Montserrat,sans-serif;letter-spacing:.03em;cursor:pointer;text-decoration:none}
+.gbtn:hover{filter:brightness(1.05)}
+.graz-h2{font-size:32px;font-weight:500;font-style:italic;color:var(--g-navy);text-align:center;margin:4px 0 4px}
+.graz-sub{text-align:center;color:#5B6478;margin:0 0 16px}
+.graz-steps{display:flex;justify-content:center;gap:8px;margin:0 auto 12px;flex-wrap:wrap;width:fit-content;max-width:100%}.graz-steps span{flex:0 0 auto;font:600 12px Montserrat,sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#9AA0AE;padding:5px 12px;border-radius:999px;border:1px solid #DDD6C2}
+.graz-steps span.on{background:var(--g-navy);color:#fff;border-color:var(--g-navy)}.graz-steps span.done{color:var(--g-gold);border-color:var(--g-gold)}
+.graz-paths{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px;margin-bottom:26px}
+.graz-path,.graz-opt{display:flex;flex-direction:column;text-align:left;padding:0;border:1px solid #E4DCC4;border-radius:16px;overflow:hidden;background:#fff;cursor:pointer;font:inherit;color:inherit;transition:transform .15s,box-shadow .15s}
+.graz-path:hover,.graz-opt:hover{transform:translateY(-3px);box-shadow:0 12px 26px rgba(26,44,84,.14)}
+.gp-ph{display:block;height:250px;position:relative;background:#EFE7D2}.gp-ph img,.go-ph img,.gs-ph img{width:100%;height:100%;object-fit:cover;display:block}
+.gp-b{display:block;padding:18px 22px 20px}.gp-range{display:inline-block;font:700 12px Montserrat,sans-serif;letter-spacing:.14em;color:var(--g-gold);text-transform:uppercase}
+.gp-b b{display:block;font-size:24px;font-weight:600;color:var(--g-navy);margin:4px 0}.gp-b small{display:block;color:#5B6478;font-size:14px;line-height:1.5}
+.gp-go{display:inline-block;margin-top:12px;font:700 13.5px Montserrat,sans-serif;color:var(--g-navy);border-bottom:2px solid var(--g-gold2)}
+.graz-back{background:none;border:0;color:var(--g-navy);font:600 14px Montserrat,sans-serif;cursor:pointer;padding:4px 0;margin-bottom:4px}
+.graz-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;margin-bottom:26px}
+.go-ph{display:block;height:190px;background:#EFE7D2;position:relative}.go-b{display:block;padding:14px 18px 16px}.go-b b{display:block;font-size:22px;font-weight:600;color:var(--g-navy)}.go-b small{display:block;color:#5B6478;font-size:13.5px;margin:2px 0 6px}
+.go-p{display:block;font:700 17px Montserrat,sans-serif;color:var(--g-ink)}.go-p em{font-style:normal;font-weight:500;font-size:13px;color:#5B6478}
+.graz-opt .tbf{display:inline-block;margin-top:8px;border:1.5px dashed var(--g-gold);color:#8A5A00;border-radius:999px;padding:2px 10px;font:600 12px Montserrat,sans-serif}
+.g-noph{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:4px;background:repeating-linear-gradient(45deg,#F3ECDA,#F3ECDA 10px,#EDE3CC 10px,#EDE3CC 20px);color:#8A7F66;font-size:28px;border-bottom:1px dashed #D8CBA8}.g-noph small{font:600 12px Montserrat,sans-serif;letter-spacing:.06em}
+.graz-sel{display:grid;grid-template-columns:minmax(0,1.1fr) 1fr;gap:22px;align-items:center;background:#fff;border:1px solid #E4DCC4;border-radius:16px;padding:16px;margin:6px 0 18px}
+.gs-ph{position:relative;height:260px;border-radius:12px;overflow:hidden;background:#EFE7D2}.gs-ph>small{position:absolute;left:10px;bottom:10px;background:rgba(26,44,84,.8);color:#fff;padding:5px 10px;border-radius:8px;font-size:12.5px}
+.gs-price{font-size:34px;font-weight:600;color:var(--g-navy);margin-top:6px}.gs-price small{display:block;font:600 14px Montserrat,sans-serif;color:#5B6478}
+.graz-grid{display:grid;grid-template-columns:1.05fr 1fr;gap:20px;align-items:start;margin-bottom:26px}.graz-grid>*{min-width:0}
+.graz-card{background:var(--g-cream);border:1px solid #E4DCC4;border-radius:16px;padding:22px 24px}.graz-card h3{font-size:26px;font-weight:500;font-style:italic;color:var(--g-navy);margin:0 0 8px}
+.graz-menu li{border-bottom-color:#E4DCC4}.graz-tbf{background:#fff;border:1.5px dashed #D8CBA8;border-radius:12px;padding:14px 16px}.graz-tbf p{margin:0 0 8px;line-height:1.55}
+.graz .fine{font-size:12.5px;color:#5B6478;line-height:1.5}
+.graz form label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:13px;margin-bottom:10px;min-width:0}
+.graz form input,.graz form textarea{width:100%;box-sizing:border-box;min-width:0;padding:10px 12px;border:1.5px solid #D8CBA8;border-radius:10px;background:#fff;font-size:15px}
+.graz form input:focus,.graz form textarea:focus{outline:2px solid var(--g-gold2);border-color:var(--g-navy)}.graz form .err{border-color:#B3261E;background:#FFF1EE}.graz form .hint{font-weight:500}
+.graz .kaar-total{border-top-color:var(--g-navy)}.graz .kaar-total b{font-family:"Playfair Display",serif;font-weight:600;font-size:28px}
+.graz-pick{background:#EDE6D2}.graz-pick b{color:var(--g-navy)}
+.graz-promo{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:#1A2C54;color:#EDE6D2;border-radius:16px;padding:14px 20px;margin:0 0 18px}
+.graz-promo b{font-family:"Playfair Display",serif;font-style:italic;font-weight:500;font-size:22px;color:#fff}.graz-promo span{flex:1;min-width:220px;font-size:14.5px}
+.graz-promo button{background:#E89908;color:#1A2C54;border:0;border-radius:999px;padding:10px 18px;font:700 14px Montserrat,sans-serif;cursor:pointer}
+.nav-graz{font-family:"Playfair Display",serif!important;font-style:italic;font-size:15.5px!important}
+@media (max-width:860px){.graz-hero,.graz-grid,.graz-sel{grid-template-columns:1fr}.graz-hero .ph{min-height:230px;order:-1}.graz-hero .txt{padding:22px}.gp-ph{height:200px}.gs-ph{height:210px}.graz-card{padding:18px}}
+@media (max-width:480px){.graz form .two{grid-template-columns:1fr!important}}
 .te-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,430px),1fr));gap:14px;margin-top:12px}
 .te-row{display:grid;grid-template-columns:1fr 110px auto;gap:6px;align-items:center;margin:5px 0}
 .te-row>*{min-width:0}.te-row input{margin:0;width:100%;box-sizing:border-box;min-width:0}.te-row .pr{position:relative}.te-row .pr span{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted,#777);font-size:13px}.te-row .pr input{padding-left:22px;text-align:right}
@@ -465,6 +513,7 @@ footer{border-top:1px solid var(--line);padding:18px 0;font-size:12.5px;color:va
       <button data-nav="about">About Us</button>
       <button data-nav="packages">Packages</button>
       <button data-nav="kaarawan" class="nav-kaar">Kaarawan Package</button>
+      <button data-nav="grazing" class="nav-graz">Grazing Stations</button>
       <button data-nav="custom">Build Your Own Menu</button>
       <button data-nav="trays">Food Trays</button>
       <button data-nav="contact">Contact Us</button>
@@ -615,7 +664,7 @@ function closestPackageHint(perHead){
 }
 
 /* ============ NAV ============ */
-const PAGE_HASH={home:"",about:"about",packages:"packages",kaarawan:"kaarawan",custom:"custom",trays:"trays",contact:"contact"};
+const PAGE_HASH={home:"",about:"about",packages:"packages",kaarawan:"kaarawan",grazing:"grazing",custom:"custom",trays:"trays",contact:"contact"};
 function go(view){state.view=view;
   if(view in PAGE_HASH){const h=PAGE_HASH[view];if((location.hash||"").slice(1)!==h)history.pushState(null,"",h?"#"+h:location.pathname)}
   render();window.scrollTo({top:0,behavior:"smooth"})}
@@ -632,6 +681,7 @@ document.querySelectorAll("header nav button").forEach(b=>b.addEventListener("cl
 document.getElementById("staffLink").addEventListener("click",e=>{e.preventDefault();location.hash="staff";route()});
 /* ============ VIEWS ============ */
 function render(){
+  {const ng=document.querySelector(".nav-graz");if(ng){const GD=grazData();ng.textContent=GD.navLabel||GD.title;ng.classList.toggle("hidden",!GD.paths.some(p=>p.show))}}
   {const nk=document.querySelector(".nav-kaar"),KD=kaarData();if(nk){nk.textContent=KD.navLabel||KD.title;nk.classList.toggle("hidden",!KD.options.some(o=>o.show))}}
   document.querySelectorAll("header nav button").forEach(b=>{
     const on = b.dataset.nav===state.view || (state.view==="choose"&&b.dataset.nav==="packages");
@@ -649,7 +699,9 @@ function render(){
   else if(state.view==="contact") v.innerHTML=viewContact();
   else if(state.view==="trays") v.innerHTML=viewTrays();
   else if(state.view==="kaarawan") v.innerHTML=viewKaarawan();
-  else if(state.view==="packages") v.innerHTML=kaarPromo()+viewPackages()+nextBand("custom");
+  else if(state.view==="grazing") v.innerHTML=viewGrazing();
+  else if(state.view==="grazEdit") v.innerHTML=state.canEdit?viewGrazEdit():viewGrazing();
+  else if(state.view==="packages") v.innerHTML=kaarPromo()+grazPromo()+viewPackages()+nextBand("custom");
   else if(state.view==="choose") v.innerHTML=viewChoose();
   else if(state.view==="custom") v.innerHTML=viewCustom()+nextBand("contact");
   else if(state.view==="done") v.innerHTML=viewDone();
@@ -1089,6 +1141,7 @@ const ABOUT_DEFAULT={
   tray_salads:"Chopped Asian Salad | 1,100\nGrilled Chicken Salad | 1,200\nChicken Macaroni Salad | 1,200\nThai Noodle Salad | 1,700\nCaesar Salad | 1,030",
   tray_rice:"Garlic Rice | 490\nJava Rice | 600\nBagoong Rice | 650",
   kaarawan:"",
+  grazing:"",
   tray_desserts:"Mango Lychee | 1,030\nBuko Pandan | 920\nDouble Dark Choco Fudge | 2,300\nBlueberry Cheesecake | 2,200\nPistachio Sans Rival | 2,400"
 };
 const ABOUT_LISTS=["services","mission","clients","homeHighlights","contactPhones"];
@@ -1595,6 +1648,190 @@ async function saveKaar(){
   if(state.aboutDraft)state.aboutDraft.kaarawan=state.about.kaarawan;
   startKaarDraft();toast("Kaarawan page saved — live now");keepScroll(render);
 }
+/* ============ GRAZING & PICA-PICA STATIONS ============
+   Two paths (light / heavy), each with options clients click into, a menu with photos, and a quick booking form.
+   Everything is stored as one JSON text field, about.grazing, edited by admins in "Edit this page". */
+const GRAZ_CDN="https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_";
+const GRAZ_DEFAULT={kicker:"Romualdo's Catering · Davao City",title:"Grazing & Pica-Pica Stations",
+  intro:"Beautifully styled food stations for parties, launches and gatherings. Choose a light pica-pica spread with a live street-food corner, or a generous grazing table for a full merienda.",
+  heroPhoto:{url:"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_165832_4d052fa5-7f27-484a-b100-1ad10034a057.png"},heroAlt:"An elegant Filipino grazing table with merienda and pica-pica",heroCaption:"",heroBtn:"Choose your station",
+  pathsTitle:"Choose your station",pathsIntro:"Tap a station to see its options.",
+  optionsTitle:"Pick an option",optionsIntro:"Tap an option to see what's on the station and book it.",backLabel:"← All stations",
+  menuTitle:"On the station",note:"Photos are for reference only. Our team confirms the final menu, styling and inclusions when we call you.",
+  bookTitle:"Book this station",bookIntro:"Tell us about your event. We'll call you to confirm.",
+  bookFine:"Sending this is not yet a confirmed booking. Our team will call or message you to confirm the date, final menu and down payment.",
+  submitBtn:"Send my booking request",minDays:5,tbfText:"Full menu to follow. We'll share the complete line-up when we call you.",
+  navLabel:"Grazing Stations",showPromo:true,promoText:"Elegant pica-pica and grazing stations with a live street-food corner, from {price}.",promoBtn:"See the stations →",
+  paths:[
+    {id:"light",name:"Light Pica-Pica & Live Street-Food Station",tagline:"Bite-sized favorites and a refined street-food cart, cooked live",range:"₱10,000 – ₱15,000",photo:{url:"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_165831_8efce3ec-1051-41b5-a2ef-0e6989954b55.png"},
+      options:[{id:"l1",name:"Option A",tagline:"",price:10000,pax:"",show:true,photo:null,caption:"",menu:[]},{id:"l2",name:"Option B",tagline:"",price:15000,pax:"",show:true,photo:null,caption:"",menu:[]}]},
+    {id:"heavy",name:"Heavy Merienda & Grazing Station",tagline:"A generous grazing table for a full afternoon merienda",range:"₱20,000 – ₱25,000",photo:{url:"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_165832_bb102053-7535-423d-b000-4c31473f1c28.png"},
+      options:[{id:"h1",name:"Option A",tagline:"",price:20000,pax:"",show:true,photo:null,caption:"",menu:[]},{id:"h2",name:"Option B",tagline:"",price:25000,pax:"",show:true,photo:null,caption:"",menu:[]}]}]};
+function grazData(){
+  let x={};try{x=JSON.parse(state.about.grazing||"{}")||{}}catch(e){x={}}
+  const d=JSON.parse(JSON.stringify(GRAZ_DEFAULT));
+  for(const k of Object.keys(d)){if(k==="paths")continue;if(typeof d[k]==="boolean"){if(typeof x[k]==="boolean")d[k]=x[k];continue}if(k==="heroPhoto"){if("heroPhoto" in x)d.heroPhoto=kRef(x.heroPhoto);continue}if(k==="minDays"){if(x.minDays!=null&&x.minDays!=="")d.minDays=Math.max(0,Math.min(60,Math.round(Number(x.minDays))||0));continue}if(typeof x[k]==="string")d[k]=x[k]}
+  const opt=(o,i,pfx)=>({id:String(o?.id||pfx+(i+1)),name:String(o?.name||""),tagline:String(o?.tagline||""),price:Math.max(0,Number(o?.price)||0),pax:String(o?.pax??""),show:o?.show!==false,photo:kRef(o?.photo),caption:String(o?.caption||""),
+    menu:Array.isArray(o?.menu)?o.menu.map(m=>({dish:String(m?.dish||""),cat:String(m?.cat||""),photo:m?.photo?kRef(m.photo):null})).filter(m=>m.dish.trim()):[]});
+  if(Array.isArray(x.paths)&&x.paths.length)d.paths=x.paths.slice(0,4).map((p,i)=>({id:String(p?.id||"p"+(i+1)),name:String(p?.name||""),tagline:String(p?.tagline||""),range:String(p?.range||""),show:p?.show!==false,photo:kRef(p?.photo),
+    options:Array.isArray(p?.options)?p.options.slice(0,6).map((o,j)=>opt(o,j,"o")):[]}));
+  d.paths.forEach(p=>{if(p.show===undefined)p.show=true});
+  return d;
+}
+const gThumb=m=>m.photo?`<span class="mthumb" tabindex="0" aria-label="Photo of ${esc(m.dish)}">${kImg(m.photo,240,m.dish,'loading="lazy"')}<span class="zoom">${kImg(m.photo,800,"",'loading="lazy"')}</span></span>`:`<span class="mthumb empty" aria-hidden="true"><span>📷</span></span>`;
+const gPh=(ref,w,alt,label)=>ref?kImg(ref,w,alt,'loading="lazy"'):`<span class="g-noph"><span>📷</span><small>${esc(label||"Photo coming soon")}</small></span>`;
+state.gForm=state.gForm||{name:"",phone:"",email:"",date:"",time:"",venue:"",pax:"",occasion:"",notes:""};
+function grazPromo(){const G=grazData();if(!G.showPromo)return "";const pr=G.paths.filter(p=>p.show).flatMap(p=>p.options.filter(o=>o.show&&o.price>0).map(o=>o.price));if(!pr.length)return "";
+  return `<div class="graz-promo"><b>${esc(G.title)}</b><span>${esc(kFill(G.promoText,{price:peso(Math.min(...pr))}))}</span>${G.promoBtn?`<button data-go="grazing">${esc(G.promoBtn)}</button>`:""}</div>`}
+function viewGrazing(){
+  const G=grazData(),paths=G.paths.filter(p=>p.show),path=paths.find(p=>p.id===state.gPath),opts=path?path.options.filter(o=>o.show):[],o=opts.find(x=>x.id===state.gOpt),f=state.gForm;
+  const fb=socialUrl("facebookUrl"),ph=(state.about.contactPhones||[])[0]||"";
+  const hero=`<section class="graz-hero"><div class="txt">${G.kicker?`<div class="kick">${esc(G.kicker)}</div>`:""}<h1>${esc(G.title)}</h1>${paras(G.intro)}
+      ${G.heroBtn?`<button class="gbtn" data-gscroll="grazPaths">${esc(G.heroBtn)}</button>`:""}</div>
+    <figure class="ph">${gPh(G.heroPhoto,1600,G.heroAlt)}${G.heroCaption?`<figcaption>${esc(G.heroCaption)}</figcaption>`:""}</figure></section>`;
+  const step=(n,t)=>`<div class="graz-steps">${["Station","Option","Book"].map((x,i)=>`<span class="${i+1<n?"done":i+1===n?"on":""}">${i+1}. ${x}</span>`).join("")}</div>`;
+  let body;
+  if(!path){
+    body=`<section id="grazPaths">${step(1)}${G.pathsTitle?`<h2 class="graz-h2">${esc(G.pathsTitle)}</h2>`:""}${G.pathsIntro?`<p class="graz-sub">${esc(G.pathsIntro)}</p>`:""}
+      <div class="graz-paths">${paths.map(p=>`<button class="graz-path" data-gpath="${esc(p.id)}"><span class="gp-ph">${gPh(p.photo,1000,p.name)}</span>
+        <span class="gp-b">${p.range?`<span class="gp-range">${esc(p.range)}</span>`:""}<b>${esc(p.name)}</b>${p.tagline?`<small>${esc(p.tagline)}</small>`:""}<span class="gp-go">See options →</span></span></button>`).join("")}</div></section>`;
+  }else if(!o){
+    body=`<section id="grazPaths">${step(2)}<button class="graz-back" data-gback="1">${esc(G.backLabel)}</button>
+      <h2 class="graz-h2">${esc(path.name)}</h2><p class="graz-sub">${esc(path.range)}${path.range&&G.optionsIntro?" · ":""}${esc(G.optionsIntro)}</p>
+      <div class="graz-opts">${opts.map(x=>`<button class="graz-opt" data-gopt="${esc(x.id)}"><span class="go-ph">${gPh(x.photo,800,x.name)}</span>
+        <span class="go-b"><b>${esc(x.name)}</b>${x.tagline?`<small>${esc(x.tagline)}</small>`:""}<span class="go-p">${x.price?peso(x.price):"Price to follow"}${x.pax?` <em>· ${esc(x.pax)}</em>`:""}</span>${x.menu.length?"":`<span class="tbf">Menu to follow</span>`}</span></button>`).join("")}</div></section>`;
+  }else{
+    const ok=o.price>0;
+    body=`<section id="grazPaths">${step(3)}<button class="graz-back" data-gback="opt">← ${esc(path.name)}</button>
+      <div class="graz-sel"><div class="gs-ph">${gPh(o.photo,1000,o.caption||o.name)}${o.caption?`<small>${esc(o.caption)}</small>`:""}</div>
+        <div><span class="gp-range">${esc(path.name)}</span><h2 class="graz-h2" style="text-align:left;margin:4px 0">${esc(o.name)}</h2>${o.tagline?`<p class="graz-sub" style="text-align:left">${esc(o.tagline)}</p>`:""}
+        <div class="gs-price">${ok?peso(o.price):"Price to follow"}${o.pax?`<small>${esc(o.pax)}</small>`:""}</div></div></div>
+      <div class="graz-grid">
+      <section class="graz-card"><h3>${esc(G.menuTitle)}</h3>
+        ${o.menu.length?`<ul class="kaar-menu graz-menu">${o.menu.map(m=>`<li>${gThumb(m)}<span>${esc(m.dish)}${m.cat?`<small>${esc(m.cat)}</small>`:""}</span></li>`).join("")}</ul>`:`<div class="graz-tbf"><p>${esc(G.tbfText)}</p></div>`}
+        ${G.note?`<p class="fine">${esc(G.note)}</p>`:""}</section>
+      <section class="graz-card" id="grazBook"><h3>${esc(G.bookTitle)}</h3><p class="hint" style="margin:0 0 10px">${esc(G.bookIntro)}</p>
+        ${ok?`<form id="grazForm" novalidate>
+          <div class="kaar-pick graz-pick">Station: <b>${esc(path.name)} · ${esc(o.name)}</b></div>
+          <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <label>Your name<input name="name" value="${esc(f.name)}" autocomplete="name" required></label>
+            <label>Mobile number<input name="phone" value="${esc(f.phone)}" type="tel" inputmode="tel" placeholder="09XX XXX XXXX" autocomplete="tel" required></label>
+            <label>Event date<input name="date" value="${esc(f.date)}" type="date" min="${phDate(G.minDays)}" required></label>
+            <label>Time<input name="time" value="${esc(f.time)}" type="time"></label>
+            <label>Number of guests<input name="pax" value="${esc(f.pax)}" type="number" inputmode="numeric" min="1" required></label>
+            <label><span>Occasion <span class="hint">(optional)</span></span><input name="occasion" value="${esc(f.occasion)}" placeholder="e.g. birthday, launch, reunion"></label>
+          </div>
+          <label>Venue / address<input name="venue" value="${esc(f.venue)}"></label>
+          <label><span>Email <span class="hint">(optional)</span></span><input name="email" value="${esc(f.email)}" type="email" autocomplete="email"></label>
+          <label><span>Anything we should know? <span class="hint">(optional)</span></span><textarea name="notes" rows="2" placeholder="e.g. theme or colors, dietary needs, setup time">${esc(f.notes)}</textarea></label>
+          <input name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-5000px" aria-hidden="true">
+          <div class="kaar-total"><span>${esc(o.name)}</span><b>${peso(o.price)}</b></div>
+          ${G.bookFine?`<p class="fine">${esc(G.bookFine)}</p>`:""}
+          <div class="formmsg" id="grazMsg"></div>
+          <button class="gbtn" type="submit" style="width:100%">${esc(G.submitBtn)}</button></form>`
+        :`<div class="graz-tbf"><p>Online booking opens once this option is priced.</p>${fb?`<a class="gbtn" href="${esc(fb)}" target="_blank" rel="noopener">Message us on Facebook</a>`:""}${ph?`<p class="fine">or call ${esc(ph)}</p>`:""}</div>`}
+      </section></div></section>`;
+  }
+  return `<div class="graz">${state.canEdit?`<div style="text-align:right;margin:0 0 8px"><button class="btn small ghost" data-go="grazEdit">✎ Edit this page</button></div>`:""}${hero}${body}</div>`;
+}
+function bindGrazing(v){
+  const top=()=>document.getElementById("grazPaths")?.scrollIntoView({behavior:"smooth",block:"start"});
+  v.querySelectorAll("[data-gpath]").forEach(b=>b.onclick=()=>{state.gPath=b.dataset.gpath;state.gOpt=null;render();top()});
+  v.querySelectorAll("[data-gopt]").forEach(b=>b.onclick=()=>{state.gOpt=b.dataset.gopt;render();top()});
+  v.querySelectorAll("[data-gback]").forEach(b=>b.onclick=()=>{if(b.dataset.gback==="opt")state.gOpt=null;else{state.gPath=null;state.gOpt=null}render();top()});
+  v.querySelectorAll("[data-gscroll]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.gscroll)?.scrollIntoView({behavior:"smooth"}));
+  const fm=$("#grazForm",v);if(!fm)return;
+  fm.addEventListener("input",e=>{const n=e.target.name;if(n&&n in state.gForm)state.gForm[n]=e.target.value});
+  fm.onsubmit=async e=>{e.preventDefault();
+    const G=grazData(),path=G.paths.find(p=>p.id===state.gPath),o=path?.options.find(x=>x.id===state.gOpt);if(!o||!(o.price>0))return;
+    const f=state.gForm,msg=$("#grazMsg");msg.textContent="";fm.querySelectorAll(".err").forEach(el=>el.classList.remove("err"));
+    const need=["name","phone","date","pax"].filter(n=>!String(f[n]||"").trim());need.forEach(n=>fm.elements[n].classList.add("err"));
+    if(need.length){msg.textContent="Please fill in your name, mobile number, event date and number of guests.";fm.elements[need[0]].focus();return}
+    if(f.date<phDate(G.minDays)){fm.elements.date.classList.add("err");const ph=(state.about.contactPhones||[])[0]||"";msg.textContent=`Please book at least ${G.minDays} days ahead. For a sooner date, message us on Facebook${ph?" or call "+ph:""}.`;return}
+    const pax=Math.max(1,Math.round(Number(f.pax))||1),btn=fm.querySelector("button[type=submit]");btn.disabled=true;btn.textContent="Sending…";
+    const q={ref:newRef(),createdAt:new Date().toISOString(),status:"New",customer:{name:f.name.trim(),phone:f.phone.trim(),email:f.email.trim()},
+      event:{date:f.date,time:f.time,type:(f.occasion.trim()||"Grazing station").slice(0,40),venue:f.venue.trim(),pax},notes:f.notes.trim(),
+      plan:{kind:"package",packageId:("g-"+path.id+"-"+o.id).slice(0,20),packageName:((path.id==="heavy"?"Grazing":"Pica-pica")+" – "+o.name).slice(0,40),pricePerHead:Math.round(o.price/pax),chefPick:false},
+      items:(o.menu.length?o.menu:[{dish:path.name+" – "+o.name+" (menu to follow)",cat:"Station"}]).map(m=>({cat:m.cat||"Station",dish:m.dish,tier:"grazing",slot:m.cat})),estimate:{perHead:Math.round(o.price/pax),total:o.price}};
+    const r=await api("submit",{inquiry:q,website:fm.elements.website.value||""});
+    if(!r.ok&&!r.network&&r.error){btn.disabled=false;btn.textContent=G.submitBtn;msg.textContent=r.error;return}
+    if(r.ok&&r.ref)q.ref=r.ref;
+    state.lastDone={inq:q,saved:!!r.ok,message:messageFor(q)};state.gForm={name:"",phone:"",email:"",date:"",time:"",venue:"",pax:"",occasion:"",notes:""};
+    if(r.ok&&state.isStaff)loadInquiries();go("done")};
+}
+/* ---------- Grazing page editor (admin) ---------- */
+function startGrazDraft(){state.gDraft=grazData();state.gDirty=false;state.gMsg=""}
+function gDirtyMark(){if(!state.gDirty){state.gDirty=true;const s=$("#saveGraz"),x=$("#discardGraz"),m=$("#gMsg");if(s)s.disabled=false;if(x)x.disabled=false;if(m)m.textContent="You have unsaved changes."}}
+function gSet(path,val){const ks=path.split(".");let o=state.gDraft;for(let i=0;i<ks.length-1;i++)o=o[ks[i]];o[ks[ks.length-1]]=val}
+function viewGrazEdit(){
+  if(!state.gDraft)startGrazDraft();
+  const D=state.gDraft;
+  const inp=(path,label,val,max,ph)=>`<label>${label}<input data-gp="${path}" value="${esc(val)}" maxlength="${max||120}" ${ph?`placeholder="${esc(ph)}"`:""}></label>`;
+  const ta=(path,label,val,rows,max)=>`<label>${label}<textarea data-gp="${path}" rows="${rows||3}" maxlength="${max||800}">${esc(val)}</textarea></label>`;
+  const photo=(path,ref,label)=>`<div class="kslot"><div class="kslot-img">${ref?kImg(ref,500,label):`<span class="hint">No photo</span>`}</div><div class="kslot-b"><b>${label}</b>
+    <label class="btn small" style="cursor:pointer;margin:0;flex-direction:row;color:#fff">${ref?"Replace photo":"＋ Add photo"}<input type="file" accept="image/*" data-gup="${path}" style="display:none"></label>${ref?`<button class="btn small ghost" data-gclr="${path}">Remove photo</button>`:""}</div></div>`;
+  const sec=(t,body)=>`<details class="panel ed sec" open><summary><h3 style="display:inline">${t}</h3></summary><div style="margin-top:12px">${body}</div></details>`;
+  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>Edit Grazing page</h1><span class="who">Admin only · every word, price, menu and photo on the <a href="#grazing" data-go="grazing">Grazing page</a></span></div>
+  <div class="formmsg" style="color:var(--blue);min-height:0;margin-bottom:8px">${esc(state.gUpMsg||"")}</div>
+  ${sec("Top of the page",`${photo("heroPhoto",D.heroPhoto,"Big photo")}${inp("heroAlt","Photo description",D.heroAlt,140)}${inp("heroCaption","Photo caption (optional)",D.heroCaption,120)}
+    ${inp("kicker","Small heading",D.kicker,60)}${inp("title","Title",D.title,60)}${ta("intro","Intro text",D.intro,3,800)}${inp("heroBtn","Button text (empty hides it)",D.heroBtn,30)}`)}
+  ${D.paths.map((p,i)=>sec(`Station ${i+1}: ${esc(p.name||"")}`,`<label class="inl" style="display:flex;flex-direction:row;gap:6px;align-items:center"><input type="checkbox" data-gshow="paths.${i}" ${p.show!==false?"checked":""} style="width:auto"> Show on the page</label>
+    ${photo(`paths.${i}.photo`,p.photo,"Station photo (clickable card)")}
+    <div class="g2">${inp(`paths.${i}.name`,"Station name",p.name,60)}${inp(`paths.${i}.range`,"Price range shown",p.range,40)}</div>${inp(`paths.${i}.tagline`,"Short line under the name",p.tagline,120)}
+    ${p.options.map((o,j)=>`<div class="kopt-ed"><div class="kopt-h"><b>Option ${j+1}</b><label class="inl"><input type="checkbox" data-gshow="paths.${i}.options.${j}" ${o.show?"checked":""}> Show</label><span style="flex:1"></span>
+        <button class="btn small ghost" data-gou="${i}.${j}" ${j===0?"disabled":""}>←</button><button class="btn small ghost" data-god="${i}.${j}" ${j===p.options.length-1?"disabled":""}>→</button><button class="btn small danger" data-gox="${i}.${j}">Remove</button></div>
+      <div class="g2">${inp(`paths.${i}.options.${j}.name`,"Option name",o.name,40)}${inp(`paths.${i}.options.${j}.tagline`,"Short line",o.tagline,100)}</div>
+      <div class="g2">${inp(`paths.${i}.options.${j}.price`,"Package price (₱, total)",o.price||"",8,"e.g. 12000")}${inp(`paths.${i}.options.${j}.pax`,"Good for (e.g. 30–40 guests)",o.pax,40)}</div>
+      ${photo(`paths.${i}.options.${j}.photo`,o.photo,"Option photo")}${inp(`paths.${i}.options.${j}.caption`,"Photo caption",o.caption,120)}
+      <b style="display:block;margin:10px 0 4px">Menu</b>
+      ${o.menu.map((m,k)=>`<div class="kmenu-row"><span class="kmph">${m.photo?kImg(m.photo,160,m.dish):`<span>📷</span>`}<label>${m.photo?"Change":"＋ Photo"}<input type="file" accept="image/*" data-gup="paths.${i}.options.${j}.menu.${k}.photo" style="display:none"></label>${m.photo?`<button type="button" data-gclr="paths.${i}.options.${j}.menu.${k}.photo">✕</button>`:""}</span>
+        <input data-gp="paths.${i}.options.${j}.menu.${k}.dish" value="${esc(m.dish)}" maxlength="80" placeholder="Item, e.g. Fish balls & kikiam"><input data-gp="paths.${i}.options.${j}.menu.${k}.cat" value="${esc(m.cat)}" maxlength="30" placeholder="Group, e.g. Live station">
+        <span class="acts"><button class="btn small ghost" data-gmu="${i}.${j}.${k}" ${k===0?"disabled":""}>↑</button><button class="btn small ghost" data-gmd="${i}.${j}.${k}" ${k===o.menu.length-1?"disabled":""}>↓</button><button class="btn small danger" data-gmx="${i}.${j}.${k}">✕</button></span></div>`).join("")||`<p class="hint">No items yet, so clients see "Menu to follow".</p>`}
+      <button class="btn small ghost" data-gma="${i}.${j}">＋ Add item</button></div>`).join("")}
+    ${p.options.length<6?`<button class="btn small" data-goa="${i}">＋ Add option</button>`:""}`)).join("")}
+  ${sec("Other wording",`<div class="g2">${inp("pathsTitle","Heading above the stations",D.pathsTitle,60)}${inp("pathsIntro","Line under it",D.pathsIntro,160)}</div>
+    <div class="g2">${inp("optionsIntro","Line above the options",D.optionsIntro,160)}${inp("backLabel","Back link",D.backLabel,40)}</div>
+    <div class="g2">${inp("menuTitle","Menu box heading",D.menuTitle,40)}${inp("bookTitle","Booking box heading",D.bookTitle,40)}</div>
+    ${inp("bookIntro","Line under the booking heading",D.bookIntro,160)}${ta("bookFine","Small print",D.bookFine,2,400)}${ta("tbfText","Message when the menu isn't encoded yet",D.tbfText,2,300)}${ta("note","Note under the menu",D.note,2,300)}
+    <div class="g2">${inp("submitBtn","Send button",D.submitBtn,40)}${inp("minDays","Book at least this many days ahead",D.minDays,2)}</div>
+    <div class="g2">${inp("navLabel","Top menu button",D.navLabel,30)}${inp("promoBtn","Banner button",D.promoBtn,30)}</div>${ta("promoText","Banner text on the Packages page ({price} = lowest price)",D.promoText,2,200)}
+    <label class="inl" style="display:flex;flex-direction:row;gap:6px;align-items:center"><input type="checkbox" data-gb="showPromo" ${D.showPromo?"checked":""} style="width:auto"> Show the banner on the Packages page</label>`)}
+  <div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:sticky;bottom:10px;z-index:5;border-color:${state.gDirty?"var(--gold)":"var(--line)"}">
+    <button class="btn gold" id="saveGraz" ${state.gDirty?"":"disabled"}>Save changes</button><button class="btn ghost" id="discardGraz" ${state.gDirty?"":"disabled"}>Discard changes</button>
+    <span class="formmsg" id="gMsg" style="margin:0">${esc(state.gMsg||(state.gDirty?"You have unsaved changes.":""))}</span></div>`;
+}
+function bindGrazEdit(v){
+  const D=state.gDraft,re=()=>{state.gDirty=true;keepScroll(render)},g=p=>p.split(".").reduce((o,k)=>o?.[k],D),n3=s=>s.split(".").map(Number);
+  v.querySelectorAll("[data-gp]").forEach(el=>el.oninput=()=>{gSet(el.dataset.gp,el.value);gDirtyMark()});
+  v.querySelectorAll("[data-gb]").forEach(el=>el.onchange=()=>{D[el.dataset.gb]=el.checked;gDirtyMark()});
+  v.querySelectorAll("[data-gshow]").forEach(el=>el.onchange=()=>{g(el.dataset.gshow).show=el.checked;gDirtyMark()});
+  v.querySelectorAll("[data-gup]").forEach(el=>el.onchange=async()=>{const f=el.files[0];el.value="";if(!f)return;state.gUpMsg="Uploading photo…";keepScroll(render);
+    try{const r=await uploadOne(f,{slot:true});const ref=r.ok&&cleanRef(r.photo);if(ref){gSet(el.dataset.gup,ref);state.gUpMsg="Photo uploaded. Click Save changes to publish.";state.gDirty=true}else state.gUpMsg="Photo not uploaded: "+upErr(r)}catch(e){state.gUpMsg="That file isn't a photo the browser can read."}keepScroll(render)});
+  v.querySelectorAll("[data-gclr]").forEach(b=>b.onclick=()=>{gSet(b.dataset.gclr,null);re()});
+  const sw=(a,i,j)=>{[a[i],a[j]]=[a[j],a[i]];re()};
+  v.querySelectorAll("[data-gou]").forEach(b=>b.onclick=()=>{const [i,j]=n3(b.dataset.gou);sw(D.paths[i].options,j,j-1)});
+  v.querySelectorAll("[data-god]").forEach(b=>b.onclick=()=>{const [i,j]=n3(b.dataset.god);sw(D.paths[i].options,j,j+1)});
+  v.querySelectorAll("[data-gox]").forEach(b=>b.onclick=()=>{const [i,j]=n3(b.dataset.gox);if(!confirm(`Remove "${D.paths[i].options[j].name}"?`))return;D.paths[i].options.splice(j,1);re()});
+  v.querySelectorAll("[data-goa]").forEach(b=>b.onclick=()=>{D.paths[+b.dataset.goa].options.push({id:"o"+Date.now().toString(36),name:"New option",tagline:"",price:0,pax:"",show:false,photo:null,caption:"",menu:[]});re()});
+  v.querySelectorAll("[data-gma]").forEach(b=>b.onclick=()=>{const [i,j]=n3(b.dataset.gma);D.paths[i].options[j].menu.push({dish:"",cat:"",photo:null});re()});
+  v.querySelectorAll("[data-gmu]").forEach(b=>b.onclick=()=>{const [i,j,k]=n3(b.dataset.gmu);sw(D.paths[i].options[j].menu,k,k-1)});
+  v.querySelectorAll("[data-gmd]").forEach(b=>b.onclick=()=>{const [i,j,k]=n3(b.dataset.gmd);sw(D.paths[i].options[j].menu,k,k+1)});
+  v.querySelectorAll("[data-gmx]").forEach(b=>b.onclick=()=>{const [i,j,k]=n3(b.dataset.gmx);D.paths[i].options[j].menu.splice(k,1);re()});
+  const sv=$("#saveGraz",v);if(sv)sv.onclick=saveGraz;
+  const dx=$("#discardGraz",v);if(dx)dx.onclick=()=>{startGrazDraft();keepScroll(render)};
+}
+async function saveGraz(){
+  const D=state.gDraft,out={...D,minDays:Math.max(0,Math.min(60,Math.round(Number(D.minDays))||0)),paths:D.paths.map(p=>({...p,options:p.options.map(o=>({...o,price:Math.max(0,Number(String(o.price).replace(/[^\d.]/g,""))||0),menu:o.menu.filter(m=>String(m.dish).trim())}))}))};
+  if(!String(out.title).trim()){state.gMsg="The title can't be empty.";keepScroll(render);return}
+  const json=JSON.stringify(out);if(json.length>20000){state.gMsg="Too much text; please shorten some menus.";keepScroll(render);return}
+  state.gMsg="Saving…";keepScroll(render);
+  let r;try{r=await api("saveAbout",{about:{...state.about,grazing:json}})}catch(e){r={ok:false,error:"No internet connection"}}
+  if(!r.ok){state.gMsg=r.error||"Couldn't save.";keepScroll(render);return}
+  applyAbout(r.about||{...state.about,grazing:json},state.gallery);
+  if(!state.about.grazing){state.gMsg="Saved, but the server didn't keep the page (the Google script needs updating).";keepScroll(render);return}
+  if(state.aboutDraft)state.aboutDraft.grazing=state.about.grazing;
+  startGrazDraft();toast("Grazing page saved — live now");keepScroll(render);
+}
 function viewContact(){
   const a=state.about, fb=socialUrl("facebookUrl"), ig=socialUrl("instagramUrl");
   const tel=n=>String(n).replace(/[^\d+]/g,"").replace(/^0/,"+63");
@@ -1819,11 +2056,13 @@ function bind(){
   if(state.view==="about"||state.view==="home")bindAbout(v);
   if(state.view==="trays")bindTrays(v);
   if(state.view==="kaarawan")bindKaarawan(v);
+  if(state.view==="grazing")bindGrazing(v);
+  if(state.view==="grazEdit")bindGrazEdit(v);
   if(state.view==="home")bindFilm(v);
   if(state.view==="aboutEdit")bindAboutEdit(v);
   if(state.view==="trayEdit")bindTrayEdit(v);
   if(state.view==="kaarEdit")bindKaarEdit(v);
-  v.querySelectorAll("[data-go]").forEach(b=>b.onclick=e=>{e.preventDefault();if(b.dataset.go==="packages")state.pkg=null;if(b.dataset.go==="trayEdit"&&!state.trayDirty)startTrayDraft();if(b.dataset.go==="kaarEdit"&&!state.kDirty)startKaarDraft();go(b.dataset.go)});
+  v.querySelectorAll("[data-go]").forEach(b=>b.onclick=e=>{e.preventDefault();if(b.dataset.go==="packages")state.pkg=null;if(b.dataset.go==="trayEdit"&&!state.trayDirty)startTrayDraft();if(b.dataset.go==="kaarEdit"&&!state.kDirty)startKaarDraft();if(b.dataset.go==="grazEdit"&&!state.gDirty)startGrazDraft();go(b.dataset.go)});
   v.querySelectorAll("[data-pax]").forEach(b=>b.onclick=()=>{state.pax=Number(b.dataset.pax);render()});
   const pax=$("#pax",v);
   if(pax){
