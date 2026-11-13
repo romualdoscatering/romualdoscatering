@@ -328,7 +328,7 @@ function alerts() {
 }
 
 /* ============ rendering infra ============ */
-const TABS_ALL = [['dash', 'Dashboard'], ['prs', 'Requests'], ['advances', 'Cash advances'], ['purchases', 'Purchases & expenses'], ['stock', 'Stock'], ['usage', 'Use & waste'], ['recipes', 'Recipes & production'], ['events', 'Catering events'], ['reports', 'Reports'], ['setup', 'Setup']];
+const TABS_ALL = [['dash', 'Dashboard'], ['prs', 'Requests'], ['advances', 'Cash advances'], ['purchases', 'Purchases & expenses'], ['stock', 'Stock'], ['usage', 'Use & waste'], ['recipes', 'Recipes & production'], ['sheets', 'Event sheets'], ['events', 'Catering events'], ['reports', 'Reports'], ['setup', 'Setup']];
 const tabsFor = () => TABS_ALL.filter(t => t[0] !== 'setup' || S.isAdmin);
 let TABS = TABS_ALL;
 const V = {};
@@ -658,6 +658,153 @@ ACT.prodToReq = () => {
   location.hash = 'prs'; toast(N.length + ' ingredients added to a new request. Check, then send.');
 };
 
+
+/* ============ EVENT SHEETS (client-facing event details + PDF) ============
+   Stored on the event record as `sheet`, so the same event also carries costing in "Catering events".
+   Billing is intentionally excluded: it is handled by finance between the admin and the client. */
+const SHEET_COURSES = ['Soup', 'Salad / appetizer', 'Main dish', 'Main dish', 'Main dish', 'Main dish', 'Pasta / noodles', 'Vegetables', 'Rice', 'Dessert', 'Drinks'];
+const EV_TYPES = ['Wedding', 'Birthday', 'Debut', 'Christening', 'Corporate', 'Anniversary', 'Graduation', 'Reunion', 'Funeral / Wake', 'Other'];
+const SHEET_STATUS = [['draft', 'Draft'], ['approval', 'For client approval'], ['approved', 'Approved by client'], ['cancelled', 'Cancelled']];
+const newSheet = (o = {}) => ({id: '', ref: '', client: '', contact: '', mobile: '', email: '', source: '', type: '', date: daysAhead(30), serve: '', call: '', pull: '', venue: '', coord: '', pax: '',
+  pkg: '', menu: SHEET_COURSES.map(c => ({course: c, dish: '', note: ''})), motif: '', setup: '', equip: '', staff: '', allergy: '', special: '', status: 'draft', approvedOn: '', preparedBy: '', ...o});
+const fmtLong = s => s ? new Date(s + 'T00:00').toLocaleDateString('en-PH', {weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'}) : '';
+const fmtClock = t => { if (!t) return ''; const [h, m] = t.split(':').map(Number); return `${(h % 12) || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
+const sheetOf = e => e.sheet ? {...newSheet(), ...e.sheet, id: e.id} : newSheet({id: e.id, client: e.client || e.name || '', date: e.date, pax: String(e.pax || ''), venue: e.venue || ''});
+const sheetRef = d => d.ref || ('EV-' + (d.date || '').replace(/-/g, '').slice(0, 8) + '-' + (d.id || '').slice(-3).toUpperCase());
+V.sheets = () => {
+  D.sheet ||= newSheet();
+  const d = D.sheet, f = D.ui;
+  const evs = Object.values(S.events).filter(e => e.status !== 'void').sort((a, b) => a.date.localeCompare(b.date));
+  const up = evs.filter(e => e.date >= today()), past = evs.filter(e => e.date < today()).reverse();
+  const lab = (t, inner, cls = '') => `<label class="${cls}">${t}${inner}</label>`;
+  const inp = (k, ph = '', type = 'text', extra = '') => `<input type="${type}" data-b="sheet.${k}" placeholder="${esc(ph)}" ${extra}>`;
+  const listRow = e => { const sh = sheetOf(e), st = SHEET_STATUS.find(x => x[0] === sh.status) || SHEET_STATUS[0];
+    return `<tr class="click" data-act="editSheet" data-arg="${e.id}"><td>${fmtD(e.date)}</td><td><b>${esc(sh.client || e.name)}</b><div class="small mut">${esc([sh.type, sh.venue].filter(Boolean).join(' · '))}</div></td><td class="n">${esc(sh.pax || e.pax || '')}</td>
+      <td><span class="chip ${sh.status === 'approved' ? 'ok' : sh.status === 'approval' ? 'warn' : sh.status === 'cancelled' ? 'mut' : 'info'}">${st[1]}</span></td>
+      <td class="row"><button class="sm" data-act="editSheet" data-arg="${e.id}">Edit</button><button class="sm pri" data-act="pdfSheet" data-arg="${e.id}">PDF</button></td></tr>`; };
+  return `<h2>Event sheets</h2>
+  <p class="lede">Encode each event's details once. <b>Generate PDF</b> makes a polished event sheet with the Romualdo's logo, for the kitchen and for the client to approve. Billing is not included; that stays with the admin and finance.</p>
+  <div class="card" id="sheetForm"><div class="row" style="margin-bottom:6px"><h3 style="margin:0">${d.id ? 'Edit event sheet' : 'New event sheet'}</h3><span class="spacer"></span>${d.id ? '<button class="sm ghost" data-act="newSheet">＋ Start a new one instead</button>' : ''}</div>
+   <h4 class="sub">1. Client</h4>
+   <div class="grid">${lab('Client name(s)', inp('client', 'e.g. Juan Manalang & Ysabel Zubiri', 'text', 'autocapitalize="words"'))}${lab('Contact person', inp('contact', '', 'text', 'autocapitalize="words"'))}${lab('Mobile no.', inp('mobile', '09XX XXX XXXX', 'tel'))}${lab('Email', inp('email', '', 'email'))}${lab('How they found us', inp('source', 'Facebook, website, referral…'))}${lab('Reference no.', inp('ref', d.id ? sheetRef(d) : 'Filled in automatically'))}</div>
+   <h4 class="sub">2. Event</h4>
+   <div class="grid">${lab('Event type', sel('sheet.type', opt('', '— choose —') + EV_TYPES.map(t => opt(t, t)).join(''), false))}${lab('Event date', inp('date', '', 'date'))}${lab('Number of guests', inp('pax', '150', 'number', 'inputmode="numeric" min="0"'))}
+    ${lab('Call time (team at venue)', inp('call', '', 'time'))}${lab('Serving time', inp('serve', '', 'time'))}${lab('Pull-out time', inp('pull', '', 'time'))}
+    ${lab('Venue / address', inp('venue', '', 'text', 'autocapitalize="words"'))}${lab('Venue coordinator & contact', inp('coord'))}${lab('Package', inp('pkg', 'Classic / Signature / Premium / Grand / Custom'))}</div>
+   <h4 class="sub">3. Menu</h4>
+   <div class="tw"><table class="lines"><thead><tr><th style="width:190px">Course</th><th>Dish</th><th style="width:240px">Note <span class="small mut">(e.g. client to choose one)</span></th><th style="width:30px"></th></tr></thead><tbody>
+    ${d.menu.map((m, i) => `<tr><td><input data-b="sheet.menu.${i}.course" list="dl-courses"></td><td><input data-b="sheet.menu.${i}.dish" placeholder="Leave empty to skip this course" autocapitalize="words"></td><td><input data-b="sheet.menu.${i}.note"></td><td><button class="sm ghost" data-act="rmCourse" data-arg="${i}" title="Remove">✕</button></td></tr>`).join('')}
+   </tbody></table></div>
+   <datalist id="dl-courses">${[...new Set(SHEET_COURSES)].concat(['Main dish', 'Carving station', 'Live station', 'Pica-pica', 'Cocktail']).map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+   <div class="row" style="margin-top:6px"><button class="sm" data-act="addCourse">＋ Add course</button></div>
+   <h4 class="sub">4. Setup &amp; service</h4>
+   <div class="grid">${lab('Motif / theme', inp('motif'))}${lab('Table setup', inp('setup', 'Buffet, plated, family style; no. of tables'))}${lab('Staff', inp('staff', 'e.g. 1 head waiter, 8 servers, 2 cooks'))}</div>
+   ${lab('Equipment', `<textarea data-b="sheet.equip" rows="2" placeholder="Chafing dishes, tables, linens, tent…"></textarea>`)}
+   <h4 class="sub">5. Notes</h4>
+   <div class="grid">${lab('Allergies / dietary needs', `<textarea data-b="sheet.allergy" rows="2"></textarea>`)}${lab('Special requests', `<textarea data-b="sheet.special" rows="2"></textarea>`)}</div>
+   <h4 class="sub">6. Approval</h4>
+   <div class="grid">${lab('Status', sel('sheet.status', SHEET_STATUS.map(([v, l]) => opt(v, l)).join(''), false))}${lab('Approved on', inp('approvedOn', '', 'date'))}${lab('Prepared by', inp('preparedBy', S.me?.name || '', 'text', 'list="dl-staff"'))}</div>
+   <div class="row end" style="margin-top:12px">${d.id ? `<button class="ghost" data-act="openEvent" data-arg="${d.id}">Costing &amp; stock →</button>` : ''}<button class="ghost" data-act="newSheet">Clear</button><button data-act="saveSheet" data-arg="pdf">Save &amp; generate PDF</button><button class="pri" data-act="saveSheet">Save</button></div>
+  </div>
+  <div class="card"><h3>Upcoming events (${up.length})</h3>
+   ${up.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th class="n">Pax</th><th>Status</th><th></th></tr></thead><tbody>${up.map(listRow).join('')}</tbody></table></div>` : '<div class="empty">No upcoming events yet.</div>'}
+   ${past.length ? `<details style="margin-top:10px"><summary class="small">Past events (${past.length})</summary><div class="tw"><table><tbody>${past.map(listRow).join('')}</tbody></table></div></details>` : ''}
+  </div>`;
+};
+ACT.newSheet = () => { D.sheet = newSheet(); render(); document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'}); };
+ACT.addCourse = () => { D.sheet.menu.push({course: 'Main dish', dish: '', note: ''}); render(); };
+ACT.rmCourse = i => { D.sheet.menu.splice(+i, 1); render(); };
+ACT.editSheet = id => { const e = S.events[id]; if (!e) return; const sh = sheetOf(e); D.sheet = JSON.parse(JSON.stringify({...sh, pax: String(sh.pax || ''), menu: (sh.menu && sh.menu.length ? sh.menu : newSheet().menu)})); if (D.ui.tab !== 'sheets') location.hash = 'sheets'; render(); setTimeout(() => document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'}), 50); };
+ACT.saveSheet = mode => {
+  const d = D.sheet, client = titleCase(d.client);
+  if (!client) return toast('Enter the client name.', true);
+  if (!d.date) return toast('Enter the event date.', true);
+  const sheet = {...d, client, pax: num(d.pax) || '', menu: d.menu.filter(m => (m.dish || '').trim() || (m.note || '').trim()).map(m => ({course: (m.course || '').trim(), dish: (m.dish || '').trim(), note: (m.note || '').trim()})), savedAt: Date.now()};
+  delete sheet.id;
+  const base = {name: client, client, date: d.date, pax: num(d.pax) || '', venue: (d.venue || '').trim()};
+  guard(async () => {
+    let id = d.id;
+    if (id) { if (!sheet.ref) sheet.ref = sheetRef({...d, id}); await upd('events/' + id, {...base, sheet}); }
+    else { id = genId(); sheet.ref = sheet.ref || sheetRef({...d, id}); await opsWrite([{op: 'add', path: 'events/' + id, data: {...base, contract: 0, notes: '', status: 'planned', plan: [], sheet}}]); }
+    D.sheet = JSON.parse(JSON.stringify({...sheet, id, pax: String(sheet.pax || ''), menu: sheet.menu.length ? sheet.menu : newSheet().menu}));
+    if (mode === 'pdf') setTimeout(() => printSheet(id), 300);
+  }, mode === 'pdf' ? 'Saved — opening the PDF' : 'Event sheet saved');
+};
+ACT.pdfSheet = id => printSheet(id);
+function printSheet(id) {
+  const e = S.events[id]; if (!e) return toast('Save the event sheet first.', true);
+  const d = sheetOf(e), ref = sheetRef(d), st = (SHEET_STATUS.find(x => x[0] === d.status) || SHEET_STATUS[0])[1];
+  const logo = new URL('../assets/logo.png', location.href).href;
+  const kv = (l, v) => v ? `<div class="kv"><span>${esc(l)}</span><b>${esc(v)}</b></div>` : '';
+  const menu = (d.menu || []).filter(m => m.dish);
+  const times = [['Call time', d.call], ['Serving time', d.serve], ['Pull-out', d.pull]].filter(x => x[1]);
+  const setup = [['Motif / theme', d.motif], ['Table setup', d.setup], ['Service staff', d.staff], ['Equipment', d.equip]].filter(x => x[1]);
+  const notes = [['Allergies & dietary needs', d.allergy], ['Special requests', d.special]].filter(x => x[1]);
+  const title = `Event Sheet - ${d.client} - ${fmtLong(d.date).replace(/^\w+, /, '')}`;
+  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,500&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+@page{size:A4;margin:16mm 16mm 18mm}
+*{box-sizing:border-box}html,body{margin:0;padding:0}
+body{font-family:Montserrat,Arial,sans-serif;color:#1A2C54;font-size:10pt;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#fff}
+.page{max-width:178mm;margin:0 auto}
+.bar{display:flex;gap:10px;justify-content:center;padding:12px;background:#F7F4EA;border-bottom:1px solid #E4DFC8;font-family:Montserrat}
+.bar button{font:600 13px Montserrat;border:0;border-radius:8px;padding:10px 18px;cursor:pointer;background:#1A2C54;color:#fff}.bar button.alt{background:#fff;color:#1A2C54;border:1px solid #CFC9B0}
+.bar span{align-self:center;font-size:12px;color:#5B6478}
+header{text-align:center;padding:6mm 0 4mm}
+header img{height:15mm}
+.tag{font-size:7.5pt;letter-spacing:.32em;text-transform:uppercase;color:#E89908;margin-top:3mm}
+h1{font-family:'Playfair Display',Georgia,serif;font-weight:400;font-style:italic;font-size:25pt;margin:4mm 0 1mm;letter-spacing:.01em}
+.sub{font-size:9pt;color:#5B6478;letter-spacing:.06em}
+.rule{display:flex;align-items:center;gap:4mm;margin:5mm 0}.rule:before,.rule:after{content:"";flex:1;border-top:.6pt solid #C9A24A}.rule i{width:2mm;height:2mm;transform:rotate(45deg);border:.6pt solid #C9A24A}
+.meta{display:flex;justify-content:space-between;font-size:8pt;color:#5B6478;letter-spacing:.04em;margin-top:-2mm}
+.status{display:inline-block;border:.6pt solid #631B1C;color:#631B1C;border-radius:20px;padding:.4mm 3mm;font-size:7.5pt;letter-spacing:.14em;text-transform:uppercase}
+h2{font-family:'Playfair Display',Georgia,serif;font-weight:600;font-size:13pt;margin:0 0 3mm;color:#1A2C54;letter-spacing:.02em}
+h2 small{display:block;font-family:Montserrat;font-weight:500;font-size:7pt;letter-spacing:.3em;text-transform:uppercase;color:#E89908;margin-bottom:1mm}
+section{margin:0 0 5.5mm;break-inside:avoid}
+.p2{break-before:page}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:2.5mm 10mm}
+.kv{display:flex;flex-direction:column;border-bottom:.4pt solid #E4DFC8;padding-bottom:1.5mm}
+.kv span{font-size:7pt;letter-spacing:.18em;text-transform:uppercase;color:#8A8F9C}.kv b{font-weight:500;font-size:10.5pt}
+.hero{background:#1A2C54;color:#fff;border-radius:3mm;padding:6mm 8mm;display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;text-align:center;margin-bottom:6mm}
+.hero span{display:block;font-size:6.5pt;letter-spacing:.28em;text-transform:uppercase;color:#E5DEB2;margin-bottom:1mm}.hero b{font-family:'Playfair Display',serif;font-weight:400;font-size:13pt}
+.times{display:flex;justify-content:center;gap:12mm;text-align:center}.times span{display:block;font-size:7pt;letter-spacing:.22em;text-transform:uppercase;color:#8A8F9C}.times b{font-family:'Playfair Display',serif;font-size:14pt;font-weight:400}
+.menu{text-align:center;border:.6pt solid #E4DFC8;border-radius:3mm;padding:5mm 8mm 2mm;background:#FCFBF6}
+.menu .c{font-size:6.6pt;letter-spacing:.3em;text-transform:uppercase;color:#E89908;margin-top:2.2mm}.menu .c:first-of-type{margin-top:0}
+.menu .d{font-family:'Playfair Display',serif;font-style:italic;font-size:12.5pt;line-height:1.25}
+.menu .n{font-size:7.5pt;color:#631B1C;font-style:italic}
+.list .kv{border:0;padding:0 0 2.5mm}
+.sign{display:grid;grid-template-columns:1fr 1fr;gap:16mm;margin-top:10mm}.sign div{border-top:.6pt solid #1A2C54;padding-top:1.5mm;font-size:8pt;color:#5B6478}.sign b{display:block;color:#1A2C54;font-weight:600;font-size:9pt}
+.ack{font-size:8.5pt;color:#5B6478;text-align:center;margin-top:4mm}
+footer{margin-top:7mm;text-align:center;font-size:7.5pt;color:#8A8F9C;letter-spacing:.06em;border-top:.4pt solid #E4DFC8;padding-top:3mm}
+@media print{.bar{display:none}.page{max-width:none;padding-bottom:12mm}footer{position:fixed;bottom:0;left:0;right:0;margin:0;background:#fff}}
+</style></head><body>
+<div class="bar"><button onclick="window.print()">Save as PDF / Print</button><button class="alt" onclick="window.close()">Close</button><span>In the print window, choose <b>Save as PDF</b> as the destination.</span></div>
+<div class="page">
+<header><img src="${logo}" alt="Romualdo's"><div class="tag">Catering Services · Davao City</div>
+<h1>Event Details</h1><div class="sub">${esc(d.client)}</div></header>
+<div class="meta"><span>Ref. ${esc(ref)}</span><span class="status">${esc(st)}</span><span>Issued ${esc(new Date().toLocaleDateString('en-PH', {month: 'long', day: 'numeric', year: 'numeric'}))}</span></div>
+<div class="rule"><i></i></div>
+<div class="hero"><div><span>Date</span><b>${esc(fmtLong(d.date))}</b></div><div><span>Guests</span><b>${esc(d.pax ? d.pax + ' pax' : 'To be confirmed')}</b></div><div><span>Occasion</span><b>${esc(d.type || 'To be confirmed')}</b></div></div>
+<section><h2><small>The Event</small>Client &amp; venue</h2><div class="grid">
+${kv('Client', d.client)}${kv('Contact person', d.contact)}${kv('Mobile', d.mobile)}${kv('Email', d.email)}${kv('Venue', d.venue)}${kv('Venue coordinator', d.coord)}${kv('Package', d.pkg)}
+</div></section>
+${times.length ? `<section><h2><small>Schedule</small>Timeline</h2><div class="times">${times.map(([l, t]) => `<div><span>${l}</span><b>${esc(fmtClock(t))}</b></div>`).join('')}</div></section>` : ''}
+${setup.length ? `<section><h2><small>Service</small>Setup &amp; service</h2><div class="grid list">${setup.map(([l, v]) => kv(l, v)).join('')}</div></section>` : ''}
+${menu.length ? `<section class="p2"><h2 style="text-align:center"><small>Prepared for you</small>The Menu</h2><div class="menu">${menu.map(m => `<div class="c">${esc(m.course)}</div><div class="d">${esc(m.dish)}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}`).join('')}<div style="height:3mm"></div></div></section>` : ''}
+${notes.length ? `<section><h2><small>Please note</small>Notes &amp; requests</h2><div class="list">${notes.map(([l, v]) => kv(l, v)).join('')}</div></section>` : ''}
+<section><p class="ack">By signing below, the client confirms the event details and menu above.</p>
+<div class="sign"><div><b>${esc(d.client)}</b>Client signature over printed name · Date</div><div><b>${esc(d.preparedBy || "Romualdo's Catering Services")}</b>Prepared by · Romualdo's Catering Services</div></div></section>
+<footer>Romualdo's Catering Services · 13 Juna Avenue, Juna Subdivision, Davao City · 0945 542 5300 · romualdoscatering@gmail.com · romualdos.ph</footer>
+</div>
+<script>window.addEventListener('load',()=>{(document.fonts?document.fonts.ready:Promise.resolve()).then(()=>setTimeout(()=>window.print(),400))});<\/script>
+</body></html>`;
+  const w = window.open('', '_blank');
+  if (!w) return toast('Your browser blocked the PDF window. Allow pop-ups for romualdos.ph and try again.', true);
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
 /* ============ STOCK & COUNTS ============ */
 V.stock = () => {
   const b = D.ui.stockBook, {st, sinceDate} = stockFor(b), q = D.ui.stockQ.trim().toLowerCase();
@@ -739,7 +886,7 @@ function eventDetail(e) {
   if (!D.plan || D.plan.eventId !== e.id) D.plan = {eventId: e.id, book: 'C', lines: (e.plan || []).length ? JSON.parse(JSON.stringify(e.plan)) : [{itemId: '', qty: ''}]};
   const rows = Object.entries(s.items).filter(([id]) => S.items[id]).sort((a, b) => iname(a[0]).localeCompare(iname(b[0])));
   const kp = (l, v, cls = '') => `<div class="kpi ${cls}"><span>${l}</span><b>${v}</b></div>`;
-  return `<div class="row"><button class="sm" data-act="closeEvent">‹ All events</button></div>
+  return `<div class="row"><button class="sm" data-act="closeEvent">‹ All events</button><span class="spacer"></span><button class="sm" data-act="editSheet" data-arg="${e.id}">Event sheet</button><button class="sm pri" data-act="pdfSheet" data-arg="${e.id}">PDF</button></div>
   <h2 style="margin-top:10px">${esc(e.name)}</h2>
   <p class="lede">${fmtD(e.date)} · ${esc(e.client || 'no client')} · ${esc(e.pax || '?')} pax${e.venue ? ' · ' + esc(e.venue) : ''} · <span class="chip ${e.status === 'closed' ? 'mut' : e.status === 'done' ? 'ok' : 'info'}">${e.status}</span></p>
   <div class="card"><div class="kpis">${kp('Contract', peso(s.contract))}${kp('Ingredients used', peso(s.used))}${kp('Event expenses', peso(s.exp))}${kp('Total cost', peso(s.cost))}${kp('Gross margin', s.contract ? peso(s.margin) + ` <small class="small">${s.pct.toFixed(1)}%</small>` : '—', s.margin < 0 ? 'bad' : 'ok')}${kp('Cost per pax', s.perPax != null ? peso(s.perPax) : '—')}</div>
