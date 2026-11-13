@@ -306,6 +306,23 @@ td.num{text-align:right;white-space:nowrap}
 .kaar .fine{font-size:12.5px;color:#7A6553;line-height:1.5}
 .kaar-total{display:flex;justify-content:space-between;align-items:baseline;border-top:2px solid var(--k-ink);margin:12px 0 4px;padding-top:10px;font:700 15px Montserrat,sans-serif}
 .kaar-total b{font-family:Shrikhand,serif;font-weight:400;font-size:28px}
+.kaar-hero figure.ph{margin:0}.kaar-hero .ph figcaption{position:absolute;left:12px;right:12px;bottom:12px;background:rgba(58,36,24,.78);color:#fff;font:600 13px Montserrat,sans-serif;padding:7px 12px;border-radius:10px}
+.kaar-h2{font-size:34px;color:var(--k-red);margin:4px 0 2px;text-align:center}.kaar-sub{text-align:center;margin:0 0 14px;color:#6B5444}
+.kaar-opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:0 0 22px}
+.kaar-opt{display:flex;flex-direction:column;text-align:left;background:var(--k-paper);border:2px solid #EADBC0;border-radius:16px;padding:0;overflow:hidden;cursor:pointer;font:inherit;color:var(--k-ink);transition:transform .12s,border-color .12s}
+.kaar-opt:hover{transform:translateY(-2px)}.kaar-opt.on{border-color:var(--k-red);box-shadow:0 0 0 3px #F6D7A0}
+.kaar-opt .oph{display:block;height:130px;background:#F3E3C6;position:relative}.kaar-opt .oph img{width:100%;height:100%;object-fit:cover;display:block}.kaar-opt .noph{display:grid;place-items:center;height:100%;font-size:40px}
+.kaar-opt .ob{display:block;padding:12px 16px 14px}.kaar-opt .ob b{display:block;font-size:22px;color:var(--k-blu);font-weight:400}.kaar-opt .ob small{display:block;color:#7A6553;font-size:13px;margin:2px 0 6px}
+.kaar-opt .op{font:700 16px Montserrat,sans-serif}.kaar-opt .op em{font-style:normal;font-weight:500;font-size:12px;color:#7A6553}
+.kaar-opt .tbf,.kaar-pick b{color:var(--k-red)}.kaar-opt .tbf{border:1.5px dashed var(--k-red);border-radius:999px;padding:3px 10px;font-size:12.5px}
+.kaar-pick{background:#FCEBD0;border-radius:10px;padding:8px 12px;margin:0 0 10px;font-size:14px}
+.kaar-tbf{background:var(--k-cream);border:2px dashed #E2CFAE;border-radius:14px;padding:16px 18px;margin-top:12px}.kaar-tbf b{font-size:24px;color:var(--k-red);font-weight:400}.kaar-tbf p{margin:6px 0 0;line-height:1.55}
+.kaar-fig{margin:12px 0 4px}.kaar-fig img{width:100%;max-height:220px;object-fit:cover;border-radius:12px;display:block}.kaar-fig figcaption{font-size:13px;color:#6B5444;margin-top:5px;font-style:italic}
+.kslot{display:flex;gap:12px;align-items:center;margin:0 0 12px}.kslot-img{width:150px;height:96px;border-radius:10px;overflow:hidden;background:#f2ede0;display:grid;place-items:center;flex:0 0 auto}.kslot-img img{width:100%;height:100%;object-fit:cover}.kslot-b{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media (max-width:640px){.g2{grid-template-columns:1fr}}
+.kopt-ed{border:1.5px solid var(--line);border-radius:12px;padding:14px;margin:0 0 14px;background:#fffdf8}.kopt-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.kopt-h .inl{display:flex!important;flex-direction:row!important;align-items:center;gap:6px;margin:0!important}.kopt-h .inl input{width:auto}
+.kmenu-row{display:grid;grid-template-columns:52px 1.6fr 1fr auto;gap:6px;align-items:center;margin:4px 0}.kmenu-row input{margin:0;width:100%;box-sizing:border-box;min-width:0;text-align:left}.kmenu-row input:first-child{text-align:center;font-size:18px}.kmenu-row .acts{display:flex;gap:3px}
+@media (max-width:640px){.kmenu-row{grid-template-columns:48px 1fr}.kmenu-row input:nth-child(3){grid-column:2}.kmenu-row .acts{grid-column:1/-1;justify-content:flex-end}}
 .kaar-promo{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:#FFF2DC;border:2px solid #F2B33D;border-radius:16px;padding:14px 20px;margin:0 0 18px;color:#3A2418}
 .kaar-promo .fiesta{font-family:Shrikhand,serif;font-size:24px;color:#C8372D}
 .kaar-promo span{flex:1;min-width:220px;font-size:14.5px}
@@ -630,6 +647,7 @@ function render(){
   else if(state.view==="about") v.innerHTML=viewAbout();
   else if(state.view==="aboutEdit") v.innerHTML=state.canEdit?viewAboutEdit():viewAbout();
   else if(state.view==="trayEdit") v.innerHTML=state.canEdit?viewTrayEdit():viewTrays();
+  else if(state.view==="kaarEdit") v.innerHTML=state.canEdit?viewKaarEdit():viewKaarawan();
   bind();
 }
 
@@ -1057,6 +1075,7 @@ const ABOUT_DEFAULT={
   tray_pasta:"Truffle Penne | 1,700\nShrimp Aglio Olio | 1,570\nSignature Baked Lasagna | 1,750\nBacon Carbonara | 1,460\nBaked Creamy Spaghetti | 1,520\nSeafood Marinara | 1,950\nChicken Enchilada | 1,900\nBaked Macaroni | 1,520\nSpaghetti alla Puttanesca | 1,700\nBeef Stroganoff | 1,850",
   tray_salads:"Chopped Asian Salad | 1,100\nGrilled Chicken Salad | 1,200\nChicken Macaroni Salad | 1,200\nThai Noodle Salad | 1,700\nCaesar Salad | 1,030",
   tray_rice:"Garlic Rice | 490\nJava Rice | 600\nBagoong Rice | 650",
+  kaarawan:"",
   tray_desserts:"Mango Lychee | 1,030\nBuko Pandan | 920\nDouble Dark Choco Fudge | 2,300\nBlueberry Cheesecake | 2,200\nPistachio Sans Rival | 2,400"
 };
 const ABOUT_LISTS=["services","mission","clients","homeHighlights","contactPhones"];
@@ -1350,33 +1369,71 @@ function bindTrays(v){
   v.querySelectorAll("[data-tmore]").forEach(b=>b.onclick=()=>{const k=b.dataset.tmore;state.trayOpen[k]=!state.trayOpen[k];keepScroll(render)});
   v.querySelectorAll("[data-scroll]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.scroll)?.scrollIntoView({behavior:"smooth"}));
 }
-/* ============ MALIGAYANG KAARAWAN (fixed birthday package) ============ */
-const KAAR={id:"kaarawan",name:"Maligayang Kaarawan",perHead:500,pax:50,
-  img:"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_113339_4048bddf-388e-4a7f-845d-dfcfcfa44825.png",
-  menu:[["🥟","Lumpia Shanghai","Appetizer"],["🍗","Fried Chicken","Chicken"],["🍢","Pork BBQ","Pork"],["🐟","Sweet & Sour Fish","Fish"],["🍝","Filipino Spaghetti","Pasta"],["🍚","Rice","Rice"],["🥗","Macaroni Salad and Fresh Fruits","Dessert"],["🥤","Softdrinks","Drinks"]]};
+/* ============ MALIGAYANG KAARAWAN (fixed birthday packages) ============
+   Everything on this page is stored as one JSON text field, about.kaarawan, edited by admins in "Edit Kaarawan page". */
+const KAAR_CDN="https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_113339_4048bddf-388e-4a7f-845d-dfcfcfa44825.png";
+const KAAR_DEFAULT={kicker:"Birthday catering package · Davao City",title:"Maligayang Kaarawan Package",
+  intro:"Ang handaang kinalakihan natin: lumpia, fried chicken, BBQ, matamis na spaghetti at malamig na softdrinks. Everything is planned for you, so you just pick the date and celebrate with the family.",
+  stamp:"No menu planning needed!",heroBtn:"Book a package",heroPhoto:{url:KAAR_CDN},heroAlt:"A Filipino birthday handaan with lumpia, fried chicken, pork barbecue and spaghetti",heroCaption:"",
+  optionsTitle:"Pumili ng handaan",optionsIntro:"Three ready-made birthday packages. Tap one to see its menu.",
+  menuTitle:"Ang Handaan",note:"📷 Photos are for reference only. Our team confirms the final menu and inclusions when we call you.",
+  bookTitle:"Book in a minute",bookIntro:"Tell us the date and where the party is. We'll call you to confirm.",
+  bookFine:"Sending this is not yet a confirmed booking. Our team will call or message you to confirm the date and arrange the down payment. More guests? Write it in the notes.",
+  minDays:3,
+  steps:[{t:"1. Pick your date",d:"Choose a package and fill in the short form. No menu to plan."},{t:"2. We call you",d:"We confirm the date, venue and down payment."},{t:"3. Celebrate!",d:"We cook and deliver the handaan. Kain na!"}],
+  options:[
+    {id:"o1",name:"Klasik Handaan",tagline:"The birthday spread we all grew up with",perHead:500,pax:50,show:true,photo:{url:KAAR_CDN},caption:"",
+      menu:[["🥟","Lumpia Shanghai","Appetizer"],["🍗","Fried Chicken","Chicken"],["🍢","Pork BBQ","Pork"],["🐟","Sweet & Sour Fish","Fish"],["🍝","Filipino Spaghetti","Pasta"],["🍚","Rice","Rice"],["🥗","Macaroni Salad and Fresh Fruits","Dessert"],["🥤","Softdrinks","Drinks"]].map(([i,d,c])=>({icon:i,dish:d,cat:c}))},
+    {id:"o2",name:"Option 2",tagline:"",perHead:0,pax:50,show:true,photo:null,caption:"",menu:[]},
+    {id:"o3",name:"Option 3",tagline:"",perHead:0,pax:50,show:true,photo:null,caption:"",menu:[]}]};
+const kRef=p=>{if(!p||typeof p!=="object")return null;if(p.url&&/^https:\/\/d8j0ntlcm91z4\.cloudfront\.net\/[\w\/.-]+$/.test(p.url))return {url:p.url};return cleanRef(p)};
+const kImg=(p,w,alt,extra)=>{p=kRef(p);if(!p)return "";const src=p.url||photoUrl(p,w);return `<img src="${esc(src)}" alt="${esc(alt||"")}" ${extra||""} ${p.id?`data-id="${esc(p.id)}" onerror="photoFallback(this)"`:`onerror="this.style.display='none'"`}>`};
+function kaarData(){
+  let x={};try{x=JSON.parse(state.about.kaarawan||"{}")||{}}catch(e){x={}}
+  const d=JSON.parse(JSON.stringify(KAAR_DEFAULT));
+  for(const k of Object.keys(d)){if(k==="options"||k==="steps")continue;if(k==="heroPhoto"){if("heroPhoto" in x)d.heroPhoto=kRef(x.heroPhoto);continue}if(k==="minDays"){if(x.minDays!=null&&x.minDays!=="")d.minDays=Math.max(0,Math.min(60,Math.round(Number(x.minDays))||0));continue}if(typeof x[k]==="string")d[k]=x[k]}
+  if(Array.isArray(x.steps))d.steps=x.steps.slice(0,3).map(s=>({t:String(s?.t||""),d:String(s?.d||"")}));
+  if(Array.isArray(x.options)&&x.options.length)d.options=x.options.slice(0,6).map((o,i)=>({id:String(o?.id||"o"+(i+1)),name:String(o?.name||""),tagline:String(o?.tagline||""),perHead:Math.max(0,Number(o?.perHead)||0),pax:Math.max(1,Math.round(Number(o?.pax))||50),show:o?.show!==false,photo:kRef(o?.photo),caption:String(o?.caption||""),
+    menu:Array.isArray(o?.menu)?o.menu.map(m=>({icon:String(m?.icon||""),dish:String(m?.dish||""),cat:String(m?.cat||"")})).filter(m=>m.dish.trim()):[]}));
+  return d;
+}
+const kReady=o=>o.perHead>0&&o.menu.length>0;
 state.kForm=state.kForm||{name:"",phone:"",email:"",date:"",time:"",venue:"",celebrant:"",notes:""};
-function kaarPromo(){return `<div class="kaar-promo"><b class="fiesta">Maligayang Kaarawan Package</b><span>A classic Pinoy birthday handaan for 50 guests — ₱25,000, menu all set. Book in under a minute.</span><button data-go="kaarawan">See the package →</button></div>`}
+function kaarPromo(){const K=kaarData(),ready=K.options.filter(o=>o.show&&kReady(o));if(!ready.length)return "";const lo=Math.min(...ready.map(o=>o.perHead*o.pax));
+  return `<div class="kaar-promo"><b class="fiesta">${esc(K.title)}</b><span>A classic Pinoy birthday handaan, menu all set, from ₱${lo.toLocaleString("en-PH")}. Book in under a minute.</span><button data-go="kaarawan">See the packages →</button></div>`}
 function viewKaarawan(){
-  const k=KAAR,f=state.kForm,total=k.perHead*k.pax,flags=`<div class="flags" aria-hidden="true">${"<i></i>".repeat(48)}</div>`;
+  const K=kaarData(),f=state.kForm,opts=K.options.filter(o=>o.show);
+  if(!opts.find(o=>o.id===state.kOpt))state.kOpt=(opts.find(kReady)||opts[0]||{}).id;
+  const o=opts.find(x=>x.id===state.kOpt),ready=o&&kReady(o),total=o?o.perHead*o.pax:0;
+  const priced=opts.filter(kReady),lo=priced.length?Math.min(...priced.map(x=>x.perHead*x.pax)):0;
+  const flags=`<div class="flags" aria-hidden="true">${"<i></i>".repeat(48)}</div>`,fb=socialUrl("facebookUrl"),ph=(state.about.contactPhones||[])[0]||"";
   return `<div class="kaar">
+  ${state.canEdit?`<div style="text-align:right;margin:0 0 8px"><button class="btn small ghost" data-go="kaarEdit">✎ Edit this page</button></div>`:""}
   <section class="kaar-hero">${flags}<div class="in">
-    <div class="txt"><div class="kick">Birthday catering package · Davao City</div>
-      <h1 class="fiesta">Maligayang Kaarawan Package</h1>
-      <p>Ang handaang kinalakihan natin: lumpia, fried chicken, BBQ, matamis na spaghetti at malamig na softdrinks. Everything is planned for you, so you just pick the date and celebrate with the family.</p>
-      <div class="kaar-price"><span class="big">₱${total.toLocaleString("en-PH")}</span><span class="sub">for ${k.pax} guests<br>₱${k.perHead}/head · menu all set</span><span class="stamp">No menu planning needed!</span></div>
-      <button class="kbtn" data-scroll="kaarBook">Book this package</button></div>
-    <div class="ph"><img src="${k.img}" alt="A Filipino birthday handaan with lumpia, fried chicken, pork barbecue and spaghetti" loading="eager" onerror="this.style.display='none'"></div>
+    <div class="txt">${K.kicker?`<div class="kick">${esc(K.kicker)}</div>`:""}
+      <h1 class="fiesta">${esc(K.title)}</h1>${paras(K.intro)}
+      ${lo?`<div class="kaar-price"><span class="sub">${priced.length>1?"Starts at":"Only"}</span><span class="big">₱${lo.toLocaleString("en-PH")}</span><span class="sub">for ${priced[0].pax} guests</span>${K.stamp?`<span class="stamp">${esc(K.stamp)}</span>`:""}</div>`:""}
+      ${K.heroBtn?`<button class="kbtn" data-scroll="kaarOpts">${esc(K.heroBtn)}</button>`:""}</div>
+    <figure class="ph">${kImg(K.heroPhoto,1600,K.heroAlt,'loading="eager"')}${K.heroCaption?`<figcaption>${esc(K.heroCaption)}</figcaption>`:""}</figure>
   </div></section>
-  <div class="kaar-grid">
-    <section class="kaar-card"><h2 class="fiesta">Ang Handaan</h2><p class="hint" style="margin:0">The complete menu, good for ${k.pax} guests</p>
-      <ul class="kaar-menu">${k.menu.map(([ic,d,c])=>`<li><span class="dot" aria-hidden="true">${ic}</span><span>${esc(d)}<small>${esc(c)}</small></span></li>`).join("")}</ul>
-      <p class="fine" style="margin:12px 0 0">📷 Photo is for reference only. Our team confirms the final menu and inclusions when we call you.</p></section>
-    <section class="kaar-card" id="kaarBook"><h2 class="fiesta">Book in a minute</h2><p class="hint" style="margin:0 0 10px">Tell us the date and where the party is. We'll call you to confirm.</p>
-      <form id="kaarForm" novalidate>
+  <section id="kaarOpts">${K.optionsTitle?`<h2 class="fiesta kaar-h2">${esc(K.optionsTitle)}</h2>`:""}${K.optionsIntro?`<p class="kaar-sub">${esc(K.optionsIntro)}</p>`:""}
+    <div class="kaar-opts" role="tablist">${opts.map(x=>`<button class="kaar-opt ${x.id===state.kOpt?"on":""}" role="tab" aria-selected="${x.id===state.kOpt}" data-kopt="${esc(x.id)}">
+      <span class="oph">${x.photo?kImg(x.photo,700,x.caption||x.name,'loading="lazy"'):`<span class="noph" aria-hidden="true">🎉</span>`}</span>
+      <span class="ob"><b class="fiesta">${esc(x.name)}</b>${x.tagline?`<small>${esc(x.tagline)}</small>`:""}
+      <span class="op">${kReady(x)?`₱${(x.perHead*x.pax).toLocaleString("en-PH")} <em>· ${x.pax} guests · ₱${x.perHead}/head</em>`:`<span class="tbf">Menu to follow</span>`}</span></span></button>`).join("")}</div></section>
+  ${o?`<div class="kaar-grid">
+    <section class="kaar-card"><h2 class="fiesta">${esc(K.menuTitle)}</h2><p class="hint" style="margin:0">${esc(o.name)}${ready?` · good for ${o.pax} guests`:""}</p>
+      ${o.photo&&o.caption?`<figure class="kaar-fig">${kImg(o.photo,900,o.caption)}<figcaption>${esc(o.caption)}</figcaption></figure>`:""}
+      ${o.menu.length?`<ul class="kaar-menu">${o.menu.map(m=>`<li><span class="dot" aria-hidden="true">${esc(m.icon||"🍽️")}</span><span>${esc(m.dish)}${m.cat?`<small>${esc(m.cat)}</small>`:""}</span></li>`).join("")}</ul>`
+        :`<div class="kaar-tbf"><b class="fiesta">Menu to follow</b><p>We're finalizing this package. Message us${fb?` on <a href="${esc(fb)}" target="_blank" rel="noopener">Facebook</a>`:""}${ph?` or call ${esc(ph)}`:""} and we'll tell you as soon as it's ready.</p></div>`}
+      ${K.note?`<p class="fine" style="margin:12px 0 0">${esc(K.note)}</p>`:""}</section>
+    <section class="kaar-card" id="kaarBook"><h2 class="fiesta">${esc(K.bookTitle)}</h2><p class="hint" style="margin:0 0 10px">${esc(K.bookIntro)}</p>
+      ${ready?`<form id="kaarForm" novalidate>
+        <div class="kaar-pick">Package: <b>${esc(o.name)}</b></div>
         <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <label>Your name<input name="name" value="${esc(f.name)}" autocomplete="name" required></label>
           <label>Mobile number<input name="phone" value="${esc(f.phone)}" type="tel" inputmode="tel" placeholder="09XX XXX XXXX" autocomplete="tel" required></label>
-          <label>Party date<input name="date" value="${esc(f.date)}" type="date" min="${phDate(3)}" required></label>
+          <label>Party date<input name="date" value="${esc(f.date)}" type="date" min="${phDate(K.minDays)}" required></label>
           <label>Time<input name="time" value="${esc(f.time)}" type="time"></label>
         </div>
         <label>Venue / address<input name="venue" value="${esc(f.venue)}" placeholder="e.g. our home in Matina, or a function hall"></label>
@@ -1386,35 +1443,114 @@ function viewKaarawan(){
         </div>
         <label><span>Anything we should know? <span class="hint">(optional)</span></span><textarea name="notes" rows="2" placeholder="e.g. 7th birthday, more guests, no seafood">${esc(f.notes)}</textarea></label>
         <input name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-5000px" aria-hidden="true">
-        <div class="kaar-total"><span>${k.pax} guests × ₱${k.perHead}</span><b>₱${total.toLocaleString("en-PH")}</b></div>
-        <p class="fine">Sending this is not yet a confirmed booking. Our team will call or message you to confirm the date and arrange the down payment. More than ${k.pax} guests? Write it in the notes.</p>
+        <div class="kaar-total"><span>${o.pax} guests × ₱${o.perHead}</span><b>₱${total.toLocaleString("en-PH")}</b></div>
+        ${K.bookFine?`<p class="fine">${esc(K.bookFine)}</p>`:""}
         <div class="formmsg" id="kaarMsg"></div>
         <button class="kbtn" type="submit" style="width:100%">Send my booking request</button>
-      </form></section>
-  </div>
-  <div class="kaar-steps"><div><b>1. Pick your date</b>Fill in the short form. No menu to choose, it's all set.</div><div><b>2. We call you</b>We confirm the date, venue and down payment.</div><div><b>3. Celebrate!</b>We cook and deliver the handaan. Kain na!</div></div>
+      </form>`:`<div class="kaar-tbf"><p>Online booking opens once the menu for <b>${esc(o.name)}</b> is ready. ${fb?`<a class="kbtn" href="${esc(fb)}" target="_blank" rel="noopener" style="margin-top:8px">Message us on Facebook</a>`:""}</p></div>`}
+    </section></div>`:""}
+  ${K.steps.some(x=>x.t||x.d)?`<div class="kaar-steps">${K.steps.map(x=>`<div><b>${esc(x.t)}</b>${esc(x.d)}</div>`).join("")}</div>`:""}
   ${flags}</div>`;
 }
 function bindKaarawan(v){
+  v.querySelectorAll("[data-kopt]").forEach(b=>b.onclick=()=>{state.kOpt=b.dataset.kopt;keepScroll(render)});
+  v.querySelectorAll("[data-scroll]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.scroll)?.scrollIntoView({behavior:"smooth"}));
   const fm=$("#kaarForm",v);if(!fm)return;
   fm.addEventListener("input",e=>{const n=e.target.name;if(n&&n in state.kForm)state.kForm[n]=e.target.value});
   fm.onsubmit=async e=>{e.preventDefault();
+    const K=kaarData(),o=K.options.find(x=>x.id===state.kOpt);if(!o||!kReady(o))return;
     const f=state.kForm,msg=$("#kaarMsg");msg.textContent="";fm.querySelectorAll(".err").forEach(el=>el.classList.remove("err"));
     const need=["name","phone","date"].filter(n=>!String(f[n]||"").trim());need.forEach(n=>fm.elements[n].classList.add("err"));
     if(need.length){msg.textContent="Please fill in your name, mobile number and party date.";fm.elements[need[0]].focus();return}
-    if(f.date<phDate(3)){fm.elements.date.classList.add("err");const ph=(state.about.contactPhones||[])[0]||"";msg.textContent=`Please book at least 3 days ahead. For a sooner date, message us on Facebook${ph?" or call "+ph:""}.`;return}
+    if(f.date<phDate(K.minDays)){fm.elements.date.classList.add("err");const ph=(state.about.contactPhones||[])[0]||"";msg.textContent=`Please book at least ${K.minDays} days ahead. For a sooner date, message us on Facebook${ph?" or call "+ph:""}.`;return}
     const btn=fm.querySelector("button[type=submit]");btn.disabled=true;btn.textContent="Sending…";
-    const k=KAAR,notes=[f.celebrant.trim()?"Celebrant: "+f.celebrant.trim():"",f.notes.trim()].filter(Boolean).join("\n");
+    const notes=[f.celebrant.trim()?"Celebrant: "+f.celebrant.trim():"",f.notes.trim()].filter(Boolean).join("\n");
+    const pname=(K.title.replace(/\s*package\s*$/i,"")+" – "+o.name).slice(0,40);
     const q={ref:newRef(),createdAt:new Date().toISOString(),status:"New",customer:{name:f.name.trim(),phone:f.phone.trim(),email:f.email.trim()},
-      event:{date:f.date,time:f.time,type:"Birthday",venue:f.venue.trim(),pax:k.pax},notes,
-      plan:{kind:"package",packageId:k.id,packageName:k.name,pricePerHead:k.perHead,chefPick:false},
-      items:k.menu.map(([,d,c])=>({cat:c,dish:d,tier:"kaarawan",slot:c})),estimate:{perHead:k.perHead,total:k.perHead*k.pax}};
+      event:{date:f.date,time:f.time,type:"Birthday",venue:f.venue.trim(),pax:o.pax},notes,
+      plan:{kind:"package",packageId:("k-"+o.id).slice(0,20),packageName:pname,pricePerHead:o.perHead,chefPick:false},
+      items:o.menu.map(m=>({cat:m.cat||"Menu",dish:m.dish,tier:"kaarawan",slot:m.cat})),estimate:{perHead:o.perHead,total:o.perHead*o.pax}};
     const r=await api("submit",{inquiry:q,website:fm.elements.website.value||""});
     if(!r.ok&&!r.network&&r.error){btn.disabled=false;btn.textContent="Send my booking request";msg.textContent=r.error;return}
     if(r.ok&&r.ref)q.ref=r.ref;
     state.lastDone={inq:q,saved:!!r.ok,message:messageFor(q)};state.kForm={name:"",phone:"",email:"",date:"",time:"",venue:"",celebrant:"",notes:""};
     if(r.ok&&state.isStaff)loadInquiries();go("done")};
-  v.querySelectorAll("[data-scroll]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.scroll)?.scrollIntoView({behavior:"smooth"}));
+}
+/* ---------- Kaarawan page editor (admin) ---------- */
+function startKaarDraft(){state.kDraft=kaarData();state.kDirty=false;state.kMsg=""}
+function kDirty(){if(!state.kDirty){state.kDirty=true;const s=$("#saveKaar"),x=$("#discardKaar"),m=$("#kMsg");if(s)s.disabled=false;if(x)x.disabled=false;if(m)m.textContent="You have unsaved changes."}}
+function viewKaarEdit(){
+  if(!state.kDraft)startKaarDraft();
+  const D=state.kDraft;
+  const inp=(path,label,val,max,ph)=>`<label>${label}<input data-kp="${path}" value="${esc(val)}" maxlength="${max||120}" ${ph?`placeholder="${esc(ph)}"`:""}></label>`;
+  const ta=(path,label,val,rows,max)=>`<label>${label}<textarea data-kp="${path}" rows="${rows||3}" maxlength="${max||800}">${esc(val)}</textarea></label>`;
+  const photo=(path,ref,label)=>`<div class="kslot"><div class="kslot-img">${ref?kImg(ref,500,label):`<span class="hint">No photo</span>`}</div><div class="kslot-b"><b>${label}</b>
+    <label class="btn small" style="cursor:pointer;margin:0;flex-direction:row;color:#fff">${ref?"Replace photo":"＋ Add photo"}<input type="file" accept="image/*" data-kup="${path}" style="display:none"></label>
+    ${ref?`<button class="btn small ghost" data-kclr="${path}">Remove photo</button>`:""}</div></div>`;
+  const sec=(t,body)=>`<details class="panel ed sec" open><summary><h3 style="display:inline">${t}</h3></summary><div style="margin-top:12px">${body}</div></details>`;
+  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>Edit Kaarawan page</h1><span class="who">Admin only · every word, price, menu and photo on the <a href="#kaarawan" data-go="kaarawan">Kaarawan page</a></span></div>
+  <div class="formmsg" id="kUpMsg" style="color:var(--blue);min-height:0;margin-bottom:8px">${esc(state.kUpMsg||"")}</div>
+  ${sec("Top of the page",`${photo("heroPhoto",D.heroPhoto,"Big photo")}${inp("heroAlt","Photo description (for screen readers)",D.heroAlt,140)}${inp("heroCaption","Photo caption (optional, shown on the photo)",D.heroCaption,120)}
+    ${inp("kicker","Small heading",D.kicker,60)}${inp("title","Big festive title",D.title,60)}${ta("intro","Intro text (blank line between paragraphs)",D.intro,3,800)}
+    <div class="g2">${inp("stamp","Stamp text (leave empty to hide)",D.stamp,40)}${inp("heroBtn","Button text (leave empty to hide)",D.heroBtn,30)}</div>`)}
+  ${sec("Packages",`<div class="g2">${inp("optionsTitle","Heading above the packages",D.optionsTitle,60)}${inp("optionsIntro","Line under the heading",D.optionsIntro,160)}</div>
+    <p class="hint" style="margin:4px 0 10px">A package with no menu or no price shows <b>"Menu to follow"</b> and can't be booked online yet.</p>
+    ${D.options.map((o,i)=>`<div class="kopt-ed"><div class="kopt-h"><b>Package ${i+1}</b><label class="inl"><input type="checkbox" data-kshow="${i}" ${o.show?"checked":""}> Show on the page</label><span style="flex:1"></span>
+      <button class="btn small ghost" data-kou="${i}" ${i===0?"disabled":""} title="Move left">←</button><button class="btn small ghost" data-kod="${i}" ${i===D.options.length-1?"disabled":""} title="Move right">→</button>${D.options.length>1?`<button class="btn small danger" data-kox="${i}">Remove</button>`:""}</div>
+      <div class="g2">${inp(`options.${i}.name`,"Package name",o.name,40)}${inp(`options.${i}.tagline`,"Short line under the name",o.tagline,80)}</div>
+      <div class="g2">${inp(`options.${i}.perHead`,"Price per head (₱)",o.perHead||"",8,"e.g. 500")}${inp(`options.${i}.pax`,"Number of guests",o.pax,5)}</div>
+      <p class="hint" style="margin:-4px 0 10px">Package total: <b>₱${((Number(o.perHead)||0)*(Number(o.pax)||0)).toLocaleString("en-PH")}</b></p>
+      ${photo(`options.${i}.photo`,o.photo,"Package photo")}${inp(`options.${i}.caption`,"Photo caption (shown above the menu)",o.caption,120)}
+      <b style="display:block;margin:10px 0 4px">Menu</b>
+      ${o.menu.map((m,j)=>`<div class="kmenu-row"><input data-kp="options.${i}.menu.${j}.icon" value="${esc(m.icon)}" maxlength="4" aria-label="Icon" title="Icon (emoji)"><input data-kp="options.${i}.menu.${j}.dish" value="${esc(m.dish)}" maxlength="80" placeholder="Dish" aria-label="Dish"><input data-kp="options.${i}.menu.${j}.cat" value="${esc(m.cat)}" maxlength="30" placeholder="Category, e.g. Pork" aria-label="Category">
+        <span class="acts"><button class="btn small ghost" data-kmu="${i}.${j}" ${j===0?"disabled":""}>↑</button><button class="btn small ghost" data-kmd="${i}.${j}" ${j===o.menu.length-1?"disabled":""}>↓</button><button class="btn small danger" data-kmx="${i}.${j}">✕</button></span></div>`).join("")||`<p class="hint">No dishes yet, so customers see "Menu to follow".</p>`}
+      <button class="btn small ghost" data-kma="${i}">＋ Add dish</button></div>`).join("")}
+    ${D.options.length<6?`<button class="btn small" id="kAddOpt">＋ Add another package</button>`:""}`)}
+  ${sec("Menu &amp; booking boxes",`<div class="g2">${inp("menuTitle","Menu box heading",D.menuTitle,40)}${inp("bookTitle","Booking box heading",D.bookTitle,40)}</div>
+    ${inp("bookIntro","Line under the booking heading",D.bookIntro,160)}${ta("bookFine","Small print above the button",D.bookFine,2,400)}${ta("note","Note under the menu",D.note,2,300)}
+    ${inp("minDays","Book at least this many days ahead",D.minDays,2)}`)}
+  ${sec("Three steps",D.steps.map((x,i)=>`<div class="g2">${inp(`steps.${i}.t`,`Step ${i+1} title`,x.t,40)}${inp(`steps.${i}.d`,`Step ${i+1} text`,x.d,160)}</div>`).join(""))}
+  <div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:sticky;bottom:10px;z-index:5;border-color:${state.kDirty?"var(--gold)":"var(--line)"}">
+    <button class="btn gold" id="saveKaar" ${state.kDirty?"":"disabled"}>Save changes</button><button class="btn ghost" id="discardKaar" ${state.kDirty?"":"disabled"}>Discard changes</button>
+    <button class="btn ghost small" id="kDefaults">Start over from the original page</button>
+    <span class="formmsg" id="kMsg" style="margin:0">${esc(state.kMsg||(state.kDirty?"You have unsaved changes.":""))}</span></div>`;
+}
+function kSet(path,val){const ks=path.split(".");let o=state.kDraft;for(let i=0;i<ks.length-1;i++)o=o[ks[i]];o[ks[ks.length-1]]=val}
+function kGet(path){return path.split(".").reduce((o,k)=>o?.[k],state.kDraft)}
+function bindKaarEdit(v){
+  const D=state.kDraft,re=()=>{state.kDirty=true;keepScroll(render)};
+  v.querySelectorAll("[data-kp]").forEach(el=>el.oninput=()=>{kSet(el.dataset.kp,el.value);kDirty();if(/perHead|pax/.test(el.dataset.kp)){const t=el.closest(".kopt-ed")?.querySelector("p.hint b");const i=+el.dataset.kp.split(".")[1];if(t)t.textContent="₱"+((Number(D.options[i].perHead)||0)*(Number(D.options[i].pax)||0)).toLocaleString("en-PH")}});
+  v.querySelectorAll("[data-kshow]").forEach(el=>el.onchange=()=>{D.options[+el.dataset.kshow].show=el.checked;kDirty()});
+  v.querySelectorAll("[data-kup]").forEach(el=>el.onchange=async()=>{const f=el.files[0];el.value="";if(!f)return;state.kUpMsg="Uploading photo…";$("#kUpMsg").textContent=state.kUpMsg;
+    try{const r=await uploadOne(f,{slot:true});const ref=r.ok&&cleanRef(r.photo);if(ref){kSet(el.dataset.kup,ref);state.kUpMsg="Photo uploaded. Click Save changes to publish.";state.kDirty=true}else state.kUpMsg="Photo not uploaded: "+upErr(r)}catch(e){state.kUpMsg="That file isn't a photo the browser can read."}keepScroll(render)});
+  v.querySelectorAll("[data-kclr]").forEach(b=>b.onclick=()=>{kSet(b.dataset.kclr,null);re()});
+  const sw=(a,i,j)=>{[a[i],a[j]]=[a[j],a[i]];re()};
+  v.querySelectorAll("[data-kou]").forEach(b=>b.onclick=()=>{const i=+b.dataset.kou;sw(D.options,i,i-1)});
+  v.querySelectorAll("[data-kod]").forEach(b=>b.onclick=()=>{const i=+b.dataset.kod;sw(D.options,i,i+1)});
+  v.querySelectorAll("[data-kox]").forEach(b=>b.onclick=()=>{const i=+b.dataset.kox;if(!confirm(`Remove the package "${D.options[i].name}"?`))return;D.options.splice(i,1);re()});
+  v.querySelectorAll("[data-kma]").forEach(b=>b.onclick=()=>{D.options[+b.dataset.kma].menu.push({icon:"🍽️",dish:"",cat:""});re()});
+  const ij=s=>s.split(".").map(Number);
+  v.querySelectorAll("[data-kmu]").forEach(b=>b.onclick=()=>{const [i,j]=ij(b.dataset.kmu);sw(D.options[i].menu,j,j-1)});
+  v.querySelectorAll("[data-kmd]").forEach(b=>b.onclick=()=>{const [i,j]=ij(b.dataset.kmd);sw(D.options[i].menu,j,j+1)});
+  v.querySelectorAll("[data-kmx]").forEach(b=>b.onclick=()=>{const [i,j]=ij(b.dataset.kmx);D.options[i].menu.splice(j,1);re()});
+  const ao=$("#kAddOpt",v);if(ao)ao.onclick=()=>{D.options.push({id:"o"+Date.now().toString(36),name:"New package",tagline:"Menu to follow",perHead:0,pax:50,show:false,photo:null,caption:"",menu:[]});re()};
+  const sv=$("#saveKaar",v);if(sv)sv.onclick=saveKaar;
+  const dx=$("#discardKaar",v);if(dx)dx.onclick=()=>{startKaarDraft();keepScroll(render)};
+  const df=$("#kDefaults",v);if(df)df.onclick=()=>{if(!confirm("Replace everything here with the original page? (Nothing is published until you click Save changes.)"))return;state.kDraft=JSON.parse(JSON.stringify(KAAR_DEFAULT));re()};
+}
+async function saveKaar(){
+  const D=state.kDraft;
+  const out={...D,minDays:Math.max(0,Math.min(60,Math.round(Number(D.minDays))||0)),options:D.options.map(o=>({...o,perHead:Math.max(0,Number(String(o.perHead).replace(/[^\d.]/g,""))||0),pax:Math.max(1,Math.round(Number(o.pax))||50),menu:o.menu.filter(m=>String(m.dish).trim())}))};
+  if(!String(out.title).trim()){state.kMsg="The title can't be empty.";keepScroll(render);return}
+  if(out.options.some(o=>!String(o.name).trim())){state.kMsg="Every package needs a name.";keepScroll(render);return}
+  const json=JSON.stringify(out);if(json.length>20000){state.kMsg="Too much text; please shorten some menus or descriptions.";keepScroll(render);return}
+  state.kMsg="Saving…";keepScroll(render);
+  let r;try{r=await api("saveAbout",{about:{...state.about,kaarawan:json}})}catch(e){r={ok:false,error:"No internet connection"}}
+  if(!r.ok){state.kMsg=r.error||"Couldn't save.";keepScroll(render);return}
+  applyAbout(r.about||{...state.about,kaarawan:json},state.gallery);
+  if(!state.about.kaarawan){state.kMsg="Saved, but the server didn't keep the page (the Google script needs updating).";keepScroll(render);return}
+  if(state.aboutDraft)state.aboutDraft.kaarawan=state.about.kaarawan;
+  startKaarDraft();toast("Kaarawan page saved — live now");keepScroll(render);
 }
 function viewContact(){
   const a=state.about, fb=socialUrl("facebookUrl"), ig=socialUrl("instagramUrl");
@@ -1643,7 +1779,8 @@ function bind(){
   if(state.view==="home")bindFilm(v);
   if(state.view==="aboutEdit")bindAboutEdit(v);
   if(state.view==="trayEdit")bindTrayEdit(v);
-  v.querySelectorAll("[data-go]").forEach(b=>b.onclick=e=>{e.preventDefault();if(b.dataset.go==="packages")state.pkg=null;if(b.dataset.go==="trayEdit"&&!state.trayDirty)startTrayDraft();go(b.dataset.go)});
+  if(state.view==="kaarEdit")bindKaarEdit(v);
+  v.querySelectorAll("[data-go]").forEach(b=>b.onclick=e=>{e.preventDefault();if(b.dataset.go==="packages")state.pkg=null;if(b.dataset.go==="trayEdit"&&!state.trayDirty)startTrayDraft();if(b.dataset.go==="kaarEdit"&&!state.kDirty)startKaarDraft();go(b.dataset.go)});
   v.querySelectorAll("[data-pax]").forEach(b=>b.onclick=()=>{state.pax=Number(b.dataset.pax);render()});
   const pax=$("#pax",v);
   if(pax){
