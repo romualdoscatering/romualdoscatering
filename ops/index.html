@@ -879,40 +879,43 @@ function printSheet(id, w) {
 <style>
 @page{size:A4;margin:0}
 *{box-sizing:border-box}html,body{margin:0;padding:0}
-body{font-family:Montserrat,Arial,sans-serif;color:#1A2C54;font-size:8.6pt;line-height:1.4;-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#ECE8DA}
+:root{--ink:#14213F;--txt:#1F2433;--lab:#4A5265;--acc:#8A5A00;--rule:#9C9479;--wine:#631B1C}
+body{font-family:Montserrat,Arial,sans-serif;color:var(--txt);font-size:9.6pt;line-height:1.42;-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#ECE8DA}
+.serif,h1,h2,.who,.hero b,.times b,.menu .d,.items td.d{font-family:Alta,'Playfair Display',Georgia,serif}
 .page{width:210mm;min-height:297mm;margin:0 auto;padding:11mm 13mm 9mm;background:#fff;display:flex;flex-direction:column}
 .bar{display:flex;gap:10px;justify-content:center;padding:12px;background:#F7F4EA;border-bottom:1px solid #E4DFC8}
 .bar button{font:600 13px Montserrat;border:0;border-radius:8px;padding:10px 18px;cursor:pointer;background:#1A2C54;color:#fff}.bar button.alt{background:#fff;color:#1A2C54;border:1px solid #CFC9B0}
 .bar span{align-self:center;font-size:12px;color:#5B6478}
-header{display:flex;align-items:center;gap:6mm;padding-bottom:3.5mm;border-bottom:.7pt solid #C9A24A}
+header{display:flex;align-items:center;gap:6mm;padding-bottom:3.5mm;border-bottom:1pt solid var(--rule)}
 header img{height:17mm}
-.hd{flex:1}.tag{font-size:6.5pt;letter-spacing:.3em;text-transform:uppercase;color:#E89908}
-h1{font-family:'Playfair Display',Georgia,serif;font-weight:400;font-style:italic;font-size:21pt;line-height:1.1;margin:.5mm 0 .5mm}
-.who{font-family:'Playfair Display',serif;font-size:11pt}
-.meta{text-align:right;font-size:7.3pt;color:#5B6478;line-height:1.7;white-space:nowrap}
-.status{display:inline-block;border:.6pt solid #631B1C;color:#631B1C;border-radius:20px;padding:0 2.5mm;font-size:6.6pt;letter-spacing:.14em;text-transform:uppercase}
-.hero{background:#1A2C54;color:#fff;border-radius:2.5mm;padding:3.2mm 6mm;display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:4mm;text-align:center;margin:4mm 0}
-.hero span{display:block;font-size:6pt;letter-spacing:.26em;text-transform:uppercase;color:#E5DEB2}.hero b{font-family:'Playfair Display',serif;font-weight:400;font-size:11.5pt}
+.hd{flex:1;min-width:0}.tag{font-size:7pt;font-weight:600;letter-spacing:.24em;text-transform:uppercase;color:var(--acc);white-space:nowrap}
+h1{font-weight:400;font-style:italic;font-size:22pt;line-height:1.1;margin:.8mm 0 .6mm;color:var(--ink)}
+.who{font-size:12.5pt;color:var(--ink)}
+.meta{text-align:right;font-size:8pt;color:var(--lab);line-height:1.75;white-space:nowrap}
+.status{display:inline-block;border:.8pt solid var(--wine);color:var(--wine);border-radius:20px;padding:0 2.5mm;font-size:7pt;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
+.hero{border-top:1.6pt solid var(--ink);border-bottom:1.6pt solid var(--ink);padding:3mm 4mm;display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:4mm;text-align:center;margin:4mm 0;color:var(--ink)}
+.hero div+div{border-left:.6pt solid var(--rule)}
+.hero span{display:block;font-size:6.8pt;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--acc)}.hero b{font-weight:400;font-size:13pt;color:var(--ink)}
 .cols{display:grid;grid-template-columns:1.12fr 1fr;gap:7mm;align-items:start}
-h2{font-family:'Playfair Display',Georgia,serif;font-weight:600;font-size:10.5pt;margin:0 0 1.5mm;letter-spacing:.02em;border-bottom:.4pt solid #E4DFC8;padding-bottom:1mm}
-h2 small{font-family:Montserrat;font-weight:500;font-size:6pt;letter-spacing:.28em;text-transform:uppercase;color:#E89908;margin-left:2mm}
+h2{font-weight:600;font-size:11.5pt;margin:0 0 1.5mm;letter-spacing:.02em;border-bottom:.8pt solid var(--rule);padding-bottom:1mm;color:var(--ink)}
+h2 small{font-family:Montserrat,Arial,sans-serif;font-weight:600;font-size:6.5pt;letter-spacing:.24em;text-transform:uppercase;color:var(--acc);margin-left:2mm}
 section{margin:0 0 3.5mm}
 table.kv{width:100%;border-collapse:collapse}
-.kv th{width:31mm;text-align:left;vertical-align:top;font-weight:500;font-size:6.4pt;letter-spacing:.14em;text-transform:uppercase;color:#8A8F9C;padding:.9mm 2mm .9mm 0}
-.kv td{font-weight:500;padding:.7mm 0;white-space:pre-wrap;overflow-wrap:anywhere}
-.times{display:flex;gap:3mm}.times div{flex:1;border:.5pt solid #E4DFC8;border-radius:2mm;text-align:center;padding:1.3mm 0}
-.times span{display:block;font-size:6pt;letter-spacing:.2em;text-transform:uppercase;color:#8A8F9C}.times b{font-family:'Playfair Display',serif;font-size:11pt;font-weight:400}
-.menu{text-align:center;border:.6pt solid #E4DFC8;border-radius:2.5mm;padding:4mm 5mm 3.5mm;background:#FCFBF6}
-.menu h2{border:0;text-align:center;font-size:13pt;font-style:italic;font-weight:400;margin-bottom:1mm}
-.menu .c{font-size:6pt;letter-spacing:.28em;text-transform:uppercase;color:#E89908;margin-top:1.8mm}
-.menu .d{font-family:'Playfair Display',serif;font-style:italic;font-size:10.5pt;line-height:1.2}
-.menu .n{font-size:6.8pt;color:#631B1C;font-style:italic}
-.items{width:100%;border-collapse:collapse;text-align:left}.items th{font-size:6pt;letter-spacing:.2em;text-transform:uppercase;color:#8A8F9C;font-weight:500;border-bottom:.5pt solid #E4DFC8;padding:1mm}
-.items td{padding:1.4mm 1mm;border-bottom:.4pt solid #EFEBDD;vertical-align:top}.items td.d{font-family:'Playfair Display',serif;font-style:italic;font-size:10pt}.items .q{text-align:center;width:16mm;font-weight:600}.items .n{font-size:6.8pt;color:#631B1C;font-style:italic}
+.kv th{width:31mm;text-align:left;vertical-align:top;font-weight:600;font-size:7pt;letter-spacing:.1em;text-transform:uppercase;color:var(--lab);padding:1mm 2mm 1mm 0}
+.kv td{font-weight:500;padding:.8mm 0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--txt)}
+.times{display:flex;gap:3mm}.times div{flex:1;border:.8pt solid var(--rule);border-radius:2mm;text-align:center;padding:1.3mm 0}
+.times span{display:block;font-size:6.6pt;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--lab)}.times b{font-size:12pt;font-weight:400;color:var(--ink)}
+.menu{text-align:center;border:1pt solid var(--rule);border-radius:2.5mm;padding:4mm 5mm 3.5mm;background:#FBF9F2}
+.menu h2{border:0;text-align:center;font-size:14pt;font-style:italic;font-weight:400;margin-bottom:1mm}
+.menu .c{font-size:6.6pt;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--acc);margin-top:2mm}
+.menu .d{font-style:italic;font-size:11.5pt;line-height:1.22;color:var(--ink)}
+.menu .n{font-size:7.6pt;color:var(--wine);font-style:italic;font-weight:500}
+.items{width:100%;border-collapse:collapse;text-align:left}.items th{font-size:6.6pt;letter-spacing:.18em;text-transform:uppercase;color:var(--lab);font-weight:600;border-bottom:.8pt solid var(--rule);padding:1mm}
+.items td{padding:1.4mm 1mm;border-bottom:.6pt solid #CFC8B0;vertical-align:top}.items td.d{font-style:italic;font-size:11pt}.items .q{text-align:center;width:16mm;font-weight:700;color:var(--ink)}.items .n{font-size:7.6pt;color:var(--wine);font-style:italic}
 .foot{margin-top:auto;padding-top:4mm}
-.ack{font-size:7.3pt;color:#5B6478;text-align:center;margin:0 0 7mm}
-.sign{display:grid;grid-template-columns:1fr 1fr;gap:14mm}.sign div{border-top:.6pt solid #1A2C54;padding-top:1.2mm;font-size:6.8pt;color:#5B6478}.sign b{display:block;color:#1A2C54;font-weight:600;font-size:8pt}
-footer{margin-top:4mm;text-align:center;font-size:6.6pt;color:#8A8F9C;letter-spacing:.05em;border-top:.4pt solid #E4DFC8;padding-top:2mm}
+.ack{font-size:8pt;color:var(--lab);text-align:center;margin:0 0 7mm}
+.sign{display:grid;grid-template-columns:1fr 1fr;gap:14mm}.sign div{border-top:.8pt solid var(--ink);padding-top:1.2mm;font-size:7.4pt;color:var(--lab)}.sign b{display:block;color:var(--ink);font-weight:600;font-size:8.6pt}
+footer{margin-top:4mm;text-align:center;font-size:7.2pt;color:var(--lab);letter-spacing:.03em;border-top:.8pt solid var(--rule);padding-top:2mm}
 @media screen{.page{margin:16px auto;box-shadow:0 2px 14px rgba(0,0,0,.12)}}
 @media print{body{background:#fff}.bar{display:none}}
 </style></head><body>
@@ -930,7 +933,7 @@ ${setup.some(x => x[1]) ? `<section><h2>Setup &amp; service<small>On site</small
 ${notes.some(x => x[1]) ? `<section><h2>Notes<small>Please note</small></h2><table class="kv">${notes.map(([l, v]) => row(l, v)).join('')}</table></section>` : ''}
 </div><div>
 ${menu.length ? (cat ? `<div class="menu"><h2>The Menu</h2>${menu.map(m => `<div class="c">${esc(m.course)}</div><div class="d">${esc(m.dish)}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}`).join('')}</div>`
-  : `<div class="menu" style="text-align:left"><h2>The Order</h2><table class="items"><thead><tr><th>Item</th><th class="q">Qty</th></tr></thead><tbody>${[[os.mains, k === 'packs' ? 'Meal packs' : 'Trays', os.main], [os.drinks, 'Drinks', os.drink], [os.addons, 'Add-ons', os.addon]].filter(g => g[0].length).map(([L, h, n]) => `<tr><td colspan="2" style="font-size:6pt;letter-spacing:.24em;text-transform:uppercase;color:#E89908;padding-top:2.5mm;border:0">${h} · ${n}</td></tr>` + L.map(m => `<tr><td><div class="d" style="font-family:'Playfair Display',serif;font-style:italic;font-size:10pt">${esc(m.dish)}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}</td><td class="q">${esc(m.qty || '1')}</td></tr>`).join('')).join('')}</tbody></table></div>`) : ''}
+  : `<div class="menu" style="text-align:left"><h2>The Order</h2><table class="items"><thead><tr><th>Item</th><th class="q">Qty</th></tr></thead><tbody>${[[os.mains, k === 'packs' ? 'Meal packs' : 'Trays', os.main], [os.drinks, 'Drinks', os.drink], [os.addons, 'Add-ons', os.addon]].filter(g => g[0].length).map(([L, h, n]) => `<tr><td colspan="2" style="font-size:6.6pt;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:#8A5A00;padding-top:2.5mm;border:0">${h} · ${n}</td></tr>` + L.map(m => `<tr><td><div class="d" style="font-family:Alta,'Playfair Display',Georgia,serif;font-style:italic;font-size:11pt;color:#14213F">${esc(m.dish)}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}</td><td class="q">${esc(m.qty || '1')}</td></tr>`).join('')).join('')}</tbody></table></div>`) : ''}
 </div></div>
 <div class="foot"><p class="ack">By signing below, the client confirms the ${cat ? 'event details and menu' : 'order details'} above.</p>
 <div class="sign"><div><b>${esc(d.client)}</b>Client signature over printed name · Date</div><div><b>${esc(d.preparedBy || "Romualdo's Catering Services")}</b>Prepared by · Romualdo's Catering Services</div></div>
