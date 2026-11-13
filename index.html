@@ -256,6 +256,8 @@ td.num{text-align:right;white-space:nowrap}
 .tray-order{margin-top:22px;background:var(--paper);border:1px solid var(--line);border-left:6px solid var(--gold);border-radius:14px;padding:20px 22px;display:flex;gap:18px;align-items:center;flex-wrap:wrap}
 .tray-order>div:first-child{flex:1;min-width:260px}.tray-order p{margin:4px 0;color:var(--muted)}
 .tray-order-b{display:flex;gap:10px;flex-wrap:wrap}.tray-order-b a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.tray-b li.has-sz{flex-wrap:wrap}.tray-b li .sz{flex-basis:100%;margin:4px 0 0;padding:4px 8px;font-size:13px;width:auto;max-width:100%}.tray-b li .sz-in{flex-basis:100%;color:var(--wine,#631B1C);font-size:12px;margin-top:2px}
+.te-sz{margin:2px 0 8px 18px;padding-left:10px;border-left:2px solid var(--gold)}.te-sz .te-row{grid-template-columns:1fr 110px auto}.te-szb{font-size:12px;padding:2px 8px}.te-link{background:none;border:0;padding:0 2px;font:600 12px inherit;color:var(--blue,#1A2C54);text-decoration:underline;cursor:pointer;opacity:.75}.te-link:hover{opacity:1}
 .te-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,430px),1fr));gap:14px;margin-top:12px}
 .te-row{display:grid;grid-template-columns:1fr 110px auto;gap:6px;align-items:center;margin:5px 0}
 .te-row>*{min-width:0}.te-row input{margin:0;width:100%;box-sizing:border-box;min-width:0}.te-row .pr{position:relative}.te-row .pr span{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted,#777);font-size:13px}.te-row .pr input{padding-left:22px;text-align:right}
@@ -1116,13 +1118,18 @@ function viewHome(){
   <div class="next-band"><span>Start by getting to know us.</span><button class="btn gold" data-go="about">Next: About Us →</button></div>`;
 }
 
-function trayItems(k){return String(state.about["tray_"+k]||"").split("\n").map(l=>{const m=l.split("|");const name=(m[0]||"").trim();const price=Number(String(m[1]||"").replace(/[^\d.]/g,""))||0;return name?{name,price}:null}).filter(Boolean)}
-state.trayCat=state.trayCat||"all";state.trayOpen=state.trayOpen||{};state.trayCart=state.trayCart||{};
+const pnum=x=>Number(String(x||"").replace(/[^\d.]/g,""))||0;
+/* A dish line is "Name | price", or with sizes "Name | Whole cake: 2,200; Box of 6: 450; Box of 12: 850".
+   opts = every size listed (sizes without a price are kept for the editor but hidden from customers). */
+function trayItems(k,all){return String(state.about["tray_"+k]||"").split("\n").map(l=>{const m=l.split("|");const name=(m[0]||"").trim();if(!name)return null;const rest=(m[1]||"").trim();
+  if(rest.includes(":")){const opts=rest.split(";").map(o=>{const i=o.lastIndexOf(":");return {label:o.slice(0,i).trim(),price:pnum(o.slice(i+1))}}).filter(o=>o.label&&(all||o.price>0));if(!opts.length&&!all)return null;return {name,price:(opts.find(o=>o.price>0)||opts[0]||{price:0}).price,opts}}
+  return {name,price:pnum(rest),opts:[]}}).filter(Boolean)}
+state.traySize=state.traySize||{};state.trayCat=state.trayCat||"all";state.trayOpen=state.trayOpen||{};state.trayCart=state.trayCart||{};
 state.trayForm=state.trayForm||{name:"",phone:"",email:"",date:"",time:"",fulfil:"Pick-up",address:"",payment:"",notes:""};
 const TRAY_LEAD_DAYS=2;
 const phDate=(addDays=0)=>new Date(Date.now()+addDays*864e5).toLocaleDateString("en-CA",{timeZone:"Asia/Manila"});
 const PAYMENTS=[["Bank transfer","Online bank transfer"],["Bank deposit","Over-the-counter bank deposit"],["GCash","GCash"]];
-function trayLines(){const L=[];for(const [k,q] of Object.entries(state.trayCart)){if(!(q>0))continue;const [cat,name]=k.split("|");const it=trayItems(cat).find(i=>i.name===name);if(it)L.push({cat,label:(TRAY_CATS.find(c=>c[0]===cat)||[cat,cat])[1],name,price:it.price,qty:q})}return L}
+function trayLines(){const L=[];for(const [k,q] of Object.entries(state.trayCart)){if(!(q>0))continue;const [cat,name,size]=k.split("|");const it=trayItems(cat).find(i=>i.name===name);if(!it)continue;const o=size?it.opts.find(x=>x.label===size):null;if(size&&!o)continue;L.push({key:k,cat,label:(TRAY_CATS.find(c=>c[0]===cat)||[cat,cat])[1],name:o?`${name} (${o.label})`:name,price:o?o.price:it.price,qty:q})}return L}
 const trayTotal=L=>L.reduce((a,l)=>a+l.price*l.qty,0);
 function viewTrays(){
   const a=state.about, fb=socialUrl("facebookUrl"), ph=(a.contactPhones||[])[0]||"";
@@ -1138,20 +1145,30 @@ function viewTrays(){
   <p class="tray-photo-note">📷 Photos are for reference only. Actual dishes, portions and presentation may vary.</p>
   <div class="tray-grid">${shown.map(c=>{const open=state.trayCat!=="all"||state.trayOpen[c.k];const list=open?c.items:c.items.slice(0,SHOW);
     return `<section class="tray-card"><img src="${trayImg(c.k)}" alt="${esc(c.l)} tray" loading="lazy" onerror="if(!this.dataset.fb){this.dataset.fb=1;this.src='assets/trays/${c.k}.jpg'}"><div class="tray-b"><h2>${esc(c.l)}</h2>
-      <ul>${list.map(i=>{const key=c.k+"|"+i.name,q=state.trayCart[key]||0;return `<li class="${q?"in":""}"><span>${esc(i.name)}</span><i></i><b>${i.price?"₱"+i.price.toLocaleString("en-PH"):""}</b>
+      <ul>${list.map(i=>{const base=c.k+"|"+i.name;
+        if(i.opts.length){const sz=state.traySize[base]&&i.opts.find(o=>o.label===state.traySize[base])?state.traySize[base]:i.opts[0].label,o=i.opts.find(x=>x.label===sz),key=base+"|"+sz,q=state.trayCart[key]||0;
+          const inCart=i.opts.map(x=>[x,state.trayCart[base+"|"+x.label]||0]).filter(x=>x[1]);
+          return `<li class="${inCart.length?"in":""} has-sz"><span>${esc(i.name)}</span><i></i><b>₱${o.price.toLocaleString("en-PH")}</b>
+          ${q?`<span class="stp"><button data-tq="${esc(key)}" data-d="-1" aria-label="Remove one">−</button><em>${q}</em><button data-tq="${esc(key)}" data-d="1" aria-label="Add one more">＋</button></span>`:`<button class="add" data-tq="${esc(key)}" data-d="1" aria-label="Add ${esc(i.name)}, ${esc(sz)}">＋</button>`}
+          <select class="sz" data-tsz="${esc(base)}" aria-label="Size for ${esc(i.name)}">${i.opts.map(x=>`<option value="${esc(x.label)}" ${x.label===sz?"selected":""}>${esc(x.label)} · ₱${x.price.toLocaleString("en-PH")}</option>`).join("")}</select>
+          ${inCart.length?`<small class="sz-in">In your order: ${inCart.map(([x,n])=>`${n} × ${esc(x.label)}`).join(", ")}</small>`:""}</li>`}
+        const key=base,q=state.trayCart[key]||0;return `<li class="${q?"in":""}"><span>${esc(i.name)}</span><i></i><b>${i.price?"₱"+i.price.toLocaleString("en-PH"):""}</b>
         ${q?`<span class="stp"><button data-tq="${esc(key)}" data-d="-1" aria-label="Remove one ${esc(i.name)}">−</button><em>${q}</em><button data-tq="${esc(key)}" data-d="1" aria-label="Add one more ${esc(i.name)}">＋</button></span>`:`<button class="add" data-tq="${esc(key)}" data-d="1" aria-label="Add ${esc(i.name)}">＋</button>`}</li>`}).join("")}</ul>
       ${c.items.length>SHOW&&state.trayCat==="all"?`<button class="more" data-tmore="${c.k}">${open?"Show less ▴":`See all ${c.items.length} ▾`}</button>`:""}</div></section>`}).join("")}</div>
   ${trayOrderHtml()}
-  ${(()=>{const L=trayLines();return L.length&&!state.trayDone?`<div class="tray-bar"><span><b>${L.reduce((a,l)=>a+l.qty,0)} tray${L.reduce((a,l)=>a+l.qty,0)>1?"s":""}</b> · ${peso(trayTotal(L))}</span><button class="btn gold" data-scroll="trayOrder">Review &amp; order →</button></div>`:""})()}`;
+  ${(()=>{const L=trayLines();return L.length&&!state.trayDone?`<div class="tray-bar"><span><b>${L.reduce((a,l)=>a+l.qty,0)} item${L.reduce((a,l)=>a+l.qty,0)>1?"s":""}</b> · ${peso(trayTotal(L))}</span><button class="btn gold" data-scroll="trayOrder">Review &amp; order →</button></div>`:""})()}`;
 }
 /* ---------- Tray prices editor (admin) — saves into the same tray_<category> fields ---------- */
-function startTrayDraft(){state.trayDraft={};TRAY_CATS.forEach(([k])=>{state.trayDraft[k]=trayItems(k).map(i=>({name:i.name,price:i.price?String(i.price):""}))});state.trayOrig=JSON.stringify(state.trayDraft);state.trayDirty=false;state.trayMsg=""}
+function startTrayDraft(){state.trayDraft={};TRAY_CATS.forEach(([k])=>{state.trayDraft[k]=trayItems(k,true).map(i=>({name:i.name,price:i.price?String(i.price):"",opts:i.opts.map(o=>({label:o.label,price:o.price?String(o.price):""}))}))});state.trayOrig=JSON.stringify(state.trayDraft);state.trayDirty=false;state.trayMsg=""}
 function trayDirty(){if(!state.trayDirty){state.trayDirty=true;state.trayMsg="";const s=$("#saveTrays"),x=$("#discardTrays"),m=$("#trayMsg");if(s)s.disabled=false;if(x)x.disabled=false;if(m)m.textContent="You have unsaved changes."}}
-function trayField(list){return list.filter(i=>String(i.name).trim()).map(i=>String(i.name).trim().replace(/\|/g,"/")+" | "+(Number(String(i.price).replace(/[^\d.]/g,""))||0).toLocaleString("en-PH",{maximumFractionDigits:0})).join("\n")}
+const szClean=t=>String(t||"").replace(/[|:;]/g," ").replace(/\s+/g," ").trim();
+const pfmt=x=>(pnum(x)||0).toLocaleString("en-PH",{maximumFractionDigits:0});
+function trayField(list){return list.filter(i=>String(i.name).trim()).map(i=>{const n=String(i.name).trim().replace(/\|/g,"/");const op=(i.opts||[]).filter(o=>szClean(o.label));
+  return n+" | "+(op.length?op.map(o=>szClean(o.label)+": "+(pnum(o.price)?pfmt(o.price):"")).join("; "):pfmt(i.price))}).join("\n")}
 function viewTrayEdit(){
   if(!state.trayDraft)startTrayDraft();
   const D=state.trayDraft,orig=JSON.parse(state.trayOrig||"{}");
-  const was=(k,i)=>{const o=(orig[k]||[])[i];return o?o.name+"|"+o.price:""};
+  const was=(k,i)=>{const o=(orig[k]||[])[i];return o?o.name+"|"+o.price+JSON.stringify(o.opts||[]):""};
   const n=Object.values(D).reduce((t,l)=>t+l.filter(i=>String(i.name).trim()).length,0);
   return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>Tray items &amp; prices</h1><span class="who">Admin only · ${n} dishes · changes go live on the <a href="#trays" data-go="trays">Food Trays page</a> when you save</span></div>
   <div class="panel" style="display:flex;gap:10px;align-items:end;flex-wrap:wrap">
@@ -1161,9 +1178,12 @@ function viewTrayEdit(){
     <button class="btn small" id="teBulkGo">Apply</button><span class="hint" style="margin:0">Updates the prices below; nothing is published until you click <b>Save changes</b>.</span>
   </div>
   <div class="te-grid">${TRAY_CATS.map(([k,l])=>`<section class="panel"><div class="te-head"><h3>${esc(l)}</h3><span class="hint">${D[k].filter(i=>String(i.name).trim()).length} dishes${D[k].length?"":" · hidden on the page while empty"}</span></div>
-    ${D[k].map((it,i)=>`<div class="te-row ${was(k,i)!==it.name+"|"+it.price?"chg":""}"><input data-ten="${k}|${i}" value="${esc(it.name)}" placeholder="Dish name" maxlength="80" aria-label="${esc(l)} dish ${i+1} name">
-      <div class="pr"><span>₱</span><input data-tep="${k}|${i}" value="${esc(it.price)}" inputmode="numeric" placeholder="0" aria-label="Price"></div>
-      <div class="acts"><button class="btn small ghost" data-teu="${k}|${i}" ${i===0?"disabled":""} title="Move up" aria-label="Move up">↑</button><button class="btn small ghost" data-ted="${k}|${i}" ${i===D[k].length-1?"disabled":""} title="Move down" aria-label="Move down">↓</button><button class="btn small danger" data-tex="${k}|${i}" title="Remove" aria-label="Remove dish">✕</button></div></div>`).join("")}
+    ${D[k].map((it,i)=>`<div class="te-row ${was(k,i)!==it.name+"|"+it.price+JSON.stringify(it.opts||[])?"chg":""}"><input data-ten="${k}|${i}" value="${esc(it.name)}" placeholder="Dish name" maxlength="80" aria-label="${esc(l)} dish ${i+1} name">
+      <div class="pr">${it.opts&&it.opts.length?`<span class="hint" style="position:static;transform:none;font-size:12px">${it.opts.length} size${it.opts.length>1?"s":""} ↓</span>`:`<span>₱</span><input data-tep="${k}|${i}" value="${esc(it.price)}" inputmode="numeric" placeholder="0" aria-label="Price">`}</div>
+      <div class="acts"><button class="btn small ghost" data-teu="${k}|${i}" ${i===0?"disabled":""} title="Move up" aria-label="Move up">↑</button><button class="btn small ghost" data-ted="${k}|${i}" ${i===D[k].length-1?"disabled":""} title="Move down" aria-label="Move down">↓</button><button class="btn small danger" data-tex="${k}|${i}" title="Remove" aria-label="Remove dish">✕</button></div></div>
+      ${it.opts&&it.opts.length?`<div class="te-sz">${it.opts.map((o,j)=>`<div class="te-row"><input data-tesl="${k}|${i}|${j}" value="${esc(o.label)}" placeholder="Size, e.g. Box of 6" maxlength="40" aria-label="Size name"><div class="pr"><span>₱</span><input data-tesp="${k}|${i}|${j}" value="${esc(o.price)}" inputmode="numeric" placeholder="price" aria-label="Size price"></div><div class="acts"><button class="btn small danger" data-tesx="${k}|${i}|${j}" title="Remove size" aria-label="Remove size">✕</button></div></div>`).join("")}
+        <button class="btn small ghost te-szb" data-tesa="${k}|${i}">＋ Add size</button> <span class="hint" style="font-size:12px">Sizes without a price stay hidden from customers.</span></div>`
+      :`<div style="margin:-3px 0 6px"><button class="te-link" data-tesa="${k}|${i}" title="Sell this dish in different sizes">＋ ${k==="desserts"?"Sizes: whole cake / boxes":"Sizes"}</button></div>`}`).join("")}
     <button class="btn small ghost" data-tea="${k}" style="margin-top:6px">＋ Add dish</button></section>`).join("")}</div>
   <div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:sticky;bottom:10px;z-index:5;border-color:${state.trayDirty?"var(--gold)":"var(--line)"}">
     <button class="btn gold" id="saveTrays" ${state.trayDirty?"":"disabled"}>Save changes</button>
@@ -1175,6 +1195,13 @@ function bindTrayEdit(v){
   const D=state.trayDraft,at=s=>{const [k,i]=s.split("|");return [k,+i]};
   v.querySelectorAll("[data-ten]").forEach(el=>el.oninput=()=>{const [k,i]=at(el.dataset.ten);D[k][i].name=el.value;trayDirty()});
   v.querySelectorAll("[data-tep]").forEach(el=>el.oninput=()=>{const [k,i]=at(el.dataset.tep);el.value=el.value.replace(/[^\d,]/g,"");D[k][i].price=el.value.replace(/,/g,"");trayDirty()});
+  const at3=s=>{const [k,i,j]=s.split("|");return [k,+i,+j]};
+  v.querySelectorAll("[data-tesl]").forEach(el=>el.oninput=()=>{const [k,i,j]=at3(el.dataset.tesl);D[k][i].opts[j].label=el.value;trayDirty()});
+  v.querySelectorAll("[data-tesp]").forEach(el=>el.oninput=()=>{const [k,i,j]=at3(el.dataset.tesp);el.value=el.value.replace(/[^\d,]/g,"");D[k][i].opts[j].price=el.value.replace(/,/g,"");trayDirty()});
+  v.querySelectorAll("[data-tesx]").forEach(b=>b.onclick=()=>{const [k,i,j]=at3(b.dataset.tesx);const it=D[k][i];it.opts.splice(j,1);if(it.opts.length===1){it.price=it.opts[0].price;it.opts=[]}if(!it.opts.length&&!it.price)it.price="";state.trayDirty=true;keepScroll(render)});
+  v.querySelectorAll("[data-tesa]").forEach(b=>b.onclick=()=>{const [k,i]=at(b.dataset.tesa);const it=D[k][i];it.opts=it.opts||[];
+    if(!it.opts.length)it.opts=k==="desserts"?[{label:"Whole cake",price:it.price||""},{label:"Box of 6",price:""},{label:"Box of 12",price:""}]:[{label:"Regular",price:it.price||""},{label:"",price:""}];
+    else it.opts.push({label:"",price:""});state.trayDirty=true;keepScroll(render)});
   const mv=(k,i,j)=>{[D[k][i],D[k][j]]=[D[k][j],D[k][i]];state.trayDirty=true;keepScroll(render)};
   v.querySelectorAll("[data-teu]").forEach(b=>b.onclick=()=>{const [k,i]=at(b.dataset.teu);mv(k,i,i-1)});
   v.querySelectorAll("[data-ted]").forEach(b=>b.onclick=()=>{const [k,i]=at(b.dataset.ted);mv(k,i,i+1)});
@@ -1183,14 +1210,14 @@ function bindTrayEdit(v){
   const g=$("#teBulkGo",v);if(g)g.onclick=()=>{const pct=parseFloat($("#teBulkPct").value),cat=$("#teBulkCat").value,r=+$("#teBulkRound").value||1;
     if(!pct){toast("Enter a percentage first, e.g. 5 or -3");return}
     if(Math.abs(pct)>50&&!confirm(`Change prices by ${pct}%? That's a big change.`))return;
-    let n=0;TRAY_CATS.forEach(([k])=>{if(cat!=="all"&&cat!==k)return;D[k].forEach(it=>{const p=Number(it.price);if(p>0){it.price=String(Math.max(r,Math.round(p*(1+pct/100)/r)*r));n++}})});
+    let n=0;TRAY_CATS.forEach(([k])=>{if(cat!=="all"&&cat!==k)return;D[k].forEach(it=>{const up=o=>{const p=Number(o.price);if(p>0){o.price=String(Math.max(r,Math.round(p*(1+pct/100)/r)*r));n++}};if(it.opts&&it.opts.length)it.opts.forEach(up);else up(it)})});
     state.trayDirty=true;state.trayMsg=`${n} price${n===1?"":"s"} changed by ${pct>0?"+":""}${pct}%. Check them, then click Save changes.`;keepScroll(render)};
   const s=$("#saveTrays",v);if(s)s.onclick=saveTrays;
   const x=$("#discardTrays",v);if(x)x.onclick=()=>{startTrayDraft();keepScroll(render)};
 }
 async function saveTrays(){
   const D=state.trayDraft,about={...state.about},bad=[];
-  TRAY_CATS.forEach(([k,l])=>{D[k].forEach(i=>{if(String(i.name).trim()&&!(Number(i.price)>0))bad.push(`${i.name} (${l})`)});about["tray_"+k]=trayField(D[k]);if(about["tray_"+k].length>3000)bad.push(`${l}: too many dishes`)});
+  TRAY_CATS.forEach(([k,l])=>{D[k].forEach(i=>{if(String(i.name).trim()&&!((i.opts&&i.opts.length)?i.opts.some(o=>szClean(o.label)&&pnum(o.price)>0):pnum(i.price)>0))bad.push(`${i.name} (${l})`)});about["tray_"+k]=trayField(D[k]);if(about["tray_"+k].length>3000)bad.push(`${l}: too many dishes`)});
   if(bad.length){state.trayMsg="Please fix: "+bad.slice(0,4).join(", ")+(bad.length>4?"…":"")+" (every dish needs a price).";keepScroll(render);return}
   state.trayMsg="Saving…";keepScroll(render);
   let r;try{r=await api("saveAbout",{about})}catch(e){r={ok:false,error:"No internet connection"}}
@@ -1209,7 +1236,7 @@ function trayOrderHtml(){
     ${d.saved?"":`<p class="formmsg">We couldn't reach our server just now, so please send us this reference by Messenger or call ${esc(ph)}.</p>`}
     <div class="tray-order-b" style="margin-top:10px">${fb?`<a class="soc fb" href="${esc(fb)}" target="_blank" rel="noopener">${ICON_FB}<span>Message us</span></a>`:""}<button class="btn ghost" id="trayNew">Start a new order</button></div></div></section>`}
   const minD=phDate(TRAY_LEAD_DAYS);
-  const lines=L.length?`<table class="tray-sum"><tbody>${L.map(l=>`<tr><td>${esc(l.name)}<div class="hint">${esc(l.label)} · ${peso(l.price)} each</div></td><td class="q"><span class="stp"><button data-tq="${esc(l.cat+"|"+l.name)}" data-d="-1">−</button><em>${l.qty}</em><button data-tq="${esc(l.cat+"|"+l.name)}" data-d="1">＋</button></span></td><td class="n">${peso(l.price*l.qty)}</td></tr>`).join("")}</tbody>
+  const lines=L.length?`<table class="tray-sum"><tbody>${L.map(l=>`<tr><td>${esc(l.name)}<div class="hint">${esc(l.label)} · ${peso(l.price)} each</div></td><td class="q"><span class="stp"><button data-tq="${esc(l.key)}" data-d="-1">−</button><em>${l.qty}</em><button data-tq="${esc(l.key)}" data-d="1">＋</button></span></td><td class="n">${peso(l.price*l.qty)}</td></tr>`).join("")}</tbody>
     <tfoot><tr><td colspan="2">Total for ${L.reduce((a,l)=>a+l.qty,0)} large tray${L.reduce((a,l)=>a+l.qty,0)>1?"s":""}</td><td class="n">${peso(trayTotal(L))}</td></tr></tfoot></table>`
     :`<p class="hint" style="margin:0 0 6px">Tap <b>＋</b> beside any dish above to add it to your order.</p>`;
   return `<section class="tray-order form" id="trayOrder">
@@ -1264,6 +1291,7 @@ function bindTrays(v){
     tf.onsubmit=e=>{e.preventDefault();submitTrayOrder(tf)}}
   const nw=$("#trayNew",v);if(nw)nw.onclick=()=>{state.trayDone=null;keepScroll(render)};
   v.querySelectorAll("[data-tc]").forEach(b=>b.onclick=()=>{state.trayCat=b.dataset.tc;keepScroll(render)});
+  v.querySelectorAll("[data-tsz]").forEach(el=>el.onchange=()=>{state.traySize[el.dataset.tsz]=el.value;keepScroll(render)});
   v.querySelectorAll("[data-tmore]").forEach(b=>b.onclick=()=>{const k=b.dataset.tmore;state.trayOpen[k]=!state.trayOpen[k];keepScroll(render)});
   v.querySelectorAll("[data-scroll]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.scroll)?.scrollIntoView({behavior:"smooth"}));
 }
