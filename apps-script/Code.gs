@@ -179,11 +179,11 @@ function sendInquiryAlert(q) {
   if (!CONFIG.ALERT_EMAILS.length || MailApp.getRemainingDailyQuota() < 1) return;
   const c = q.customer || {}, ev = q.event || {}, p = q.plan || {}, es = q.estimate || {};
   if (p.kind === 'tray') return sendTrayAlert(q);
-  const plan = p.kind === 'package' ? (p.packageName + ' Package (' + pesoTxt(p.pricePerHead) + '/head)') : 'Custom menu';
+  const plan = p.kind === 'package' ? (p.pricePerHead > 0 ? p.packageName + ' Package (' + pesoTxt(p.pricePerHead) + '/head)' : p.packageName + ' (quote requested)') : 'Custom menu';
   const items = p.chefPick ? ['Chef to recommend the menu'] : (q.items || []).map(function (i) { return (COURSE_NAMES[i.cat] || i.cat) + ': ' + i.dish; });
   const subject = 'New inquiry: ' + c.name + ' · ' + (ev.type || 'Event') + ' · ' + niceDate(ev.date) + ' · ' + ev.pax + ' pax';
   const rows = [['Reference', q.ref], ['Customer', c.name], ['Mobile', c.phone], ['Email', c.email || '—'], ['Event', (ev.type || 'Event') + ' on ' + niceDate(ev.date) + (ev.time ? ' at ' + niceTime(ev.time) : '')],
-    ['Venue', ev.venue || '—'], ['Guests', ev.pax + ' pax'], ['Plan', plan], ['Estimated total', pesoTxt(es.total) + ' (' + pesoTxt(es.perHead) + '/head) — estimate only'], ['Notes', q.notes || '—']];
+    ['Venue', ev.venue || '—'], ['Guests', ev.pax + ' pax'], ['Plan', plan], ['Estimated total', es.total > 0 ? pesoTxt(es.total) + ' (' + pesoTxt(es.perHead) + '/head) — estimate only' : 'To be quoted'], ['Notes', q.notes || '—']];
   const html = '<div style="font-family:Arial,sans-serif;color:#1A2C54;max-width:560px">' +
     '<div style="background:#1A2C54;color:#fff;padding:14px 18px;border-radius:10px 10px 0 0"><b style="font-size:17px">New catering inquiry</b><div style="font-size:12px;color:#E5DEB2">from romualdos.ph · ' + h(q.ref) + '</div></div>' +
     '<table style="width:100%;border-collapse:collapse;font-size:14px;border:1px solid #E4DFC8;border-top:0">' +
@@ -303,7 +303,8 @@ const ABOUT_TEXT_FIELDS = {
   tray_beef: 3000, tray_pork: 3000, tray_chicken: 3000, tray_seafood: 3000, tray_vegetables: 3000, tray_pasta: 3000, tray_salads: 3000, tray_rice: 3000, tray_desserts: 3000,
   kaarawan: 20000,
   grazing: 20000,
-  sitePhotos: 8000
+  sitePhotos: 8000,
+  packed: 12000
 };
 const ABOUT_LIST_FIELDS = { services: 12, mission: 12, clients: 30, homeHighlights: 8, contactPhones: 6 };
 const ABOUT_PHOTO_FIELDS = ['heroPhoto', 'teamPhoto', 'homePhoto'];

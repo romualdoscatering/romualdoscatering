@@ -427,6 +427,36 @@ body.nav-open .nav-burger span:nth-child(1){transform:translateY(7px) rotate(45d
 .off-img{display:block;height:180px;background:#EFE7D2}.off-img img{width:100%;height:100%;object-fit:cover;display:block}
 .off-b{display:flex;flex-direction:column;gap:4px;padding:16px 18px 18px;flex:1}.off-b b{font-size:20px;color:var(--navy);font-family:"Libre Baskerville",serif}.off-b small{color:#5B6478;font-size:14px;line-height:1.5}
 .off-p{font-weight:700;color:var(--wine);font-size:14.5px;margin-top:4px}.off-go{margin-top:auto;padding-top:10px;font-weight:700;color:var(--navy);font-size:14px}
+
+/* ===== Packed meals page (brand navy/gold) ===== */
+.pm-hero{display:grid;grid-template-columns:1fr 1.1fr;background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden;margin-bottom:18px}
+.pm-hero .txt{padding:32px 34px;display:flex;flex-direction:column;justify-content:center}
+.pm-hero .kick{font:600 11.5px Montserrat,sans-serif;letter-spacing:.24em;text-transform:uppercase;color:var(--gold)}
+.pm-hero h1{font-size:clamp(34px,4.4vw,52px);margin:8px 0 12px;color:var(--navy)}
+.pm-hero p{line-height:1.65;color:#4A5265;margin:0 0 16px}
+.pm-hero .ph{margin:0;position:relative;min-height:320px;background:#EFE7D2}.pm-hero .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.pm-ghost{text-decoration:none}
+.pm-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:0 0 26px}
+.pm-stats div{background:var(--navy);color:#fff;border-radius:14px;padding:16px 18px;text-align:center}.pm-stats b{display:block;font-family:"Libre Baskerville",serif;font-size:26px;color:#F2C46B}.pm-stats span{font-size:13.5px;color:#DCE1EC}
+.pm-h2{text-align:center;color:var(--navy);margin:0 0 4px}.pm-sub{text-align:center;color:#5B6478;margin:0 0 16px}
+.pm-types{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:26px}
+.pm-type{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;padding-bottom:14px}.pm-type .pm-ph{display:block;height:140px;position:relative;background:#EFE7D2;margin-bottom:10px}.pm-type .pm-ph img{width:100%;height:100%;object-fit:cover;display:block}
+.pm-type b{display:block;padding:0 14px;color:var(--navy);font-size:16.5px}.pm-type small{display:block;padding:2px 14px 0;color:#5B6478;font-size:13.5px;line-height:1.45}
+.pm-two{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}.pm-two>*{min-width:0}
+.pm-card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px 24px}.pm-card h3{margin:0 0 10px;color:var(--navy);font-size:22px}
+.pm-for{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:8px 14px}.pm-for li{position:relative;padding-left:22px;font-weight:600;color:#33415C;font-size:14.5px}.pm-for li::before{content:"✓";position:absolute;left:0;color:var(--gold);font-weight:800}
+.pm-steps{margin:0;padding:0;list-style:none;display:grid;gap:12px}.pm-steps b{display:block;color:var(--navy)}.pm-steps span{color:#5B6478;font-size:14px}
+.pm-quote{margin-bottom:28px;border-top:4px solid var(--gold)}
+.pm-meals{border:0;padding:0;margin:0 0 12px;display:flex;flex-wrap:wrap;gap:8px}.pm-meals legend{font-weight:700;font-size:13.5px;margin-bottom:8px;padding:0}
+.pm-chk{display:inline-flex!important;flex-direction:row!important;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:999px;padding:8px 14px;font-weight:600;font-size:14px;cursor:pointer;background:#FBF8F0}
+.pm-chk input{width:auto!important;margin:0;accent-color:var(--navy)}
+.pm-meals .pm-chk:has(input:checked){background:var(--navy);color:#fff;border-color:var(--navy)}
+.pm-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.packed form label:not(.pm-chk){display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:13px;margin-bottom:10px;min-width:0}
+.packed form input:not([type=checkbox]),.packed form textarea{width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:#fff;font-size:15px}
+.packed form .err{border-color:#B3261E!important;background:#FFF1EE!important}.packed form .hint{font-weight:500}.packed .fine{font-size:12.5px;color:#5B6478}
+@media (max-width:860px){.pm-hero,.pm-two{grid-template-columns:1fr}.pm-hero .ph{min-height:220px;order:-1}.pm-hero .txt{padding:22px}.pm-stats{grid-template-columns:1fr}.pm-stats b{font-size:22px}}
+@media (max-width:520px){.pm-grid,.pm-for{grid-template-columns:1fr}.pm-types{grid-template-columns:1fr 1fr;gap:10px}.pm-type .pm-ph{height:110px}.pm-type b{font-size:15px;padding:0 10px}.pm-type small{padding:2px 10px 0;font-size:12.5px}}
 .te-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,430px),1fr));gap:14px;margin-top:12px}
 .te-row{display:grid;grid-template-columns:1fr 110px auto;gap:6px;align-items:center;margin:5px 0}
 .te-row>*{min-width:0}.te-row input{margin:0;width:100%;box-sizing:border-box;min-width:0}.te-row .pr{position:relative}.te-row .pr span{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted,#777);font-size:13px}.te-row .pr input{padding-left:22px;text-align:right}
@@ -702,7 +732,7 @@ function closestPackageHint(perHead){
 }
 
 /* ============ NAV ============ */
-const PAGE_HASH={home:"",about:"about",offers:"offers",packages:"packages",kaarawan:"kaarawan",grazing:"grazing",custom:"custom",trays:"trays",contact:"contact"};
+const PAGE_HASH={home:"",about:"about",offers:"offers",packed:"packed",packages:"packages",kaarawan:"kaarawan",grazing:"grazing",custom:"custom",trays:"trays",contact:"contact"};
 function go(view){state.view=view;
   if(view in PAGE_HASH){const h=PAGE_HASH[view];if((location.hash||"").slice(1)!==h)history.pushState(null,"",h?"#"+h:location.pathname)}
   render();window.scrollTo({top:0,behavior:"smooth"})}
@@ -718,8 +748,138 @@ document.querySelectorAll("header nav button[data-nav]").forEach(b=>b.addEventLi
   go(v);
 }));
 
+/* ============ PACKED MEALS (no prices; request-a-quote form). Stored in about.packed, edited by admins. ============ */
+const PM_CDN="https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_";
+const PACKED_DEFAULT={kicker:"Romualdo's Catering · Davao City",title:"Packed Meals",
+  intro:"Snacks and full meals, freshly cooked, neatly packed and delivered on time. From crew meals and office lunches to seminars and big corporate events, we cook for as few as 30 and as many as 2,000+ guests.",
+  heroPhoto:{url:PM_CDN+"172410_5910d34e-1538-45a9-9a33-32feb7717d40.png"},heroAlt:"Rows of Romualdo's packed meals ready for delivery",heroBtn:"Request a quote",
+  stats:[{n:"30 – 2,000+",l:"guests per order"},{n:"5",l:"meal times a day"},{n:"Any budget",l:"from crew meals to premium boxes"}],
+  typesTitle:"What we pack",typesIntro:"Choose one or several. We plan the menu around your schedule, headcount and budget.",
+  types:[{name:"Breakfast",desc:"Silog meals, rice bowls and hot breakfast packs.",photo:{url:PM_CDN+"172409_16ca35df-d98a-4454-b386-aaec17bf8cc2.png"}},
+    {name:"Morning snacks",desc:"Kakanin, pastries, sandwiches and drinks.",photo:{url:PM_CDN+"172409_b3c61a8c-967a-4d16-aea2-9f5633a60469.png"}},
+    {name:"Lunch",desc:"Rice meals with ulam and sides, packed per person.",photo:{url:PM_CDN+"172408_19b4c9ca-b00e-4bc7-91f2-ed7dbd25de15.png"}},
+    {name:"Afternoon snacks",desc:"Merienda boxes, light or heavy.",photo:{url:PM_CDN+"172409_b4875758-a4cb-423d-b5ff-7e23a678dbf3.png"}},
+    {name:"Dinner",desc:"Full meals for late shifts, crews and events.",photo:{url:PM_CDN+"172409_e8373c09-2a80-40cb-837e-db57e14bbea5.png"}}],
+  forTitle:"Perfect for",forList:"Crew and staff meals\nSeminars and trainings\nCorporate events and launches\nSchool and church activities\nProduction shoots\nOutreach and community events",
+  howTitle:"How it works",steps:[{t:"1. Tell us what you need",d:"Meal times, number of guests, date and delivery address."},{t:"2. Get your menu and quote",d:"We suggest a menu that fits your budget, from simple crew meals to premium boxes."},{t:"3. We cook and deliver",d:"Packed, labeled and delivered on schedule, once or every day."}],
+  quoteTitle:"Request a quote",quoteIntro:"No fixed prices here: every order is planned around your needs. Tell us what you need and we'll get back to you with a menu and quotation.",
+  quoteFine:"Sending this is not a booking yet. Our team will call or message you to plan the menu and confirm the price.",submitBtn:"Send my request",minPax:30};
+function packedData(){
+  let x={};try{x=JSON.parse(state.about.packed||"{}")||{}}catch(e){x={}}
+  const d=JSON.parse(JSON.stringify(PACKED_DEFAULT));
+  for(const k of Object.keys(d)){if(["types","steps","stats"].includes(k))continue;if(k==="heroPhoto"){if("heroPhoto" in x)d.heroPhoto=kRef(x.heroPhoto);continue}if(k==="minPax"){if(x.minPax)d.minPax=Math.max(1,Math.round(Number(x.minPax))||30);continue}if(typeof x[k]==="string")d[k]=x[k]}
+  if(Array.isArray(x.types))d.types=x.types.slice(0,8).map(t=>({name:String(t?.name||""),desc:String(t?.desc||""),photo:kRef(t?.photo)})).filter(t=>t.name.trim());
+  if(Array.isArray(x.steps))d.steps=x.steps.slice(0,3).map(t=>({t:String(t?.t||""),d:String(t?.d||"")}));
+  if(Array.isArray(x.stats))d.stats=x.stats.slice(0,3).map(t=>({n:String(t?.n||""),l:String(t?.l||"")}));
+  return d;
+}
+state.mForm=state.mForm||{name:"",company:"",phone:"",email:"",pax:"",date:"",time:"",venue:"",budget:"",notes:"",repeat:false,meals:[]};
+function viewPacked(){
+  const P=packedData(),f=state.mForm,fb=socialUrl("facebookUrl"),ph=(state.about.contactPhones||[])[0]||"";
+  return `<div class="packed">${state.canEdit?`<div style="text-align:right;margin:0 0 8px"><button class="btn small ghost" data-go="packedEdit">✎ Edit this page</button></div>`:""}
+  <section class="pm-hero"><div class="txt">${P.kicker?`<div class="kick">${esc(P.kicker)}</div>`:""}<h1>${esc(P.title)}</h1>${paras(P.intro)}
+    <div class="home-btns">${P.heroBtn?`<button class="btn gold" data-mscroll="pmQuote">${esc(P.heroBtn)}</button>`:""}${fb?`<a class="btn ghost pm-ghost" href="${esc(fb)}" target="_blank" rel="noopener">Message us on Facebook</a>`:""}</div></div>
+    <figure class="ph">${gPh(P.heroPhoto,1600,P.heroAlt)}</figure></section>
+  ${P.stats.some(s=>s.n)?`<div class="pm-stats">${P.stats.filter(s=>s.n).map(s=>`<div><b>${esc(s.n)}</b><span>${esc(s.l)}</span></div>`).join("")}</div>`:""}
+  ${P.types.length?`<section><h2 class="pm-h2">${esc(P.typesTitle)}</h2>${P.typesIntro?`<p class="pm-sub">${esc(P.typesIntro)}</p>`:""}
+    <div class="pm-types">${P.types.map(t=>`<div class="pm-type"><span class="pm-ph">${gPh(t.photo,700,t.name)}</span><b>${esc(t.name)}</b>${t.desc?`<small>${esc(t.desc)}</small>`:""}</div>`).join("")}</div></section>`:""}
+  <div class="pm-two">
+    ${P.forList.trim()?`<section class="pm-card"><h3>${esc(P.forTitle)}</h3><ul class="pm-for">${P.forList.split("\n").filter(l=>l.trim()).map(l=>`<li>${esc(l.trim())}</li>`).join("")}</ul></section>`:""}
+    ${P.steps.some(s=>s.t)?`<section class="pm-card"><h3>${esc(P.howTitle)}</h3><ol class="pm-steps">${P.steps.filter(s=>s.t).map(s=>`<li><b>${esc(s.t)}</b><span>${esc(s.d)}</span></li>`).join("")}</ol></section>`:""}
+  </div>
+  <section class="pm-card pm-quote" id="pmQuote"><h3>${esc(P.quoteTitle)}</h3><p class="hint" style="margin:0 0 12px">${esc(P.quoteIntro)}</p>
+    <form id="pmForm" novalidate>
+      <fieldset class="pm-meals"><legend>Which meals? <span class="hint">(choose any)</span></legend>${P.types.map(t=>`<label class="pm-chk"><input type="checkbox" name="meal" value="${esc(t.name)}" ${f.meals.includes(t.name)?"checked":""}> ${esc(t.name)}</label>`).join("")}</fieldset>
+      <div class="pm-grid">
+        <label>Your name<input name="name" value="${esc(f.name)}" autocomplete="name" required></label>
+        <label><span>Company / organization <span class="hint">(optional)</span></span><input name="company" value="${esc(f.company)}" autocomplete="organization"></label>
+        <label>Mobile number<input name="phone" value="${esc(f.phone)}" type="tel" inputmode="tel" placeholder="09XX XXX XXXX" autocomplete="tel" required></label>
+        <label><span>Email <span class="hint">(optional)</span></span><input name="email" value="${esc(f.email)}" type="email" autocomplete="email"></label>
+        <label>Number of guests / packs<input name="pax" value="${esc(f.pax)}" type="number" inputmode="numeric" min="${P.minPax}" placeholder="at least ${P.minPax}" required></label>
+        <label><span>Budget per pack <span class="hint">(optional)</span></span><input name="budget" value="${esc(f.budget)}" placeholder="e.g. ₱120–150"></label>
+        <label>Date needed<input name="date" value="${esc(f.date)}" type="date" min="${phDate(1)}" required></label>
+        <label><span>Delivery time <span class="hint">(optional)</span></span><input name="time" value="${esc(f.time)}" type="time"></label>
+      </div>
+      <label class="pm-chk" style="margin:0 0 10px"><input type="checkbox" name="repeat" ${f.repeat?"checked":""}> This is for several days or a regular schedule</label>
+      <label>Delivery address<input name="venue" value="${esc(f.venue)}" placeholder="Office, site or venue address"></label>
+      <label><span>Anything we should know? <span class="hint">(optional)</span></span><textarea name="notes" rows="3" placeholder="e.g. 3 days of crew lunches, halal or no pork, individual labels, utensils">${esc(f.notes)}</textarea></label>
+      <input name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-5000px" aria-hidden="true">
+      ${P.quoteFine?`<p class="fine">${esc(P.quoteFine)}</p>`:""}
+      <div class="formmsg" id="pmMsg"></div>
+      <div class="home-btns"><button class="btn gold" type="submit">${esc(P.submitBtn)}</button>${ph?`<a class="btn ghost" href="tel:${esc(ph.replace(/\s+/g,""))}">Call ${esc(ph)}</a>`:""}</div>
+    </form></section></div>`;
+}
+function bindPacked(v){
+  v.querySelectorAll("[data-mscroll]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.mscroll)?.scrollIntoView({behavior:"smooth"}));
+  const fm=$("#pmForm",v);if(!fm)return;
+  fm.addEventListener("input",e=>{const t=e.target,n=t.name;if(n==="meal")state.mForm.meals=[...fm.querySelectorAll('[name=meal]:checked')].map(x=>x.value);else if(n==="repeat")state.mForm.repeat=t.checked;else if(n&&n in state.mForm)state.mForm[n]=t.value});
+  fm.onsubmit=async e=>{e.preventDefault();
+    const P=packedData(),f=state.mForm,msg=$("#pmMsg");msg.textContent="";fm.querySelectorAll(".err").forEach(el=>el.classList.remove("err"));
+    const need=["name","phone","pax","date"].filter(n=>!String(f[n]||"").trim());need.forEach(n=>fm.elements[n].classList.add("err"));
+    if(need.length){msg.textContent="Please fill in your name, mobile number, number of guests and the date.";fm.elements[need[0]].focus();return}
+    const pax=Math.round(Number(f.pax))||0;
+    if(pax<P.minPax){fm.elements.pax.classList.add("err");msg.textContent=`Packed meal orders start at ${P.minPax} guests. For smaller orders, please message or call us.`;return}
+    const btn=fm.querySelector("button[type=submit]");btn.disabled=true;btn.textContent="Sending…";
+    const meals=f.meals.length?f.meals:["Meals to be discussed"];
+    const notes=[f.company.trim()?"Company: "+f.company.trim():"",f.repeat?"Several days / regular schedule":"",f.budget.trim()?"Budget per pack: "+f.budget.trim():"",f.notes.trim()].filter(Boolean).join("\n");
+    const q={ref:newRef(),createdAt:new Date().toISOString(),status:"New",customer:{name:f.name.trim(),phone:f.phone.trim(),email:f.email.trim()},
+      event:{date:f.date,time:f.time,type:"Packed meals",venue:f.venue.trim(),pax},notes,
+      plan:{kind:"package",packageId:"packed",packageName:"Packed meals",pricePerHead:0,chefPick:false},
+      items:meals.map(m=>({cat:"Packed meal",dish:m,tier:"packed",slot:"Packed meal"})),estimate:{perHead:0,total:0}};
+    const r=await api("submit",{inquiry:q,website:fm.elements.website.value||""});
+    if(!r.ok&&!r.network&&r.error){btn.disabled=false;btn.textContent=P.submitBtn;msg.textContent=r.error;return}
+    if(r.ok&&r.ref)q.ref=r.ref;
+    state.lastDone={inq:q,saved:!!r.ok,message:messageFor(q)};state.mForm={name:"",company:"",phone:"",email:"",pax:"",date:"",time:"",venue:"",budget:"",notes:"",repeat:false,meals:[]};
+    if(r.ok&&state.isStaff)loadInquiries();go("done")};
+}
+/* ---------- Packed meals editor (admin) ---------- */
+function startPackedDraft(){state.mDraft=packedData();state.mDirty=false;state.mMsg=""}
+function viewPackedEdit(){
+  if(!state.mDraft)startPackedDraft();
+  const D=state.mDraft;
+  const inp=(path,label,val,max)=>`<label>${label}<input data-mp="${path}" value="${esc(val)}" maxlength="${max||120}"></label>`;
+  const ta=(path,label,val,rows,max)=>`<label>${label}<textarea data-mp="${path}" rows="${rows||3}" maxlength="${max||800}">${esc(val)}</textarea></label>`;
+  const photo=(path,ref,label)=>`<div class="kslot"><div class="kslot-img">${ref?kImg(ref,500,label):`<span class="hint">No photo</span>`}</div><div class="kslot-b"><b>${label}</b><label class="btn small" style="cursor:pointer;margin:0;flex-direction:row;color:#fff">${ref?"Replace photo":"＋ Add photo"}<input type="file" accept="image/*" data-mup="${path}" style="display:none"></label>${ref?`<button class="btn small ghost" data-mclr="${path}">Remove photo</button>`:""}</div></div>`;
+  const sec=(t,body)=>`<details class="panel ed sec" open><summary><h3 style="display:inline">${t}</h3></summary><div style="margin-top:12px">${body}</div></details>`;
+  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>Edit Packed Meals page</h1><span class="who">Admin only · <a href="#packed" data-go="packed">view the page</a></span></div>
+  <div class="formmsg" style="color:var(--blue);min-height:0;margin-bottom:8px">${esc(state.mUpMsg||"")}</div>
+  ${sec("Top of the page",`${photo("heroPhoto",D.heroPhoto,"Big photo")}${inp("heroAlt","Photo description",D.heroAlt,140)}${inp("kicker","Small heading",D.kicker,60)}${inp("title","Title",D.title,60)}${ta("intro","Intro text",D.intro,3,800)}${inp("heroBtn","Button text",D.heroBtn,30)}
+    <b style="display:block;margin:8px 0 4px">Highlights</b>${D.stats.map((s,i)=>`<div class="g2">${inp(`stats.${i}.n`,`Highlight ${i+1}`,s.n,30)}${inp(`stats.${i}.l`,"Label",s.l,60)}</div>`).join("")}`)}
+  ${sec("Meal types",`<div class="g2">${inp("typesTitle","Heading",D.typesTitle,60)}${inp("typesIntro","Line under the heading",D.typesIntro,200)}</div>
+    ${D.types.map((t,i)=>`<div class="kopt-ed"><div class="kopt-h"><b>${esc(t.name||"Meal type")}</b><span style="flex:1"></span><button class="btn small ghost" data-mtu="${i}" ${i===0?"disabled":""}>↑</button><button class="btn small ghost" data-mtd="${i}" ${i===D.types.length-1?"disabled":""}>↓</button><button class="btn small danger" data-mtx="${i}">Remove</button></div>
+      ${photo(`types.${i}.photo`,t.photo,"Photo")}<div class="g2">${inp(`types.${i}.name`,"Name",t.name,40)}${inp(`types.${i}.desc`,"Short description",t.desc,120)}</div></div>`).join("")}
+    ${D.types.length<8?`<button class="btn small" id="mAddType">＋ Add meal type</button>`:""}<p class="hint">The meal types also appear as the checkboxes in the quote form.</p>`)}
+  ${sec("Perfect for &amp; how it works",`${inp("forTitle","Heading",D.forTitle,60)}${ta("forList","List (one per line)",D.forList,6,800)}${inp("howTitle","Steps heading",D.howTitle,60)}
+    ${D.steps.map((x,i)=>`<div class="g2">${inp(`steps.${i}.t`,`Step ${i+1}`,x.t,60)}${inp(`steps.${i}.d`,"Text",x.d,160)}</div>`).join("")}`)}
+  ${sec("Quote form",`${inp("quoteTitle","Heading",D.quoteTitle,60)}${ta("quoteIntro","Intro",D.quoteIntro,2,300)}${ta("quoteFine","Small print",D.quoteFine,2,300)}<div class="g2">${inp("submitBtn","Send button",D.submitBtn,40)}${inp("minPax","Minimum guests",D.minPax,5)}</div>`)}
+  <div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:sticky;bottom:10px;z-index:5;border-color:${state.mDirty?"var(--gold)":"var(--line)"}">
+    <button class="btn gold" id="saveMp" ${state.mDirty?"":"disabled"}>Save changes</button><button class="btn ghost" id="discardMp" ${state.mDirty?"":"disabled"}>Discard changes</button>
+    <span class="formmsg" id="mMsg" style="margin:0">${esc(state.mMsg||(state.mDirty?"You have unsaved changes.":""))}</span></div>`;
+}
+function mSet(path,val){const ks=path.split(".");let o=state.mDraft;for(let i=0;i<ks.length-1;i++)o=o[ks[i]];o[ks[ks.length-1]]=val}
+function bindPackedEdit(v){
+  const D=state.mDraft,re=()=>{state.mDirty=true;keepScroll(render)};
+  const mark=()=>{if(!state.mDirty){state.mDirty=true;const s=$("#saveMp"),x=$("#discardMp"),m=$("#mMsg");if(s)s.disabled=false;if(x)x.disabled=false;if(m)m.textContent="You have unsaved changes."}};
+  v.querySelectorAll("[data-mp]").forEach(el=>el.oninput=()=>{mSet(el.dataset.mp,el.value);mark()});
+  v.querySelectorAll("[data-mup]").forEach(el=>el.onchange=async()=>{const f=el.files[0];el.value="";if(!f)return;state.mUpMsg="Uploading photo…";keepScroll(render);
+    try{const r=await uploadOne(f,{slot:true});const ref=r.ok&&cleanRef(r.photo);if(ref){mSet(el.dataset.mup,ref);state.mUpMsg="Photo uploaded. Click Save changes to publish.";state.mDirty=true}else state.mUpMsg="Photo not uploaded: "+upErr(r)}catch(e){state.mUpMsg="That file isn't a photo the browser can read."}keepScroll(render)});
+  v.querySelectorAll("[data-mclr]").forEach(b=>b.onclick=()=>{mSet(b.dataset.mclr,null);re()});
+  const sw=(a,i,j)=>{[a[i],a[j]]=[a[j],a[i]];re()};
+  v.querySelectorAll("[data-mtu]").forEach(b=>b.onclick=()=>{const i=+b.dataset.mtu;sw(D.types,i,i-1)});
+  v.querySelectorAll("[data-mtd]").forEach(b=>b.onclick=()=>{const i=+b.dataset.mtd;sw(D.types,i,i+1)});
+  v.querySelectorAll("[data-mtx]").forEach(b=>b.onclick=()=>{const i=+b.dataset.mtx;if(!confirm(`Remove "${D.types[i].name}"?`))return;D.types.splice(i,1);re()});
+  const at=$("#mAddType",v);if(at)at.onclick=()=>{D.types.push({name:"New meal type",desc:"",photo:null});re()};
+  const sv=$("#saveMp",v);if(sv)sv.onclick=async()=>{if(!String(D.title).trim()){state.mMsg="The title can't be empty.";keepScroll(render);return}
+    const out={...D,minPax:Math.max(1,Math.round(Number(D.minPax))||30)},json=JSON.stringify(out);state.mMsg="Saving…";keepScroll(render);
+    let r;try{r=await api("saveAbout",{about:{...state.about,packed:json}})}catch(e){r={ok:false,error:"No internet connection"}}
+    if(!r.ok){state.mMsg=r.error||"Couldn't save.";keepScroll(render);return}
+    applyAbout(r.about||{...state.about,packed:json},state.gallery);
+    if(!state.about.packed){state.mMsg="Saved, but the server didn't keep the page (the Google script needs updating).";keepScroll(render);return}
+    if(state.aboutDraft)state.aboutDraft.packed=state.about.packed;state.mUpMsg="";startPackedDraft();toast("Packed Meals page saved — live now");keepScroll(render)};
+  const dx=$("#discardMp",v);if(dx)dx.onclick=()=>{startPackedDraft();state.mUpMsg="";keepScroll(render)};
+}
 /* ============ OUR OFFERS: dropdown panel, hub page, mobile menu ============ */
-const OFFER_VIEWS=["offers","packages","choose","kaarawan","grazing","trays","custom"];
+const OFFER_VIEWS=["offers","packed","packages","choose","kaarawan","grazing","trays","custom"];
 function offerList(){
   const K=kaarData(),G=grazData(),kp=K.options.filter(o=>o.show&&kReady(o)).map(o=>o.perHead*o.pax),gp=G.paths.filter(p=>p.show).flatMap(p=>p.options.filter(o=>o.show&&o.price>0).map(o=>o.price));
   const tp=TRAY_CATS.flatMap(([k])=>trayItems(k).map(i=>i.price)).filter(Boolean),pk=Math.min(...PACKAGES.map(x=>x.price).filter(Boolean));
@@ -729,6 +889,7 @@ function offerList(){
     {v:"kaarawan",s:"Ready-made Pinoy birthday handaan",t:K.title.replace(/\s*package\s*$/i,"")+" Package",d:"Ready-made Pinoy birthday handaan, menu all set. Book in a minute.",p:kp.length?`${peso(Math.min(...kp))} for ${K.options.find(kReady)?.pax||50} guests`:"",img:kRef(K.options.find(o=>o.show)?.photo)?.url||kRef(K.heroPhoto)?.url||""},
     {v:"grazing",s:"Grazing tables and a live street-food station",t:G.title,d:"Elegant grazing tables and a live street-food station for parties and launches.",p:gp.length?`from ${peso(Math.min(...gp))}`:"",img:kRef(G.paths[0]?.photo)?.url||kRef(G.heroPhoto)?.url||""},
     {v:"trays",s:"Party trays for 10–12 guests",t:"Food Trays",d:"Large party trays good for 10–12 guests. Order online 2–3 days ahead.",p:tp.length?`from ${peso(Math.min(...tp))}/tray`:"",img:trayImg("chicken")},
+    {v:"packed",s:"Snacks and meals for 30 to 2,000+ guests",t:packedData().title,d:"Snacks and full meals, packed and delivered for crews, offices and corporate events. Ask us for a quote.",p:"30 to 2,000+ guests · ask for a quote",img:kRef(packedData().heroPhoto)?.url||""},
     {v:"custom",s:"Pick your own dishes, instant estimate",t:"Build Your Own Menu",d:"Pick your own dishes and get an instant estimate.",p:"",img:trayImg("pasta")}];
 }
 function offerListEdited(){const o=sitePhotos().offers||{};return offerList().map(x=>{const e=o[x.v]||{},ph=kRef(e.photo);return {...x,t:e.title||x.t,d:e.desc||x.d,s:e.short||x.s,img:ph?(ph.url||photoUrl(ph,900)):x.img}})}
@@ -802,6 +963,8 @@ function render(){
   else if(state.view==="contact") v.innerHTML=viewContact();
   else if(state.view==="trays") v.innerHTML=viewTrays();
   else if(state.view==="offers") v.innerHTML=viewOffers();
+  else if(state.view==="packed") v.innerHTML=viewPacked();
+  else if(state.view==="packedEdit") v.innerHTML=state.canEdit?viewPackedEdit():viewPacked();
   else if(state.view==="photosEdit") v.innerHTML=state.canEdit?viewPhotosEdit():viewOffers();
   else if(state.view==="kaarawan") v.innerHTML=viewKaarawan();
   else if(state.view==="grazing") v.innerHTML=viewGrazing();
@@ -986,7 +1149,7 @@ function viewDone(){
       <div class="okmark">✓</div>
       <h2>${state.isStaff?"Inquiry saved":"Thank you! We've received your inquiry."}</h2>
       <p>Your reference number is <b>${esc(d.inq.ref)}</b>. ${state.isStaff?"It is now in the inquiry list.":"Our team will contact you at <b>"+esc(d.inq.customer.phone)+"</b> with a formal quotation."}</p>
-      <p class="hint">Estimated total: ${peso(d.inq.estimate.total)} — this is an <b>estimate only</b>; the final price is confirmed in your quotation.</p>
+      ${d.inq.estimate.total>0?`<p class="hint">Estimated total: ${peso(d.inq.estimate.total)} — this is an <b>estimate only</b>; the final price is confirmed in your quotation.</p>`:`<p class="hint">We'll prepare a menu and quotation that fits your needs and budget.</p>`}
       <div class="contact" style="margin-bottom:14px"><div><b>Text / Call</b>0945 542 5300</div><div><b>Email</b>romualdoscatering@gmail.com</div></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" data-go="packages">New inquiry</button>${state.isStaff?'<button class="btn ghost" data-go="admin">Open inquiry list</button>':""}</div>
     </div>`;
@@ -1246,6 +1409,7 @@ const ABOUT_DEFAULT={
   tray_salads:"Chopped Asian Salad | 1,100\nGrilled Chicken Salad | 1,200\nChicken Macaroni Salad | 1,200\nThai Noodle Salad | 1,700\nCaesar Salad | 1,030",
   tray_rice:"Garlic Rice | 490\nJava Rice | 600\nBagoong Rice | 650",
   kaarawan:"",
+  packed:"",
   sitePhotos:"",
   grazing:"",
   tray_desserts:"Mango Lychee | 1,030\nBuko Pandan | 920\nDouble Dark Choco Fudge | 2,300\nBlueberry Cheesecake | 2,200\nPistachio Sans Rival | 2,400"
@@ -2164,13 +2328,15 @@ function bind(){
   if(state.view==="kaarawan")bindKaarawan(v);
   if(state.view==="offers")v.querySelectorAll(".off-card[data-to]").forEach(b=>b.onclick=()=>goOffer(b.dataset.to));
   if(state.view==="photosEdit")bindPhotosEdit(v);
+  if(state.view==="packed")bindPacked(v);
+  if(state.view==="packedEdit")bindPackedEdit(v);
   if(state.view==="grazing")bindGrazing(v);
   if(state.view==="grazEdit")bindGrazEdit(v);
   if(state.view==="home")bindFilm(v);
   if(state.view==="aboutEdit")bindAboutEdit(v);
   if(state.view==="trayEdit")bindTrayEdit(v);
   if(state.view==="kaarEdit")bindKaarEdit(v);
-  v.querySelectorAll("[data-go]").forEach(b=>b.onclick=e=>{e.preventDefault();if(b.dataset.go==="packages")state.pkg=null;if(b.dataset.go==="trayEdit"&&!state.trayDirty)startTrayDraft();if(b.dataset.go==="kaarEdit"&&!state.kDirty)startKaarDraft();if(b.dataset.go==="grazEdit"&&!state.gDirty)startGrazDraft();if(b.dataset.go==="photosEdit"&&!state.pDirty)startPhotosDraft();if(b.dataset.go==="aboutEdit"&&!state.aboutDirty)startAboutDraft();go(b.dataset.go)});
+  v.querySelectorAll("[data-go]").forEach(b=>b.onclick=e=>{e.preventDefault();if(b.dataset.go==="packages")state.pkg=null;if(b.dataset.go==="trayEdit"&&!state.trayDirty)startTrayDraft();if(b.dataset.go==="kaarEdit"&&!state.kDirty)startKaarDraft();if(b.dataset.go==="grazEdit"&&!state.gDirty)startGrazDraft();if(b.dataset.go==="photosEdit"&&!state.pDirty)startPhotosDraft();if(b.dataset.go==="packedEdit"&&!state.mDirty)startPackedDraft();if(b.dataset.go==="aboutEdit"&&!state.aboutDirty)startAboutDraft();go(b.dataset.go)});
   v.querySelectorAll("[data-pax]").forEach(b=>b.onclick=()=>{state.pax=Number(b.dataset.pax);render()});
   const pax=$("#pax",v);
   if(pax){
@@ -2252,10 +2418,10 @@ function messageFor(q){
   lines.push(`Event: ${q.event.type||"Event"} on ${fmtDate(q.event.date)}${q.event.time?" at "+fmtTime(q.event.time):""}`);
   if(q.event.venue)lines.push(`Venue: ${q.event.venue}`);
   lines.push(`Guests: ${q.event.pax} pax`);
-  lines.push(`Plan: ${q.plan.kind==="package"?`${q.plan.packageName} Package (${peso(q.plan.pricePerHead)}/head)`:"Custom menu"}`);
+  lines.push(`Plan: ${q.plan.kind==="package"?(q.plan.pricePerHead>0?`${q.plan.packageName} Package (${peso(q.plan.pricePerHead)}/head)`:`${q.plan.packageName} (quote requested)`):"Custom menu"}`);
   if(q.plan.chefPick)lines.push("Menu: Chef to recommend");
   else{lines.push("Menu:");q.items.forEach(i=>lines.push(`- ${COURSES[i.cat]||i.cat}: ${i.dish}`))}
-  lines.push(`Estimated total: ${peso(q.estimate.total)} (${peso(q.estimate.perHead)}/head) — estimate only`);
+  if(q.estimate.total>0)lines.push(`Estimated total: ${peso(q.estimate.total)} (${peso(q.estimate.perHead)}/head) — estimate only`);
   if(q.notes)lines.push(`Notes: ${q.notes}`);
   const compact={...q};delete compact.status;
   lines.push("","[Please keep this reference line] RCS1:"+b64e(JSON.stringify(compact)));
