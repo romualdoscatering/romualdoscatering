@@ -804,15 +804,21 @@ ACT.saveSheet = mode => {
   if (!titleCase(d.client)) return toast('Enter the client name.', true);
   if (!d.date) return toast('Enter the event date.', true);
   clearTimeout(AS.timer);
+  const win = mode === 'pdf' ? pdfWindow() : null;   // open now, while it still counts as the user's click, so Chrome doesn't block it
   guard(async () => {
     if (!d.id) d.id = genId();
     const {id, sheet} = await writeSheet(d);
     D.sheet = JSON.parse(JSON.stringify({...sheet, id, pax: String(sheet.pax || ''), menu: sheet.menu.length ? sheet.menu : sheet.kind === 'catering' ? newSheet().menu : orderRows()}));
     AS.dirty = false; AS.err = ''; AS.lastOk = Date.now(); AS.restoredAt = 0; draftClear();
-    if (mode === 'pdf') setTimeout(() => printSheet(id), 300);
-  }, mode === 'pdf' ? 'Saved — opening the PDF' : 'Event sheet saved');
+    if (mode === 'pdf') setTimeout(() => printSheet(id, win), 300);
+  }, mode === 'pdf' ? 'Saved — opening the PDF' : 'Event sheet saved').then(ok => { if (!ok && win) win.close(); });
 };
-ACT.pdfSheet = id => printSheet(id);
+ACT.pdfSheet = id => printSheet(id, pdfWindow());
+function pdfWindow() {
+  const w = window.open('', '_blank');
+  if (w) w.document.write('<!DOCTYPE html><title>Preparing PDF…</title><body style="font:15px Montserrat,Arial,sans-serif;color:#1A2C54;display:grid;place-items:center;height:90vh;margin:0">Preparing the event sheet…</body>');
+  return w;
+}
 ACT.delSheet = id => {
   const e = S.events[id]; if (!e) return;
   const name = e.sheet?.client || e.client || e.name || 'this event';
@@ -821,8 +827,8 @@ ACT.delSheet = id => {
   if (D.sheet?.id === id) { clearTimeout(AS.timer); clearTimeout(AS.localTimer); AS.dirty = false; AS.err = ''; AS.restoredAt = 0; AS.lastOk = 0; draftClear(); D.sheet = newSheet(); }
   guard(async () => { await upd('events/' + id, {status: 'void', voidReason: 'Event sheet deleted', voidBy: S.me?.name || S.me?.username || '', voidAt: Date.now()}); }, 'Event sheet deleted');
 };
-function printSheet(id) {
-  const e = S.events[id]; if (!e) return toast('Save the event sheet first.', true);
+function printSheet(id, w) {
+  const e = S.events[id]; if (!e) { if (w) w.close(); return toast('Save the event sheet first.', true); }
   const d = sheetOf(e), ref = sheetRef(d), st = (SHEET_STATUS.find(x => x[0] === d.status) || SHEET_STATUS[0])[1];
   const k = d.kind || 'catering', cat = k === 'catering', kl = sheetKindLabel(k);
   const logo = new URL('../assets/logo.png', location.href).href;
@@ -904,7 +910,7 @@ function fit(){var p=document.getElementById('pg'),H=p.offsetWidth*297/210;p.sty
 window.addEventListener('load',function(){(document.fonts?document.fonts.ready:Promise.resolve()).then(function(){fit();setTimeout(function(){window.print()},400)})});
 <\/script>
 </body></html>`;
-  const w = window.open('', '_blank');
+  w = w && !w.closed ? w : window.open('', '_blank');
   if (!w) return toast('Your browser blocked the PDF window. Allow pop-ups for romualdos.ph and try again.', true);
   w.document.open(); w.document.write(html); w.document.close();
 }
