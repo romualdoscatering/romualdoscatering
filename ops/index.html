@@ -685,7 +685,7 @@ V.sheets = () => {
   const listRow = e => { const sh = sheetOf(e), st = SHEET_STATUS.find(x => x[0] === sh.status) || SHEET_STATUS[0];
     return `<tr class="click" data-act="editSheet" data-arg="${e.id}"><td>${fmtD(e.date)}</td><td><b>${esc(sh.client || e.name)}</b>${sh.kind && sh.kind !== 'catering' ? ` <span class="chip warn">${sheetKindLabel(sh.kind)}</span>` : ''}<div class="small mut">${esc([sh.kind && sh.kind !== 'catering' ? sh.fulfil : sh.type, sh.venue].filter(Boolean).join(' · '))}</div></td><td class="n">${esc(sh.pax || e.pax || '')}</td>
       <td><span class="chip ${sh.status === 'approved' ? 'ok' : sh.status === 'approval' ? 'warn' : sh.status === 'cancelled' ? 'mut' : 'info'}">${st[1]}</span></td>
-      <td class="row"><button class="sm" data-act="editSheet" data-arg="${e.id}">Edit</button><button class="sm pri" data-act="pdfSheet" data-arg="${e.id}">PDF</button></td></tr>`; };
+      <td class="row"><button class="sm" data-act="editSheet" data-arg="${e.id}">Edit</button><button class="sm pri" data-act="pdfSheet" data-arg="${e.id}">PDF</button>${S.isAdmin ? `<button class="sm ghost" data-act="delSheet" data-arg="${e.id}" title="Delete this event sheet" style="color:#9B1C1C">Delete</button>` : ''}</td></tr>`; };
   return `<h2>Event sheets</h2>
   <p class="lede">Encode each event's details once. <b>Generate PDF</b> makes a polished event sheet with the Romualdo's logo, for the kitchen and for the client to approve. Billing is not included; that stays with the admin and finance.</p>
   <div class="card" id="sheetForm"><div class="row" style="margin-bottom:6px"><h3 style="margin:0">${d.id ? 'Edit event sheet' : 'New event sheet'}</h3><span id="sheetSaveState" class="save-state ${AS.err ? 'warn' : AS.dirty ? 'busy' : 'ok'}">${esc(saveStateText())}</span><span class="spacer"></span>${d.id ? '<button class="sm ghost" data-act="newSheet">＋ Start a new one instead</button>' : ''}</div>
@@ -813,6 +813,14 @@ ACT.saveSheet = mode => {
   }, mode === 'pdf' ? 'Saved — opening the PDF' : 'Event sheet saved');
 };
 ACT.pdfSheet = id => printSheet(id);
+ACT.delSheet = id => {
+  const e = S.events[id]; if (!e) return;
+  const name = e.sheet?.client || e.client || e.name || 'this event';
+  const linked = [...S.purchases, ...S.expenses, ...S.moves].filter(x => x.eventId === id && x.status !== 'void').length;
+  if (!confirm(`Delete the event sheet for ${name} (${fmtD(e.date)})?` + (linked ? `\n\n${linked} purchase/expense/stock record${linked === 1 ? ' is' : 's are'} linked to this event. They stay in their own pages.` : '') + '\n\nThis removes it from the list.')) return;
+  if (D.sheet?.id === id) { clearTimeout(AS.timer); clearTimeout(AS.localTimer); AS.dirty = false; AS.err = ''; AS.restoredAt = 0; AS.lastOk = 0; draftClear(); D.sheet = newSheet(); }
+  guard(async () => { await upd('events/' + id, {status: 'void', voidReason: 'Event sheet deleted', voidBy: S.me?.name || S.me?.username || '', voidAt: Date.now()}); }, 'Event sheet deleted');
+};
 function printSheet(id) {
   const e = S.events[id]; if (!e) return toast('Save the event sheet first.', true);
   const d = sheetOf(e), ref = sheetRef(d), st = (SHEET_STATUS.find(x => x[0] === d.status) || SHEET_STATUS[0])[1];
