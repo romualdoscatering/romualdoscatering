@@ -261,7 +261,7 @@ td.num{text-align:right;white-space:nowrap}
 
 /* ===== Maligayang Kaarawan page: Pinoy fiesta look, scoped to .kaar ===== */
 .nav-kaar{color:#B5302A!important;font-weight:700}
-.kaar{--k-red:#C8372D;--k-yel:#F2B33D;--k-blu:#2C5AA0;--k-grn:#3C8A5A;--k-ink:#3A2418;--k-cream:#FFF7E8;--k-paper:#FFFDF7;color:var(--k-ink);margin:-8px 0 0}
+.kaar{background:var(--k-page,transparent);border-radius:18px;--k-red:#C8372D;--k-yel:#F2B33D;--k-blu:#2C5AA0;--k-grn:#3C8A5A;--k-ink:#3A2418;--k-cream:#FFF7E8;--k-paper:#FFFDF7;color:var(--k-ink);margin:-8px 0 0}
 .kaar .fiesta{font-family:Shrikhand,'Libre Baskerville',serif;font-weight:400;letter-spacing:.01em}
 .kaar .bunting{height:34px;background:
   linear-gradient(135deg,var(--k-red) 25%,transparent 25%) 0 0/56px 34px,
@@ -331,6 +331,7 @@ td.num{text-align:right;white-space:nowrap}
 .kslot{display:flex;gap:12px;align-items:center;margin:0 0 12px}.kslot-img{width:150px;height:96px;border-radius:10px;overflow:hidden;background:#f2ede0;display:grid;place-items:center;flex:0 0 auto}.kslot-img img{width:100%;height:100%;object-fit:cover}.kslot-b{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
 .g2{display:grid;grid-template-columns:1fr 1fr;gap:10px}@media (max-width:640px){.g2{grid-template-columns:1fr}}
 .kopt-ed{border:1.5px solid var(--line);border-radius:12px;padding:14px;margin:0 0 14px;background:#fffdf8}.kopt-h{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.kopt-h .inl{display:flex!important;flex-direction:row!important;align-items:center;gap:6px;margin:0!important}.kopt-h .inl input{width:auto}
+.kchecks{display:flex;flex-wrap:wrap;gap:6px 18px}.kchecks .inl,.kcolors .inl{display:flex!important;flex-direction:row!important;align-items:center;gap:6px;margin:0!important;font-weight:600}.kchecks input{width:auto}.kcolors{display:flex;flex-wrap:wrap;gap:8px 18px}.kcolors input[type=color]{width:36px;height:28px;padding:0;border:1px solid var(--line);border-radius:6px}
 .kmenu-row{display:grid;grid-template-columns:118px 1.6fr 1fr auto;gap:6px;align-items:center;margin:6px 0}.kmenu-row input{margin:0;width:100%;box-sizing:border-box;min-width:0;text-align:left}.kmph{display:flex;align-items:center;gap:4px}.kmph>img,.kmph>span{width:44px;height:44px;border-radius:8px;object-fit:cover;background:#f2ede0;display:grid;place-items:center;flex:0 0 44px}.kmph label{font:600 11.5px inherit;color:var(--blue);cursor:pointer;text-decoration:underline;margin:0!important;display:inline!important}.kmph button{border:0;background:none;color:#9B1C1C;cursor:pointer;font-size:12px;padding:0 2px}.kmenu-row .acts{display:flex;gap:3px}
 @media (max-width:640px){.kmenu-row{grid-template-columns:1fr 1fr}.kmenu-row .kmph{grid-column:1/-1}.kmenu-row .acts{grid-column:1/-1;justify-content:flex-end}}
 .kaar-promo{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:#FFF2DC;border:2px solid #F2B33D;border-radius:16px;padding:14px 20px;margin:0 0 18px;color:#3A2418}
@@ -630,6 +631,7 @@ document.querySelectorAll("header nav button").forEach(b=>b.addEventListener("cl
 document.getElementById("staffLink").addEventListener("click",e=>{e.preventDefault();location.hash="staff";route()});
 /* ============ VIEWS ============ */
 function render(){
+  {const nk=document.querySelector(".nav-kaar"),KD=kaarData();if(nk){nk.textContent=KD.navLabel||KD.title;nk.classList.toggle("hidden",!KD.options.some(o=>o.show))}}
   document.querySelectorAll("header nav button").forEach(b=>{
     const on = b.dataset.nav===state.view || (state.view==="choose"&&b.dataset.nav==="packages");
     b.setAttribute("aria-current", on?"true":"false");
@@ -1390,6 +1392,14 @@ const KAAR_DEFAULT={kicker:"Birthday catering package · Davao City",title:"Mali
   bookTitle:"Book in a minute",bookIntro:"Tell us the date and where the party is. We'll call you to confirm.",
   bookFine:"Sending this is not yet a confirmed booking. Our team will call or message you to confirm the date and arrange the down payment. More guests? Write it in the notes.",
   minDays:3,
+  navLabel:"🎉 Kaarawan Package",showPromo:true,promoText:"A classic Pinoy birthday handaan, menu all set, from {price}. Book in under a minute.",promoBtn:"See the packages →",
+  priceFrom:"Starts at",priceOnly:"Only",forGuests:"for {pax} guests",goodFor:"good for {pax} guests",
+  tbfBadge:"Menu to follow",tbfTitle:"Menu to follow",tbfText:"We're finalizing this package. Message us and we'll tell you as soon as it's ready.",
+  closedText:"Online booking opens once the menu for {package} is ready.",fbBtn:"Message us on Facebook",
+  pickLabel:"Package:",lName:"Your name",lPhone:"Mobile number",pPhone:"09XX XXX XXXX",lDate:"Party date",lTime:"Time",lVenue:"Venue / address",pVenue:"e.g. our home in Matina, or a function hall",
+  lCeleb:"Celebrant's name",lEmail:"Email",lNotes:"Anything we should know?",pNotes:"e.g. 7th birthday, more guests, no seafood",optional:"(optional)",submitBtn:"Send my booking request",
+  showSteps:true,showFlags:true,
+  colors:{red:"#C8372D",yellow:"#F2B33D",blue:"#2C5AA0",green:"#3C8A5A",ink:"#3A2418",cream:"#FFF7E8",page:"#F1E2CF"},
   steps:[{t:"1. Pick your date",d:"Choose a package and fill in the short form. No menu to plan."},{t:"2. We call you",d:"We confirm the date, venue and down payment."},{t:"3. Celebrate!",d:"We cook and deliver the handaan. Kain na!"}],
   options:[
     {id:"o1",name:"Klasik Handaan",tagline:"The birthday spread we all grew up with",perHead:500,pax:50,show:true,photo:{url:KAAR_CDN},caption:"",
@@ -1401,7 +1411,7 @@ const kImg=(p,w,alt,extra)=>{p=kRef(p);if(!p)return "";const src=p.url||photoUrl
 function kaarData(){
   let x={};try{x=JSON.parse(state.about.kaarawan||"{}")||{}}catch(e){x={}}
   const d=JSON.parse(JSON.stringify(KAAR_DEFAULT));
-  for(const k of Object.keys(d)){if(k==="options"||k==="steps")continue;if(k==="heroPhoto"){if("heroPhoto" in x)d.heroPhoto=kRef(x.heroPhoto);continue}if(k==="minDays"){if(x.minDays!=null&&x.minDays!=="")d.minDays=Math.max(0,Math.min(60,Math.round(Number(x.minDays))||0));continue}if(typeof x[k]==="string")d[k]=x[k]}
+  for(const k of Object.keys(d)){if(k==="options"||k==="steps")continue;if(typeof d[k]==="boolean"){if(typeof x[k]==="boolean")d[k]=x[k];continue}if(k==="colors"){const c=x.colors||{};for(const n of Object.keys(d.colors))if(/^#[0-9a-f]{6}$/i.test(c[n]||""))d.colors[n]=c[n];continue}if(k==="heroPhoto"){if("heroPhoto" in x)d.heroPhoto=kRef(x.heroPhoto);continue}if(k==="minDays"){if(x.minDays!=null&&x.minDays!=="")d.minDays=Math.max(0,Math.min(60,Math.round(Number(x.minDays))||0));continue}if(typeof x[k]==="string")d[k]=x[k]}
   if(Array.isArray(x.steps))d.steps=x.steps.slice(0,3).map(s=>({t:String(s?.t||""),d:String(s?.d||"")}));
   if(Array.isArray(x.options)&&x.options.length)d.options=x.options.slice(0,6).map((o,i)=>({id:String(o?.id||"o"+(i+1)),name:String(o?.name||""),tagline:String(o?.tagline||""),perHead:Math.max(0,Number(o?.perHead)||0),pax:Math.max(1,Math.round(Number(o?.pax))||50),show:o?.show!==false,photo:kRef(o?.photo),caption:String(o?.caption||""),
     menu:Array.isArray(o?.menu)?o.menu.map(m=>({icon:String(m?.icon||""),dish:String(m?.dish||""),cat:String(m?.cat||""),...(m&&"photo" in m?{photo:m.photo===null?null:kRef(m.photo)}:{})})).filter(m=>m.dish.trim()):[]}));
@@ -1411,21 +1421,23 @@ const KAAR_DISH_IMG={"lumpia shanghai":"https://d8j0ntlcm91z4.cloudfront.net/use
 const kDishPhoto=m=>kRef(m.photo)||(m.photo===null?null:(KAAR_DISH_IMG[String(m.dish||"").trim().toLowerCase()]?{url:KAAR_DISH_IMG[String(m.dish||"").trim().toLowerCase()]}:null));
 const kThumb=m=>{const ph=kDishPhoto(m);return ph?`<span class="mthumb" tabindex="0" aria-label="Photo of ${esc(m.dish)}">${kImg(ph,240,m.dish,'loading="lazy"')}<span class="zoom">${kImg(ph,800,"",'loading="lazy"')}</span></span>`:`<span class="mthumb empty" aria-hidden="true"><span>📷</span></span>`};
 const kReady=o=>o.perHead>0&&o.menu.length>0;
+const kFill=(t,v)=>String(t||"").replace(/\{(\w+)\}/g,(m,k)=>v[k]!=null?v[k]:m);
+const kStyle=K=>{const c=K.colors;return `--k-red:${c.red};--k-yel:${c.yellow};--k-blu:${c.blue};--k-grn:${c.green};--k-ink:${c.ink};--k-cream:${c.cream};--k-page:${c.page}`};
 state.kForm=state.kForm||{name:"",phone:"",email:"",date:"",time:"",venue:"",celebrant:"",notes:""};
-function kaarPromo(){const K=kaarData(),ready=K.options.filter(o=>o.show&&kReady(o));if(!ready.length)return "";const lo=Math.min(...ready.map(o=>o.perHead*o.pax));
-  return `<div class="kaar-promo"><b class="fiesta">${esc(K.title)}</b><span>A classic Pinoy birthday handaan, menu all set, from ₱${lo.toLocaleString("en-PH")}. Book in under a minute.</span><button data-go="kaarawan">See the packages →</button></div>`}
+function kaarPromo(){const K=kaarData();if(!K.showPromo)return "";const ready=K.options.filter(o=>o.show&&kReady(o));if(!ready.length)return "";const lo=Math.min(...ready.map(o=>o.perHead*o.pax));
+  return `<div class="kaar-promo" style="${kStyle(K)}"><b class="fiesta">${esc(K.title)}</b><span>${esc(kFill(K.promoText,{price:"₱"+lo.toLocaleString("en-PH")}))}</span>${K.promoBtn?`<button data-go="kaarawan">${esc(K.promoBtn)}</button>`:""}</div>`}
 function viewKaarawan(){
   const K=kaarData(),f=state.kForm,opts=K.options.filter(o=>o.show);
   if(!opts.find(o=>o.id===state.kOpt))state.kOpt=(opts.find(kReady)||opts[0]||{}).id;
   const o=opts.find(x=>x.id===state.kOpt),ready=o&&kReady(o),total=o?o.perHead*o.pax:0;
   const priced=opts.filter(kReady),lo=priced.length?Math.min(...priced.map(x=>x.perHead*x.pax)):0;
-  const flags=`<div class="flags" aria-hidden="true">${"<i></i>".repeat(48)}</div>`,fb=socialUrl("facebookUrl"),ph=(state.about.contactPhones||[])[0]||"";
-  return `<div class="kaar">
+  const flags=K.showFlags?`<div class="flags" aria-hidden="true">${"<i></i>".repeat(48)}</div>`:"",fb=socialUrl("facebookUrl"),ph=(state.about.contactPhones||[])[0]||"";
+  return `<div class="kaar" style="${kStyle(K)}">
   ${state.canEdit?`<div style="text-align:right;margin:0 0 8px"><button class="btn small ghost" data-go="kaarEdit">✎ Edit this page</button></div>`:""}
   <section class="kaar-hero">${flags}<div class="in">
     <div class="txt">${K.kicker?`<div class="kick">${esc(K.kicker)}</div>`:""}
       <h1 class="fiesta">${esc(K.title)}</h1>${paras(K.intro)}
-      ${lo?`<div class="kaar-price"><span class="sub">${priced.length>1?"Starts at":"Only"}</span><span class="big">₱${lo.toLocaleString("en-PH")}</span><span class="sub">for ${priced[0].pax} guests</span>${K.stamp?`<span class="stamp">${esc(K.stamp)}</span>`:""}</div>`:""}
+      ${lo?`<div class="kaar-price"><span class="sub">${esc(priced.length>1?K.priceFrom:K.priceOnly)}</span><span class="big">₱${lo.toLocaleString("en-PH")}</span><span class="sub">${esc(kFill(K.forGuests,{pax:priced[0].pax}))}</span>${K.stamp?`<span class="stamp">${esc(K.stamp)}</span>`:""}</div>`:""}
       ${K.heroBtn?`<button class="kbtn" data-scroll="kaarOpts">${esc(K.heroBtn)}</button>`:""}</div>
     <figure class="ph">${kImg(K.heroPhoto,1600,K.heroAlt,'loading="eager"')}${K.heroCaption?`<figcaption>${esc(K.heroCaption)}</figcaption>`:""}</figure>
   </div></section>
@@ -1433,36 +1445,36 @@ function viewKaarawan(){
     <div class="kaar-opts" role="tablist">${opts.map(x=>`<button class="kaar-opt ${x.id===state.kOpt?"on":""}" role="tab" aria-selected="${x.id===state.kOpt}" data-kopt="${esc(x.id)}">
       <span class="oph">${x.photo?kImg(x.photo,700,x.caption||x.name,'loading="lazy"'):`<span class="noph" aria-hidden="true">🎉</span>`}</span>
       <span class="ob"><b class="fiesta">${esc(x.name)}</b>${x.tagline?`<small>${esc(x.tagline)}</small>`:""}
-      <span class="op">${kReady(x)?`₱${(x.perHead*x.pax).toLocaleString("en-PH")} <em>· ${x.pax} guests · ₱${x.perHead}/head</em>`:`<span class="tbf">Menu to follow</span>`}</span></span></button>`).join("")}</div></section>
+      <span class="op">${kReady(x)?`₱${(x.perHead*x.pax).toLocaleString("en-PH")} <em>· ${x.pax} guests · ₱${x.perHead}/head</em>`:`<span class="tbf">${esc(K.tbfBadge)}</span>`}</span></span></button>`).join("")}</div></section>
   ${o?`<div class="kaar-grid">
-    <section class="kaar-card"><h2 class="fiesta">${esc(K.menuTitle)}</h2><p class="hint" style="margin:0">${esc(o.name)}${ready?` · good for ${o.pax} guests`:""}</p>
+    <section class="kaar-card"><h2 class="fiesta">${esc(K.menuTitle)}</h2><p class="hint" style="margin:0">${esc(o.name)}${ready&&K.goodFor?` · ${esc(kFill(K.goodFor,{pax:o.pax}))}`:""}</p>
       ${o.photo&&o.caption?`<figure class="kaar-fig">${kImg(o.photo,900,o.caption)}<figcaption>${esc(o.caption)}</figcaption></figure>`:""}
       ${o.menu.length?`<ul class="kaar-menu">${o.menu.map(m=>`<li>${kThumb(m)}<span>${esc(m.dish)}${m.cat?`<small>${esc(m.cat)}</small>`:""}</span></li>`).join("")}</ul>`
-        :`<div class="kaar-tbf"><b class="fiesta">Menu to follow</b><p>We're finalizing this package. Message us${fb?` on <a href="${esc(fb)}" target="_blank" rel="noopener">Facebook</a>`:""}${ph?` or call ${esc(ph)}`:""} and we'll tell you as soon as it's ready.</p></div>`}
+        :`<div class="kaar-tbf"><b class="fiesta">${esc(K.tbfTitle)}</b><p>${esc(K.tbfText)}</p><p class="fine">${fb?`<a href="${esc(fb)}" target="_blank" rel="noopener">Facebook</a>`:""}${fb&&ph?" · ":""}${ph?`Call or text ${esc(ph)}`:""}</p></div>`}
       ${K.note?`<p class="fine" style="margin:12px 0 0">${esc(K.note)}</p>`:""}</section>
     <section class="kaar-card" id="kaarBook"><h2 class="fiesta">${esc(K.bookTitle)}</h2><p class="hint" style="margin:0 0 10px">${esc(K.bookIntro)}</p>
       ${ready?`<form id="kaarForm" novalidate>
-        <div class="kaar-pick">Package: <b>${esc(o.name)}</b></div>
+        <div class="kaar-pick">${esc(K.pickLabel)} <b>${esc(o.name)}</b></div>
         <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <label>Your name<input name="name" value="${esc(f.name)}" autocomplete="name" required></label>
-          <label>Mobile number<input name="phone" value="${esc(f.phone)}" type="tel" inputmode="tel" placeholder="09XX XXX XXXX" autocomplete="tel" required></label>
-          <label>Party date<input name="date" value="${esc(f.date)}" type="date" min="${phDate(K.minDays)}" required></label>
-          <label>Time<input name="time" value="${esc(f.time)}" type="time"></label>
+          <label>${esc(K.lName)}<input name="name" value="${esc(f.name)}" autocomplete="name" required></label>
+          <label>${esc(K.lPhone)}<input name="phone" value="${esc(f.phone)}" type="tel" inputmode="tel" placeholder="${esc(K.pPhone)}" autocomplete="tel" required></label>
+          <label>${esc(K.lDate)}<input name="date" value="${esc(f.date)}" type="date" min="${phDate(K.minDays)}" required></label>
+          <label>${esc(K.lTime)}<input name="time" value="${esc(f.time)}" type="time"></label>
         </div>
-        <label>Venue / address<input name="venue" value="${esc(f.venue)}" placeholder="e.g. our home in Matina, or a function hall"></label>
+        <label>${esc(K.lVenue)}<input name="venue" value="${esc(f.venue)}" placeholder="${esc(K.pVenue)}"></label>
         <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-          <label><span>Celebrant's name <span class="hint">(optional)</span></span><input name="celebrant" value="${esc(f.celebrant)}"></label>
-          <label><span>Email <span class="hint">(optional)</span></span><input name="email" value="${esc(f.email)}" type="email" autocomplete="email"></label>
+          <label><span>${esc(K.lCeleb)} <span class="hint">${esc(K.optional)}</span></span><input name="celebrant" value="${esc(f.celebrant)}"></label>
+          <label><span>${esc(K.lEmail)} <span class="hint">${esc(K.optional)}</span></span><input name="email" value="${esc(f.email)}" type="email" autocomplete="email"></label>
         </div>
-        <label><span>Anything we should know? <span class="hint">(optional)</span></span><textarea name="notes" rows="2" placeholder="e.g. 7th birthday, more guests, no seafood">${esc(f.notes)}</textarea></label>
+        <label><span>${esc(K.lNotes)} <span class="hint">${esc(K.optional)}</span></span><textarea name="notes" rows="2" placeholder="${esc(K.pNotes)}">${esc(f.notes)}</textarea></label>
         <input name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-5000px" aria-hidden="true">
         <div class="kaar-total"><span>${o.pax} guests × ₱${o.perHead}</span><b>₱${total.toLocaleString("en-PH")}</b></div>
         ${K.bookFine?`<p class="fine">${esc(K.bookFine)}</p>`:""}
         <div class="formmsg" id="kaarMsg"></div>
-        <button class="kbtn" type="submit" style="width:100%">Send my booking request</button>
-      </form>`:`<div class="kaar-tbf"><p>Online booking opens once the menu for <b>${esc(o.name)}</b> is ready. ${fb?`<a class="kbtn" href="${esc(fb)}" target="_blank" rel="noopener" style="margin-top:8px">Message us on Facebook</a>`:""}</p></div>`}
+        <button class="kbtn" type="submit" style="width:100%">${esc(K.submitBtn)}</button>
+      </form>`:`<div class="kaar-tbf"><p>${esc(kFill(K.closedText,{package:o.name}))}</p>${fb&&K.fbBtn?`<a class="kbtn" href="${esc(fb)}" target="_blank" rel="noopener" style="margin-top:8px">${esc(K.fbBtn)}</a>`:""}</div>`}
     </section></div>`:""}
-  ${K.steps.some(x=>x.t||x.d)?`<div class="kaar-steps">${K.steps.map(x=>`<div><b>${esc(x.t)}</b>${esc(x.d)}</div>`).join("")}</div>`:""}
+  ${K.showSteps&&K.steps.some(x=>x.t||x.d)?`<div class="kaar-steps">${K.steps.map(x=>`<div><b>${esc(x.t)}</b>${esc(x.d)}</div>`).join("")}</div>`:""}
   ${flags}</div>`;
 }
 function bindKaarawan(v){
@@ -1484,7 +1496,7 @@ function bindKaarawan(v){
       plan:{kind:"package",packageId:("k-"+o.id).slice(0,20),packageName:pname,pricePerHead:o.perHead,chefPick:false},
       items:o.menu.map(m=>({cat:m.cat||"Menu",dish:m.dish,tier:"kaarawan",slot:m.cat})),estimate:{perHead:o.perHead,total:o.perHead*o.pax}};
     const r=await api("submit",{inquiry:q,website:fm.elements.website.value||""});
-    if(!r.ok&&!r.network&&r.error){btn.disabled=false;btn.textContent="Send my booking request";msg.textContent=r.error;return}
+    if(!r.ok&&!r.network&&r.error){btn.disabled=false;btn.textContent=K.submitBtn;msg.textContent=r.error;return}
     if(r.ok&&r.ref)q.ref=r.ref;
     state.lastDone={inq:q,saved:!!r.ok,message:messageFor(q)};state.kForm={name:"",phone:"",email:"",date:"",time:"",venue:"",celebrant:"",notes:""};
     if(r.ok&&state.isStaff)loadInquiries();go("done")};
@@ -1522,6 +1534,21 @@ function viewKaarEdit(){
   ${sec("Menu &amp; booking boxes",`<div class="g2">${inp("menuTitle","Menu box heading",D.menuTitle,40)}${inp("bookTitle","Booking box heading",D.bookTitle,40)}</div>
     ${inp("bookIntro","Line under the booking heading",D.bookIntro,160)}${ta("bookFine","Small print above the button",D.bookFine,2,400)}${ta("note","Note under the menu",D.note,2,300)}
     ${inp("minDays","Book at least this many days ahead",D.minDays,2)}`)}
+  ${sec("Booking form wording",`<div class="g2">${inp("pickLabel","Before the package name",D.pickLabel,30)}${inp("submitBtn","Send button",D.submitBtn,40)}</div>
+    <div class="g2">${inp("lName","Name label",D.lName,30)}${inp("lPhone","Mobile label",D.lPhone,30)}</div><div class="g2">${inp("pPhone","Mobile example text",D.pPhone,30)}${inp("lDate","Date label",D.lDate,30)}</div>
+    <div class="g2">${inp("lTime","Time label",D.lTime,30)}${inp("lVenue","Venue label",D.lVenue,30)}</div>${inp("pVenue","Venue example text",D.pVenue,80)}
+    <div class="g2">${inp("lCeleb","Celebrant label",D.lCeleb,30)}${inp("lEmail","Email label",D.lEmail,30)}</div><div class="g2">${inp("lNotes","Notes label",D.lNotes,40)}${inp("optional","Word for optional fields",D.optional,20)}</div>
+    ${inp("pNotes","Notes example text",D.pNotes,80)}`)}
+  ${sec("Prices &amp; menu-to-follow wording",`<p class="hint" style="margin:0 0 8px">{pax}, {price} and {package} are filled in automatically.</p>
+    <div class="g2">${inp("priceFrom","Before the price (several packages)",D.priceFrom,20)}${inp("priceOnly","Before the price (one package)",D.priceOnly,20)}</div>
+    <div class="g2">${inp("forGuests","After the price",D.forGuests,40)}${inp("goodFor","Under the menu heading",D.goodFor,40)}</div>
+    <div class="g2">${inp("tbfBadge","Badge on unfinished packages",D.tbfBadge,30)}${inp("tbfTitle","Heading in place of the menu",D.tbfTitle,40)}</div>
+    ${ta("tbfText","Message in place of the menu",D.tbfText,2,300)}${ta("closedText","Message in place of the booking form",D.closedText,2,300)}${inp("fbBtn","Facebook button (leave empty to hide)",D.fbBtn,40)}`)}
+  ${sec("Menu button, banner &amp; look",`<div class="g2">${inp("navLabel","Top menu button",D.navLabel,30)}${inp("promoBtn","Banner button",D.promoBtn,30)}</div>
+    ${ta("promoText","Banner text on the Packages page ({price} = cheapest package)",D.promoText,2,200)}
+    <div class="kchecks"><label class="inl"><input type="checkbox" data-kb="showPromo" ${D.showPromo?"checked":""}> Show the banner on the Packages page</label><label class="inl"><input type="checkbox" data-kb="showFlags" ${D.showFlags?"checked":""}> Show the banderitas</label><label class="inl"><input type="checkbox" data-kb="showSteps" ${D.showSteps?"checked":""}> Show the three steps</label></div>
+    <b style="display:block;margin:12px 0 6px">Colors</b><div class="kcolors">${[["red","Title &amp; buttons"],["yellow","Title shadow &amp; accents"],["blue","Headings"],["green","Banderitas"],["ink","Text"],["cream","Boxes"],["page","Page background"]].map(([k,l])=>`<label class="inl"><input type="color" data-kc="${k}" value="${esc(D.colors[k])}"> ${l}</label>`).join("")}</div>
+    <button class="btn small ghost" id="kColorsReset" style="margin-top:8px">Reset colors</button>`)}
   ${sec("Three steps",D.steps.map((x,i)=>`<div class="g2">${inp(`steps.${i}.t`,`Step ${i+1} title`,x.t,40)}${inp(`steps.${i}.d`,`Step ${i+1} text`,x.d,160)}</div>`).join(""))}
   <div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:sticky;bottom:10px;z-index:5;border-color:${state.kDirty?"var(--gold)":"var(--line)"}">
     <button class="btn gold" id="saveKaar" ${state.kDirty?"":"disabled"}>Save changes</button><button class="btn ghost" id="discardKaar" ${state.kDirty?"":"disabled"}>Discard changes</button>
@@ -1533,6 +1560,9 @@ function kGet(path){return path.split(".").reduce((o,k)=>o?.[k],state.kDraft)}
 function bindKaarEdit(v){
   const D=state.kDraft,re=()=>{state.kDirty=true;keepScroll(render)};
   v.querySelectorAll("[data-kp]").forEach(el=>el.oninput=()=>{kSet(el.dataset.kp,el.value);kDirty();if(/perHead|pax/.test(el.dataset.kp)){const t=el.closest(".kopt-ed")?.querySelector("p.hint b");const i=+el.dataset.kp.split(".")[1];if(t)t.textContent="₱"+((Number(D.options[i].perHead)||0)*(Number(D.options[i].pax)||0)).toLocaleString("en-PH")}});
+  v.querySelectorAll("[data-kb]").forEach(el=>el.onchange=()=>{D[el.dataset.kb]=el.checked;kDirty()});
+  v.querySelectorAll("[data-kc]").forEach(el=>el.oninput=()=>{D.colors[el.dataset.kc]=el.value;kDirty()});
+  const cr=$("#kColorsReset",v);if(cr)cr.onclick=()=>{D.colors={...KAAR_DEFAULT.colors};re()};
   v.querySelectorAll("[data-kshow]").forEach(el=>el.onchange=()=>{D.options[+el.dataset.kshow].show=el.checked;kDirty()});
   v.querySelectorAll("[data-kup]").forEach(el=>el.onchange=async()=>{const f=el.files[0];el.value="";if(!f)return;state.kUpMsg="Uploading photo…";$("#kUpMsg").textContent=state.kUpMsg;
     try{const r=await uploadOne(f,{slot:true});const ref=r.ok&&cleanRef(r.photo);if(ref){kSet(el.dataset.kup,ref);state.kUpMsg="Photo uploaded. Click Save changes to publish.";state.kDirty=true}else state.kUpMsg="Photo not uploaded: "+upErr(r)}catch(e){state.kUpMsg="That file isn't a photo the browser can read."}keepScroll(render)});
