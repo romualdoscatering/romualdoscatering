@@ -20,7 +20,7 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <meta name="theme-color" content="#1A2C54">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Montserrat:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Shrikhand&family=Montserrat:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="config.js"></script>
 <style>
@@ -258,6 +258,59 @@ td.num{text-align:right;white-space:nowrap}
 .tray-order-b{display:flex;gap:10px;flex-wrap:wrap}.tray-order-b a.btn{text-decoration:none;display:inline-flex;align-items:center}
 .tray-b li.has-sz{flex-wrap:wrap}.tray-b li .sz{flex-basis:100%;margin:4px 0 0;padding:4px 8px;font-size:13px;width:auto;max-width:100%}.tray-b li .sz-in{flex-basis:100%;color:var(--wine,#631B1C);font-size:12px;margin-top:2px}
 .te-sz{margin:2px 0 8px 18px;padding-left:10px;border-left:2px solid var(--gold)}.te-sz .te-row{grid-template-columns:1fr 110px auto}.te-szb{font-size:12px;padding:2px 8px}.te-link{background:none;border:0;padding:0 2px;font:600 12px inherit;color:var(--blue,#1A2C54);text-decoration:underline;cursor:pointer;opacity:.75}.te-link:hover{opacity:1}
+
+/* ===== Maligayang Kaarawan page: Pinoy fiesta look, scoped to .kaar ===== */
+.nav-kaar{color:#B5302A!important;font-weight:700}
+.kaar{--k-red:#C8372D;--k-yel:#F2B33D;--k-blu:#2C5AA0;--k-grn:#3C8A5A;--k-ink:#3A2418;--k-cream:#FFF7E8;--k-paper:#FFFDF7;color:var(--k-ink);margin:-8px 0 0}
+.kaar .fiesta{font-family:Shrikhand,'Libre Baskerville',serif;font-weight:400;letter-spacing:.01em}
+.kaar .bunting{height:34px;background:
+  linear-gradient(135deg,var(--k-red) 25%,transparent 25%) 0 0/56px 34px,
+  linear-gradient(225deg,var(--k-red) 25%,transparent 25%) 0 0/56px 34px;position:relative}
+.kaar .flags{display:flex;justify-content:space-between;height:30px;overflow:hidden;position:relative;margin:0 -6px}
+.kaar .flags::before{content:"";position:absolute;left:0;right:0;top:3px;border-top:2px solid #8B6A4A;opacity:.6}
+.kaar .flags i{flex:0 0 26px;height:26px;margin-top:4px;clip-path:polygon(0 0,100% 0,50% 100%)}
+.kaar .flags i:nth-child(4n+1){background:var(--k-red)}.kaar .flags i:nth-child(4n+2){background:var(--k-yel)}.kaar .flags i:nth-child(4n+3){background:var(--k-blu)}.kaar .flags i:nth-child(4n){background:var(--k-grn)}
+.kaar-hero{background:var(--k-cream);border-radius:18px;overflow:hidden;box-shadow:0 1px 0 #EADBC0;margin-bottom:22px}
+.kaar-hero .in{display:grid;grid-template-columns:1.05fr 1fr;gap:0;align-items:stretch}
+.kaar-hero .txt{padding:26px 34px 30px}
+.kaar-hero .kick{font:700 12px Montserrat,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--k-blu)}
+.kaar-hero h1{font-size:clamp(38px,5.4vw,64px);line-height:1.02;margin:10px 0 12px;color:var(--k-red);text-shadow:3px 3px 0 var(--k-yel)}
+.kaar-hero p{font-size:16px;line-height:1.6;margin:0 0 18px;max-width:34em}
+.kaar-hero .ph{position:relative;min-height:320px;background:#E9D9BC}
+.kaar-hero .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.kaar-price{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:6px 0 18px}
+.kaar-price .big{font-family:Shrikhand,serif;font-size:44px;color:var(--k-ink);line-height:1}
+.kaar-price .sub{font:600 13px/1.5 Montserrat,sans-serif;color:#6B5444}
+.kaar-price .stamp{border:2px dashed var(--k-red);color:var(--k-red);border-radius:999px;padding:6px 14px;font:700 13px Montserrat,sans-serif;transform:rotate(-3deg)}
+.kaar .kbtn{display:inline-block;background:var(--k-red);color:#fff;border:0;border-radius:999px;padding:13px 26px;font:700 15px Montserrat,sans-serif;cursor:pointer;box-shadow:0 3px 0 #8E2019}
+.kaar .kbtn:hover{filter:brightness(1.06)}.kaar .kbtn:active{transform:translateY(2px);box-shadow:0 1px 0 #8E2019}
+.kaar-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;align-items:start}
+.kaar-card{background:var(--k-paper);border:1px solid #EADBC0;border-radius:16px;padding:22px 26px}
+.kaar-card h2{font-size:30px;color:var(--k-blu);margin:0 0 4px}
+.kaar-card .hint{color:#7A6553}
+.kaar-menu{list-style:none;margin:12px 0 0;padding:0}
+.kaar-menu li{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px dashed #E2CFAE;font:600 16px Montserrat,sans-serif}
+.kaar-menu li:last-child{border-bottom:0}
+.kaar-menu .dot{flex:0 0 34px;height:34px;border-radius:50%;display:grid;place-items:center;font-size:17px;background:#FCEBD0}
+.kaar-menu small{display:block;font:500 12px Montserrat,sans-serif;color:#8A7260}
+.kaar-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:22px 0}
+.kaar-steps div{background:var(--k-cream);border-radius:14px;padding:16px 18px;font-size:14px;line-height:1.5}
+.kaar-steps b{display:block;font-family:Shrikhand,serif;font-weight:400;font-size:22px;color:var(--k-red);margin-bottom:2px}
+.kaar-grid>*,.kaar-hero .in>*{min-width:0}
+.kaar form label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:13px;margin-bottom:10px;color:var(--k-ink);min-width:0}
+.kaar form input,.kaar form textarea{width:100%;box-sizing:border-box;min-width:0;padding:10px 12px;border:1.5px solid #DCC7A4;border-radius:10px;background:#fff;font-size:15px;color:var(--k-ink)}
+.kaar form input:focus,.kaar form textarea:focus{outline:2px solid var(--k-yel);border-color:var(--k-red)}
+.kaar form .err{border-color:var(--k-red);background:#FFF1EE}
+.kaar form .hint{font-weight:500}
+@media (max-width:480px){.kaar form .two{grid-template-columns:1fr!important}}
+.kaar .fine{font-size:12.5px;color:#7A6553;line-height:1.5}
+.kaar-total{display:flex;justify-content:space-between;align-items:baseline;border-top:2px solid var(--k-ink);margin:12px 0 4px;padding-top:10px;font:700 15px Montserrat,sans-serif}
+.kaar-total b{font-family:Shrikhand,serif;font-weight:400;font-size:28px}
+.kaar-promo{display:flex;align-items:center;gap:16px;flex-wrap:wrap;background:#FFF2DC;border:2px solid #F2B33D;border-radius:16px;padding:14px 20px;margin:0 0 18px;color:#3A2418}
+.kaar-promo .fiesta{font-family:Shrikhand,serif;font-size:24px;color:#C8372D}
+.kaar-promo span{flex:1;min-width:220px;font-size:14.5px}
+.kaar-promo button{background:#C8372D;color:#fff;border:0;border-radius:999px;padding:10px 18px;font:700 14px Montserrat,sans-serif;cursor:pointer}
+@media (max-width:860px){.kaar-hero .in,.kaar-grid{grid-template-columns:1fr}.kaar-hero .ph{min-height:220px;order:-1}.kaar-steps{grid-template-columns:1fr}.kaar-hero .txt{padding:20px 20px 24px}.kaar-card{padding:18px}}
 .te-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,430px),1fr));gap:14px;margin-top:12px}
 .te-row{display:grid;grid-template-columns:1fr 110px auto;gap:6px;align-items:center;margin:5px 0}
 .te-row>*{min-width:0}.te-row input{margin:0;width:100%;box-sizing:border-box;min-width:0}.te-row .pr{position:relative}.te-row .pr span{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted,#777);font-size:13px}.te-row .pr input{padding-left:22px;text-align:right}
@@ -382,6 +435,7 @@ footer{border-top:1px solid var(--line);padding:18px 0;font-size:12.5px;color:va
       <button data-nav="home">Home</button>
       <button data-nav="about">About Us</button>
       <button data-nav="packages">Packages</button>
+      <button data-nav="kaarawan" class="nav-kaar">🎉 Kaarawan Package</button>
       <button data-nav="custom">Build Your Own Menu</button>
       <button data-nav="trays">Food Trays</button>
       <button data-nav="contact">Contact Us</button>
@@ -532,7 +586,7 @@ function closestPackageHint(perHead){
 }
 
 /* ============ NAV ============ */
-const PAGE_HASH={home:"",about:"about",packages:"packages",custom:"custom",trays:"trays",contact:"contact"};
+const PAGE_HASH={home:"",about:"about",packages:"packages",kaarawan:"kaarawan",custom:"custom",trays:"trays",contact:"contact"};
 function go(view){state.view=view;
   if(view in PAGE_HASH){const h=PAGE_HASH[view];if((location.hash||"").slice(1)!==h)history.pushState(null,"",h?"#"+h:location.pathname)}
   render();window.scrollTo({top:0,behavior:"smooth"})}
@@ -564,7 +618,8 @@ function render(){
   if(state.view==="home") v.innerHTML=viewHome();
   else if(state.view==="contact") v.innerHTML=viewContact();
   else if(state.view==="trays") v.innerHTML=viewTrays();
-  else if(state.view==="packages") v.innerHTML=viewPackages()+nextBand("custom");
+  else if(state.view==="kaarawan") v.innerHTML=viewKaarawan();
+  else if(state.view==="packages") v.innerHTML=kaarPromo()+viewPackages()+nextBand("custom");
   else if(state.view==="choose") v.innerHTML=viewChoose();
   else if(state.view==="custom") v.innerHTML=viewCustom()+nextBand("contact");
   else if(state.view==="done") v.innerHTML=viewDone();
@@ -1295,6 +1350,72 @@ function bindTrays(v){
   v.querySelectorAll("[data-tmore]").forEach(b=>b.onclick=()=>{const k=b.dataset.tmore;state.trayOpen[k]=!state.trayOpen[k];keepScroll(render)});
   v.querySelectorAll("[data-scroll]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.scroll)?.scrollIntoView({behavior:"smooth"}));
 }
+/* ============ MALIGAYANG KAARAWAN (fixed birthday package) ============ */
+const KAAR={id:"kaarawan",name:"Maligayang Kaarawan",perHead:500,pax:50,
+  img:"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_113339_4048bddf-388e-4a7f-845d-dfcfcfa44825.png",
+  menu:[["🥟","Lumpia Shanghai","Appetizer"],["🍗","Fried Chicken","Chicken"],["🍢","Pork BBQ","Pork"],["🐟","Sweet & Sour Fish","Fish"],["🍝","Filipino Spaghetti","Pasta"],["🍚","Rice","Rice"],["🥗","Macaroni Salad and Fresh Fruits","Dessert"],["🥤","Softdrinks","Drinks"]]};
+state.kForm=state.kForm||{name:"",phone:"",email:"",date:"",time:"",venue:"",celebrant:"",notes:""};
+function kaarPromo(){return `<div class="kaar-promo"><b class="fiesta">Maligayang Kaarawan Package</b><span>A classic Pinoy birthday handaan for 50 guests — ₱25,000, menu all set. Book in under a minute.</span><button data-go="kaarawan">See the package →</button></div>`}
+function viewKaarawan(){
+  const k=KAAR,f=state.kForm,total=k.perHead*k.pax,flags=`<div class="flags" aria-hidden="true">${"<i></i>".repeat(48)}</div>`;
+  return `<div class="kaar">
+  <section class="kaar-hero">${flags}<div class="in">
+    <div class="txt"><div class="kick">Birthday catering package · Davao City</div>
+      <h1 class="fiesta">Maligayang Kaarawan Package</h1>
+      <p>Ang handaang kinalakihan natin: lumpia, fried chicken, BBQ, matamis na spaghetti at malamig na softdrinks. Everything is planned for you, so you just pick the date and celebrate with the family.</p>
+      <div class="kaar-price"><span class="big">₱${total.toLocaleString("en-PH")}</span><span class="sub">for ${k.pax} guests<br>₱${k.perHead}/head · menu all set</span><span class="stamp">No menu planning needed!</span></div>
+      <button class="kbtn" data-scroll="kaarBook">Book this package</button></div>
+    <div class="ph"><img src="${k.img}" alt="A Filipino birthday handaan with lumpia, fried chicken, pork barbecue and spaghetti" loading="eager" onerror="this.style.display='none'"></div>
+  </div></section>
+  <div class="kaar-grid">
+    <section class="kaar-card"><h2 class="fiesta">Ang Handaan</h2><p class="hint" style="margin:0">The complete menu, good for ${k.pax} guests</p>
+      <ul class="kaar-menu">${k.menu.map(([ic,d,c])=>`<li><span class="dot" aria-hidden="true">${ic}</span><span>${esc(d)}<small>${esc(c)}</small></span></li>`).join("")}</ul>
+      <p class="fine" style="margin:12px 0 0">📷 Photo is for reference only. Our team confirms the final menu and inclusions when we call you.</p></section>
+    <section class="kaar-card" id="kaarBook"><h2 class="fiesta">Book in a minute</h2><p class="hint" style="margin:0 0 10px">Tell us the date and where the party is. We'll call you to confirm.</p>
+      <form id="kaarForm" novalidate>
+        <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <label>Your name<input name="name" value="${esc(f.name)}" autocomplete="name" required></label>
+          <label>Mobile number<input name="phone" value="${esc(f.phone)}" type="tel" inputmode="tel" placeholder="09XX XXX XXXX" autocomplete="tel" required></label>
+          <label>Party date<input name="date" value="${esc(f.date)}" type="date" min="${phDate(3)}" required></label>
+          <label>Time<input name="time" value="${esc(f.time)}" type="time"></label>
+        </div>
+        <label>Venue / address<input name="venue" value="${esc(f.venue)}" placeholder="e.g. our home in Matina, or a function hall"></label>
+        <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <label><span>Celebrant's name <span class="hint">(optional)</span></span><input name="celebrant" value="${esc(f.celebrant)}"></label>
+          <label><span>Email <span class="hint">(optional)</span></span><input name="email" value="${esc(f.email)}" type="email" autocomplete="email"></label>
+        </div>
+        <label><span>Anything we should know? <span class="hint">(optional)</span></span><textarea name="notes" rows="2" placeholder="e.g. 7th birthday, more guests, no seafood">${esc(f.notes)}</textarea></label>
+        <input name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-5000px" aria-hidden="true">
+        <div class="kaar-total"><span>${k.pax} guests × ₱${k.perHead}</span><b>₱${total.toLocaleString("en-PH")}</b></div>
+        <p class="fine">Sending this is not yet a confirmed booking. Our team will call or message you to confirm the date and arrange the down payment. More than ${k.pax} guests? Write it in the notes.</p>
+        <div class="formmsg" id="kaarMsg"></div>
+        <button class="kbtn" type="submit" style="width:100%">Send my booking request</button>
+      </form></section>
+  </div>
+  <div class="kaar-steps"><div><b>1. Pick your date</b>Fill in the short form. No menu to choose, it's all set.</div><div><b>2. We call you</b>We confirm the date, venue and down payment.</div><div><b>3. Celebrate!</b>We cook and deliver the handaan. Kain na!</div></div>
+  ${flags}</div>`;
+}
+function bindKaarawan(v){
+  const fm=$("#kaarForm",v);if(!fm)return;
+  fm.addEventListener("input",e=>{const n=e.target.name;if(n&&n in state.kForm)state.kForm[n]=e.target.value});
+  fm.onsubmit=async e=>{e.preventDefault();
+    const f=state.kForm,msg=$("#kaarMsg");msg.textContent="";fm.querySelectorAll(".err").forEach(el=>el.classList.remove("err"));
+    const need=["name","phone","date"].filter(n=>!String(f[n]||"").trim());need.forEach(n=>fm.elements[n].classList.add("err"));
+    if(need.length){msg.textContent="Please fill in your name, mobile number and party date.";fm.elements[need[0]].focus();return}
+    if(f.date<phDate(3)){fm.elements.date.classList.add("err");const ph=(state.about.contactPhones||[])[0]||"";msg.textContent=`Please book at least 3 days ahead. For a sooner date, message us on Facebook${ph?" or call "+ph:""}.`;return}
+    const btn=fm.querySelector("button[type=submit]");btn.disabled=true;btn.textContent="Sending…";
+    const k=KAAR,notes=[f.celebrant.trim()?"Celebrant: "+f.celebrant.trim():"",f.notes.trim()].filter(Boolean).join("\n");
+    const q={ref:newRef(),createdAt:new Date().toISOString(),status:"New",customer:{name:f.name.trim(),phone:f.phone.trim(),email:f.email.trim()},
+      event:{date:f.date,time:f.time,type:"Birthday",venue:f.venue.trim(),pax:k.pax},notes,
+      plan:{kind:"package",packageId:k.id,packageName:k.name,pricePerHead:k.perHead,chefPick:false},
+      items:k.menu.map(([,d,c])=>({cat:c,dish:d,tier:"kaarawan",slot:c})),estimate:{perHead:k.perHead,total:k.perHead*k.pax}};
+    const r=await api("submit",{inquiry:q,website:fm.elements.website.value||""});
+    if(!r.ok&&!r.network&&r.error){btn.disabled=false;btn.textContent="Send my booking request";msg.textContent=r.error;return}
+    if(r.ok&&r.ref)q.ref=r.ref;
+    state.lastDone={inq:q,saved:!!r.ok,message:messageFor(q)};state.kForm={name:"",phone:"",email:"",date:"",time:"",venue:"",celebrant:"",notes:""};
+    if(r.ok&&state.isStaff)loadInquiries();go("done")};
+  v.querySelectorAll("[data-scroll]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.scroll)?.scrollIntoView({behavior:"smooth"}));
+}
 function viewContact(){
   const a=state.about, fb=socialUrl("facebookUrl"), ig=socialUrl("instagramUrl");
   const tel=n=>String(n).replace(/[^\d+]/g,"").replace(/^0/,"+63");
@@ -1518,6 +1639,7 @@ function bind(){
   if(state.view==="menu")bindMenu(v);
   if(state.view==="about"||state.view==="home")bindAbout(v);
   if(state.view==="trays")bindTrays(v);
+  if(state.view==="kaarawan")bindKaarawan(v);
   if(state.view==="home")bindFilm(v);
   if(state.view==="aboutEdit")bindAboutEdit(v);
   if(state.view==="trayEdit")bindTrayEdit(v);
@@ -1605,7 +1727,7 @@ function messageFor(q){
   lines.push(`Guests: ${q.event.pax} pax`);
   lines.push(`Plan: ${q.plan.kind==="package"?`${q.plan.packageName} Package (${peso(q.plan.pricePerHead)}/head)`:"Custom menu"}`);
   if(q.plan.chefPick)lines.push("Menu: Chef to recommend");
-  else{lines.push("Menu:");q.items.forEach(i=>lines.push(`- ${COURSES[i.cat]}: ${i.dish}`))}
+  else{lines.push("Menu:");q.items.forEach(i=>lines.push(`- ${COURSES[i.cat]||i.cat}: ${i.dish}`))}
   lines.push(`Estimated total: ${peso(q.estimate.total)} (${peso(q.estimate.perHead)}/head) — estimate only`);
   if(q.notes)lines.push(`Notes: ${q.notes}`);
   const compact={...q};delete compact.status;
