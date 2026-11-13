@@ -735,7 +735,7 @@ function printSheet(id) {
   const e = S.events[id]; if (!e) return toast('Save the event sheet first.', true);
   const d = sheetOf(e), ref = sheetRef(d), st = (SHEET_STATUS.find(x => x[0] === d.status) || SHEET_STATUS[0])[1];
   const logo = new URL('../assets/logo.png', location.href).href;
-  const kv = (l, v) => v ? `<div class="kv"><span>${esc(l)}</span><b>${esc(v)}</b></div>` : '';
+  const kv = (l, v, wide) => v ? `<div class="kv${wide || String(v).length > 60 ? ' wide' : ''}"><span>${esc(l)}</span><b>${esc(v)}</b></div>` : '';
   const menu = (d.menu || []).filter(m => m.dish);
   const times = [['Call time', d.call], ['Serving time', d.serve], ['Pull-out', d.pull]].filter(x => x[1]);
   const setup = [['Motif / theme', d.motif], ['Table setup', d.setup], ['Service staff', d.staff], ['Equipment', d.equip]].filter(x => x[1]);
@@ -763,10 +763,13 @@ h1{font-family:'Playfair Display',Georgia,serif;font-weight:400;font-style:itali
 h2{font-family:'Playfair Display',Georgia,serif;font-weight:600;font-size:13pt;margin:0 0 3mm;color:#1A2C54;letter-spacing:.02em}
 h2 small{display:block;font-family:Montserrat;font-weight:500;font-size:7pt;letter-spacing:.3em;text-transform:uppercase;color:#E89908;margin-bottom:1mm}
 section{margin:0 0 5.5mm;break-inside:avoid}
-.p2{break-before:page}
+section.flow{break-inside:auto}section h2{break-after:avoid}
+.p2{break-before:auto}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:2.5mm 10mm}
 .kv{display:flex;flex-direction:column;border-bottom:.4pt solid #E4DFC8;padding-bottom:1.5mm}
-.kv span{font-size:7pt;letter-spacing:.18em;text-transform:uppercase;color:#8A8F9C}.kv b{font-weight:500;font-size:10.5pt}
+.kv span{font-size:7pt;letter-spacing:.18em;text-transform:uppercase;color:#8A8F9C}.kv b{font-weight:500;font-size:10.5pt;white-space:pre-wrap;overflow-wrap:anywhere}
+.kv.wide{grid-column:1/-1}.kv.wide b{font-size:9.5pt;line-height:1.45}
+.kv{break-inside:avoid}
 .hero{background:#1A2C54;color:#fff;border-radius:3mm;padding:6mm 8mm;display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;text-align:center;margin-bottom:6mm}
 .hero span{display:block;font-size:6.5pt;letter-spacing:.28em;text-transform:uppercase;color:#E5DEB2;margin-bottom:1mm}.hero b{font-family:'Playfair Display',serif;font-weight:400;font-size:13pt}
 .times{display:flex;justify-content:center;gap:12mm;text-align:center}.times span{display:block;font-size:7pt;letter-spacing:.22em;text-transform:uppercase;color:#8A8F9C}.times b{font-family:'Playfair Display',serif;font-size:14pt;font-weight:400}
@@ -778,7 +781,7 @@ section{margin:0 0 5.5mm;break-inside:avoid}
 .sign{display:grid;grid-template-columns:1fr 1fr;gap:16mm;margin-top:10mm}.sign div{border-top:.6pt solid #1A2C54;padding-top:1.5mm;font-size:8pt;color:#5B6478}.sign b{display:block;color:#1A2C54;font-weight:600;font-size:9pt}
 .ack{font-size:8.5pt;color:#5B6478;text-align:center;margin-top:4mm}
 footer{margin-top:7mm;text-align:center;font-size:7.5pt;color:#8A8F9C;letter-spacing:.06em;border-top:.4pt solid #E4DFC8;padding-top:3mm}
-@media print{.bar{display:none}.page{max-width:none;padding-bottom:12mm}footer{position:fixed;bottom:0;left:0;right:0;margin:0;background:#fff}}
+@media print{.bar{display:none}.page{max-width:none}}
 </style></head><body>
 <div class="bar"><button onclick="window.print()">Save as PDF / Print</button><button class="alt" onclick="window.close()">Close</button><span>In the print window, choose <b>Save as PDF</b> as the destination.</span></div>
 <div class="page">
@@ -791,9 +794,9 @@ footer{margin-top:7mm;text-align:center;font-size:7.5pt;color:#8A8F9C;letter-spa
 ${kv('Client', d.client)}${kv('Contact person', d.contact)}${kv('Mobile', d.mobile)}${kv('Email', d.email)}${kv('Venue', d.venue)}${kv('Venue coordinator', d.coord)}${kv('Package', d.pkg)}
 </div></section>
 ${times.length ? `<section><h2><small>Schedule</small>Timeline</h2><div class="times">${times.map(([l, t]) => `<div><span>${l}</span><b>${esc(fmtClock(t))}</b></div>`).join('')}</div></section>` : ''}
-${setup.length ? `<section><h2><small>Service</small>Setup &amp; service</h2><div class="grid list">${setup.map(([l, v]) => kv(l, v)).join('')}</div></section>` : ''}
+${setup.length ? `<section class="flow"><h2><small>Service</small>Setup &amp; service</h2><div class="grid list">${setup.map(([l, v]) => kv(l, v, l === 'Equipment')).join('')}</div></section>` : ''}
 ${menu.length ? `<section class="p2"><h2 style="text-align:center"><small>Prepared for you</small>The Menu</h2><div class="menu">${menu.map(m => `<div class="c">${esc(m.course)}</div><div class="d">${esc(m.dish)}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}`).join('')}<div style="height:3mm"></div></div></section>` : ''}
-${notes.length ? `<section><h2><small>Please note</small>Notes &amp; requests</h2><div class="list">${notes.map(([l, v]) => kv(l, v)).join('')}</div></section>` : ''}
+${notes.length ? `<section class="flow"><h2><small>Please note</small>Notes &amp; requests</h2><div class="list">${notes.map(([l, v]) => kv(l, v)).join('')}</div></section>` : ''}
 <section><p class="ack">By signing below, the client confirms the event details and menu above.</p>
 <div class="sign"><div><b>${esc(d.client)}</b>Client signature over printed name · Date</div><div><b>${esc(d.preparedBy || "Romualdo's Catering Services")}</b>Prepared by · Romualdo's Catering Services</div></div></section>
 <footer>Romualdo's Catering Services · 13 Juna Avenue, Juna Subdivision, Davao City · 0945 542 5300 · romualdoscatering@gmail.com · romualdos.ph</footer>
