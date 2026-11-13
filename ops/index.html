@@ -666,7 +666,10 @@ ACT.prodToReq = () => {
 const SHEET_COURSES = ['Soup', 'Salad / appetizer', 'Main dish', 'Main dish', 'Main dish', 'Main dish', 'Pasta / noodles', 'Vegetables', 'Rice', 'Dessert', 'Drinks'];
 const EV_TYPES = ['Wedding', 'Birthday', 'Debut', 'Christening', 'Corporate', 'Anniversary', 'Graduation', 'Reunion', 'Funeral / Wake', 'Other'];
 const SHEET_STATUS = [['draft', 'Draft'], ['approval', 'For client approval'], ['approved', 'Approved by client'], ['cancelled', 'Cancelled']];
-const newSheet = (o = {}) => ({id: '', ref: '', client: '', contact: '', mobile: '', email: '', source: '', type: '', date: daysAhead(30), serve: '', call: '', pull: '', venue: '', coord: '', pax: '',
+const SHEET_KINDS = [['catering', 'Catering / buffet event'], ['trays', 'Food trays'], ['packs', 'Food packs']];
+const sheetKindLabel = k => ({trays: 'Food trays', packs: 'Food packs'})[k] || 'Catering';
+const orderRows = (n = 5) => Array.from({length: n}, () => ({course: '', dish: '', qty: '', note: ''}));
+const newSheet = (o = {}) => ({id: '', ref: '', kind: 'catering', fulfil: '', client: '', contact: '', mobile: '', email: '', source: '', type: '', date: daysAhead(30), serve: '', call: '', pull: '', venue: '', coord: '', pax: '',
   pkg: '', menu: SHEET_COURSES.map(c => ({course: c, dish: '', note: ''})), motif: '', setup: '', equip: '', staff: '', allergy: '', special: '', status: 'draft', approvedOn: '', preparedBy: '', ...o});
 const fmtLong = s => s ? new Date(s + 'T00:00').toLocaleDateString('en-PH', {weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'}) : '';
 const fmtClock = t => { if (!t) return ''; const [h, m] = t.split(':').map(Number); return `${(h % 12) || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
@@ -674,22 +677,24 @@ const sheetOf = e => e.sheet ? {...newSheet(), ...e.sheet, id: e.id} : newSheet(
 const sheetRef = d => d.ref || ('EV-' + (d.date || '').replace(/-/g, '').slice(0, 8) + '-' + (d.id || '').slice(-3).toUpperCase());
 V.sheets = () => {
   D.sheet ||= newSheet(); maybeRestoreDraft();
-  const d = D.sheet, f = D.ui;
+  const d = D.sheet, f = D.ui, k = d.kind || 'catering', cat = k === 'catering';
   const evs = Object.values(S.events).filter(e => e.status !== 'void').sort((a, b) => a.date.localeCompare(b.date));
   const up = evs.filter(e => e.date >= today()), past = evs.filter(e => e.date < today()).reverse();
   const lab = (t, inner, cls = '') => `<label class="${cls}">${t}${inner}</label>`;
   const inp = (k, ph = '', type = 'text', extra = '') => `<input type="${type}" data-b="sheet.${k}" placeholder="${esc(ph)}" ${extra}>`;
   const listRow = e => { const sh = sheetOf(e), st = SHEET_STATUS.find(x => x[0] === sh.status) || SHEET_STATUS[0];
-    return `<tr class="click" data-act="editSheet" data-arg="${e.id}"><td>${fmtD(e.date)}</td><td><b>${esc(sh.client || e.name)}</b><div class="small mut">${esc([sh.type, sh.venue].filter(Boolean).join(' · '))}</div></td><td class="n">${esc(sh.pax || e.pax || '')}</td>
+    return `<tr class="click" data-act="editSheet" data-arg="${e.id}"><td>${fmtD(e.date)}</td><td><b>${esc(sh.client || e.name)}</b>${sh.kind && sh.kind !== 'catering' ? ` <span class="chip warn">${sheetKindLabel(sh.kind)}</span>` : ''}<div class="small mut">${esc([sh.kind && sh.kind !== 'catering' ? sh.fulfil : sh.type, sh.venue].filter(Boolean).join(' · '))}</div></td><td class="n">${esc(sh.pax || e.pax || '')}</td>
       <td><span class="chip ${sh.status === 'approved' ? 'ok' : sh.status === 'approval' ? 'warn' : sh.status === 'cancelled' ? 'mut' : 'info'}">${st[1]}</span></td>
       <td class="row"><button class="sm" data-act="editSheet" data-arg="${e.id}">Edit</button><button class="sm pri" data-act="pdfSheet" data-arg="${e.id}">PDF</button></td></tr>`; };
   return `<h2>Event sheets</h2>
   <p class="lede">Encode each event's details once. <b>Generate PDF</b> makes a polished event sheet with the Romualdo's logo, for the kitchen and for the client to approve. Billing is not included; that stays with the admin and finance.</p>
   <div class="card" id="sheetForm"><div class="row" style="margin-bottom:6px"><h3 style="margin:0">${d.id ? 'Edit event sheet' : 'New event sheet'}</h3><span id="sheetSaveState" class="save-state ${AS.err ? 'warn' : AS.dirty ? 'busy' : 'ok'}">${esc(saveStateText())}</span><span class="spacer"></span>${d.id ? '<button class="sm ghost" data-act="newSheet">＋ Start a new one instead</button>' : ''}</div>
    ${AS.restoredAt ? `<div class="alert info" style="margin:8px 0">Restored your unsaved work from ${esc(clockNow(AS.restoredAt))}${new Date(AS.restoredAt).toDateString() !== new Date().toDateString() ? ' on ' + esc(fmtD(new Date(AS.restoredAt).toISOString().slice(0, 10))) : ''}. It saves online automatically. <span class="spacer"></span><button class="sm ghost" data-act="discardDraft">Discard draft</button></div>` : ''}
+   <div class="row" style="margin:4px 0 8px"><b class="small">This is for:</b><div class="seg">${SHEET_KINDS.map(([v, l]) => `<button type="button" class="${(d.kind || 'catering') === v ? 'on' : ''}" data-act="sheetKind" data-arg="${v}">${l}</button>`).join('')}</div></div>
+   ${cat ? '' : `<div class="alert info" style="margin:0 0 8px">For clients ordering food only (no buffet set-up). Order at least 2 days ahead; next-day orders are by call or message.</div>`}
    <h4 class="sub">1. Client</h4>
-   <div class="grid">${lab('Client name(s)', inp('client', 'e.g. Juan Manalang & Ysabel Zubiri', 'text', 'autocapitalize="words"'))}${lab('Contact person', inp('contact', '', 'text', 'autocapitalize="words"'))}${lab('Mobile no.', inp('mobile', '09XX XXX XXXX', 'tel'))}${lab('Email', inp('email', '', 'email'))}${lab('How they found us', inp('source', 'Facebook, website, referral…'))}${lab('Reference no.', inp('ref', d.id ? sheetRef(d) : 'Filled in automatically'))}</div>
-   <h4 class="sub">2. Event</h4>
+   <div class="grid">${lab('Client name(s)', inp('client', cat ? 'e.g. Juan Manalang & Ysabel Zubiri' : 'e.g. Maria Santos', 'text', 'autocapitalize="words"'))}${lab('Contact person', inp('contact', '', 'text', 'autocapitalize="words"'))}${lab('Mobile no.', inp('mobile', '09XX XXX XXXX', 'tel'))}${lab('Email', inp('email', '', 'email'))}${lab('How they found us', inp('source', 'Facebook, website, referral…'))}${lab('Reference no.', inp('ref', d.id ? sheetRef(d) : 'Filled in automatically'))}</div>
+   ${cat ? `<h4 class="sub">2. Event</h4>
    <div class="grid">${lab('Event type', sel('sheet.type', opt('', '— choose —') + EV_TYPES.map(t => opt(t, t)).join(''), false))}${lab('Event date', inp('date', '', 'date'))}${lab('Number of guests', inp('pax', '150', 'number', 'inputmode="numeric" min="0"'))}
     ${lab('Call time (team at venue)', inp('call', '', 'time'))}${lab('Serving time', inp('serve', '', 'time'))}${lab('Pull-out time', inp('pull', '', 'time'))}
     ${lab('Venue / address', inp('venue', '', 'text', 'autocapitalize="words"'))}${lab('Venue coordinator & contact', inp('coord'))}${lab('Package', inp('pkg', 'Classic / Signature / Premium / Grand / Custom'))}</div>
@@ -701,10 +706,18 @@ V.sheets = () => {
    <div class="row" style="margin-top:6px"><button class="sm" data-act="addCourse">＋ Add course</button></div>
    <h4 class="sub">4. Setup &amp; service</h4>
    <div class="grid">${lab('Motif / theme', inp('motif'))}${lab('Table setup', inp('setup', 'Buffet, plated, family style; no. of tables'))}${lab('Staff', inp('staff', 'e.g. 1 head waiter, 8 servers, 2 cooks'))}</div>
-   ${lab('Equipment', `<textarea data-b="sheet.equip" rows="2" placeholder="Chafing dishes, tables, linens, tent…"></textarea>`)}
-   <h4 class="sub">5. Notes</h4>
+   ${lab('Equipment', `<textarea data-b="sheet.equip" rows="2" placeholder="Chafing dishes, tables, linens, tent…"></textarea>`)}`
+   : `<h4 class="sub">2. Pick-up or delivery</h4>
+   <div class="grid">${lab('Pick-up or delivery', sel('sheet.fulfil', opt('', '— choose —') + opt('Pick-up', 'Pick-up') + opt('Delivery', 'Delivery'), true))}${lab(d.fulfil === 'Delivery' ? 'Delivery date' : 'Pick-up date', inp('date', '', 'date'))}${lab(d.fulfil === 'Delivery' ? 'Delivery time' : 'Ready by (time)', inp('serve', '', 'time'))}
+    ${lab(d.fulfil === 'Delivery' ? 'Delivery address & landmark' : 'Pick-up location', inp('venue', d.fulfil === 'Delivery' ? '' : "Romualdo's, 13 Juna Ave. (leave blank)", 'text', 'autocapitalize="words"'))}${lab('Good for (pax, optional)', inp('pax', '', 'number', 'inputmode="numeric" min="0"'))}</div>
+   <h4 class="sub">3. ${k === 'packs' ? 'Food packs' : 'Trays'} ordered</h4>
+   <div class="tw"><table class="lines"><thead><tr><th>Item</th><th style="width:90px">Qty</th><th style="width:240px">Note <span class="small mut">(e.g. less spicy)</span></th><th style="width:30px"></th></tr></thead><tbody>
+    ${d.menu.map((m, i) => `<tr><td><input data-b="sheet.menu.${i}.dish" placeholder="${k === 'packs' ? 'e.g. Chicken Pastel with rice' : 'e.g. Baked Rosemary Chicken (large tray)'}" autocapitalize="words"></td><td><input data-b="sheet.menu.${i}.qty" type="number" inputmode="numeric" min="0" placeholder="1"></td><td><input data-b="sheet.menu.${i}.note"></td><td><button class="sm ghost" data-act="rmCourse" data-arg="${i}" title="Remove">✕</button></td></tr>`).join('')}
+   </tbody></table></div>
+   <div class="row" style="margin-top:6px"><button class="sm" data-act="addCourse">＋ Add item</button></div>`}
+   <h4 class="sub">${cat ? 5 : 4}. Notes</h4>
    <div class="grid">${lab('Allergies / dietary needs', `<textarea data-b="sheet.allergy" rows="2"></textarea>`)}${lab('Special requests', `<textarea data-b="sheet.special" rows="2"></textarea>`)}</div>
-   <h4 class="sub">6. Approval</h4>
+   <h4 class="sub">${cat ? 6 : 5}. Approval</h4>
    <div class="grid">${lab('Status', sel('sheet.status', SHEET_STATUS.map(([v, l]) => opt(v, l)).join(''), false))}${lab('Approved on', inp('approvedOn', '', 'date'))}${lab('Prepared by', inp('preparedBy', S.me?.name || '', 'text', 'list="dl-staff"'))}</div>
    <div class="row end" style="margin-top:12px">${d.id ? `<button class="ghost" data-act="openEvent" data-arg="${d.id}">Costing &amp; stock →</button>` : ''}<button class="ghost" data-act="newSheet">Clear</button><button data-act="saveSheet" data-arg="pdf">Save &amp; generate PDF</button><button class="pri" data-act="saveSheet">Save</button></div>
   </div>
@@ -714,9 +727,14 @@ V.sheets = () => {
   </div>`;
 };
 ACT.newSheet = async () => { await flushSheet(); AS.dirty = false; AS.restoredAt = 0; AS.lastOk = 0; draftClear(); D.sheet = newSheet(); render(); document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'}); };
-ACT.addCourse = () => { D.sheet.menu.push({course: 'Main dish', dish: '', note: ''}); render(); sheetTouched(); };
+ACT.addCourse = () => { D.sheet.menu.push((D.sheet.kind || 'catering') === 'catering' ? {course: 'Main dish', dish: '', note: ''} : {course: '', dish: '', qty: '', note: ''}); render(); sheetTouched(); };
+ACT.sheetKind = k => { const d = D.sheet, was = d.kind || 'catering'; if (was === k) return;
+  const empty = !d.menu.some(m => (m.dish || '').trim());
+  if (empty) d.menu = k === 'catering' ? newSheet().menu : orderRows();
+  else if ((was === 'catering') !== (k === 'catering')) d.menu = d.menu.map(m => ({...m, course: k === 'catering' ? (m.course || 'Main dish') : m.course}));
+  d.kind = k; if (k !== 'catering' && !d.fulfil) d.fulfil = 'Pick-up'; render(); sheetTouched(); };
 ACT.rmCourse = i => { D.sheet.menu.splice(+i, 1); render(); sheetTouched(); };
-ACT.editSheet = async id => { const e = S.events[id]; if (!e) return; if (D.sheet?.id !== id) { await flushSheet(); AS.dirty = false; AS.restoredAt = 0; AS.lastOk = 0; draftClear(); } const sh = sheetOf(e); D.sheet = JSON.parse(JSON.stringify({...sh, pax: String(sh.pax || ''), menu: (sh.menu && sh.menu.length ? sh.menu : newSheet().menu)})); if (D.ui.tab !== 'sheets') location.hash = 'sheets'; render(); setTimeout(() => document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'}), 50); };
+ACT.editSheet = async id => { const e = S.events[id]; if (!e) return; if (D.sheet?.id !== id) { await flushSheet(); AS.dirty = false; AS.restoredAt = 0; AS.lastOk = 0; draftClear(); } const sh = sheetOf(e); D.sheet = JSON.parse(JSON.stringify({...sh, pax: String(sh.pax || ''), menu: (sh.menu && sh.menu.length ? sh.menu : (sh.kind || 'catering') === 'catering' ? newSheet().menu : orderRows())})); if (D.ui.tab !== 'sheets') location.hash = 'sheets'; render(); setTimeout(() => document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'}), 50); };
 /* ---- auto-save: every keystroke is kept on this device at once (draft), and saved online a few seconds after typing stops ---- */
 const DRAFT_KEY = 'rcs_sheet_draft';
 const AS = {timer: 0, localTimer: 0, saving: false, dirty: false, lastOk: 0, err: '', restoredAt: 0, rev: 0};
@@ -740,7 +758,7 @@ function sheetTouched() {
 }
 function sheetPayload(d) {
   const client = titleCase(d.client);
-  const sheet = {...d, client, pax: num(d.pax) || '', menu: d.menu.filter(m => (m.dish || '').trim() || (m.note || '').trim()).map(m => ({course: (m.course || '').trim(), dish: (m.dish || '').trim(), note: (m.note || '').trim()})), savedAt: Date.now()};
+  const sheet = {...d, client, pax: num(d.pax) || '', kind: d.kind || 'catering', menu: d.menu.filter(m => (m.dish || '').trim() || (m.note || '').trim()).map(m => ({course: (m.course || '').trim(), dish: (m.dish || '').trim(), qty: String(m.qty || '').trim(), note: (m.note || '').trim()})), savedAt: Date.now()};
   delete sheet.id;
   return {client, sheet, base: {name: client, client, date: d.date, pax: num(d.pax) || '', venue: (d.venue || '').trim()}};
 }
@@ -789,7 +807,7 @@ ACT.saveSheet = mode => {
   guard(async () => {
     if (!d.id) d.id = genId();
     const {id, sheet} = await writeSheet(d);
-    D.sheet = JSON.parse(JSON.stringify({...sheet, id, pax: String(sheet.pax || ''), menu: sheet.menu.length ? sheet.menu : newSheet().menu}));
+    D.sheet = JSON.parse(JSON.stringify({...sheet, id, pax: String(sheet.pax || ''), menu: sheet.menu.length ? sheet.menu : sheet.kind === 'catering' ? newSheet().menu : orderRows()}));
     AS.dirty = false; AS.err = ''; AS.lastOk = Date.now(); AS.restoredAt = 0; draftClear();
     if (mode === 'pdf') setTimeout(() => printSheet(id), 300);
   }, mode === 'pdf' ? 'Saved — opening the PDF' : 'Event sheet saved');
@@ -798,74 +816,85 @@ ACT.pdfSheet = id => printSheet(id);
 function printSheet(id) {
   const e = S.events[id]; if (!e) return toast('Save the event sheet first.', true);
   const d = sheetOf(e), ref = sheetRef(d), st = (SHEET_STATUS.find(x => x[0] === d.status) || SHEET_STATUS[0])[1];
+  const k = d.kind || 'catering', cat = k === 'catering', kl = sheetKindLabel(k);
   const logo = new URL('../assets/logo.png', location.href).href;
-  const kv = (l, v, wide) => v ? `<div class="kv${wide || String(v).length > 60 ? ' wide' : ''}"><span>${esc(l)}</span><b>${esc(v)}</b></div>` : '';
+  const row = (l, v) => v ? `<tr><th>${esc(l)}</th><td>${esc(v)}</td></tr>` : '';
   const menu = (d.menu || []).filter(m => m.dish);
-  const times = [['Call time', d.call], ['Serving time', d.serve], ['Pull-out', d.pull]].filter(x => x[1]);
-  const setup = [['Motif / theme', d.motif], ['Table setup', d.setup], ['Service staff', d.staff], ['Equipment', d.equip]].filter(x => x[1]);
-  const notes = [['Allergies & dietary needs', d.allergy], ['Special requests', d.special]].filter(x => x[1]);
-  const title = `Event Sheet - ${d.client} - ${fmtLong(d.date).replace(/^\w+, /, '')}`;
+  const qtyTotal = menu.reduce((t, m) => t + (parseFloat(m.qty) || 0), 0);
+  const times = cat ? [['Call time', d.call], ['Serving', d.serve], ['Pull-out', d.pull]].filter(x => x[1]) : [];
+  const setup = cat ? [['Motif / theme', d.motif], ['Table setup', d.setup], ['Service staff', d.staff], ['Equipment', d.equip]] : [];
+  const notes = [['Allergies & dietary', d.allergy], ['Special requests', d.special]];
+  const hero = cat ? [['Date', fmtLong(d.date)], ['Guests', d.pax ? d.pax + ' pax' : 'To be confirmed'], ['Occasion', d.type || 'To be confirmed']]
+    : [[d.fulfil === 'Delivery' ? 'Delivery date' : 'Pick-up date', fmtLong(d.date)], [d.fulfil === 'Delivery' ? 'Delivery time' : 'Ready by', d.serve ? fmtClock(d.serve) : 'To be confirmed'], ['Order', (qtyTotal ? qtyTotal + ' ' + (k === 'packs' ? 'pack' : 'tray') + (qtyTotal === 1 ? '' : 's') : kl) + (d.fulfil ? ' · ' + d.fulfil : '')]];
+  const docTitle = cat ? 'Event Details' : k === 'packs' ? 'Food Pack Order' : 'Food Tray Order';
+  const title = `${cat ? 'Event Sheet' : docTitle} - ${d.client} - ${fmtLong(d.date).replace(/^\w+, /, '')}`;
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,500&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,500&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-@page{size:A4;margin:16mm 16mm 18mm}
+@page{size:A4;margin:0}
 *{box-sizing:border-box}html,body{margin:0;padding:0}
-body{font-family:Montserrat,Arial,sans-serif;color:#1A2C54;font-size:10pt;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#fff}
-.page{max-width:178mm;margin:0 auto}
-.bar{display:flex;gap:10px;justify-content:center;padding:12px;background:#F7F4EA;border-bottom:1px solid #E4DFC8;font-family:Montserrat}
+body{font-family:Montserrat,Arial,sans-serif;color:#1A2C54;font-size:8.6pt;line-height:1.4;-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#ECE8DA}
+.page{width:210mm;min-height:297mm;margin:0 auto;padding:11mm 13mm 9mm;background:#fff;display:flex;flex-direction:column}
+.bar{display:flex;gap:10px;justify-content:center;padding:12px;background:#F7F4EA;border-bottom:1px solid #E4DFC8}
 .bar button{font:600 13px Montserrat;border:0;border-radius:8px;padding:10px 18px;cursor:pointer;background:#1A2C54;color:#fff}.bar button.alt{background:#fff;color:#1A2C54;border:1px solid #CFC9B0}
 .bar span{align-self:center;font-size:12px;color:#5B6478}
-header{text-align:center;padding:6mm 0 4mm}
-header img{height:15mm}
-.tag{font-size:7.5pt;letter-spacing:.32em;text-transform:uppercase;color:#E89908;margin-top:3mm}
-h1{font-family:'Playfair Display',Georgia,serif;font-weight:400;font-style:italic;font-size:25pt;margin:4mm 0 1mm;letter-spacing:.01em}
-.sub{font-size:9pt;color:#5B6478;letter-spacing:.06em}
-.rule{display:flex;align-items:center;gap:4mm;margin:5mm 0}.rule:before,.rule:after{content:"";flex:1;border-top:.6pt solid #C9A24A}.rule i{width:2mm;height:2mm;transform:rotate(45deg);border:.6pt solid #C9A24A}
-.meta{display:flex;justify-content:space-between;font-size:8pt;color:#5B6478;letter-spacing:.04em;margin-top:-2mm}
-.status{display:inline-block;border:.6pt solid #631B1C;color:#631B1C;border-radius:20px;padding:.4mm 3mm;font-size:7.5pt;letter-spacing:.14em;text-transform:uppercase}
-h2{font-family:'Playfair Display',Georgia,serif;font-weight:600;font-size:13pt;margin:0 0 3mm;color:#1A2C54;letter-spacing:.02em}
-h2 small{display:block;font-family:Montserrat;font-weight:500;font-size:7pt;letter-spacing:.3em;text-transform:uppercase;color:#E89908;margin-bottom:1mm}
-section{margin:0 0 5.5mm;break-inside:avoid}
-section.flow{break-inside:auto}section h2{break-after:avoid}
-.p2{break-before:auto}
-.grid{display:grid;grid-template-columns:1fr 1fr;gap:2.5mm 10mm}
-.kv{display:flex;flex-direction:column;border-bottom:.4pt solid #E4DFC8;padding-bottom:1.5mm}
-.kv span{font-size:7pt;letter-spacing:.18em;text-transform:uppercase;color:#8A8F9C}.kv b{font-weight:500;font-size:10.5pt;white-space:pre-wrap;overflow-wrap:anywhere}
-.kv.wide{grid-column:1/-1}.kv.wide b{font-size:9.5pt;line-height:1.45}
-.kv{break-inside:avoid}
-.hero{background:#1A2C54;color:#fff;border-radius:3mm;padding:6mm 8mm;display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;text-align:center;margin-bottom:6mm}
-.hero span{display:block;font-size:6.5pt;letter-spacing:.28em;text-transform:uppercase;color:#E5DEB2;margin-bottom:1mm}.hero b{font-family:'Playfair Display',serif;font-weight:400;font-size:13pt}
-.times{display:flex;justify-content:center;gap:12mm;text-align:center}.times span{display:block;font-size:7pt;letter-spacing:.22em;text-transform:uppercase;color:#8A8F9C}.times b{font-family:'Playfair Display',serif;font-size:14pt;font-weight:400}
-.menu{text-align:center;border:.6pt solid #E4DFC8;border-radius:3mm;padding:5mm 8mm 2mm;background:#FCFBF6}
-.menu .c{font-size:6.6pt;letter-spacing:.3em;text-transform:uppercase;color:#E89908;margin-top:2.2mm}.menu .c:first-of-type{margin-top:0}
-.menu .d{font-family:'Playfair Display',serif;font-style:italic;font-size:12.5pt;line-height:1.25}
-.menu .n{font-size:7.5pt;color:#631B1C;font-style:italic}
-.list .kv{border:0;padding:0 0 2.5mm}
-.sign{display:grid;grid-template-columns:1fr 1fr;gap:16mm;margin-top:10mm}.sign div{border-top:.6pt solid #1A2C54;padding-top:1.5mm;font-size:8pt;color:#5B6478}.sign b{display:block;color:#1A2C54;font-weight:600;font-size:9pt}
-.ack{font-size:8.5pt;color:#5B6478;text-align:center;margin-top:4mm}
-footer{margin-top:7mm;text-align:center;font-size:7.5pt;color:#8A8F9C;letter-spacing:.06em;border-top:.4pt solid #E4DFC8;padding-top:3mm}
-@media print{.bar{display:none}.page{max-width:none}}
+header{display:flex;align-items:center;gap:6mm;padding-bottom:3.5mm;border-bottom:.7pt solid #C9A24A}
+header img{height:17mm}
+.hd{flex:1}.tag{font-size:6.5pt;letter-spacing:.3em;text-transform:uppercase;color:#E89908}
+h1{font-family:'Playfair Display',Georgia,serif;font-weight:400;font-style:italic;font-size:21pt;line-height:1.1;margin:.5mm 0 .5mm}
+.who{font-family:'Playfair Display',serif;font-size:11pt}
+.meta{text-align:right;font-size:7.3pt;color:#5B6478;line-height:1.7;white-space:nowrap}
+.status{display:inline-block;border:.6pt solid #631B1C;color:#631B1C;border-radius:20px;padding:0 2.5mm;font-size:6.6pt;letter-spacing:.14em;text-transform:uppercase}
+.hero{background:#1A2C54;color:#fff;border-radius:2.5mm;padding:3.2mm 6mm;display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:4mm;text-align:center;margin:4mm 0}
+.hero span{display:block;font-size:6pt;letter-spacing:.26em;text-transform:uppercase;color:#E5DEB2}.hero b{font-family:'Playfair Display',serif;font-weight:400;font-size:11.5pt}
+.cols{display:grid;grid-template-columns:1.12fr 1fr;gap:7mm;align-items:start}
+h2{font-family:'Playfair Display',Georgia,serif;font-weight:600;font-size:10.5pt;margin:0 0 1.5mm;letter-spacing:.02em;border-bottom:.4pt solid #E4DFC8;padding-bottom:1mm}
+h2 small{font-family:Montserrat;font-weight:500;font-size:6pt;letter-spacing:.28em;text-transform:uppercase;color:#E89908;margin-left:2mm}
+section{margin:0 0 3.5mm}
+table.kv{width:100%;border-collapse:collapse}
+.kv th{width:31mm;text-align:left;vertical-align:top;font-weight:500;font-size:6.4pt;letter-spacing:.14em;text-transform:uppercase;color:#8A8F9C;padding:.9mm 2mm .9mm 0}
+.kv td{font-weight:500;padding:.7mm 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.times{display:flex;gap:3mm}.times div{flex:1;border:.5pt solid #E4DFC8;border-radius:2mm;text-align:center;padding:1.3mm 0}
+.times span{display:block;font-size:6pt;letter-spacing:.2em;text-transform:uppercase;color:#8A8F9C}.times b{font-family:'Playfair Display',serif;font-size:11pt;font-weight:400}
+.menu{text-align:center;border:.6pt solid #E4DFC8;border-radius:2.5mm;padding:4mm 5mm 3.5mm;background:#FCFBF6}
+.menu h2{border:0;text-align:center;font-size:13pt;font-style:italic;font-weight:400;margin-bottom:1mm}
+.menu .c{font-size:6pt;letter-spacing:.28em;text-transform:uppercase;color:#E89908;margin-top:1.8mm}
+.menu .d{font-family:'Playfair Display',serif;font-style:italic;font-size:10.5pt;line-height:1.2}
+.menu .n{font-size:6.8pt;color:#631B1C;font-style:italic}
+.items{width:100%;border-collapse:collapse;text-align:left}.items th{font-size:6pt;letter-spacing:.2em;text-transform:uppercase;color:#8A8F9C;font-weight:500;border-bottom:.5pt solid #E4DFC8;padding:1mm}
+.items td{padding:1.4mm 1mm;border-bottom:.4pt solid #EFEBDD;vertical-align:top}.items td.d{font-family:'Playfair Display',serif;font-style:italic;font-size:10pt}.items .q{text-align:center;width:16mm;font-weight:600}.items .n{font-size:6.8pt;color:#631B1C;font-style:italic}
+.foot{margin-top:auto;padding-top:4mm}
+.ack{font-size:7.3pt;color:#5B6478;text-align:center;margin:0 0 7mm}
+.sign{display:grid;grid-template-columns:1fr 1fr;gap:14mm}.sign div{border-top:.6pt solid #1A2C54;padding-top:1.2mm;font-size:6.8pt;color:#5B6478}.sign b{display:block;color:#1A2C54;font-weight:600;font-size:8pt}
+footer{margin-top:4mm;text-align:center;font-size:6.6pt;color:#8A8F9C;letter-spacing:.05em;border-top:.4pt solid #E4DFC8;padding-top:2mm}
+@media screen{.page{margin:16px auto;box-shadow:0 2px 14px rgba(0,0,0,.12)}}
+@media print{body{background:#fff}.bar{display:none}}
 </style></head><body>
-<div class="bar"><button onclick="window.print()">Save as PDF / Print</button><button class="alt" onclick="window.close()">Close</button><span>In the print window, choose <b>Save as PDF</b> as the destination.</span></div>
-<div class="page">
-<header><img src="${logo}" alt="Romualdo's"><div class="tag">Catering Services · Davao City</div>
-<h1>Event Details</h1><div class="sub">${esc(d.client)}</div></header>
-<div class="meta"><span>Ref. ${esc(ref)}</span><span class="status">${esc(st)}</span><span>Issued ${esc(new Date().toLocaleDateString('en-PH', {month: 'long', day: 'numeric', year: 'numeric'}))}</span></div>
-<div class="rule"><i></i></div>
-<div class="hero"><div><span>Date</span><b>${esc(fmtLong(d.date))}</b></div><div><span>Guests</span><b>${esc(d.pax ? d.pax + ' pax' : 'To be confirmed')}</b></div><div><span>Occasion</span><b>${esc(d.type || 'To be confirmed')}</b></div></div>
-<section><h2><small>The Event</small>Client &amp; venue</h2><div class="grid">
-${kv('Client', d.client)}${kv('Contact person', d.contact)}${kv('Mobile', d.mobile)}${kv('Email', d.email)}${kv('Venue', d.venue)}${kv('Venue coordinator', d.coord)}${kv('Package', d.pkg)}
-</div></section>
-${times.length ? `<section><h2><small>Schedule</small>Timeline</h2><div class="times">${times.map(([l, t]) => `<div><span>${l}</span><b>${esc(fmtClock(t))}</b></div>`).join('')}</div></section>` : ''}
-${setup.length ? `<section class="flow"><h2><small>Service</small>Setup &amp; service</h2><div class="grid list">${setup.map(([l, v]) => kv(l, v, l === 'Equipment')).join('')}</div></section>` : ''}
-${menu.length ? `<section class="p2"><h2 style="text-align:center"><small>Prepared for you</small>The Menu</h2><div class="menu">${menu.map(m => `<div class="c">${esc(m.course)}</div><div class="d">${esc(m.dish)}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}`).join('')}<div style="height:3mm"></div></div></section>` : ''}
-${notes.length ? `<section class="flow"><h2><small>Please note</small>Notes &amp; requests</h2><div class="list">${notes.map(([l, v]) => kv(l, v)).join('')}</div></section>` : ''}
-<section><p class="ack">By signing below, the client confirms the event details and menu above.</p>
-<div class="sign"><div><b>${esc(d.client)}</b>Client signature over printed name · Date</div><div><b>${esc(d.preparedBy || "Romualdo's Catering Services")}</b>Prepared by · Romualdo's Catering Services</div></div></section>
-<footer>Romualdo's Catering Services · 13 Juna Avenue, Juna Subdivision, Davao City · 0945 542 5300 · romualdoscatering@gmail.com · romualdos.ph</footer>
+<div class="bar"><button onclick="window.print()">Save as PDF / Print</button><button class="alt" onclick="window.close()">Close</button><span>Choose <b>Save as PDF</b> as the destination. The sheet fits on one page.</span></div>
+<div class="page" id="pg">
+<header><img src="${logo}" alt="Romualdo's"><div class="hd"><div class="tag">Catering Services · Davao City</div><h1>${esc(docTitle)}</h1><div class="who">${esc(d.client)}</div></div>
+<div class="meta">Ref. ${esc(ref)}<br><span class="status">${esc(st)}</span><br>Issued ${esc(new Date().toLocaleDateString('en-PH', {month: 'long', day: 'numeric', year: 'numeric'}))}</div></header>
+<div class="hero">${hero.map(([l, v]) => `<div><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join('')}</div>
+<div class="cols"><div>
+<section><h2>Client${cat ? ' &amp; venue' : ''}<small>Details</small></h2><table class="kv">
+${row('Client', d.client)}${row('Contact person', d.contact)}${row('Mobile', d.mobile)}${row('Email', d.email)}${cat ? row('Venue', d.venue) + row('Coordinator', d.coord) + row('Package', d.pkg) : row(d.fulfil === 'Delivery' ? 'Deliver to' : 'Pick-up at', d.fulfil === 'Delivery' ? d.venue : (d.venue || "Romualdo's, 13 Juna Ave., Juna Subd.")) + row('Good for', d.pax ? d.pax + ' pax' : '')}
+</table></section>
+${times.length ? `<section><h2>Timeline<small>Schedule</small></h2><div class="times">${times.map(([l, t]) => `<div><span>${l}</span><b>${esc(fmtClock(t))}</b></div>`).join('')}</div></section>` : ''}
+${setup.some(x => x[1]) ? `<section><h2>Setup &amp; service<small>On site</small></h2><table class="kv">${setup.map(([l, v]) => row(l, v)).join('')}</table></section>` : ''}
+${notes.some(x => x[1]) ? `<section><h2>Notes<small>Please note</small></h2><table class="kv">${notes.map(([l, v]) => row(l, v)).join('')}</table></section>` : ''}
+</div><div>
+${menu.length ? (cat ? `<div class="menu"><h2>The Menu</h2>${menu.map(m => `<div class="c">${esc(m.course)}</div><div class="d">${esc(m.dish)}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}`).join('')}</div>`
+  : `<div class="menu" style="text-align:left"><h2>The Order</h2><table class="items"><thead><tr><th>Item</th><th class="q">Qty</th></tr></thead><tbody>${menu.map(m => `<tr><td><div class="d" style="font-family:'Playfair Display',serif;font-style:italic;font-size:10pt">${esc(m.dish)}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}</td><td class="q">${esc(m.qty || '1')}</td></tr>`).join('')}</tbody></table></div>`) : ''}
+</div></div>
+<div class="foot"><p class="ack">By signing below, the client confirms the ${cat ? 'event details and menu' : 'order details'} above.</p>
+<div class="sign"><div><b>${esc(d.client)}</b>Client signature over printed name · Date</div><div><b>${esc(d.preparedBy || "Romualdo's Catering Services")}</b>Prepared by · Romualdo's Catering Services</div></div>
+<footer>Romualdo's Catering Services · 13 Juna Avenue, Juna Subdivision, Davao City · 0945 542 5300 · romualdoscatering@gmail.com · romualdos.ph</footer></div>
 </div>
-<script>window.addEventListener('load',()=>{(document.fonts?document.fonts.ready:Promise.resolve()).then(()=>setTimeout(()=>window.print(),400))});<\/script>
+<script>
+function fit(){var p=document.getElementById('pg'),H=p.offsetWidth*297/210;p.style.zoom=1;p.style.minHeight='0';var h=p.scrollHeight,z=h>H?Math.max(.55,(H-2)/h):1;p.style.zoom=z;p.style.minHeight=((H-2)/z)+'px';}
+window.addEventListener('load',function(){(document.fonts?document.fonts.ready:Promise.resolve()).then(function(){fit();setTimeout(function(){window.print()},400)})});
+<\/script>
 </body></html>`;
   const w = window.open('', '_blank');
   if (!w) return toast('Your browser blocked the PDF window. Allow pop-ups for romualdos.ph and try again.', true);
