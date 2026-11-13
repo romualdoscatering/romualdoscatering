@@ -24,6 +24,7 @@ header{position:sticky;top:0;z-index:5;background:#1f1d1a;color:#fff}
 .who{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#e9e2d6;margin-left:10px}.who b{font-weight:600}.who button{background:transparent;color:#e9e2d6;border-color:#5a544b;padding:4px 10px;font-size:12px}
 .login{max-width:380px;margin:60px auto}.login h2{text-align:center}
 .pr-from{display:flex;gap:10px;align-items:center;padding:8px 12px;border-radius:10px;background:var(--infobg);margin-bottom:12px}
+.save-state{font-size:12px;margin-left:10px;padding:2px 10px;border-radius:999px;background:#EEF3EE;color:#2E6B3E}.save-state.busy{background:#FFF4DC;color:#8A5A00}.save-state.warn{background:#FBE9E7;color:#8A1F11}
 h4.sub{font-size:13px;margin:16px 0 8px;color:var(--ink)}
 .adv-left{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;padding:10px 14px;border-radius:10px;background:var(--infobg);margin:4px 0 6px;font-size:13px}
 .adv-left .left{margin-left:auto;font-size:15px}
@@ -672,7 +673,7 @@ const fmtClock = t => { if (!t) return ''; const [h, m] = t.split(':').map(Numbe
 const sheetOf = e => e.sheet ? {...newSheet(), ...e.sheet, id: e.id} : newSheet({id: e.id, client: e.client || e.name || '', date: e.date, pax: String(e.pax || ''), venue: e.venue || ''});
 const sheetRef = d => d.ref || ('EV-' + (d.date || '').replace(/-/g, '').slice(0, 8) + '-' + (d.id || '').slice(-3).toUpperCase());
 V.sheets = () => {
-  D.sheet ||= newSheet();
+  D.sheet ||= newSheet(); maybeRestoreDraft();
   const d = D.sheet, f = D.ui;
   const evs = Object.values(S.events).filter(e => e.status !== 'void').sort((a, b) => a.date.localeCompare(b.date));
   const up = evs.filter(e => e.date >= today()), past = evs.filter(e => e.date < today()).reverse();
@@ -684,7 +685,8 @@ V.sheets = () => {
       <td class="row"><button class="sm" data-act="editSheet" data-arg="${e.id}">Edit</button><button class="sm pri" data-act="pdfSheet" data-arg="${e.id}">PDF</button></td></tr>`; };
   return `<h2>Event sheets</h2>
   <p class="lede">Encode each event's details once. <b>Generate PDF</b> makes a polished event sheet with the Romualdo's logo, for the kitchen and for the client to approve. Billing is not included; that stays with the admin and finance.</p>
-  <div class="card" id="sheetForm"><div class="row" style="margin-bottom:6px"><h3 style="margin:0">${d.id ? 'Edit event sheet' : 'New event sheet'}</h3><span class="spacer"></span>${d.id ? '<button class="sm ghost" data-act="newSheet">＋ Start a new one instead</button>' : ''}</div>
+  <div class="card" id="sheetForm"><div class="row" style="margin-bottom:6px"><h3 style="margin:0">${d.id ? 'Edit event sheet' : 'New event sheet'}</h3><span id="sheetSaveState" class="save-state ${AS.err ? 'warn' : AS.dirty ? 'busy' : 'ok'}">${esc(saveStateText())}</span><span class="spacer"></span>${d.id ? '<button class="sm ghost" data-act="newSheet">＋ Start a new one instead</button>' : ''}</div>
+   ${AS.restoredAt ? `<div class="alert info" style="margin:8px 0">Restored your unsaved work from ${esc(clockNow(AS.restoredAt))}${new Date(AS.restoredAt).toDateString() !== new Date().toDateString() ? ' on ' + esc(fmtD(new Date(AS.restoredAt).toISOString().slice(0, 10))) : ''}. It saves online automatically. <span class="spacer"></span><button class="sm ghost" data-act="discardDraft">Discard draft</button></div>` : ''}
    <h4 class="sub">1. Client</h4>
    <div class="grid">${lab('Client name(s)', inp('client', 'e.g. Juan Manalang & Ysabel Zubiri', 'text', 'autocapitalize="words"'))}${lab('Contact person', inp('contact', '', 'text', 'autocapitalize="words"'))}${lab('Mobile no.', inp('mobile', '09XX XXX XXXX', 'tel'))}${lab('Email', inp('email', '', 'email'))}${lab('How they found us', inp('source', 'Facebook, website, referral…'))}${lab('Reference no.', inp('ref', d.id ? sheetRef(d) : 'Filled in automatically'))}</div>
    <h4 class="sub">2. Event</h4>
@@ -711,22 +713,84 @@ V.sheets = () => {
    ${past.length ? `<details style="margin-top:10px"><summary class="small">Past events (${past.length})</summary><div class="tw"><table><tbody>${past.map(listRow).join('')}</tbody></table></div></details>` : ''}
   </div>`;
 };
-ACT.newSheet = () => { D.sheet = newSheet(); render(); document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'}); };
-ACT.addCourse = () => { D.sheet.menu.push({course: 'Main dish', dish: '', note: ''}); render(); };
-ACT.rmCourse = i => { D.sheet.menu.splice(+i, 1); render(); };
-ACT.editSheet = id => { const e = S.events[id]; if (!e) return; const sh = sheetOf(e); D.sheet = JSON.parse(JSON.stringify({...sh, pax: String(sh.pax || ''), menu: (sh.menu && sh.menu.length ? sh.menu : newSheet().menu)})); if (D.ui.tab !== 'sheets') location.hash = 'sheets'; render(); setTimeout(() => document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'}), 50); };
-ACT.saveSheet = mode => {
-  const d = D.sheet, client = titleCase(d.client);
-  if (!client) return toast('Enter the client name.', true);
-  if (!d.date) return toast('Enter the event date.', true);
+ACT.newSheet = async () => { await flushSheet(); AS.dirty = false; AS.restoredAt = 0; AS.lastOk = 0; draftClear(); D.sheet = newSheet(); render(); document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'}); };
+ACT.addCourse = () => { D.sheet.menu.push({course: 'Main dish', dish: '', note: ''}); render(); sheetTouched(); };
+ACT.rmCourse = i => { D.sheet.menu.splice(+i, 1); render(); sheetTouched(); };
+ACT.editSheet = async id => { const e = S.events[id]; if (!e) return; if (D.sheet?.id !== id) { await flushSheet(); AS.dirty = false; AS.restoredAt = 0; AS.lastOk = 0; draftClear(); } const sh = sheetOf(e); D.sheet = JSON.parse(JSON.stringify({...sh, pax: String(sh.pax || ''), menu: (sh.menu && sh.menu.length ? sh.menu : newSheet().menu)})); if (D.ui.tab !== 'sheets') location.hash = 'sheets'; render(); setTimeout(() => document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'}), 50); };
+/* ---- auto-save: every keystroke is kept on this device at once (draft), and saved online a few seconds after typing stops ---- */
+const DRAFT_KEY = 'rcs_sheet_draft';
+const AS = {timer: 0, localTimer: 0, saving: false, dirty: false, lastOk: 0, err: '', restoredAt: 0, rev: 0};
+const clockNow = t => new Date(t || Date.now()).toLocaleTimeString('en-PH', {hour: 'numeric', minute: '2-digit'});
+function draftWrite() { try { localStorage.setItem(DRAFT_KEY, JSON.stringify({at: Date.now(), user: S.me?.username || '', data: D.sheet})); } catch (e) {} }
+function draftRead() { try { const x = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); return x && x.data && (!x.user || !S.me || x.user === S.me.username) ? x : null; } catch (e) { return null; } }
+function draftClear() { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} }
+function saveStateText() {
+  if (AS.saving) return 'Saving…';
+  if (AS.err) return 'Kept on this device — will retry saving online (' + AS.err + ')';
+  if (AS.dirty) return (D.sheet.client || '').trim() && D.sheet.date ? 'Unsaved changes — auto-saving…' : 'Draft kept on this device. Enter the client name and date to save it online.';
+  if (AS.lastOk) return 'All changes saved · ' + clockNow(AS.lastOk);
+  return D.sheet.id ? 'Saved' : 'Auto-save is on';
+}
+function paintSaveState() { const el = document.getElementById('sheetSaveState'); if (el) { el.textContent = saveStateText(); el.className = 'save-state ' + (AS.err ? 'warn' : AS.dirty || AS.saving ? 'busy' : 'ok'); } }
+function sheetTouched() {
+  AS.dirty = true; AS.err = ''; AS.rev++;
+  clearTimeout(AS.localTimer); AS.localTimer = setTimeout(draftWrite, 300);
+  clearTimeout(AS.timer); AS.timer = setTimeout(autoSaveSheet, 3000);
+  paintSaveState();
+}
+function sheetPayload(d) {
+  const client = titleCase(d.client);
   const sheet = {...d, client, pax: num(d.pax) || '', menu: d.menu.filter(m => (m.dish || '').trim() || (m.note || '').trim()).map(m => ({course: (m.course || '').trim(), dish: (m.dish || '').trim(), note: (m.note || '').trim()})), savedAt: Date.now()};
   delete sheet.id;
-  const base = {name: client, client, date: d.date, pax: num(d.pax) || '', venue: (d.venue || '').trim()};
+  return {client, sheet, base: {name: client, client, date: d.date, pax: num(d.pax) || '', venue: (d.venue || '').trim()}};
+}
+async function writeSheet(d) {
+  const {client, sheet, base} = sheetPayload(d);
+  let id = d.id;
+  if (id && S.events[id]) { if (!sheet.ref) sheet.ref = sheetRef({...d, id}); await upd('events/' + id, {...base, sheet}); }
+  else { id = id || genId(); sheet.ref = sheet.ref || sheetRef({...d, id}); await opsWrite([{op: 'add', path: 'events/' + id, data: {...base, contract: 0, notes: '', status: 'planned', plan: [], sheet}}]); }
+  return {id, sheet, client};
+}
+async function autoSaveSheet() {
+  clearTimeout(AS.timer);
+  const d = D.sheet; if (!AS.dirty || !d || !S.token) return;
+  if (!(d.client || '').trim() || !d.date) { draftWrite(); paintSaveState(); return; }
+  if (AS.saving || S.busy) { AS.timer = setTimeout(autoSaveSheet, 2000); return; }
+  AS.saving = true; paintSaveState();
+  const rev = AS.rev;
+  try {
+    if (!d.id) d.id = genId();            // fix the id first so a second save updates instead of duplicating
+    const r = await writeSheet(d);
+    if (!d.ref) d.ref = r.sheet.ref;
+    AS.lastOk = Date.now(); AS.err = '';
+    if (AS.rev === rev && D.sheet === d) { AS.dirty = false; draftClear(); }
+    else AS.timer = setTimeout(autoSaveSheet, 1500); // more typing happened while saving
+    const h = document.querySelector('#sheetForm h3'); if (h && D.ui.tab === 'sheets') h.textContent = 'Edit event sheet';
+  } catch (e) { AS.err = e?.message ? String(e.message).slice(0, 60) : 'offline'; draftWrite(); AS.timer = setTimeout(autoSaveSheet, 15000); }
+  finally { AS.saving = false; paintSaveState(); }
+}
+async function flushSheet() { if (AS.dirty) { draftWrite(); await autoSaveSheet(); } }
+window.addEventListener('beforeunload', e => { if (AS.dirty) { draftWrite(); if (!((D.sheet?.client || '').trim() && D.sheet?.date) || AS.err) return; e.preventDefault(); e.returnValue = ''; } });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && AS.dirty) { draftWrite(); autoSaveSheet(); } });
+function maybeRestoreDraft() {
+  if (AS.dirty || AS.restoredAt) return;
+  const x = draftRead(); if (!x) return;
+  const cur = x.data.id && S.events[x.data.id]?.sheet;
+  if (cur && (cur.savedAt || 0) >= x.at) { draftClear(); return; }   // the online copy is newer
+  D.sheet = {...newSheet(), ...x.data}; AS.restoredAt = x.at; AS.dirty = true;
+  clearTimeout(AS.timer); AS.timer = setTimeout(autoSaveSheet, 2500);
+}
+ACT.discardDraft = () => { draftClear(); AS.dirty = false; AS.restoredAt = 0; AS.err = ''; const id = D.sheet.id; D.sheet = id && S.events[id] ? JSON.parse(JSON.stringify({...sheetOf(S.events[id]), pax: String(S.events[id].sheet?.pax || '')})) : newSheet(); render(); toast('Draft discarded'); };
+ACT.saveSheet = mode => {
+  const d = D.sheet;
+  if (!titleCase(d.client)) return toast('Enter the client name.', true);
+  if (!d.date) return toast('Enter the event date.', true);
+  clearTimeout(AS.timer);
   guard(async () => {
-    let id = d.id;
-    if (id) { if (!sheet.ref) sheet.ref = sheetRef({...d, id}); await upd('events/' + id, {...base, sheet}); }
-    else { id = genId(); sheet.ref = sheet.ref || sheetRef({...d, id}); await opsWrite([{op: 'add', path: 'events/' + id, data: {...base, contract: 0, notes: '', status: 'planned', plan: [], sheet}}]); }
+    if (!d.id) d.id = genId();
+    const {id, sheet} = await writeSheet(d);
     D.sheet = JSON.parse(JSON.stringify({...sheet, id, pax: String(sheet.pax || ''), menu: sheet.menu.length ? sheet.menu : newSheet().menu}));
+    AS.dirty = false; AS.err = ''; AS.lastOk = Date.now(); AS.restoredAt = 0; draftClear();
     if (mode === 'pdf') setTimeout(() => printSheet(id), 300);
   }, mode === 'pdf' ? 'Saved — opening the PDF' : 'Event sheet saved');
 };
@@ -1528,7 +1592,7 @@ document.addEventListener('click', e => {
 document.addEventListener('input', e => {
   const it = e.target.dataset?.item;
   if (it && e.target.closest('#view')) { const el = e.target, pos = el.selectionStart, v = capWords(el.value); if (v !== el.value) { el.value = v; try { el.setSelectionRange(pos, pos); } catch (x) {} } return; }
-  const p = e.target.dataset?.b; if (!p || !e.target.closest('#view')) return; if (e.target.type === 'checkbox') return; setPath(D, p, e.target.value); live(); });
+  const p = e.target.dataset?.b; if (!p || !e.target.closest('#view')) return; if (e.target.type === 'checkbox') return; setPath(D, p, e.target.value); live(); if (p.startsWith('sheet.')) sheetTouched(); });
 document.addEventListener('change', e => {
   const el = e.target;
   if (el.dataset?.item && el.closest('#view')) {
@@ -1541,6 +1605,7 @@ document.addEventListener('change', e => {
   if (el.type === 'checkbox') setPath(D, p, el.checked); else setPath(D, p, el.value);
   if (el.value === '__new') { setPath(D, p, ''); render(); return itemModal(null, id => { setPath(D, p, id); const m = p.match(/^(purchase|req)\.lines\.(\d+)\.itemId$/); if (m && S.items[id]?.lastCost && !D[m[1]].lines[m[2]].cost) D[m[1]].lines[m[2]].cost = String(S.items[id].lastCost); render(); }); }
   const m = p.match(/^(purchase|req)\.lines\.(\d+)\.itemId$/); if (m) { const l = D[m[1]].lines[m[2]]; if (!l.cost && S.items[l.itemId]?.lastCost) l.cost = String(S.items[l.itemId].lastCost); }
+  if (p.startsWith('sheet.')) sheetTouched();
   if ('rr' in el.dataset) render();
 });
 function route() { let h = location.hash.slice(1); if (h === 'expenses') { h = 'purchases'; history.replaceState(null, '', '#purchases'); } D.ui.tab = TABS.some(t => t[0] === h) ? h : 'dash'; render(); window.scrollTo(0, 0); }
