@@ -39,7 +39,7 @@ input,select,textarea{font-family:inherit;font-size:15px;color:var(--navy)}
 .wrap{max-width:1120px;margin:0 auto;padding:0 20px}
 
 header.top{background:var(--paper);border-bottom:3px solid var(--gold)}
-header .bar{display:flex;align-items:center;gap:20px;padding:14px 0;flex-wrap:wrap}
+header .bar{display:flex;align-items:center;gap:20px;padding:14px 20px;flex-wrap:wrap}
 header img{width:220px;height:auto;display:block}
 header nav{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
 header nav button{border:0;background:transparent;padding:10px 14px;border-radius:999px;font-weight:600;color:var(--blue);font-size:14px}
@@ -388,6 +388,45 @@ header nav button.nav-kaar[aria-current="true"]{color:#F2B33D!important}
 .nav-graz{font-family:"Playfair Display",serif!important;font-style:italic;font-size:15.5px!important}
 @media (max-width:860px){.graz-hero,.graz-grid,.graz-sel{grid-template-columns:1fr}.graz-hero .ph{min-height:230px;order:-1}.graz-hero .txt{padding:22px}.gp-ph{height:200px}.gs-ph{height:210px}.graz-card{padding:18px}}
 @media (max-width:480px){.graz form .two{grid-template-columns:1fr!important}}
+
+/* ===== navigation: Our Offers dropdown, Book now, mobile menu ===== */
+header nav{align-items:center}
+.dd{position:relative}
+.dd-btn .caret{font-size:11px;margin-left:2px;display:inline-block;transition:transform .15s}
+.dd:hover .dd-btn .caret,.dd:focus-within .dd-btn .caret{transform:rotate(180deg)}
+.dd-panel{position:absolute;top:calc(100% + 6px);left:50%;transform:translate(-50%,6px);width:420px;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 40px rgba(26,44,84,.18);padding:8px;opacity:0;visibility:hidden;transition:opacity .15s,transform .15s,visibility .15s;z-index:60}
+.dd-panel::before{content:"";position:absolute;left:0;right:0;top:-10px;height:10px}
+.dd:hover .dd-panel,.dd:focus-within .dd-panel{opacity:1;visibility:visible;transform:translate(-50%,0)}
+.dd-item{display:flex;gap:12px;align-items:center;width:100%;text-align:left;border:0;background:none;padding:8px;border-radius:10px;cursor:pointer;font:inherit;color:var(--blue)}
+.dd-item:hover,.dd-item:focus{background:#F7F2E4;outline:none}
+.dd-img{flex:0 0 56px;width:56px;height:44px;border-radius:8px;overflow:hidden;background:#EFE7D2}.dd-img img{width:100%;height:100%;object-fit:cover;display:block}
+.dd-t b{display:block;font-size:14.5px;color:var(--navy)}.dd-t small{display:block;font-size:12.5px;color:#6B7280;font-weight:500}
+.dd-all{display:block;width:100%;margin-top:4px;border:0;border-top:1px solid var(--line);background:none;padding:10px 8px 6px;text-align:center;font:700 13px inherit;color:var(--navy);cursor:pointer}
+header nav button.nav-book{background:var(--gold);color:var(--navy);font-weight:700;padding:10px 18px}
+header nav button.nav-book[aria-current="true"]{background:var(--navy);color:#fff}
+.nav-burger{display:none;margin-left:auto;width:44px;height:44px;border:1.5px solid var(--line);border-radius:10px;background:#fff;flex-direction:column;justify-content:center;align-items:center;gap:5px;cursor:pointer}
+.nav-burger span{display:block;width:20px;height:2px;background:var(--navy);border-radius:2px;transition:transform .2s,opacity .2s}
+body.nav-open .nav-burger span:nth-child(1){transform:translateY(7px) rotate(45deg)}body.nav-open .nav-burger span:nth-child(2){opacity:0}body.nav-open .nav-burger span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+@media (max-width:860px){
+  header img{width:170px}
+  .nav-burger{display:flex}
+  header nav{display:none;width:100%;flex-direction:column;align-items:stretch;gap:2px;margin:6px 0 4px}
+  body.nav-open header nav{display:flex}
+  header nav button{text-align:left;padding:12px 14px;font-size:15px}
+  header nav button.nav-book{text-align:center;margin-top:6px}
+  .dd-btn .caret{display:none}
+  .dd-panel{position:static;transform:none;width:auto;opacity:1;visibility:visible;box-shadow:none;border:0;padding:0 0 0 10px;background:transparent}
+  .dd:hover .dd-panel,.dd:focus-within .dd-panel{transform:none}
+  .dd-all{display:none}
+}
+/* hub */
+.offers .off-head{text-align:center;max-width:720px;margin:6px auto 22px}.offers .off-head h1{margin:6px 0 8px}.offers .off-head p{color:#5B6478;margin:0}
+.off-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-bottom:30px}
+.off-card{display:flex;flex-direction:column;text-align:left;padding:0;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff;cursor:pointer;font:inherit;color:inherit;transition:transform .15s,box-shadow .15s}
+.off-card:hover{transform:translateY(-3px);box-shadow:0 12px 26px rgba(26,44,84,.14)}
+.off-img{display:block;height:180px;background:#EFE7D2}.off-img img{width:100%;height:100%;object-fit:cover;display:block}
+.off-b{display:flex;flex-direction:column;gap:4px;padding:16px 18px 18px;flex:1}.off-b b{font-size:20px;color:var(--navy);font-family:"Libre Baskerville",serif}.off-b small{color:#5B6478;font-size:14px;line-height:1.5}
+.off-p{font-weight:700;color:var(--wine);font-size:14.5px;margin-top:4px}.off-go{margin-top:auto;padding-top:10px;font-weight:700;color:var(--navy);font-size:14px}
 .te-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,430px),1fr));gap:14px;margin-top:12px}
 .te-row{display:grid;grid-template-columns:1fr 110px auto;gap:6px;align-items:center;margin:5px 0}
 .te-row>*{min-width:0}.te-row input{margin:0;width:100%;box-sizing:border-box;min-width:0}.te-row .pr{position:relative}.te-row .pr span{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--muted,#777);font-size:13px}.te-row .pr input{padding-left:22px;text-align:right}
@@ -508,15 +547,14 @@ footer{border-top:1px solid var(--line);padding:18px 0;font-size:12.5px;color:va
 <header class="top">
   <div class="wrap bar">
     <img src="assets/logo.png" alt="Romualdo's">
-    <nav>
+    <button class="nav-burger" id="navBurger" aria-label="Open menu" aria-expanded="false" aria-controls="mainNav"><span></span><span></span><span></span></button>
+    <nav id="mainNav">
       <button data-nav="home">Home</button>
       <button data-nav="about">About Us</button>
-      <button data-nav="packages">Packages</button>
-      <button data-nav="kaarawan" class="nav-kaar">Kaarawan Package</button>
-      <button data-nav="grazing" class="nav-graz">Grazing Stations</button>
-      <button data-nav="custom">Build Your Own Menu</button>
-      <button data-nav="trays">Food Trays</button>
+      <div class="dd"><button data-nav="offers" class="dd-btn" aria-haspopup="true">Our Offers <span class="caret" aria-hidden="true">▾</span></button>
+        <div class="dd-panel" id="ddPanel" role="menu"></div></div>
       <button data-nav="contact">Contact Us</button>
+      <button data-nav="book" class="nav-book">Book now</button>
       <button data-nav="admin" class="staff hidden" id="navAdmin">Inquiries</button>
       <button data-nav="menu" class="staff hidden" id="navMenu">Menu items</button>
       <button data-nav="aboutEdit" class="staff hidden" id="navAboutEdit">Edit pages</button>
@@ -664,13 +702,15 @@ function closestPackageHint(perHead){
 }
 
 /* ============ NAV ============ */
-const PAGE_HASH={home:"",about:"about",packages:"packages",kaarawan:"kaarawan",grazing:"grazing",custom:"custom",trays:"trays",contact:"contact"};
+const PAGE_HASH={home:"",about:"about",offers:"offers",packages:"packages",kaarawan:"kaarawan",grazing:"grazing",custom:"custom",trays:"trays",contact:"contact"};
 function go(view){state.view=view;
   if(view in PAGE_HASH){const h=PAGE_HASH[view];if((location.hash||"").slice(1)!==h)history.pushState(null,"",h?"#"+h:location.pathname)}
   render();window.scrollTo({top:0,behavior:"smooth"})}
-document.querySelectorAll("header nav button").forEach(b=>b.addEventListener("click",()=>{
-  const v=b.dataset.nav; if(v==="packages"){state.pkg=null}
+document.querySelectorAll("header nav button[data-nav]").forEach(b=>b.addEventListener("click",()=>{
+  let v=b.dataset.nav; if(v==="packages"){state.pkg=null}
   if(v==="logout"){logout();return}
+  closeNav();
+  if(v==="book"){state.offersBook=true;v="offers"}else if(v==="offers")state.offersBook=false;
   if(v==="menu"&&(!state.menuDraft||!state.menuDirty))startMenuDraft();
   if(v==="aboutEdit")startAboutDraft();
   if(v==="trayEdit"&&!state.trayDirty)startTrayDraft();
@@ -678,13 +718,37 @@ document.querySelectorAll("header nav button").forEach(b=>b.addEventListener("cl
   go(v);
 }));
 
+/* ============ OUR OFFERS: dropdown panel, hub page, mobile menu ============ */
+const OFFER_VIEWS=["offers","packages","choose","kaarawan","grazing","trays","custom"];
+function offerList(){
+  const K=kaarData(),G=grazData(),kp=K.options.filter(o=>o.show&&kReady(o)).map(o=>o.perHead*o.pax),gp=G.paths.filter(p=>p.show).flatMap(p=>p.options.filter(o=>o.show&&o.price>0).map(o=>o.price));
+  const tp=TRAY_CATS.flatMap(([k])=>trayItems(k).map(i=>i.price)).filter(Boolean),pk=Math.min(...PACKAGES.map(x=>x.price).filter(Boolean));
+  const hp=state.about.homePhoto?photoUrl(state.about.homePhoto,900):"";
+  return [
+    {v:"packages",t:"Catering Packages",d:"Full buffet catering for weddings, debuts, christenings and company events.",p:isFinite(pk)?`from ${peso(pk)}/head`:"",img:hp},
+    {v:"kaarawan",t:K.title.replace(/\s*package\s*$/i,"")+" Package",d:"Ready-made Pinoy birthday handaan, menu all set. Book in a minute.",p:kp.length?`${peso(Math.min(...kp))} for ${K.options.find(kReady)?.pax||50} guests`:"",img:kRef(K.options.find(o=>o.show)?.photo)?.url||kRef(K.heroPhoto)?.url||""},
+    {v:"grazing",t:G.title,d:"Elegant grazing tables and a live street-food station for parties and launches.",p:gp.length?`from ${peso(Math.min(...gp))}`:"",img:kRef(G.paths[0]?.photo)?.url||kRef(G.heroPhoto)?.url||""},
+    {v:"trays",t:"Food Trays",d:"Large party trays good for 10–12 guests. Order online 2–3 days ahead.",p:tp.length?`from ${peso(Math.min(...tp))}/tray`:"",img:trayImg("chicken")},
+    {v:"custom",t:"Build Your Own Menu",d:"Pick your own dishes and get an instant estimate.",p:"",img:trayImg("pasta")}];
+}
+function offersPanel(){return offerList().map(o=>`<button class="dd-item" data-to="${o.v}" role="menuitem"><span class="dd-img">${o.img?`<img src="${esc(o.img)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span><span class="dd-t"><b>${esc(o.t)}</b><small>${esc(o.p||o.d)}</small></span></button>`).join("")+`<button class="dd-all" data-to="offers">See all offers →</button>`}
+function goOffer(v){closeNav();document.activeElement?.blur?.();if(v==="packages")state.pkg=null;if(v==="offers")state.offersBook=false;go(v)}
+function viewOffers(){
+  const L=offerList(),bk=state.offersBook;
+  return `<div class="offers"><div class="off-head"><div class="kicker" style="color:var(--gold)">${bk?"Book with Romualdo's":"Romualdo's Catering · Davao City"}</div><h1>${bk?"What would you like to book?":"Our Offers"}</h1>
+    <p>${bk?"Choose what fits your event. Each one takes you straight to its booking form.":"From full catering to ready-made birthday packages, grazing stations and party trays. Pick what fits your event."}</p></div>
+    <div class="off-grid">${L.map(o=>`<button class="off-card" data-to="${o.v}"><span class="off-img">${o.img?`<img src="${esc(o.img)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>
+      <span class="off-b"><b>${esc(o.t)}</b><small>${esc(o.d)}</small>${o.p?`<span class="off-p">${esc(o.p)}</span>`:""}<span class="off-go">${bk?"Book this →":"View →"}</span></span></button>`).join("")}</div></div>`;
+}
+function closeNav(){document.body.classList.remove("nav-open");const b=document.getElementById("navBurger");if(b)b.setAttribute("aria-expanded","false")}
+document.getElementById("navBurger").addEventListener("click",()=>{const o=document.body.classList.toggle("nav-open");document.getElementById("navBurger").setAttribute("aria-expanded",o?"true":"false")});
+document.getElementById("ddPanel").addEventListener("click",e=>{const b=e.target.closest("[data-to]");if(b){e.stopPropagation();goOffer(b.dataset.to)}});
 document.getElementById("staffLink").addEventListener("click",e=>{e.preventDefault();location.hash="staff";route()});
 /* ============ VIEWS ============ */
 function render(){
-  {const ng=document.querySelector(".nav-graz");if(ng){const GD=grazData();ng.textContent=GD.navLabel||GD.title;ng.classList.toggle("hidden",!GD.paths.some(p=>p.show))}}
-  {const nk=document.querySelector(".nav-kaar"),KD=kaarData();if(nk){nk.textContent=KD.navLabel||KD.title;nk.classList.toggle("hidden",!KD.options.some(o=>o.show))}}
+  {const dp=document.getElementById("ddPanel");if(dp)dp.innerHTML=offersPanel()}
   document.querySelectorAll("header nav button").forEach(b=>{
-    const on = b.dataset.nav===state.view || (state.view==="choose"&&b.dataset.nav==="packages");
+    const on = b.dataset.nav===state.view || (state.view==="choose"&&b.dataset.nav==="packages") || (b.dataset.nav==="offers"&&OFFER_VIEWS.includes(state.view)&&!(state.view==="offers"&&state.offersBook)) || (b.dataset.nav==="book"&&state.view==="offers"&&state.offersBook);
     b.setAttribute("aria-current", on?"true":"false");
   });
   $("#navAdmin").classList.toggle("hidden",!state.isStaff);
@@ -698,10 +762,11 @@ function render(){
   if(state.view==="home") v.innerHTML=viewHome();
   else if(state.view==="contact") v.innerHTML=viewContact();
   else if(state.view==="trays") v.innerHTML=viewTrays();
+  else if(state.view==="offers") v.innerHTML=viewOffers();
   else if(state.view==="kaarawan") v.innerHTML=viewKaarawan();
   else if(state.view==="grazing") v.innerHTML=viewGrazing();
   else if(state.view==="grazEdit") v.innerHTML=state.canEdit?viewGrazEdit():viewGrazing();
-  else if(state.view==="packages") v.innerHTML=kaarPromo()+grazPromo()+viewPackages()+nextBand("custom");
+  else if(state.view==="packages") v.innerHTML=viewPackages()+nextBand("custom");
   else if(state.view==="choose") v.innerHTML=viewChoose();
   else if(state.view==="custom") v.innerHTML=viewCustom()+nextBand("contact");
   else if(state.view==="done") v.innerHTML=viewDone();
@@ -1663,9 +1728,9 @@ const GRAZ_DEFAULT={kicker:"Romualdo's Catering · Davao City",title:"Grazing & 
   submitBtn:"Send my booking request",minDays:5,tbfText:"Full menu to follow. We'll share the complete line-up when we call you.",
   navLabel:"Grazing Stations",showPromo:true,promoText:"Elegant pica-pica and grazing stations with a live street-food corner, from {price}.",promoBtn:"See the stations →",
   paths:[
-    {id:"light",name:"Light Pica-Pica & Live Street-Food Station",tagline:"Bite-sized favorites and a refined street-food cart, cooked live",range:"₱10,000 – ₱15,000",photo:{url:"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_165831_8efce3ec-1051-41b5-a2ef-0e6989954b55.png"},
+    {id:"light",name:"Light Pica-Pica & Live Street-Food Station",tagline:"Bite-sized favorites and a refined street-food cart, cooked live",range:"₱10,000 – ₱15,000",photo:{url:"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_170703_f6337fc2-f9f8-4b7a-b023-723f53b3de1b.png"},
       options:[{id:"l1",name:"Option A",tagline:"",price:10000,pax:"",show:true,photo:null,caption:"",menu:[]},{id:"l2",name:"Option B",tagline:"",price:15000,pax:"",show:true,photo:null,caption:"",menu:[]}]},
-    {id:"heavy",name:"Heavy Merienda & Grazing Station",tagline:"A generous grazing table for a full afternoon merienda",range:"₱20,000 – ₱25,000",photo:{url:"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_165832_bb102053-7535-423d-b000-4c31473f1c28.png"},
+    {id:"heavy",name:"Heavy Merienda & Grazing Station",tagline:"A generous grazing table for a full afternoon merienda",range:"₱20,000 – ₱25,000",photo:{url:"https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261113_170703_6cc254ff-3c18-4d1a-b4a3-aabf81681159.png"},
       options:[{id:"h1",name:"Option A",tagline:"",price:20000,pax:"",show:true,photo:null,caption:"",menu:[]},{id:"h2",name:"Option B",tagline:"",price:25000,pax:"",show:true,photo:null,caption:"",menu:[]}]}]};
 function grazData(){
   let x={};try{x=JSON.parse(state.about.grazing||"{}")||{}}catch(e){x={}}
@@ -2056,6 +2121,7 @@ function bind(){
   if(state.view==="about"||state.view==="home")bindAbout(v);
   if(state.view==="trays")bindTrays(v);
   if(state.view==="kaarawan")bindKaarawan(v);
+  if(state.view==="offers")v.querySelectorAll("[data-to]").forEach(b=>b.onclick=()=>goOffer(b.dataset.to));
   if(state.view==="grazing")bindGrazing(v);
   if(state.view==="grazEdit")bindGrazEdit(v);
   if(state.view==="home")bindFilm(v);
