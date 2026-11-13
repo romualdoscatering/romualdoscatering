@@ -260,7 +260,8 @@ td.num{text-align:right;white-space:nowrap}
 .te-sz{margin:2px 0 8px 18px;padding-left:10px;border-left:2px solid var(--gold)}.te-sz .te-row{grid-template-columns:1fr 110px auto}.te-szb{font-size:12px;padding:2px 8px}.te-link{background:none;border:0;padding:0 2px;font:600 12px inherit;color:var(--blue,#1A2C54);text-decoration:underline;cursor:pointer;opacity:.75}.te-link:hover{opacity:1}
 
 /* ===== Maligayang Kaarawan page: Pinoy fiesta look, scoped to .kaar ===== */
-.nav-kaar{color:#B5302A!important;font-weight:700}
+.nav-kaar{font-family:Shrikhand,"Libre Baskerville",serif!important;font-weight:400!important;font-size:16px!important;letter-spacing:.02em;color:#C8372D!important}
+header nav button.nav-kaar[aria-current="true"]{color:#F2B33D!important}
 .kaar{background:var(--k-page,transparent);border-radius:18px;--k-red:#C8372D;--k-yel:#F2B33D;--k-blu:#2C5AA0;--k-grn:#3C8A5A;--k-ink:#3A2418;--k-cream:#FFF7E8;--k-paper:#FFFDF7;color:var(--k-ink);margin:-8px 0 0}
 .kaar .fiesta{font-family:Shrikhand,'Libre Baskerville',serif;font-weight:400;letter-spacing:.01em}
 .kaar .bunting{height:34px;background:
@@ -463,7 +464,7 @@ footer{border-top:1px solid var(--line);padding:18px 0;font-size:12.5px;color:va
       <button data-nav="home">Home</button>
       <button data-nav="about">About Us</button>
       <button data-nav="packages">Packages</button>
-      <button data-nav="kaarawan" class="nav-kaar">🎉 Kaarawan Package</button>
+      <button data-nav="kaarawan" class="nav-kaar">Kaarawan Package</button>
       <button data-nav="custom">Build Your Own Menu</button>
       <button data-nav="trays">Food Trays</button>
       <button data-nav="contact">Contact Us</button>
@@ -1392,7 +1393,7 @@ const KAAR_DEFAULT={kicker:"Birthday catering package · Davao City",title:"Mali
   bookTitle:"Book in a minute",bookIntro:"Tell us the date and where the party is. We'll call you to confirm.",
   bookFine:"Sending this is not yet a confirmed booking. Our team will call or message you to confirm the date and arrange the down payment. More guests? Write it in the notes.",
   minDays:3,
-  navLabel:"🎉 Kaarawan Package",showPromo:true,promoText:"A classic Pinoy birthday handaan, menu all set, from {price}. Book in under a minute.",promoBtn:"See the packages →",
+  navLabel:"Kaarawan Package",showPromo:true,promoText:"A classic Pinoy birthday handaan, menu all set, from {price}. Book in under a minute.",promoBtn:"See the packages →",
   priceFrom:"Starts at",priceOnly:"Only",forGuests:"for {pax} guests",goodFor:"good for {pax} guests",
   tbfBadge:"Menu to follow",tbfTitle:"Menu to follow",tbfText:"We're finalizing this package. Message us and we'll tell you as soon as it's ready.",
   closedText:"Online booking opens once the menu for {package} is ready.",fbBtn:"Message us on Facebook",
