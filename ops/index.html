@@ -781,6 +781,7 @@ async function autoSaveSheet() {
     const r = await writeSheet(d);
     if (!d.ref) d.ref = r.sheet.ref;
     AS.lastOk = Date.now(); AS.err = '';
+    clearTimeout(calTimer); const sid = d.id; calTimer = setTimeout(() => bookingSync(sid, false), 45000);
     if (AS.rev === rev && D.sheet === d) { AS.dirty = false; draftClear(); }
     else AS.timer = setTimeout(autoSaveSheet, 1500); // more typing happened while saving
     const h = document.querySelector('#sheetForm h3'); if (h && D.ui.tab === 'sheets') h.textContent = 'Edit event sheet';
@@ -811,9 +812,23 @@ ACT.saveSheet = mode => {
     D.sheet = JSON.parse(JSON.stringify({...sheet, id, pax: String(sheet.pax || ''), menu: sheet.menu.length ? sheet.menu : sheet.kind === 'catering' ? newSheet().menu : orderRows()}));
     AS.dirty = false; AS.err = ''; AS.lastOk = Date.now(); AS.restoredAt = 0; draftClear();
     if (mode === 'pdf') setTimeout(() => printSheet(id, win), 300);
+    setTimeout(() => bookingSync(id, true), 600);
   }, mode === 'pdf' ? 'Saved — opening the PDF' : 'Event sheet saved').then(ok => { if (!ok && win) win.close(); });
 };
 ACT.pdfSheet = id => printSheet(id, pdfWindow());
+/* Calendar + emailed copy (server side). notify=true after Save: emails the booking copy if anything changed. */
+let calTimer = 0;
+async function bookingSync(id, notify) {
+  try {
+    const r = await api('sheetSync', {id, notify: !!notify});
+    if (!notify) return;
+    const bits = [];
+    if (r.calendar === 'created') bits.push('added to the calendar'); else if (r.calendar === 'updated') bits.push('calendar updated');
+    if (r.emailed) bits.push('booking copy emailed');
+    if (r.calendar === 'error' || r.mailError) toast('Saved, but ' + (r.calendar === 'error' ? 'the calendar could not be updated' : 'the email could not be sent') + ': ' + (r.calError || r.mailError), true);
+    else if (bits.length) toast('Saved · ' + bits.join(' · '));
+  } catch (e) { if (notify) toast('Saved. Calendar/email will catch up at 3 PM (' + (e.message || e) + ')', true); }
+}
 function pdfWindow() {
   const w = window.open('', '_blank');
   if (w) w.document.write('<!DOCTYPE html><title>Preparing PDF…</title><body style="font:15px Montserrat,Arial,sans-serif;color:#1A2C54;display:grid;place-items:center;height:90vh;margin:0">Preparing the event sheet…</body>');
@@ -825,7 +840,7 @@ ACT.delSheet = id => {
   const linked = [...S.purchases, ...S.expenses, ...S.moves].filter(x => x.eventId === id && x.status !== 'void').length;
   if (!confirm(`Delete the event sheet for ${name} (${fmtD(e.date)})?` + (linked ? `\n\n${linked} purchase/expense/stock record${linked === 1 ? ' is' : 's are'} linked to this event. They stay in their own pages.` : '') + '\n\nThis removes it from the list.')) return;
   if (D.sheet?.id === id) { clearTimeout(AS.timer); clearTimeout(AS.localTimer); AS.dirty = false; AS.err = ''; AS.restoredAt = 0; AS.lastOk = 0; draftClear(); D.sheet = newSheet(); }
-  guard(async () => { await upd('events/' + id, {status: 'void', voidReason: 'Event sheet deleted', voidBy: S.me?.name || S.me?.username || '', voidAt: Date.now()}); }, 'Event sheet deleted');
+  guard(async () => { await upd('events/' + id, {status: 'void', voidReason: 'Event sheet deleted', voidBy: S.me?.name || S.me?.username || '', voidAt: Date.now()}); bookingSync(id, false); }, 'Event sheet deleted');
 };
 function printSheet(id, w) {
   const e = S.events[id]; if (!e) { if (w) w.close(); return toast('Save the event sheet first.', true); }

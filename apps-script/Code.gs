@@ -58,7 +58,8 @@ function doPost(e) {
       case 'deletePhoto': requireAdmin(req.token); return out(deletePhoto(req.id));
       // ---- operations app (purchasing, stock, requisitions) — see Ops.gs ----
       case 'opsSync':
-      case 'opsWrite':  return out(handleOps(req));
+      case 'opsWrite':
+      case 'sheetSync': return out(handleOps(req));
       default:          return out({ ok: false, error: 'Unknown action.' });
     }
   } catch (err) {

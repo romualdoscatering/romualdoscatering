@@ -28,6 +28,7 @@ function handleOps(req) {
   switch (req.action) {
     case 'opsSync':  return opsSync(me, req);
     case 'opsWrite': return opsWrite(me, req.ops);
+    case 'sheetSync': return sheetSync(me, req);
     default:         return { ok: false, error: 'Unknown action.' };
   }
 }
@@ -230,4 +231,251 @@ function testOps() {
   }
   const staff = loadStaff();
   console.log('Staff file OK — ' + staff.length + ' account(s). Admins: ' + staff.filter(function (s) { return s.role === 'Admin'; }).map(function (s) { return s.username; }).join(', '));
+}
+
+
+/* =====================================================================
+   BOOKINGS: Google Calendar + emailed booking copy + 2-day alert
+   ---------------------------------------------------------------------
+   • Every event sheet (catering, food trays, food packs) is put on the
+     "Catering and Events" calendar and kept up to date.
+   • When staff press Save, a copy of the booking details (with a PDF)
+     goes to BOOK.EMAILS — only if something changed since the last copy.
+   • Every day at about 3:00 PM (Manila) everyone in BOOK.EMAILS gets an
+     alert for bookings 2 days away. Calendar events also carry a pop-up
+     reminder at exactly 3:00 PM two days before.
+   Run setupBookings() once from the editor (and approve access).
+   ===================================================================== */
+const BOOK = {
+  CAL_ID: '514003536ae4e0052290f7d416657b97df67ed53cb6ac667f072f8c23cd93a34@group.calendar.google.com',
+  CAL_NAME: 'Catering and Events',
+  EMAILS: ['events@romualdos.ph', 'romualdoscatering@gmail.com', 'jasperpatrickdomingo@gmail.com'],
+  TZ: 'Asia/Manila',
+  ALERT_HOUR: 15,
+  DAYS_BEFORE: 2,
+  OPS_URL: 'https://romualdos.ph/ops/#sheets',
+  LOGO_URL: 'https://romualdos.ph/assets/logo.png'
+};
+
+/** Run once from the editor: approves Calendar access and creates the daily 3 PM job. */
+function setupBookings() {
+  ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'dailyBookingJob') ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('dailyBookingJob').timeBased().atHour(BOOK.ALERT_HOUR).nearMinute(0).everyDays(1).inTimezone(BOOK.TZ).create();
+  Logger.log('Calendar: ' + bookCal().getName());
+  const n = syncAllBookings(true);
+  Logger.log('Daily 3 PM job set. Calendar entries checked: ' + n);
+}
+
+function bookCal() {
+  let c = null;
+  try { c = CalendarApp.getCalendarById(BOOK.CAL_ID); } catch (e) {}
+  if (!c) { const l = CalendarApp.getCalendarsByName(BOOK.CAL_NAME); c = l.length ? l[0] : CalendarApp.getDefaultCalendar(); }
+  return c;
+}
+function bookProps() { return PropertiesService.getScriptProperties(); }
+function readEventDoc(id) {
+  const r = readAll(opsSheet()).filter(function (x) { return x.path === 'events/' + id; })[0];
+  return r ? toDoc(r).data : null;
+}
+function bookKind(sh) { return sh.kind === 'trays' ? 'Food trays' : sh.kind === 'packs' ? 'Food packs' : 'Catering'; }
+function bookHash(o) { return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, JSON.stringify(o), Utilities.Charset.UTF_8)); }
+function bookContent(ev) { const sh = ev.sheet || {}; const c = JSON.parse(JSON.stringify(sh)); delete c.savedAt; c._v = ev.status; return c; }
+function clock12(t) { if (!t) return ''; const p = String(t).split(':'); const h = Number(p[0]), m = p[1] || '00'; return ((h % 12) || 12) + ':' + m + (h < 12 ? ' AM' : ' PM'); }
+function qtyTotal(sh) { return (sh.menu || []).filter(function (m) { return m.dish; }).reduce(function (t, m) { return t + (parseFloat(m.qty) || 0); }, 0); }
+function bookTitle(sh) {
+  const k = sh.kind || 'catering';
+  if (k === 'catering') return 'Catering: ' + sh.client + (sh.type ? ' – ' + sh.type : '') + (sh.pax ? ' (' + sh.pax + ' pax)' : '');
+  const q = qtyTotal(sh), unit = k === 'packs' ? 'pack' : 'tray';
+  return bookKind(sh) + (sh.fulfil ? ' (' + sh.fulfil + ')' : '') + ': ' + sh.client + (q ? ' – ' + q + ' ' + unit + (q === 1 ? '' : 's') : '');
+}
+/** Plain-text booking details (calendar description + email text). */
+function bookText(sh, ref) {
+  const k = sh.kind || 'catering', cat = k === 'catering', L = [];
+  const add = function (l, v) { if (v) L.push(l + ': ' + v); };
+  add('Type', bookKind(sh)); add('Ref', ref); add('Status', ({draft: 'Draft', approval: 'For client approval', approved: 'Approved by client', cancelled: 'Cancelled'})[sh.status] || sh.status);
+  add('Client', sh.client); add('Contact person', sh.contact); add('Mobile', sh.mobile); add('Email', sh.email);
+  add(cat ? 'Date' : (sh.fulfil === 'Delivery' ? 'Delivery date' : 'Pick-up date'), niceDate(sh.date));
+  if (cat) { add('Event type', sh.type); add('Guests', sh.pax ? sh.pax + ' pax' : ''); add('Call time', clock12(sh.call)); add('Serving time', clock12(sh.serve)); add('Pull-out', clock12(sh.pull)); add('Venue', sh.venue); add('Venue coordinator', sh.coord); add('Package', sh.pkg); }
+  else { add('Pick-up / delivery', sh.fulfil); add(sh.fulfil === 'Delivery' ? 'Delivery time' : 'Ready by', clock12(sh.serve)); add(sh.fulfil === 'Delivery' ? 'Deliver to' : 'Pick-up at', sh.venue); add('Good for', sh.pax ? sh.pax + ' pax' : ''); }
+  const menu = (sh.menu || []).filter(function (m) { return m.dish; });
+  if (menu.length) { L.push(''); L.push(cat ? 'MENU' : 'ORDER'); menu.forEach(function (m) { L.push('• ' + (cat ? (m.course ? m.course + ': ' : '') : (m.qty || 1) + ' × ') + m.dish + (m.note ? ' (' + m.note + ')' : '')); }); }
+  if (cat && (sh.motif || sh.setup || sh.staff || sh.equip)) { L.push(''); L.push('SETUP & SERVICE'); add('Motif / theme', sh.motif); add('Table setup', sh.setup); add('Staff', sh.staff); add('Equipment', sh.equip); }
+  if (sh.allergy || sh.special) { L.push(''); add('Allergies / dietary', sh.allergy); add('Special requests', sh.special); }
+  add('Prepared by', sh.preparedBy);
+  return L.join('\n');
+}
+/** Start/end Dates for the calendar entry, or null for an all-day entry. */
+function bookTimes(sh) {
+  const k = sh.kind || 'catering';
+  const at = function (t) { return new Date(sh.date + 'T' + t + ':00+08:00'); };
+  if (k === 'catering') {
+    const s = sh.call || sh.serve; if (!s) return null;
+    const start = at(s); let end = sh.pull ? at(sh.pull) : new Date(start.getTime() + 5 * 36e5);
+    if (end <= start) end = new Date(end.getTime() + 864e5);
+    return { start: start, end: end };
+  }
+  if (!sh.serve) return null;
+  const st = at(sh.serve); return { start: new Date(st.getTime() - 30 * 6e4), end: st };
+}
+/** Minutes before the event start that equals 3:00 PM, two days before the event date. */
+function alertMinutes(sh, start) {
+  const alertAt = new Date(new Date(sh.date + 'T00:00:00+08:00').getTime() - BOOK.DAYS_BEFORE * 864e5 + BOOK.ALERT_HOUR * 36e5);
+  return Math.max(0, Math.round((start.getTime() - alertAt.getTime()) / 6e4));
+}
+
+/** Creates, updates or removes the calendar entry for one event. Returns 'created' | 'updated' | 'removed' | 'same' | 'skip'. */
+function syncCalendar(id, ev, force) {
+  const P = bookProps(), key = 'cal_' + id, hkey = 'calh_' + id;
+  const sh = ev && ev.sheet ? ev.sheet : null;
+  const cal = bookCal();
+  let ce = null; const cid = P.getProperty(key);
+  if (cid) { try { ce = cal.getEventById(cid); } catch (e) { ce = null; } }
+  if (!ev || ev.status === 'void' || !sh || !sh.date || !sh.client) {
+    if (ce) { try { ce.deleteEvent(); } catch (e) {} }
+    P.deleteProperty(key); P.deleteProperty(hkey);
+    return ce ? 'removed' : 'skip';
+  }
+  const h = bookHash(bookContent(ev));
+  if (ce && !force && P.getProperty(hkey) === h) return 'same';
+  if (!ce) ce = adoptCalendarEvent(cal, sh);          // an entry typed in by hand earlier for the same client and date
+  const ref = sh.ref || id;
+  const title = (sh.status === 'cancelled' ? 'CANCELLED – ' : '') + bookTitle(sh);
+  const desc = bookText(sh, ref) + '\n\nOpen in Romualdo\'s Ops: ' + BOOK.OPS_URL;
+  const t = bookTimes(sh), day = new Date(sh.date + 'T00:00:00+08:00');
+  const was = !!ce;
+  if (ce) {
+    if (t) ce.setTime(t.start, t.end); else ce.setAllDayDate(day);
+    ce.setTitle(title); ce.setDescription(desc); ce.setLocation(sh.venue || '');
+  } else {
+    ce = t ? cal.createEvent(title, t.start, t.end, { description: desc, location: sh.venue || '' })
+           : cal.createAllDayEvent(title, day, { description: desc, location: sh.venue || '' });
+  }
+  ce.setTag('rcs_id', id);
+  ce.removeAllReminders();
+  if (sh.status !== 'cancelled') { const m = alertMinutes(sh, t ? t.start : day); ce.addPopupReminder(m); ce.addEmailReminder(m); }
+  P.setProperty(key, ce.getId()); P.setProperty(hkey, h);
+  return was ? 'updated' : 'created';
+}
+function adoptCalendarEvent(cal, sh) {
+  const words = String(sh.client || '').split(/[\s&,]+/).filter(function (w) { return w.length > 3 && !/^(and|don|dona|mr|mrs|ms)$/i.test(w); });
+  if (!words.length) return null;
+  const day = new Date(sh.date + 'T00:00:00+08:00');
+  const list = cal.getEventsForDay(day).filter(function (e) {
+    if (e.getTag('rcs_id')) return false;
+    const t = e.getTitle().toLowerCase();
+    return words.some(function (w) { return t.indexOf(w.toLowerCase()) >= 0; });
+  });
+  return list.length === 1 ? list[0] : null;
+}
+
+/** Called by the Ops app after Save (notify=true) or Delete. */
+function sheetSync(me, req) {
+  const id = String(req.id || '');
+  if (!/^[A-Za-z0-9_-]{4,40}$/.test(id)) return { ok: false, error: 'Invalid event.' };
+  const ev = readEventDoc(id);
+  const res = { ok: true, calendar: 'skip', emailed: false };
+  try { res.calendar = syncCalendar(id, ev, false); } catch (e) { res.calendar = 'error'; res.calError = String(e.message || e).slice(0, 120); }
+  if (req.notify && ev && ev.status !== 'void' && ev.sheet && ev.sheet.client && ev.sheet.date) {
+    try { res.emailed = emailBooking(id, ev, me); } catch (e) { res.mailError = String(e.message || e).slice(0, 120); }
+  }
+  return res;
+}
+
+/* ---------- emailed copy with PDF ---------- */
+function emailBooking(id, ev, me) {
+  const P = bookProps(), mkey = 'mail_' + id, h = bookHash(bookContent(ev));
+  if (P.getProperty(mkey) === h) return false;                        // nothing changed since the last copy
+  if (MailApp.getRemainingDailyQuota() < BOOK.EMAILS.length) throw new Error('Daily email limit reached');
+  const sh = ev.sheet, ref = sh.ref || id, first = !P.getProperty(mkey);
+  const subject = (first ? 'New booking: ' : 'Updated booking: ') + bookTitle(sh) + ' · ' + niceDate(sh.date);
+  const pdf = bookPdf(sh, ref);
+  const body = 'Booking details' + (first ? '' : ' (updated)') + ' saved by ' + (me.name || me.username) + ' in Romualdo\'s Ops.\n\n' + bookText(sh, ref) + '\n\nThe event sheet PDF is attached. Open in Ops: ' + BOOK.OPS_URL;
+  MailApp.sendEmail({ to: BOOK.EMAILS.join(','), subject: subject, body: body, htmlBody: bookHtmlEmail(sh, ref, first, me), attachments: [pdf], name: 'Romualdo\'s Bookings' });
+  P.setProperty(mkey, h);
+  return true;
+}
+function hx(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function bookRows(sh) {
+  const k = sh.kind || 'catering', cat = k === 'catering', R = [];
+  const add = function (l, v) { if (v) R.push([l, v]); };
+  add('Client', sh.client); add('Contact person', sh.contact); add('Mobile', sh.mobile); add('Email', sh.email);
+  if (cat) { add('Date', niceDate(sh.date)); add('Event type', sh.type); add('Guests', sh.pax ? sh.pax + ' pax' : ''); add('Call time', clock12(sh.call)); add('Serving time', clock12(sh.serve)); add('Pull-out', clock12(sh.pull)); add('Venue', sh.venue); add('Venue coordinator', sh.coord); add('Package', sh.pkg); add('Motif / theme', sh.motif); add('Table setup', sh.setup); add('Service staff', sh.staff); add('Equipment', sh.equip); }
+  else { add(sh.fulfil === 'Delivery' ? 'Delivery date' : 'Pick-up date', niceDate(sh.date)); add('Pick-up / delivery', sh.fulfil); add(sh.fulfil === 'Delivery' ? 'Delivery time' : 'Ready by', clock12(sh.serve)); add(sh.fulfil === 'Delivery' ? 'Deliver to' : 'Pick-up at', sh.venue); add('Good for', sh.pax ? sh.pax + ' pax' : ''); }
+  add('Allergies / dietary', sh.allergy); add('Special requests', sh.special);
+  return R;
+}
+function bookMenuHtml(sh) {
+  const cat = (sh.kind || 'catering') === 'catering', menu = (sh.menu || []).filter(function (m) { return m.dish; });
+  if (!menu.length) return '';
+  return '<table width="100%" cellpadding="5" style="border-collapse:collapse;font-size:12px">' + menu.map(function (m) {
+    return '<tr><td style="border-bottom:1px solid #E4DFC8;color:#B07A0A;font-size:10px;letter-spacing:1px;text-transform:uppercase;width:32%">' + hx(cat ? m.course : (m.qty || 1) + ' ×') + '</td><td style="border-bottom:1px solid #E4DFC8;font-family:Georgia,serif;font-style:italic;font-size:14px">' + hx(m.dish) + (m.note ? '<br><span style="font-size:11px;color:#631B1C">' + hx(m.note) + '</span>' : '') + '</td></tr>';
+  }).join('') + '</table>';
+}
+function bookHtmlEmail(sh, ref, first, me) {
+  const cat = (sh.kind || 'catering') === 'catering';
+  return '<div style="font-family:Arial,sans-serif;color:#1A2C54;max-width:640px">' +
+    '<div style="background:#1A2C54;color:#fff;padding:14px 18px;border-radius:8px 8px 0 0"><div style="font-size:11px;letter-spacing:2px;color:#E5DEB2">' + (first ? 'NEW BOOKING' : 'UPDATED BOOKING') + ' · ' + hx(bookKind(sh).toUpperCase()) + '</div>' +
+    '<div style="font-family:Georgia,serif;font-size:21px;margin-top:4px">' + hx(sh.client) + '</div><div style="font-size:13px;color:#E5DEB2">' + hx(niceDate(sh.date)) + ' · Ref. ' + hx(ref) + '</div></div>' +
+    '<div style="border:1px solid #E4DFC8;border-top:0;padding:14px 18px;border-radius:0 0 8px 8px">' +
+    '<table cellpadding="4" style="border-collapse:collapse;font-size:13px">' + bookRows(sh).map(function (r) { return '<tr><td style="color:#8A8F9C;font-size:11px;text-transform:uppercase;letter-spacing:1px;vertical-align:top;padding-right:14px;white-space:nowrap">' + hx(r[0]) + '</td><td style="white-space:pre-wrap">' + hx(r[1]) + '</td></tr>'; }).join('') + '</table>' +
+    ((sh.menu || []).some(function (m) { return m.dish; }) ? '<h3 style="font-family:Georgia,serif;font-weight:normal;font-style:italic;margin:16px 0 4px">' + (cat ? 'The Menu' : 'The Order') + '</h3>' + bookMenuHtml(sh) : '') +
+    '<p style="font-size:12px;color:#5B6478;margin-top:16px">Saved by ' + hx(me.name || me.username) + '. The event sheet PDF is attached. <a href="' + BOOK.OPS_URL + '" style="color:#631B1C">Open in Romualdo\'s Ops</a></p></div></div>';
+}
+function logoData() {
+  const c = CacheService.getScriptCache(), k = 'logo_b64';
+  let b = c.get(k);
+  if (!b) { try { b = Utilities.base64Encode(UrlFetchApp.fetch(BOOK.LOGO_URL).getBlob().getBytes()); if (b.length < 90000) c.put(k, b, 21600); } catch (e) { b = ''; } }
+  return b ? 'data:image/png;base64,' + b : '';
+}
+/** PDF copy of the event sheet (simple layout that Google's PDF converter renders reliably). */
+function bookPdf(sh, ref) {
+  const cat = (sh.kind || 'catering') === 'catering', logo = logoData();
+  const title = cat ? 'Event Details' : (sh.kind === 'packs' ? 'Food Pack Order' : 'Food Tray Order');
+  const st = ({draft: 'Draft', approval: 'For client approval', approved: 'Approved by client', cancelled: 'Cancelled'})[sh.status] || '';
+  const html = '<html><head><meta charset="utf-8"><style>@page{size:A4;margin:12mm}body{font-family:Georgia,serif;color:#1A2C54;font-size:11px}td{vertical-align:top}</style></head><body>' +
+    '<table width="100%"><tr><td width="40%">' + (logo ? '<img src="' + logo + '" style="height:52px">' : '<b style="font-size:22px">Romualdo\'s</b>') + '</td>' +
+    '<td><div style="font-size:9px;letter-spacing:2px;color:#E89908">CATERING SERVICES · DAVAO CITY</div><div style="font-size:24px;font-style:italic">' + title + '</div><div style="font-size:14px">' + hx(sh.client) + '</div></td>' +
+    '<td align="right" style="font-size:10px;color:#5B6478;font-family:Arial">Ref. ' + hx(ref) + '<br>' + hx(st) + '<br>Issued ' + Utilities.formatDate(new Date(), BOOK.TZ, 'MMMM d, yyyy') + '</td></tr></table>' +
+    '<hr style="border:0;border-top:1px solid #C9A24A;margin:8px 0 10px">' +
+    '<table width="100%" cellspacing="0" cellpadding="8" style="background:#1A2C54;color:#fff;text-align:center"><tr><td><span style="font-size:8px;letter-spacing:2px;color:#E5DEB2;font-family:Arial">DATE</span><br><span style="font-size:14px">' + hx(niceDate(sh.date)) + '</span></td>' +
+    (cat ? '<td><span style="font-size:8px;letter-spacing:2px;color:#E5DEB2;font-family:Arial">GUESTS</span><br><span style="font-size:14px">' + hx(sh.pax ? sh.pax + ' pax' : 'TBC') + '</span></td><td><span style="font-size:8px;letter-spacing:2px;color:#E5DEB2;font-family:Arial">OCCASION</span><br><span style="font-size:14px">' + hx(sh.type || 'TBC') + '</span></td>'
+      : '<td><span style="font-size:8px;letter-spacing:2px;color:#E5DEB2;font-family:Arial">' + (sh.fulfil === 'Delivery' ? 'DELIVERY TIME' : 'READY BY') + '</span><br><span style="font-size:14px">' + hx(clock12(sh.serve) || 'TBC') + '</span></td><td><span style="font-size:8px;letter-spacing:2px;color:#E5DEB2;font-family:Arial">ORDER</span><br><span style="font-size:14px">' + hx((qtyTotal(sh) || '') + ' ' + (sh.kind === 'packs' ? 'packs' : 'trays') + (sh.fulfil ? ' · ' + sh.fulfil : '')) + '</span></td>') +
+    '</tr></table><br>' +
+    '<table width="100%"><tr><td width="54%" style="padding-right:14px"><table width="100%" cellpadding="3" style="font-family:Arial;font-size:10.5px">' +
+    bookRows(sh).map(function (r) { return '<tr><td width="34%" style="color:#8A8F9C;font-size:8.5px;letter-spacing:1px;border-bottom:1px solid #EFEBDD">' + hx(r[0].toUpperCase()) + '</td><td style="border-bottom:1px solid #EFEBDD;white-space:pre-wrap">' + hx(r[1]) + '</td></tr>'; }).join('') +
+    '</table></td><td style="background:#FCFBF6;border:1px solid #E4DFC8;padding:10px"><div style="text-align:center;font-size:17px;font-style:italic;margin-bottom:4px">' + (cat ? 'The Menu' : 'The Order') + '</div>' + bookMenuHtml(sh) + '</td></tr></table>' +
+    '<br><br><p style="text-align:center;font-family:Arial;font-size:9.5px;color:#5B6478">By signing below, the client confirms the ' + (cat ? 'event details and menu' : 'order details') + ' above.</p><br><br>' +
+    '<table width="100%" style="font-family:Arial;font-size:9.5px;color:#5B6478"><tr><td width="45%" style="border-top:1px solid #1A2C54;padding-top:3px"><b style="color:#1A2C54">' + hx(sh.client) + '</b><br>Client signature over printed name · Date</td><td width="10%"></td><td style="border-top:1px solid #1A2C54;padding-top:3px"><b style="color:#1A2C54">' + hx(sh.preparedBy || 'Romualdo\'s Catering Services') + '</b><br>Prepared by · Romualdo\'s Catering Services</td></tr></table>' +
+    '<p style="text-align:center;font-family:Arial;font-size:8.5px;color:#8A8F9C;border-top:1px solid #E4DFC8;padding-top:5px;margin-top:18px">Romualdo\'s Catering Services · 13 Juna Avenue, Juna Subdivision, Davao City · 0945 542 5300 · romualdoscatering@gmail.com · romualdos.ph</p></body></html>';
+  const name = (cat ? 'Event Sheet' : title) + ' - ' + String(sh.client).replace(/[\\\/:*?"<>|]/g, '') + ' - ' + Utilities.formatDate(new Date(sh.date + 'T00:00:00+08:00'), BOOK.TZ, 'd MMM yyyy') + '.pdf';
+  return HtmlService.createHtmlOutput(html).getAs('application/pdf').setName(name);
+}
+
+/* ---------- daily job (about 3:00 PM Manila) ---------- */
+function syncAllBookings(force) {
+  const rows = readAll(opsSheet()).filter(function (r) { return r.coll === 'events'; });
+  let n = 0;
+  rows.forEach(function (r) {
+    const id = r.path.split('/')[1], ev = toDoc(r).data;
+    if (!ev.sheet && !bookProps().getProperty('cal_' + id)) return;
+    try { if (syncCalendar(id, ev, !!force) !== 'same') n++; } catch (e) { Logger.log('calendar ' + id + ': ' + e); }
+  });
+  return n;
+}
+function dailyBookingJob() {
+  try { syncAllBookings(false); } catch (e) { Logger.log(e); }
+  const target = Utilities.formatDate(new Date(Date.now() + BOOK.DAYS_BEFORE * 864e5), BOOK.TZ, 'yyyy-MM-dd');
+  const P = bookProps(), dkey = 'alert_' + target;
+  if (P.getProperty(dkey)) return;
+  const list = readAll(opsSheet()).filter(function (r) { return r.coll === 'events'; }).map(function (r) { return { id: r.path.split('/')[1], ev: toDoc(r).data }; })
+    .filter(function (x) { const sh = x.ev.sheet; return sh && x.ev.status !== 'void' && sh.status !== 'cancelled' && (sh.date || x.ev.date) === target; });
+  if (!list.length) { P.setProperty(dkey, 'none'); return; }
+  if (MailApp.getRemainingDailyQuota() < BOOK.EMAILS.length) return;
+  const subject = 'Reminder: ' + list.length + ' booking' + (list.length > 1 ? 's' : '') + ' in 2 days · ' + niceDate(target);
+  const text = 'Heads up! These bookings are on ' + niceDate(target) + ':\n\n' + list.map(function (x) { return bookText(x.ev.sheet, x.ev.sheet.ref || x.id); }).join('\n\n────────────\n\n') + '\n\nOpen in Ops: ' + BOOK.OPS_URL;
+  const html = '<div style="font-family:Arial,sans-serif;color:#1A2C54;max-width:640px"><h2 style="font-family:Georgia,serif;font-weight:normal">Reminder: bookings in 2 days</h2><p>' + hx(niceDate(target)) + ' · ' + list.length + ' booking' + (list.length > 1 ? 's' : '') + '</p>' +
+    list.map(function (x) { const sh = x.ev.sheet; return '<div style="border:1px solid #E4DFC8;border-radius:8px;padding:12px 16px;margin:10px 0"><div style="font-size:11px;letter-spacing:2px;color:#B07A0A">' + hx(bookKind(sh).toUpperCase()) + ' · REF. ' + hx(sh.ref || x.id) + '</div><div style="font-family:Georgia,serif;font-size:18px;margin:3px 0 8px">' + hx(sh.client) + '</div><table cellpadding="3" style="font-size:13px">' + bookRows(sh).map(function (r) { return '<tr><td style="color:#8A8F9C;font-size:11px;text-transform:uppercase;vertical-align:top;padding-right:12px">' + hx(r[0]) + '</td><td style="white-space:pre-wrap">' + hx(r[1]) + '</td></tr>'; }).join('') + '</table>' + bookMenuHtml(sh) + '</div>'; }).join('') +
+    '<p style="font-size:12px"><a href="' + BOOK.OPS_URL + '" style="color:#631B1C">Open in Romualdo\'s Ops</a></p></div>';
+  MailApp.sendEmail({ to: BOOK.EMAILS.join(','), subject: subject, body: text, htmlBody: html, name: 'Romualdo\'s Bookings' });
+  P.setProperty(dkey, String(Date.now()));
 }
