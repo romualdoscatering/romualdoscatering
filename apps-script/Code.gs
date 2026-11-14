@@ -253,7 +253,7 @@ function deleteInquiry(ref) {
 function saveRates(r) {
   r = r || {};
   const courses = ['soup', 'appetizer', 'chicken', 'pork', 'beef', 'fish', 'veg', 'pasta', 'dessert'];
-  const clean = { base: num(r.base), minPax: Math.max(1, Math.floor(num(r.minPax)) || 50), standard: {}, premium: {} };
+  const clean = { base: num(r.base), minPax: Math.max(1, Math.floor(num(r.minPax)) || 50), customMinPax: Math.max(1, Math.floor(num(r.customMinPax)) || 30), customMinPerHead: (r.customMinPerHead === undefined || r.customMinPerHead === null || r.customMinPerHead === '') ? 600 : num(r.customMinPerHead), standard: {}, premium: {} };
   courses.forEach(function (c) {
     clean.standard[c] = num(r.standard && r.standard[c]);
     clean.premium[c] = num(r.premium && r.premium[c]);

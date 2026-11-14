@@ -681,7 +681,7 @@ const PACKAGES = [
 ];
 /* Default per-head rates for custom menus. Staff can override these in "Custom rates". */
 const DEFAULT_RATES = {
-  base:120, minPax:50,
+  base:120, minPax:50, customMinPax:30, customMinPerHead:600,
   standard:{soup:50,appetizer:50,chicken:80,pork:80,beef:95,fish:85,veg:45,pasta:55,dessert:45},
   premium:{soup:65,appetizer:70,chicken:110,pork:115,beef:135,fish:125,veg:60,pasta:75,dessert:60}
 };
@@ -703,7 +703,9 @@ const $ = (s,el=document)=>el.querySelector(s);
 const peso = n => "₱" + Math.round(n).toLocaleString("en-PH");
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),2600)}
-function minPax(){return Math.max(1, Number(state.rates.minPax)||50)}
+function minPax(){return state.view==="custom"?customMinPax():Math.max(1, Number(state.rates.minPax)||50)}
+function customMinPax(){return Math.max(1, Math.floor(Number(state.rates.customMinPax))||30)}
+function customMinPerHead(){const v=Number(state.rates.customMinPerHead);return isFinite(v)&&v>=0?v:600}
 function paxVal(){return Math.max(minPax(), Math.floor(Number(state.pax)||0))}
 function dishRate(tier,cat,dish){const o=PRICE_OVERRIDE[tier+"|"+cat+"|"+dish];return o!=null?o:rate(tier,cat)}
 function rate(tier,cat){const v=Number(state.rates?.[tier]?.[cat]);return isFinite(v)?v:DEFAULT_RATES[tier][cat]}
@@ -723,8 +725,10 @@ function customItems(){
 }
 function customEstimate(){
   const items=customItems();const dishes=items.reduce((s,i)=>s+i.perHead,0);
-  const base=Number(state.rates.base)||0;const perHead=items.length?base+dishes:0;
-  return {items,base,dishes,perHead,total:perHead*paxVal()};
+  const base=Number(state.rates.base)||0;const raw=items.length?base+dishes:0;
+  const floor=customMinPerHead(),pax=paxVal(),perHead=items.length?Math.max(raw,floor):0;
+  const minTotal=floor*customMinPax(),total=items.length?Math.max(perHead*pax,minTotal):0;
+  return {items,base,dishes,raw,perHead,total,floor,minTotal,lifted:items.length>0&&raw<floor};
 }
 function closestPackageHint(perHead){
   const cheaper=PACKAGES.filter(p=>p.price<=perHead).pop();
@@ -989,8 +993,8 @@ function paxBox(){
   return `<div class="pax">
     <label for="pax">Number of guests</label>
     <div class="row"><input id="pax" type="number" min="${mp}" step="1" value="${esc(state.pax)}" inputmode="numeric"><span>pax</span></div>
-    <div class="q">${[50,75,100,150,200,300].map(n=>`<button data-pax="${n}">${n}</button>`).join("")}</div>
-    <small>Minimum of ${mp} guests. Estimates below update as you type.</small>
+    <div class="q">${(state.view==="custom"?[30,50,75,100,150,200]:[50,75,100,150,200,300]).map(n=>`<button data-pax="${n}">${n}</button>`).join("")}</div>
+    <small>Minimum of ${mp} guests${state.view==="custom"&&customMinPerHead()>0?` and ${peso(customMinPerHead())}/head (${peso(customMinPerHead()*mp)} minimum)`:""}. Estimates update as you type.</small>
   </div>`;
 }
 
@@ -1113,10 +1117,12 @@ function customSummary(){
     <div class="total">
       <div class="line"><span>Rice & softdrinks</span><span>${e.items.length?peso(e.base):"—"}/head</span></div>
       <div class="line"><span>Your dishes</span><span>${peso(e.dishes)}/head</span></div>
+      ${e.lifted?`<div class="line"><span>Dishes subtotal</span><span>${peso(e.raw)}/head</span></div><div class="line" style="color:var(--custard)"><span>Minimum per head</span><span>${peso(e.floor)}</span></div>`:""}
       <div class="line"><span><b>Estimated per head</b></span><span><b>${peso(e.perHead)}</b></span></div>
       <div class="est-label" style="margin-top:8px">Estimated total</div><div class="big">${peso(e.total)}</div>
     </div>
     ${hint?`<p style="font-size:12.5px;margin:8px 0 0;color:var(--custard)">${esc(hint)}</p>`:""}
+    ${e.floor>0?`<p style="font-size:12.5px;margin:8px 0 0;color:${e.lifted?"var(--custard)":"inherit"};opacity:${e.lifted?1:.8}">Custom menus start at ${customMinPax()} guests and ${peso(e.floor)}/head (minimum ${peso(e.minTotal)}).${e.lifted?" Your dishes come to less, so the minimum applies. Add more dishes at no extra cost up to "+peso(e.floor)+"/head.":""}</p>`:""}
     <div class="disclaim">This is an <b>estimate only</b>, not a final quotation. Custom menus are priced per dish and confirmed by our team after review.</div>
   </div>`;
 }
@@ -1256,7 +1262,9 @@ function viewRates(){
   <div class="panel rates" style="max-width:620px">
     <table><thead><tr><th>Course</th><th class="num">Standard ₱/head</th><th class="num">Premium ₱/head</th></tr></thead><tbody>
       <tr><td><b>Rice & softdrinks</b> (every custom menu)</td><td class="num" colspan="2"><input type="number" min="0" data-rate="base" value="${esc(r.base)}"></td></tr>
-      <tr><td><b>Minimum guests</b></td><td class="num" colspan="2"><input type="number" min="1" data-rate="minPax" value="${esc(r.minPax)}"></td></tr>
+      <tr><td><b>Minimum guests</b> (packages)</td><td class="num" colspan="2"><input type="number" min="1" data-rate="minPax" value="${esc(r.minPax)}"></td></tr>
+      <tr><td><b>Minimum guests</b> (build your own menu)</td><td class="num" colspan="2"><input type="number" min="1" data-rate="customMinPax" value="${esc(r.customMinPax??DEFAULT_RATES.customMinPax)}"></td></tr>
+      <tr><td><b>Minimum per head</b> (build your own menu)</td><td class="num" colspan="2"><input type="number" min="0" data-rate="customMinPerHead" value="${esc(r.customMinPerHead??DEFAULT_RATES.customMinPerHead)}"></td></tr>
       ${rows}
     </tbody></table>
     <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn gold" id="saveRates">Save rates</button><button class="btn ghost" id="resetRates">Reset to defaults</button><span class="formmsg" id="ratesMsg"></span></div>
@@ -2526,14 +2534,14 @@ async function importMessage(){
   else msg.textContent=r.error||"Couldn't save. Please try again.";
 }
 async function saveRates(){
-  const r={base:0,minPax:50,standard:{},premium:{}};
+  const r={base:0,minPax:50,customMinPax:30,customMinPerHead:600,standard:{},premium:{}};
   document.querySelectorAll("[data-rate]").forEach(el=>{
     const v=Math.max(0,Number(el.value)||0);const k=el.dataset.rate;
-    if(k==="base")r.base=v;else if(k==="minPax")r.minPax=Math.max(1,Math.floor(v)||50);else{const [t,c]=k.split("|");r[t][c]=v}
+    if(k==="base")r.base=v;else if(k==="minPax")r.minPax=Math.max(1,Math.floor(v)||50);else if(k==="customMinPax")r.customMinPax=Math.max(1,Math.floor(v)||30);else if(k==="customMinPerHead")r.customMinPerHead=v;else{const [t,c]=k.split("|");r[t][c]=v}
   });
   $("#ratesMsg").textContent="Saving…";
   const res=await api("saveRates",{rates:r});
-  if(res.ok){state.rates=res.rates||r;$("#ratesMsg").textContent="";toast("Rates saved")}
+  if(res.ok){applyRates(res.rates||r);$("#ratesMsg").textContent="";toast("Rates saved")}
   else $("#ratesMsg").textContent=res.error||"Couldn't save rates.";
 }
 
@@ -2585,7 +2593,7 @@ function downloadExcel(){
 }
 
 /* ============ START ============ */
-function applyRates(r){if(!r)return;state.rates={base:Number(r.base)||0,minPax:Number(r.minPax)||50,standard:{...DEFAULT_RATES.standard,...(r.standard||{})},premium:{...DEFAULT_RATES.premium,...(r.premium||{})}}}
+function applyRates(r){if(!r)return;state.rates={base:Number(r.base)||0,minPax:Number(r.minPax)||50,customMinPax:Math.max(1,Math.floor(Number(r.customMinPax))||DEFAULT_RATES.customMinPax),customMinPerHead:(r.customMinPerHead!=null&&r.customMinPerHead!==""&&isFinite(Number(r.customMinPerHead)))?Math.max(0,Number(r.customMinPerHead)):DEFAULT_RATES.customMinPerHead,standard:{...DEFAULT_RATES.standard,...(r.standard||{})},premium:{...DEFAULT_RATES.premium,...(r.premium||{})}}}
 function route(){
   if(location.hash==="#staff"){go(state.isStaff?"admin":"login");if(state.isStaff&&!state.inqLoaded)loadInquiries()}
   else{const h=location.hash.slice(1);const v=Object.keys(PAGE_HASH).find(k=>PAGE_HASH[k]===h);
