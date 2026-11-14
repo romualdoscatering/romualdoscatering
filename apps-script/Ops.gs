@@ -30,6 +30,8 @@ function handleOps(req) {
     case 'opsWrite': return opsWrite(me, req.ops);
     case 'sheetSync': return sheetSync(me, req);
     case 'archiveSync': return archiveSync(me);
+    case 'opsUpload': return opsUpload(me, req);
+    case 'opsFile': return opsFile(me, req);
     default:         return { ok: false, error: 'Unknown action.' };
   }
 }
@@ -144,6 +146,15 @@ function checkStaff(coll, before, after) {
     if (after.status !== before.status && ['approved', 'rejected'].indexOf(after.status) >= 0) forbid('Only Admin accounts can approve or reject requisitions.');
     if (before.status === 'approved' && after.status === 'cancelled') forbid('Only Admin accounts can cancel an approved requisition.');
   }
+  if (coll === 'events') {
+    if (!same(before.contract, after.contract) || !same(before.pricing, after.pricing)) forbid('Only Admin accounts can set the contract price.');
+    const rb = before.receipts || {}, ra = after.receipts || {};
+    Object.keys(rb).concat(Object.keys(ra)).forEach(function (k) {
+      const b = rb[k] || null, a = ra[k] || null;
+      if (!same(b && b.verified, a && a.verified)) forbid('Only Admin accounts can verify receipts.');
+      if (b && b.verified && !same(b, a)) forbid('A verified receipt can only be changed or removed by an Admin.');
+    });
+  }
   if (coll === 'events' && before.archive && !after.archive) forbid('Only Admin accounts can take an event out of the archive.');
   if (coll === 'events' && !same((before.archive || {}).billed, (after.archive || {}).billed)) forbid('Only Admin accounts can record the amount billed.');
   if (coll === 'events' && !same((before.archive || {}).payment, (after.archive || {}).payment)) forbid('Only Admin accounts can record payments.');
@@ -183,6 +194,14 @@ function opsWrite(me, ops) {
       if (!before && coll === 'prs') after.requestedByUser = me.username;
       if (coll === 'prs' && before && after.status !== before.status && (after.status === 'approved' || after.status === 'rejected')) { after.approverUser = me.username; after.approvedAt = now; }
       if (after.status === 'void' && (!before || before.status !== 'void')) { after.voidBy = me.username; after.voidAt = now; }
+      if (coll === 'events' && isObj(after.receipts)) {
+        Object.keys(after.receipts).forEach(function (k) {
+          const a = after.receipts[k], b = before && isObj(before.receipts) ? before.receipts[k] : null;
+          if (!a) { delete after.receipts[k]; return; }
+          if (a.verified && !(b && b.verified)) { a.verified.user = me.username; a.verified.at = now; }
+          if (!b) { a.addedBy = me.username; a.at = now; }
+        });
+      }
       if (!admin) checkStaff(coll, before, after);
       const json = JSON.stringify(after);
       if (json.length > OPS.MAX_DOC_CHARS) forbid('This record is too large. Split it into smaller ones.');
@@ -552,4 +571,38 @@ function archiveSync(me) {
     try { if (rows.length) main.getRange(2, 21, rows.length, 1).setNumberFormat('₱#,##0.00'); } catch (e) {}
     return { ok: true, count: rows.length, url: ss.getUrl() + '#gid=' + main.getSheetId() };
   });
+}
+
+
+/* ---------------- Event receipts (private files in Drive, viewed through the app) ---------------- */
+function receiptsFolder() {
+  const props = PropertiesService.getScriptProperties(), id = props.getProperty('RECEIPTS_FOLDER_ID');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) {} }
+  const parent = DriveApp.getFolderById(CONFIG.APP_FOLDER_ID), it = parent.getFoldersByName('Event Receipts');
+  const f = it.hasNext() ? it.next() : parent.createFolder('Event Receipts');
+  props.setProperty('RECEIPTS_FOLDER_ID', f.getId());
+  return f;
+}
+function opsUpload(me, req) {
+  const b64 = String(req.data || ''), mime = req.mime === 'application/pdf' ? 'application/pdf' : 'image/jpeg';
+  if (!b64 || b64.length > 20 * 1024 * 1024) return { ok: false, error: 'The file is missing or too large.' };
+  let bytes; try { bytes = Utilities.base64Decode(b64); } catch (e) { return { ok: false, error: 'The file could not be read.' }; }
+  const jpg = bytes.length > 3 && (bytes[0] & 255) === 0xFF && (bytes[1] & 255) === 0xD8;
+  const pdf = bytes.length > 4 && bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
+  if (mime === 'image/jpeg' ? !jpg : !pdf) return { ok: false, error: 'Only photos (JPEG) and PDF receipts are accepted.' };
+  const safe = String(req.name || 'receipt').replace(/[^\w &'.,()-]/g, '').slice(0, 60).trim() || 'receipt';
+  const name = Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd HHmmss') + ' ' + safe + (mime === 'application/pdf' ? '.pdf' : '.jpg');
+  const file = receiptsFolder().createFile(Utilities.newBlob(bytes, mime, name));
+  try { file.setDescription('Event ' + String(req.eventId || '').slice(0, 40) + ' · uploaded by ' + me.username); } catch (e) {}
+  return { ok: true, id: file.getId() };
+}
+function opsFile(me, req) {
+  const id = String(req.id || '');
+  if (!/^[A-Za-z0-9_-]{10,80}$/.test(id)) return { ok: false, error: 'Invalid file.' };
+  let f; try { f = DriveApp.getFileById(id); } catch (e) { return { ok: false, error: 'File not found.' }; }
+  const folderId = receiptsFolder().getId(), ps = f.getParents(); let inside = false;
+  while (ps.hasNext()) { if (ps.next().getId() === folderId) { inside = true; break; } }
+  if (!inside) return { ok: false, error: 'Not a receipt file.' };
+  const blob = f.getBlob();
+  return { ok: true, mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
 }

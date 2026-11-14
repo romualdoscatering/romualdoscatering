@@ -359,6 +359,7 @@ function render() {
     <datalist id="dl-units">${UNITS.map(s => `<option value="${s}">`).join('')}</datalist>`;
   $('#view').innerHTML = banner + (V[tab] ? V[tab]() : '') + dl;
   $('#view').querySelectorAll('[data-b]').forEach(el => { const v = getPath(D, el.dataset.b); if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? ''; });
+  if ($('#view [data-live="evtot"]')) live();
 }
 function live() {
   document.querySelectorAll('#view [data-live]').forEach(el => {
@@ -372,6 +373,7 @@ function live() {
     else if (k === 'cvar') { const l = D.count.lines[a]; if (l.actual === '' || l.actual == null) h = ''; else { const v = num(l.actual) - l.system; h = `<span class="${v < -0.001 ? 'bad-t' : v > 0.001 ? 'ok-t' : 'mut'}">${v > 0 ? '+' : ''}${fq(v)}</span>`; } }
     else if (k === 'osum') { const d = D.sheet, kk = d.kind || 'catering', o = orderSum(d.menu, kk), px = num(d.pax);
       h = !o.main && !o.drink && !o.addon ? '' : `Counts as <b>${esc(orderLabel(o, kk) || '0')}</b>${o.drink ? ' · ' + plural(o.drink, 'drink') : ''}${kk === 'packs' && px && o.main !== px ? ` <span class="bad-t">· ${o.main} packs vs ${px} pax, please check</span>` : ''}`; }
+    else if (k === 'evtot') { const T = pricingTotal(D.evp || {}); h = `<div class="small mut">${peso(num(D.evp.perHead))} × ${num(D.evp.pax)} guests = ${peso(T.base)}${T.extras ? ' + charges ' + peso(T.extras) : ''}${T.disc ? ' − discount ' + peso(T.disc) : ''}${T.custom ? ' · <b>custom total used</b>' : ''}</div><div style="font-size:24px;font-weight:700">Contract: ${peso(T.total)}</div>`; }
     else if (k === 'counted') h = D.count.lines.filter(l => l.actual !== '' && l.actual != null).length;
     if (h !== undefined) el.innerHTML = h;
   });
@@ -1170,33 +1172,174 @@ V.events = () => {
   </div>`;
 };
 function eventDetail(e) {
-  const s = eventStats(e);
-  if (!D.plan || D.plan.eventId !== e.id) D.plan = {eventId: e.id, book: 'C', lines: (e.plan || []).length ? JSON.parse(JSON.stringify(e.plan)) : [{itemId: '', qty: ''}]};
-  const rows = Object.entries(s.items).filter(([id]) => S.items[id]).sort((a, b) => iname(a[0]).localeCompare(iname(b[0])));
-  const kp = (l, v, cls = '') => `<div class="kpi ${cls}"><span>${l}</span><b>${v}</b></div>`;
+  const s = eventStats(e), R = rcptStats(e), sh = e.sheet || {};
+  const kp = (l, v, cls = '', sub = '') => `<div class="kpi ${cls}"><span>${l}</span><b>${v}</b>${sub ? `<div class="small mut" style="margin-top:2px">${sub}</div>` : ''}</div>`;
+  const other = r2(s.used + s.exp), cost = r2(R.total + other), contract = num(e.contract), margin = contract - cost;
+  const paxN = num(e.pax || sh.pax);
+  if (!D.evp || D.evp.eventId !== e.id) D.evp = pricingDraft(e);
+  const P = D.evp, pin = (k, ph = '', ex = '') => `<input data-b="evp.${k}" placeholder="${esc(ph)}" ${ex}>`;
+  const list = Object.entries(e.receipts || {}).filter(([, r]) => r).sort((a, b) => String(b[1].date || '').localeCompare(String(a[1].date || '')) || (b[1].at || 0) - (a[1].at || 0));
+  const rrow = ([rid, r]) => `<tr><td>${fmtD(r.date)}<div class="small mut">${esc(r.by || '')}</div></td><td><b>${esc(r.store || 'Receipt')}</b>${r.note ? `<div class="small mut">${esc(r.note)}</div>` : ''}<div class="small"><a href="#" data-act="rcptView" data-arg="${rid}">${r.mime === 'application/pdf' ? '📄 View PDF' : '🧾 View receipt'}</a></div></td>
+    <td class="n"><b>${peso(r.amount)}</b>${r.ocrAmount != null && r.ocrAmount !== '' && Math.abs(num(r.ocrAmount) - num(r.amount)) > 0.005 ? `<div class="small mut">auto-read ${peso(r.ocrAmount)}, corrected</div>` : r.ocrAmount != null && r.ocrAmount !== '' ? '<div class="small mut">auto-read</div>' : '<div class="small mut">typed in</div>'}</td>
+    <td>${r.verified ? `<span class="chip ok">✓ verified</span><div class="small mut">${esc(r.verified.name || r.verified.user || '')}</div>` : '<span class="chip warn">to check</span>'}</td>
+    <td class="row">${!r.verified || S.isAdmin ? `<button class="sm" data-act="rcptEdit" data-arg="${rid}">Edit</button>` : ''}${S.isAdmin ? (r.verified ? `<button class="sm ghost" data-act="rcptVerify" data-arg="${rid}|0">Undo check</button>` : `<button class="sm" style="background:var(--ok);border-color:var(--ok);color:#fff" data-act="rcptVerify" data-arg="${rid}|1">✓ Verify</button>`) : ''}${!r.verified || S.isAdmin ? `<button class="sm ghost" data-act="rcptDel" data-arg="${rid}" title="Remove" style="color:#9B1C1C">✕</button>` : ''}</td></tr>`;
   return `<div class="row"><button class="sm" data-act="closeEvent">‹ All events</button><span class="spacer"></span><button class="sm" data-act="editSheet" data-arg="${e.id}">Event sheet</button><button class="sm pri" data-act="pdfSheet" data-arg="${e.id}">PDF</button></div>
   <h2 style="margin-top:10px">${esc(e.name)}</h2>
   <p class="lede">${fmtD(e.date)} · ${esc(e.client || 'no client')} · ${esc(e.pax || '?')} pax${e.venue ? ' · ' + esc(e.venue) : ''} · <span class="chip ${e.status === 'closed' ? 'mut' : e.status === 'done' ? 'ok' : 'info'}">${e.status}</span></p>
-  <div class="card"><div class="kpis">${kp('Contract', peso(s.contract))}${kp('Ingredients used', peso(s.used))}${kp('Event expenses', peso(s.exp))}${kp('Total cost', peso(s.cost))}${kp('Gross margin', s.contract ? peso(s.margin) + ` <small class="small">${s.pct.toFixed(1)}%</small>` : '—', s.margin < 0 ? 'bad' : 'ok')}${kp('Cost per pax', s.perPax != null ? peso(s.perPax) : '—')}</div>
-   <p class="small mut" style="margin:6px 0 10px">Purchases charged to this event: ${peso(s.purch)}. Ingredients used = issued to the event − leftovers returned, valued at purchase cost.</p>
-   <div class="row">${e.status === 'planned' ? '<button class="sm" data-act="evStatus" data-arg="done">Mark event done</button>' : ''}${e.status === 'done' ? '<button class="sm" data-act="evStatus" data-arg="closed">Close event (lock)</button><button class="sm ghost" data-act="evStatus" data-arg="planned">Reopen</button>' : ''}${e.status === 'closed' ? '<button class="sm ghost" data-act="evStatus" data-arg="done">Reopen</button>' : ''}<button class="sm" data-act="editEv">Edit details</button><button class="sm" data-act="issueEvent">Issue all received purchases to this event</button></div>
+  <div class="card"><div class="kpis">${kp('Contract', peso(contract), '', e.pricing?.perHead ? peso(e.pricing.perHead) + '/guest' : '')}${kp('Receipts', peso(R.total), '', R.n ? `${R.n} receipt${R.n === 1 ? '' : 's'} · ${R.todo ? R.todo + ' to check' : 'all checked'}` : 'none yet')}${other ? kp('Other recorded costs', peso(other), '', 'stock issued & expenses') : ''}${kp('Total cost', peso(cost))}${kp('Gross margin', contract ? peso(margin) + ` <small class="small">${(margin / contract * 100).toFixed(1)}%</small>` : '—', margin < 0 ? 'bad' : 'ok')}${kp('Cost per guest', paxN ? peso(cost / paxN) : '—')}</div>
+   <div class="row" style="margin-top:10px">${e.status === 'planned' ? '<button class="sm" data-act="evStatus" data-arg="done">Mark event done</button>' : ''}${e.status === 'done' ? '<button class="sm" data-act="evStatus" data-arg="closed">Close event (lock)</button><button class="sm ghost" data-act="evStatus" data-arg="planned">Reopen</button>' : ''}${e.status === 'closed' ? '<button class="sm ghost" data-act="evStatus" data-arg="done">Reopen</button>' : ''}<button class="sm" data-act="editEv">Edit details</button></div>
    ${e.notes ? `<p class="small" style="white-space:pre-wrap;margin-bottom:0">${esc(e.notes)}</p>` : ''}
   </div>
-  <div class="card"><div class="row"><h3>Menu plan — ingredient quantities</h3><span class="spacer"></span><button class="sm" data-act="marketList">Market list</button></div>
-   <p class="small mut" style="margin-top:0">Enter the total quantity of each ingredient this event needs. "To buy" subtracts what is already in the catering storeroom.</p>
-   ${linesEditor('plan', {stock: true, stockBook: 'C', plan: true, qtyLabel: 'Planned'})}
-   <div class="row end" style="margin-top:10px"><button class="pri" data-act="savePlan">Save plan</button></div>
+  <div class="card"><div class="row"><h3 style="margin:0">Contract price</h3><span class="spacer"></span>${S.isAdmin ? '' : '<span class="small mut">Set by Admins</span>'}</div>
+   ${S.isAdmin ? `<p class="small mut" style="margin:4px 0 10px">Prices vary per guest: enter this client's rate. Add any extra charges or a discount, or type a custom total.</p>
+   <div class="grid">
+    <label>Price per guest ₱${pin('perHead', 'e.g. 650', 'type="number" inputmode="decimal" min="0" step="any"')}</label>
+    <label>Number of guests${pin('pax', '', 'type="number" inputmode="numeric" min="0"')}</label>
+    <label>Discount ₱${pin('discount', '0', 'type="number" inputmode="decimal" min="0" step="any"')}</label>
+   </div>
+   <div class="small" style="font-weight:600;margin:6px 0 4px">Extra charges <span class="mut" style="font-weight:400">(transport, equipment rental, additional dishes…)</span></div>
+   ${P.extras.map((x, i) => `<div class="row" style="gap:8px;margin-bottom:6px"><input data-b="evp.extras.${i}.label" placeholder="What for" style="flex:2"><input data-b="evp.extras.${i}.amount" type="number" inputmode="decimal" min="0" step="any" placeholder="₱" style="flex:1"><button class="sm ghost" data-act="evpRmExtra" data-arg="${i}">✕</button></div>`).join('')}
+   <button class="sm" data-act="evpAddExtra">＋ Add a charge</button>
+   <div class="grid" style="margin-top:10px">
+    <label>Custom total ₱ <span class="small mut">(optional: replaces the computed total)</span>${pin('custom', 'Leave blank to use the computed total', 'type="number" inputmode="decimal" min="0" step="any"')}</label>
+    <label style="grid-column:span 2">Pricing notes${pin('note', 'e.g. ₱650/guest for 20, ₱600/guest beyond 20; 50% down paid Nov 2')}</label>
+   </div>
+   <div class="row" style="margin-top:10px;align-items:center"><div data-live="evtot"></div><span class="spacer"></span><button class="pri" data-act="savePricing">Save contract price</button></div>`
+   : `<p style="margin:8px 0 0">${contract ? `<b>${peso(contract)}</b>${e.pricing?.perHead ? ` · ${peso(e.pricing.perHead)} × ${esc(e.pricing.pax)} guests` : ''}` : '<span class="mut">Not set yet.</span>'}${e.pricing?.note ? `<div class="small mut">${esc(e.pricing.note)}</div>` : ''}</p>`}
   </div>
-  <div class="card"><h3>Planned vs bought vs used</h3>
-   ${rows.length ? `<div class="tw"><table><thead><tr><th>Item</th><th>Unit</th><th class="n">Planned</th><th class="n">Bought</th><th class="n">Issued</th><th class="n">Returned</th><th class="n">Used</th><th class="n">Used vs plan</th></tr></thead><tbody>
-    ${rows.map(([id, x]) => { const used = x.issued - x.returned; const dv = x.planned ? (used - x.planned) / x.planned * 100 : null; return `<tr><td>${esc(iname(id))}</td><td class="mut">${esc(iunit(id))}</td><td class="n">${x.planned ? fq(x.planned) : '—'}</td><td class="n">${fq(x.bought)}${x.pending ? `<div class="small warn-t">+${fq(x.pending)} unreceived</div>` : ''}</td><td class="n">${fq(x.issued)}</td><td class="n">${fq(x.returned)}</td><td class="n"><b>${fq(used)}</b></td><td class="n ${dv != null && dv > 10 ? 'bad-t' : dv != null && dv < -10 ? 'ok-t' : ''}">${dv == null ? (used ? '<span class="chip warn">not planned</span>' : '') : (dv > 0 ? '+' : '') + dv.toFixed(0) + '%'}</td></tr>`; }).join('')}
-   </tbody></table></div>` : '<div class="empty">Nothing planned, bought or issued yet.</div>'}
+  <div class="card"><div class="row"><h3 style="margin:0">Receipts for this event</h3><span class="spacer"></span><button class="pri" data-act="rcptAdd">＋ Upload receipts</button></div>
+   <p class="small mut" style="margin:4px 0 10px">Upload photos or PDFs of receipts for the ingredients and items used for this client. The total is read automatically; check it and correct it if needed. Admins and owners mark each receipt ✓ verified after double-checking.</p>
+   ${list.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Store / supplier</th><th class="n">Amount</th><th>Check</th><th></th></tr></thead><tbody>${list.map(rrow).join('')}</tbody>
+    <tfoot><tr><td></td><td><b>Total</b>${R.todo ? `<div class="small warn-t">${peso(R.unverified)} not yet verified</div>` : ''}</td><td class="n"><b>${peso(R.total)}</b></td><td colspan="2"></td></tr></tfoot></table></div>` : '<div class="empty">No receipts yet. Tap “Upload receipts” to add photos from your phone or computer.</div>'}
+   <input type="file" id="rcptFile" accept="image/*,application/pdf" multiple style="display:none">
   </div>
-  <div class="two">
-   <div class="card"><h3>Purchases for this event</h3>${s.ps.length ? `<table><tbody>${s.ps.map(p => `<tr class="click" data-act="viewP" data-arg="${p.id}"><td>${fmtD(p.date)}</td><td>${esc(p.supplier)}<div class="small mut">${esc(p.buyer)}</div></td><td class="n">${peso(p.total)}</td><td>${p.status === 'pending' ? '<span class="chip warn">to receive</span>' : '<span class="chip ok">received</span>'}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">None</div>'}</div>
-   <div class="card"><h3>Expenses for this event</h3>${s.es.length ? `<table><tbody>${s.es.map(x => `<tr><td>${fmtD(x.date)}</td><td>${esc(x.cat)}<div class="small mut">${esc(x.desc)}</div></td><td class="n">${peso(x.amount)}</td></tr>`).join('')}</tbody></table>` : '<div class="empty">None</div>'}</div>
-  </div>`;
+  ${s.ps.length || s.es.length ? `<div class="two">
+   ${s.ps.length ? `<div class="card"><h3>Purchases charged to this event</h3><table><tbody>${s.ps.map(p => `<tr class="click" data-act="viewP" data-arg="${p.id}"><td>${fmtD(p.date)}</td><td>${esc(p.supplier)}<div class="small mut">${esc(p.buyer)}</div></td><td class="n">${peso(p.total)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+   ${s.es.length ? `<div class="card"><h3>Expenses charged to this event</h3><table><tbody>${s.es.map(x => `<tr><td>${fmtD(x.date)}</td><td>${esc(x.cat)}<div class="small mut">${esc(x.desc)}</div></td><td class="n">${peso(x.amount)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+  </div>` : ''}`;
 }
+/* ---- contract pricing ---- */
+function pricingDraft(e) {
+  const p = e.pricing || {}, sh = e.sheet || {}, pax = p.pax ?? (e.pax || sh.pax || '');
+  return {eventId: e.id, perHead: String(p.perHead ?? (num(e.contract) && num(pax) ? r2(num(e.contract) / num(pax)) : '')), pax: String(pax ?? ''), discount: String(p.discount || ''),
+    extras: (p.extras || []).map(x => ({label: x.label || '', amount: String(x.amount ?? '')})), custom: String(p.custom ?? ''), note: p.note || ''};
+}
+function pricingTotal(P) {
+  const base = r2(num(P.perHead) * num(P.pax)), extras = r2((P.extras || []).reduce((a, x) => a + num(x.amount), 0)), disc = r2(num(P.discount));
+  const computed = r2(Math.max(0, base + extras - disc)), custom = String(P.custom ?? '').trim() !== '';
+  return {base, extras, disc, computed, custom, total: custom ? r2(num(P.custom)) : computed};
+}
+ACT.evpAddExtra = () => { D.evp.extras.push({label: '', amount: ''}); render(); };
+ACT.evpRmExtra = i => { D.evp.extras.splice(+i, 1); render(); };
+ACT.savePricing = () => {
+  const P = D.evp, e = S.events[P.eventId]; if (!e) return; const T = pricingTotal(P);
+  const pricing = {perHead: num(P.perHead), pax: num(P.pax), discount: num(P.discount), extras: P.extras.filter(x => x.label.trim() || num(x.amount)).map(x => ({label: x.label.trim(), amount: num(x.amount)})), custom: T.custom ? num(P.custom) : '', note: P.note.trim(), by: S.me?.name || S.me?.username || '', at: Date.now()};
+  guard(async () => { await upd('events/' + e.id, {pricing, contract: T.total, pax: num(P.pax) || e.pax || ''}); D.evp = null; }, 'Contract price saved');
+};
+/* ---- receipts: upload, auto-read total (OCR), human check ---- */
+function rcptStats(e) {
+  const L = Object.values(e.receipts || {}).filter(Boolean);
+  const total = r2(L.reduce((a, r) => a + num(r.amount), 0)), unverified = r2(L.filter(r => !r.verified).reduce((a, r) => a + num(r.amount), 0));
+  return {n: L.length, total, unverified, todo: L.filter(r => !r.verified).length};
+}
+let TESS = null;
+function loadTesseract() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  return TESS ||= new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'; sc.onload = () => ok(window.Tesseract); sc.onerror = () => { TESS = null; no(new Error('Could not load the receipt reader')); }; document.head.appendChild(sc); });
+}
+/* Finds the most likely "total" on a receipt. Prefers lines saying TOTAL / AMOUNT DUE / NET, skips subtotal, VAT, cash, change. */
+function parseReceipt(text) {
+  const lines = String(text || '').split(/\n/).map(l => l.trim()).filter(Boolean);
+  const amt = l => { const m = l.replace(/[oO](?=\d)|(?<=\d)[oO]/g, '0').replace(/(\d)\s+(?=\d{3}\b)/g, '$1').match(/(?:₱|P|PHP|Php)?\s*(\d{1,3}(?:[,\s]\d{3})+|\d+)(?:[.,](\d{2}))\b/g); if (!m) return null;
+    const v = m.map(x => { const n = x.replace(/[^\d.,]/g, ''); const t = n.replace(/[.,](\d{2})$/, '.$1').replace(/[,\s](?=\d{3})/g, ''); return parseFloat(t); }).filter(x => isFinite(x) && x > 0 && x < 10000000); return v.length ? v[v.length - 1] : null; };
+  const BAD = /sub\s*-?\s*total|vat(?!.*(incl|total))|vatable|tax|cash|change|tender|discount|disc\.|points|qty|items?\s*count|no\.? of items|savings|card|gcash|paid/i;
+  let best = null, score = -1;
+  lines.forEach((l, i) => { const u = l.toUpperCase(); let sc = -1;
+    if (/GRAND\s*TOTAL|AMOUNT\s*DUE|TOTAL\s*AMOUNT\s*DUE|TOTAL\s*DUE|NET\s*AMOUNT|AMOUNT\s*PAYABLE/.test(u)) sc = 3;
+    else if (/\bTOTAL\b|TOTAL\s*:/.test(u) && !BAD.test(l)) sc = 2;
+    else if (/\bAMOUNT\b/.test(u) && !BAD.test(l)) sc = 1;
+    if (sc < 0) return; let v = amt(l); if (v == null && lines[i + 1]) v = amt(lines[i + 1]);
+    if (v != null && (sc > score || (sc === score && v > best))) { best = v; score = sc; } });
+  if (best == null) { const all = lines.filter(l => !BAD.test(l)).map(amt).filter(v => v != null); if (all.length) best = Math.max(...all); }
+  const dm = String(text).match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/) || null; let date = '';
+  if (dm) { let [, a, b, y] = dm; y = y.length === 2 ? '20' + y : y; const mm = +a <= 12 ? a : b, dd = +a <= 12 ? b : a; if (+mm >= 1 && +mm <= 12 && +dd >= 1 && +dd <= 31) date = `${y}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`; if (date > today() || date < '2020-01-01') date = ''; }
+  const store = (lines.find(l => /[A-Za-z]{3,}/.test(l) && !/receipt|invoice|official|tin\b|vat reg|address|tel|date|time|cashier|\d{3,}/i.test(l)) || '').replace(/[^\w&'.,\- ]/g, '').trim().slice(0, 60);
+  return {total: best == null ? null : r2(best), date, store};
+}
+function shrinkImage(file, max = 1800, q = 0.82) {
+  return new Promise((ok, no) => { const img = new Image(), u = URL.createObjectURL(file);
+    img.onload = () => { const k = Math.min(1, max / Math.max(img.width, img.height)), c = document.createElement('canvas'); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(u); ok(c.toDataURL('image/jpeg', q)); };
+    img.onerror = () => { URL.revokeObjectURL(u); no(new Error('That file is not a photo the browser can read.')); }; img.src = u; });
+}
+const fileB64 = f => new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result)); r.onerror = () => no(new Error('Could not read the file.')); r.readAsDataURL(f); });
+ACT.rcptAdd = () => { const inp = $('#rcptFile'); if (!inp) return; inp.value = ''; inp.onchange = () => { const fs = [...inp.files]; if (fs.length) rcptQueue(D.ui.eventId, fs); }; inp.click(); };
+async function rcptQueue(eventId, files) { for (let i = 0; i < files.length; i++) { const done = await rcptOne(eventId, files[i], i + 1, files.length); if (done === 'stop') break; } }
+function rcptOne(eventId, file, n, of) {
+  return new Promise(resolve => {
+    const pdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+    if (!pdf && !/^image\//.test(file.type)) { toast(file.name + ' is not a photo or PDF.', true); return resolve('next'); }
+    if (file.size > 15 * 1024 * 1024) { toast(file.name + ' is too large (max 15 MB).', true); return resolve('next'); }
+    const url = pdf ? '' : URL.createObjectURL(file); let ocr = null, dataP = pdf ? fileB64(file) : shrinkImage(file), finished = false;
+    const end = r => { if (finished) return; finished = true; if (url) URL.revokeObjectURL(url); resolve(r); };
+    openModal(`<div class="row"><h3 style="margin:0">Add receipt${of > 1 ? ` <span class="small mut">(${n} of ${of})</span>` : ''}</h3><span class="spacer"></span><button class="sm ghost" data-mact="stop">✕</button></div>
+     <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:10px" class="rcpt-grid">
+      <div style="background:#F3EFE6;border-radius:10px;min-height:200px;max-height:460px;overflow:auto;display:flex;align-items:flex-start;justify-content:center">${pdf ? `<div class="empty" style="padding:30px">📄 ${esc(file.name)}<div class="small mut">PDFs are stored as is; type the total.</div></div>` : `<img src="${url}" alt="Receipt" style="width:100%;display:block">`}</div>
+      <div><div id="r-ocr" class="alert info" style="margin:0 0 10px">${pdf ? 'Type the total from the receipt.' : '🔎 Reading the total from the receipt…'}</div>
+       <label>Total amount ₱<input id="r-amt" type="number" inputmode="decimal" min="0" step="any" placeholder="${pdf ? '0.00' : 'Reading…'}" style="font-size:20px;font-weight:700"></label>
+       <label>Store / supplier<input id="r-store" list="dl-sup" autocapitalize="words"></label>
+       <label>Receipt date<input id="r-date" type="date" value="${today()}"></label>
+       <label>Note <span class="small mut">(optional)</span><input id="r-note" placeholder="e.g. chicken & pork for Saturday's buffet"></label>
+       <p class="small mut" style="margin:6px 0 0">Please compare the amount with the receipt before saving. An Admin will double-check it.</p></div></div>
+     <style>@media(max-width:700px){.rcpt-grid{grid-template-columns:1fr!important}}</style>
+     <div class="row end" style="margin-top:14px">${of > 1 && n < of ? '<button data-mact="skip">Skip this one</button>' : ''}<button data-mact="stop">Cancel</button><button class="pri" data-mact="save" id="r-save">Save receipt</button></div>`, {
+      stop: () => { closeModal(); end('stop'); }, skip: () => { closeModal(); end('next'); },
+      save: async b => {
+        const amt = $('#r-amt').value; if (amt === '' || !(num(amt) > 0)) { $('#r-amt').focus(); return toast('Enter the total amount on the receipt.', true); }
+        b.disabled = true; b.textContent = 'Uploading…';
+        try {
+          const data = await dataP, mime = pdf ? 'application/pdf' : 'image/jpeg', e = S.events[eventId];
+          const up = await api('opsUpload', {data: data.split(',')[1], mime, name: (e?.sheet?.client || e?.name || 'event') + ' ' + ($('#r-store').value || 'receipt'), eventId});
+          if (!up.ok) throw new Error(up.error || 'Upload failed');
+          const rid = 'r' + genId();
+          const rec = {fileId: up.id, mime, amount: r2(num(amt)), ocrAmount: ocr && ocr.total != null ? ocr.total : '', store: $('#r-store').value.trim(), date: $('#r-date').value || today(), note: $('#r-note').value.trim(), by: S.me?.name || S.me?.username || '', at: Date.now()};
+          await upd('events/' + eventId, {receipts: {[rid]: rec}});
+          closeModal(); toast('Receipt saved'); render(); end('next');
+        } catch (err) { b.disabled = false; b.textContent = 'Save receipt'; toast(err.message, true); }
+      }});
+    if (pdf) return;
+    loadTesseract().then(T => T.recognize(file, 'eng', {logger: m => { const el = $('#r-ocr'); if (el && m.status === 'recognizing text') el.textContent = '🔎 Reading the total… ' + Math.round(m.progress * 100) + '%'; }}))
+      .then(res => { if (finished) return; ocr = parseReceipt(res.data.text); const el = $('#r-ocr'), a = $('#r-amt'); if (!el) return;
+        if (ocr.total != null) { if (!a.value) a.value = ocr.total.toFixed(2); el.className = 'alert ok'; el.innerHTML = `Detected total: <b>${peso(ocr.total)}</b>. Please check it against the receipt and correct it if needed.`; }
+        else { el.className = 'alert warn'; el.textContent = "Couldn't find the total on this photo. Please type it in."; }
+        if (a) a.placeholder = '0.00'; if (ocr.store && !$('#r-store').value) $('#r-store').value = ocr.store; if (ocr.date) $('#r-date').value = ocr.date; })
+      .catch(err => { const el = $('#r-ocr'); if (el) { el.className = 'alert warn'; el.textContent = 'Auto-read is not available right now (' + err.message + '). Please type the total.'; } const a = $('#r-amt'); if (a) a.placeholder = '0.00'; });
+  });
+}
+const FILECACHE = {};
+ACT.rcptView = async rid => {
+  const e = S.events[D.ui.eventId], r = e?.receipts?.[rid]; if (!r) return;
+  openModal(`<div class="row"><h3 style="margin:0">${esc(r.store || 'Receipt')} · ${peso(r.amount)}</h3><span class="spacer"></span><button class="sm ghost" data-mact="close">✕</button></div><div id="r-view" class="empty" style="margin-top:10px">Loading…</div>`, {});
+  try {
+    const f = FILECACHE[r.fileId] || (FILECACHE[r.fileId] = await api('opsFile', {id: r.fileId}));
+    if (!f.ok) { delete FILECACHE[r.fileId]; throw new Error(f.error || 'Could not open the file'); }
+    const box = $('#r-view'); if (!box) return; box.className = '';
+    if (f.mime === 'application/pdf') { const bin = atob(f.data), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i); const u = URL.createObjectURL(new Blob([u8], {type: 'application/pdf'})); box.innerHTML = `<iframe src="${u}" style="width:100%;height:70vh;border:0"></iframe><a href="${u}" download="receipt.pdf">Download PDF</a>`; }
+    else box.innerHTML = `<img src="data:${esc(f.mime)};base64,${f.data}" alt="Receipt" style="width:100%;max-height:75vh;object-fit:contain;display:block">`;
+  } catch (err) { const box = $('#r-view'); if (box) box.textContent = err.message; }
+};
+ACT.rcptEdit = rid => {
+  const e = S.events[D.ui.eventId], r = e?.receipts?.[rid]; if (!r) return;
+  openModal(`<h3 style="margin-top:0">Edit receipt</h3><div class="grid"><label>Total amount ₱<input id="r-amt" type="number" inputmode="decimal" min="0" step="any" value="${esc(r.amount)}"></label><label>Store / supplier<input id="r-store" list="dl-sup" value="${esc(r.store)}"></label><label>Receipt date<input id="r-date" type="date" value="${esc(r.date)}"></label></div>
+   <label>Note<input id="r-note" value="${esc(r.note)}"></label>${r.ocrAmount !== '' && r.ocrAmount != null ? `<p class="small mut">Auto-read amount: ${peso(r.ocrAmount)}</p>` : ''}${mBtns()}`, {
+    save: () => { if (!(num($('#r-amt').value) > 0)) return toast('Enter the amount.', true);
+      const ch = {amount: r2(num($('#r-amt').value)), store: $('#r-store').value.trim(), date: $('#r-date').value || r.date, note: $('#r-note').value.trim(), editedBy: S.me?.name || S.me?.username || '', editedAt: Date.now()};
+      closeModal(); guard(async () => { await upd('events/' + e.id, {receipts: {[rid]: ch}}); }, 'Receipt updated'); }});
+};
+ACT.rcptVerify = arg => { const [rid, on] = arg.split('|'); const e = S.events[D.ui.eventId]; if (!e) return;
+  guard(async () => { await upd('events/' + e.id, {receipts: {[rid]: {verified: on === '1' ? {name: S.me?.name || S.me?.username || '', at: Date.now()} : null}}}); }, on === '1' ? 'Receipt verified' : 'Check undone'); };
+ACT.rcptDel = rid => { const e = S.events[D.ui.eventId], r = e?.receipts?.[rid]; if (!r || !confirm(`Remove the ${peso(r.amount)} receipt${r.store ? ' from ' + r.store : ''}?`)) return;
+  guard(async () => { await upd('events/' + e.id, {receipts: {[rid]: null}}); }, 'Receipt removed'); };
 
 /* ============ REPORTS ============ */
 V.reports = () => {
@@ -1682,10 +1825,10 @@ ACT.viewCount = (id, fallback) => {
 
 ACT.saveEv = () => {
   const d = D.event; if (!d.name.trim() || !d.date) return toast('Enter the event name and date.', true);
-  guard(async () => { const id = await addDoc('events', {name: d.name.trim(), client: d.client.trim(), date: d.date, pax: num(d.pax) || '', contract: r2(num(d.contract)), venue: d.venue.trim(), notes: d.notes.trim(), status: 'planned', plan: []}); D.event = newEvent(); D.ui.eventId = id; D.plan = null; }, 'Event created — now plan the menu quantities');
+  guard(async () => { const id = await addDoc('events', {name: d.name.trim(), client: d.client.trim(), date: d.date, pax: num(d.pax) || '', contract: r2(num(d.contract)), venue: d.venue.trim(), notes: d.notes.trim(), status: 'planned', plan: []}); D.event = newEvent(); D.ui.eventId = id; D.plan = null; }, 'Event created');
 };
-ACT.openEvent = id => { D.ui.eventId = id; D.plan = null; if (D.ui.tab !== 'events') location.hash = 'events'; else render(); window.scrollTo(0, 0); };
-ACT.closeEvent = () => { D.ui.eventId = ''; D.plan = null; render(); };
+ACT.openEvent = id => { D.ui.eventId = id; D.plan = null; D.evp = null; if (D.ui.tab !== 'events') location.hash = 'events'; else render(); window.scrollTo(0, 0); };
+ACT.closeEvent = () => { D.ui.eventId = ''; D.plan = null; D.evp = null; render(); };
 ACT.evStatus = st => guard(async () => { await upd('events/' + D.ui.eventId, {status: st}); }, 'Event ' + st);
 ACT.savePlan = () => {
   const lines = D.plan.lines.filter(l => l.itemId && num(l.qty) > 0).map(l => ({itemId: l.itemId, qty: num(l.qty)}));
@@ -1693,8 +1836,8 @@ ACT.savePlan = () => {
 };
 ACT.editEv = () => {
   const e = S.events[D.ui.eventId]; if (!e) return;
-  openModal(`<h3>Edit event</h3><div class="grid"><label>Name<input id="m-name" value="${esc(e.name)}"></label><label>Client<input id="m-client" value="${esc(e.client)}"></label><label>Date<input id="m-date" type="date" value="${esc(e.date)}"></label><label>Pax<input id="m-pax" type="number" value="${esc(e.pax)}"></label><label>Contract ₱<input id="m-ct" type="number" step="any" value="${esc(e.contract)}"></label><label>Venue<input id="m-venue" value="${esc(e.venue)}"></label></div><label>Menu / notes<textarea id="m-notes">${esc(e.notes)}</textarea></label>${mBtns()}`,
-   {save: () => guard(async () => { await upd('events/' + e.id, {name: $('#m-name').value.trim() || e.name, client: $('#m-client').value.trim(), date: $('#m-date').value || e.date, pax: num($('#m-pax').value) || '', contract: r2(num($('#m-ct').value)), venue: $('#m-venue').value.trim(), notes: $('#m-notes').value}); closeModal(); }, 'Event updated')});
+  openModal(`<h3>Edit event</h3><div class="grid"><label>Name<input id="m-name" value="${esc(e.name)}"></label><label>Client<input id="m-client" value="${esc(e.client)}"></label><label>Date<input id="m-date" type="date" value="${esc(e.date)}"></label><label>Pax<input id="m-pax" type="number" value="${esc(e.pax)}"></label><label>Venue<input id="m-venue" value="${esc(e.venue)}"></label></div><label>Menu / notes<textarea id="m-notes">${esc(e.notes)}</textarea></label>${mBtns()}`,
+   {save: () => guard(async () => { await upd('events/' + e.id, {name: $('#m-name').value.trim() || e.name, client: $('#m-client').value.trim(), date: $('#m-date').value || e.date, pax: num($('#m-pax').value) || '', venue: $('#m-venue').value.trim(), notes: $('#m-notes').value}); closeModal(); }, 'Event updated')});
 };
 ACT.issueEvent = () => {
   const e = S.events[D.ui.eventId]; const s = eventStats(e); const {st} = stockFor('C');
