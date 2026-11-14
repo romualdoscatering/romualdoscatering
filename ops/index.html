@@ -1253,7 +1253,15 @@ function parseReceipt(text) {
   const raw = String(text || '').replace(/\r/g, '');
   const dm = raw.match(/\b(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{2,4})\b/); let date = '';
   if (dm) { let [, a, b, y] = dm; y = y.length === 2 ? '20' + y : y; const mm = +a <= 12 ? a : b, dd = +a <= 12 ? b : a; if (+mm >= 1 && +mm <= 12 && +dd >= 1 && +dd <= 31) date = `${y}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`; if (date > today() || date < '2020-01-01') date = ''; }
-  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  let lines = raw.split('\n').map(l => l.trim().replace(/^\\/, '')).filter(l => l && !/^[-–—=_.~\\\s]+$/.test(l));
+  /* handwriting fix-ups: "so"/"s0" after a dash is 50; join a name line with a number on the next line ("Packaging" / "250") */
+  lines = lines.map(l => l.replace(/([-–=]\s*)[sS]([oO0])\b/g, '$15$2'));
+  const numOnly = l => /^[-–—=:~\s]*(?:₱|P)?\s*[\d,.oO]+\s*$/.test(l) && /\d/.test(l), hasNum = l => /\d/.test(l.replace(/\b\d{1,2}\s*[\/\-.]\s*\d{1,2}\s*[\/\-.]\s*\d{2,4}\b/, ''));
+  const J = []; for (let i = 0; i < lines.length; i++) { const l = lines[i], n = lines[i + 1];
+    if (/[A-Za-z]{3,}/.test(l) && !hasNum(l) && n && numOnly(n)) { J.push(l + ' - ' + n.replace(/^[-–—=:~\s]+/, '')); i++; }
+    else if (/^[A-Za-z][A-Za-z.' ]{2,20}$/.test(l) && l.split(/\s+/).length <= 2 && n && /^[A-Z][A-Za-z]{2,}/.test(n) && hasNum(n) && i > 0 && J.some(x => hasNum(x))) { J.push(l + ' ' + n); i++; }
+    else J.push(l); }
+  lines = J;
   const clean = l => l.replace(/\b\d{1,2}\s*[\/\-.]\s*\d{1,2}\s*[\/\-.]\s*\d{2,4}\b/g, ' ').replace(/\b\d{1,2}:\d{2}(:\d{2})?\s*(am|pm)?\b/ig, ' ')
     .replace(/(?<=\d)[oO]|[oO](?=\d)/g, '0').replace(/(?<=\d)[lI|]|[lI|](?=\d{2})/g, '1').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/(?<=\d)\s(?=\d{3}\b)/g, '');
   const amt = l => { const m = [...clean(l).matchAll(/(?:₱|PHP|Php|P)?\s*(\d+(?:\.\d{1,2})?)(?!\s*(?:kg|kgs|kls?|kilos?|g|grams?|pcs?|pieces?|x|ml|l|ltrs?|liters?|packs?|%)\b)(?![\d.])/gi)].map(x => parseFloat(x[1])).filter(v => isFinite(v) && v > 0 && v < 10000000); return m.length ? m[m.length - 1] : null; };
@@ -1267,7 +1275,8 @@ function parseReceipt(text) {
   const itemsSum = r2(items.reduce((a, x) => a + x.amount, 0));
   if (total == null && items.length >= 2) total = itemsSum;
   if (total == null) { const all = lines.filter(l => !SKIP.test(l)).map(amt).filter(v => v != null); if (all.length) total = Math.max(...all); }
-  const store = (lines.find(l => /[A-Za-z]{3,}/.test(l) && !/receipt|invoice|official|tin\b|vat reg|address|tel|date|time|cashier|\d/i.test(l)) || '').replace(/[^\w&'.,\- ]/g, '').trim().slice(0, 60);
+  const firstAmt = lines.findIndex(l => amt(l) != null && /[A-Za-z]/.test(l));
+  const store = (lines.slice(0, Math.min(3, firstAmt < 0 ? 3 : firstAmt)).find(l => /[A-Za-z]{3,}/.test(l) && !/receipt|invoice|official|tin\b|vat reg|address|tel|date|time|cashier|\d/i.test(l)) || '').replace(/[^\w&'.,\- ]/g, '').trim().slice(0, 60);
   return {total: total == null ? null : r2(total), date, store, items, itemsSum, matches: total != null && items.length > 1 && Math.abs(itemsSum - total) < 0.01};
 }
 function shrinkImage(file, max = 1800, q = 0.82) {
