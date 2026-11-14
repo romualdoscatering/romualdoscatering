@@ -904,7 +904,7 @@ function viewOffers(){
   return `<div class="offers"><div class="off-head"><div class="kicker" style="color:var(--gold)">${bk?"Book with Romualdo's":"Romualdo's Catering · Davao City"}</div><h1>${bk?"What would you like to book?":"Our Offers"}</h1>
     <p>${bk?"Choose what fits your event. Each one takes you straight to its booking form.":"From full catering to ready-made birthday packages, grazing stations and party trays. Pick what fits your event."}</p></div>
     ${state.canEdit?`<div style="text-align:right;margin:-8px 0 10px"><button class="btn small ghost" data-go="photosEdit">✎ Edit photos &amp; text</button></div>`:""}<div class="off-grid">${L.map(o=>`<button class="off-card" data-to="${o.v}"><span class="off-img">${o.img?`<img src="${esc(o.img)}" alt="" loading="lazy" onerror="this.remove()">`:""}</span>
-      <span class="off-b"><b>${esc(o.t)}</b><small>${esc(o.d)}</small>${o.p?`<span class="off-p">${esc(o.p)}</span>`:""}<span class="off-go">${bk?"Book this →":"View →"}</span></span></button>`).join("")}</div></div>`;
+      <span class="off-b"><b>${esc(o.t)}</b><small>${esc(o.d)}</small><span class="off-go">${bk?"Book this →":"View →"}</span></span></button>`).join("")}</div></div>`;
 }
 /* ---------- site photos: food tray category photos + Our Offers cards (admin-editable, stored in about.sitePhotos) ---------- */
 function sitePhotos(){try{const x=JSON.parse(state.about.sitePhotos||"{}");return x&&typeof x==="object"?x:{}}catch(e){return {}}}
