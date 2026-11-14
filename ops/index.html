@@ -893,7 +893,7 @@ function arcSync(quiet) {
 V.archive = () => {
   if (!ARC.synced && !ARC.syncing && S.lastSync) arcSync(true);
   const f = D.ui, t = today();
-  const due = Object.values(S.events).filter(e => e.status !== 'void' && !e.archive && e.date && e.date < t).sort((a, b) => b.date.localeCompare(a.date));
+  const due = Object.values(S.events).filter(e => e.status !== 'void' && !e.archive && e.date && e.date <= t).sort((a, b) => b.date.localeCompare(a.date));
   const all = Object.values(S.events).filter(e => e.status !== 'void' && e.archive);
   const years = [...new Set(all.map(e => (sheetOf(e).date || e.date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
   const list = arcFiltered(), ful = list.filter(([e]) => (e.archive.outcome || 'fulfilled') === 'fulfilled');
@@ -908,7 +908,7 @@ V.archive = () => {
     <td><span class="chip ${r.outcome === 'Fulfilled' ? 'ok' : 'mut'}">${esc(r.outcome)}</span></td><td class="small mut">${esc(r.archivedBy)}<div>${esc(r.archivedOn)}</div></td><td>›</td></tr>`;
   return `<h2>Archive</h2>
   <p class="lede">Finished events and fulfilled orders, kept for documentation and traceability. Every archived event is also copied to an Excel-ready sheet automatically.</p>
-  ${due.length ? `<div class="card" style="border-left:4px solid var(--warn,#B7791F)"><h3>Finished, waiting to be archived (${due.length})</h3><p class="small mut" style="margin:-4px 0 8px">These events are past their date. Confirm how each went to move it into the archive.</p>
+  ${due.length ? `<div class="card" style="border-left:4px solid var(--warn,#B7791F)"><h3>Finished, waiting to be archived (${due.length})</h3><p class="small mut" style="margin:-4px 0 8px">Events dated today or earlier. Once an event is done, confirm how it went to move it into the archive.</p>
    <div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th class="n">Pax</th><th></th></tr></thead><tbody>${due.map(dueRow).join('')}</tbody></table></div></div>` : ''}
   <div class="card"><div class="row" style="margin-bottom:8px"><h3 style="margin:0">Archived events (${list.length}${list.length !== all.length ? ' of ' + all.length : ''})</h3><span class="spacer"></span>
     <button class="sm pri" data-act="arcXlsx">⬇ Download Excel (.xlsx)</button>${ARC.url ? `<a class="sm" style="text-decoration:none;padding:6px 10px;border:1px solid var(--line,#ccc);border-radius:8px" href="${esc(ARC.url)}" target="_blank" rel="noopener">Open Google Sheet copy ↗</a>` : ''}<button class="sm ghost" data-act="arcResync" title="Rebuild the Google Sheet copy now">${ARC.syncing ? 'Updating…' : '↻ Update sheet copy'}</button></div>
