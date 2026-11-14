@@ -1247,24 +1247,28 @@ function loadTesseract() {
   if (window.Tesseract) return Promise.resolve(window.Tesseract);
   return TESS ||= new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'; sc.onload = () => ok(window.Tesseract); sc.onerror = () => { TESS = null; no(new Error('Could not load the receipt reader')); }; document.head.appendChild(sc); });
 }
-/* Finds the most likely "total" on a receipt. Prefers lines saying TOTAL / AMOUNT DUE / NET, skips subtotal, VAT, cash, change. */
+/* Reads a receipt or a handwritten breakdown: the total (prefers the TOTAL / AMOUNT DUE line), the line items, the date and the store.
+   Works with printed receipts (1,610.00) and handwritten lists (Chicken breast - 660 … Total - 1,900). */
 function parseReceipt(text) {
-  const lines = String(text || '').split(/\n/).map(l => l.trim()).filter(Boolean);
-  const amt = l => { const m = l.replace(/[oO](?=\d)|(?<=\d)[oO]/g, '0').replace(/(\d)\s+(?=\d{3}\b)/g, '$1').match(/(?:₱|P|PHP|Php)?\s*(\d{1,3}(?:[,\s]\d{3})+|\d+)(?:[.,](\d{2}))\b/g); if (!m) return null;
-    const v = m.map(x => { const n = x.replace(/[^\d.,]/g, ''); const t = n.replace(/[.,](\d{2})$/, '.$1').replace(/[,\s](?=\d{3})/g, ''); return parseFloat(t); }).filter(x => isFinite(x) && x > 0 && x < 10000000); return v.length ? v[v.length - 1] : null; };
-  const BAD = /sub\s*-?\s*total|vat(?!.*(incl|total))|vatable|tax|cash|change|tender|discount|disc\.|points|qty|items?\s*count|no\.? of items|savings|card|gcash|paid/i;
-  let best = null, score = -1;
-  lines.forEach((l, i) => { const u = l.toUpperCase(); let sc = -1;
-    if (/GRAND\s*TOTAL|AMOUNT\s*DUE|TOTAL\s*AMOUNT\s*DUE|TOTAL\s*DUE|NET\s*AMOUNT|AMOUNT\s*PAYABLE/.test(u)) sc = 3;
-    else if (/\bTOTAL\b|TOTAL\s*:/.test(u) && !BAD.test(l)) sc = 2;
-    else if (/\bAMOUNT\b/.test(u) && !BAD.test(l)) sc = 1;
-    if (sc < 0) return; let v = amt(l); if (v == null && lines[i + 1]) v = amt(lines[i + 1]);
-    if (v != null && (sc > score || (sc === score && v > best))) { best = v; score = sc; } });
-  if (best == null) { const all = lines.filter(l => !BAD.test(l)).map(amt).filter(v => v != null); if (all.length) best = Math.max(...all); }
-  const dm = String(text).match(/\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})\b/) || null; let date = '';
+  const raw = String(text || '').replace(/\r/g, '');
+  const dm = raw.match(/\b(\d{1,2})\s*[\/\-.]\s*(\d{1,2})\s*[\/\-.]\s*(\d{2,4})\b/); let date = '';
   if (dm) { let [, a, b, y] = dm; y = y.length === 2 ? '20' + y : y; const mm = +a <= 12 ? a : b, dd = +a <= 12 ? b : a; if (+mm >= 1 && +mm <= 12 && +dd >= 1 && +dd <= 31) date = `${y}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`; if (date > today() || date < '2020-01-01') date = ''; }
-  const store = (lines.find(l => /[A-Za-z]{3,}/.test(l) && !/receipt|invoice|official|tin\b|vat reg|address|tel|date|time|cashier|\d{3,}/i.test(l)) || '').replace(/[^\w&'.,\- ]/g, '').trim().slice(0, 60);
-  return {total: best == null ? null : r2(best), date, store};
+  const lines = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  const clean = l => l.replace(/\b\d{1,2}\s*[\/\-.]\s*\d{1,2}\s*[\/\-.]\s*\d{2,4}\b/g, ' ').replace(/\b\d{1,2}:\d{2}(:\d{2})?\s*(am|pm)?\b/ig, ' ')
+    .replace(/(?<=\d)[oO]|[oO](?=\d)/g, '0').replace(/(?<=\d)[lI|]|[lI|](?=\d{2})/g, '1').replace(/(?<=\d),(?=\d{3}\b)/g, '').replace(/(?<=\d)\s(?=\d{3}\b)/g, '');
+  const amt = l => { const m = [...clean(l).matchAll(/(?:₱|PHP|Php|P)?\s*(\d+(?:\.\d{1,2})?)(?!\s*(?:kg|kgs|kls?|kilos?|g|grams?|pcs?|pieces?|x|ml|l|ltrs?|liters?|packs?|%)\b)(?![\d.])/gi)].map(x => parseFloat(x[1])).filter(v => isFinite(v) && v > 0 && v < 10000000); return m.length ? m[m.length - 1] : null; };
+  const TOT = /\b(grand\s*total|amount\s*due|total\s*amount|total\s*due|net\s*amount|amount\s*payable|t[o0]ta[l1i]|tot)\b/i, SUB = /sub\s*-?\s*t[o0]ta[l1]/i;
+  const SKIP = /vat|vatable|tax|cash|change|tender|discount|points|savings|card|gcash|paid|tin\b|or\s*no|invoice\s*no|tel|phone|cashier|qty\b/i;
+  let total = null, best = -1; const items = [];
+  lines.forEach((l, i) => { const v = amt(l), letters = (l.match(/[A-Za-z]/g) || []).length;
+    let sc = -1; if (SUB.test(l)) sc = -1; else if (/grand\s*total|amount\s*due|total\s*due|amount\s*payable/i.test(l)) sc = 3; else if (TOT.test(l)) sc = 2;
+    if (sc >= 0) { const x = v != null ? v : (lines[i + 1] ? amt(lines[i + 1]) : null); if (x != null && (sc > best || (sc === best && x > total))) { total = x; best = sc; } return; }
+    if (v != null && letters >= 3 && !SKIP.test(l) && !SUB.test(l)) { const name = clean(l).replace(/(?:₱|PHP|Php|P)?\s*\d+(?:\.\d{1,2})?\s*$/i, '').replace(/[-–—=:_.~\s]+$/g, '').replace(/^[-–—=:_.~\s]+/g, '').trim(); if (name && /[A-Za-z]{2,}/.test(name)) items.push({name: name.slice(0, 60), amount: v}); } });
+  const itemsSum = r2(items.reduce((a, x) => a + x.amount, 0));
+  if (total == null && items.length >= 2) total = itemsSum;
+  if (total == null) { const all = lines.filter(l => !SKIP.test(l)).map(amt).filter(v => v != null); if (all.length) total = Math.max(...all); }
+  const store = (lines.find(l => /[A-Za-z]{3,}/.test(l) && !/receipt|invoice|official|tin\b|vat reg|address|tel|date|time|cashier|\d/i.test(l)) || '').replace(/[^\w&'.,\- ]/g, '').trim().slice(0, 60);
+  return {total: total == null ? null : r2(total), date, store, items, itemsSum, matches: total != null && items.length > 1 && Math.abs(itemsSum - total) < 0.01};
 }
 function shrinkImage(file, max = 1800, q = 0.82) {
   return new Promise((ok, no) => { const img = new Image(), u = URL.createObjectURL(file);
@@ -1284,9 +1288,9 @@ function rcptOne(eventId, file, n, of) {
     const end = r => { if (finished) return; finished = true; if (url) URL.revokeObjectURL(url); resolve(r); };
     openModal(`<div class="row"><h3 style="margin:0">Add receipt${of > 1 ? ` <span class="small mut">(${n} of ${of})</span>` : ''}</h3><span class="spacer"></span><button class="sm ghost" data-mact="stop">✕</button></div>
      <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:10px" class="rcpt-grid">
-      <div style="background:#F3EFE6;border-radius:10px;min-height:200px;max-height:460px;overflow:auto;display:flex;align-items:flex-start;justify-content:center">${pdf ? `<div class="empty" style="padding:30px">📄 ${esc(file.name)}<div class="small mut">PDFs are stored as is; type the total.</div></div>` : `<img src="${url}" alt="Receipt" style="width:100%;display:block">`}</div>
-      <div><div id="r-ocr" class="alert info" style="margin:0 0 10px">${pdf ? 'Type the total from the receipt.' : '🔎 Reading the total from the receipt…'}</div>
-       <label>Total amount ₱<input id="r-amt" type="number" inputmode="decimal" min="0" step="any" placeholder="${pdf ? '0.00' : 'Reading…'}" style="font-size:20px;font-weight:700"></label>
+      <div style="background:#F3EFE6;border-radius:10px;min-height:200px;max-height:460px;overflow:auto;display:flex;align-items:flex-start;justify-content:center">${pdf ? `<div class="empty" style="padding:30px">📄 ${esc(file.name)}<div class="small mut">PDF receipt</div></div>` : `<img src="${url}" alt="Receipt" style="width:100%;display:block">`}</div>
+      <div><div id="r-ocr" class="alert info" style="margin:0 0 10px">🔎 Reading the receipt…</div>
+       <label>Total amount ₱<input id="r-amt" type="number" inputmode="decimal" min="0" step="any" placeholder="Reading…" style="font-size:20px;font-weight:700"></label>
        <label>Store / supplier<input id="r-store" list="dl-sup" autocapitalize="words"></label>
        <label>Receipt date<input id="r-date" type="date" value="${today()}"></label>
        <label>Note <span class="small mut">(optional)</span><input id="r-note" placeholder="e.g. chicken & pork for Saturday's buffet"></label>
@@ -1302,18 +1306,22 @@ function rcptOne(eventId, file, n, of) {
           const up = await api('opsUpload', {data: data.split(',')[1], mime, name: (e?.sheet?.client || e?.name || 'event') + ' ' + ($('#r-store').value || 'receipt'), eventId});
           if (!up.ok) throw new Error(up.error || 'Upload failed');
           const rid = 'r' + genId();
-          const rec = {fileId: up.id, mime, amount: r2(num(amt)), ocrAmount: ocr && ocr.total != null ? ocr.total : '', store: $('#r-store').value.trim(), date: $('#r-date').value || today(), note: $('#r-note').value.trim(), by: S.me?.name || S.me?.username || '', at: Date.now()};
+          const rec = {fileId: up.id, mime, amount: r2(num(amt)), ocrAmount: ocr && ocr.total != null ? ocr.total : '', items: ocr && ocr.items ? ocr.items.slice(0, 40) : [], store: $('#r-store').value.trim(), date: $('#r-date').value || today(), note: $('#r-note').value.trim(), by: S.me?.name || S.me?.username || '', at: Date.now()};
           await upd('events/' + eventId, {receipts: {[rid]: rec}});
           closeModal(); toast('Receipt saved'); render(); end('next');
         } catch (err) { b.disabled = false; b.textContent = 'Save receipt'; toast(err.message, true); }
       }});
-    if (pdf) return;
-    loadTesseract().then(T => T.recognize(file, 'eng', {logger: m => { const el = $('#r-ocr'); if (el && m.status === 'recognizing text') el.textContent = '🔎 Reading the total… ' + Math.round(m.progress * 100) + '%'; }}))
-      .then(res => { if (finished) return; ocr = parseReceipt(res.data.text); const el = $('#r-ocr'), a = $('#r-amt'); if (!el) return;
-        if (ocr.total != null) { if (!a.value) a.value = ocr.total.toFixed(2); el.className = 'alert ok'; el.innerHTML = `Detected total: <b>${peso(ocr.total)}</b>. Please check it against the receipt and correct it if needed.`; }
-        else { el.className = 'alert warn'; el.textContent = "Couldn't find the total on this photo. Please type it in."; }
-        if (a) a.placeholder = '0.00'; if (ocr.store && !$('#r-store').value) $('#r-store').value = ocr.store; if (ocr.date) $('#r-date').value = ocr.date; })
-      .catch(err => { const el = $('#r-ocr'); if (el) { el.className = 'alert warn'; el.textContent = 'Auto-read is not available right now (' + err.message + '). Please type the total.'; } const a = $('#r-amt'); if (a) a.placeholder = '0.00'; });
+    const show = (res, how) => { if (finished) return; ocr = res; const el = $('#r-ocr'), a = $('#r-amt'); if (!el) return; if (a) a.placeholder = '0.00';
+      if (ocr.total != null) { if (!a.value) a.value = ocr.total.toFixed(2); el.className = 'alert ok';
+        el.innerHTML = `Detected total: <b>${peso(ocr.total)}</b>${ocr.matches ? ` <span class="chip ok">matches the ${ocr.items.length} items</span>` : ocr.items.length > 1 ? ` <span class="chip warn">items add up to ${peso(ocr.itemsSum)}, please check</span>` : ''}<div class="small mut">Read by ${how}. Please compare with the receipt and correct it if needed.</div>`
+          + (ocr.items.length ? `<details style="margin-top:6px"${ocr.items.length <= 12 ? ' open' : ''}><summary class="small">Items found (${ocr.items.length})</summary><table class="small" style="width:100%">${ocr.items.map(x => `<tr><td>${esc(x.name)}</td><td class="n">${peso(x.amount)}</td></tr>`).join('')}</table></details>` : ''); }
+      else { el.className = 'alert warn'; el.textContent = "Couldn't find the total on this receipt. Please type it in."; }
+      if (ocr.store && !$('#r-store').value) $('#r-store').value = ocr.store; if (ocr.date) $('#r-date').value = ocr.date; };
+    const fail = msg => { if (finished) return; const el = $('#r-ocr'); if (el) { el.className = 'alert warn'; el.textContent = msg; } const a = $('#r-amt'); if (a) a.placeholder = '0.00'; };
+    const tess = () => pdf ? Promise.reject(new Error('no reader for PDFs')) : loadTesseract().then(T => T.recognize(file, 'eng', {logger: m => { const el = $('#r-ocr'); if (el && m.status === 'recognizing text') el.textContent = '🔎 Reading the total… ' + Math.round(m.progress * 100) + '%'; }})).then(r => show(parseReceipt(r.data.text), 'the on-device reader'));
+    dataP.then(data => api('opsOcr', {data: data.split(',')[1], mime: pdf ? 'application/pdf' : 'image/jpeg'}))
+      .then(r => { if (!r.ok || !String(r.text || '').trim()) throw new Error(r.error || 'empty'); const res = parseReceipt(r.text); res.raw = r.text; if (res.total == null && !pdf) return tess().catch(() => show(res, 'Google')); show(res, 'Google'); })
+      .catch(() => tess().catch(err => fail(pdf ? "Couldn't read this PDF automatically. Please type the total." : 'Auto-read is not available right now. Please type the total.')));
   });
 }
 const FILECACHE = {};
@@ -1827,8 +1835,8 @@ ACT.saveEv = () => {
   const d = D.event; if (!d.name.trim() || !d.date) return toast('Enter the event name and date.', true);
   guard(async () => { const id = await addDoc('events', {name: d.name.trim(), client: d.client.trim(), date: d.date, pax: num(d.pax) || '', contract: r2(num(d.contract)), venue: d.venue.trim(), notes: d.notes.trim(), status: 'planned', plan: []}); D.event = newEvent(); D.ui.eventId = id; D.plan = null; }, 'Event created');
 };
-ACT.openEvent = id => { D.ui.eventId = id; D.plan = null; D.evp = null; if (D.ui.tab !== 'events') location.hash = 'events'; else render(); window.scrollTo(0, 0); };
-ACT.closeEvent = () => { D.ui.eventId = ''; D.plan = null; D.evp = null; render(); };
+ACT.openEvent = id => { D.ui.eventId = id; D.plan = null; if (D.ui.tab !== 'events') location.hash = 'events'; else render(); window.scrollTo(0, 0); };
+ACT.closeEvent = () => { D.ui.eventId = ''; D.plan = null; render(); };
 ACT.evStatus = st => guard(async () => { await upd('events/' + D.ui.eventId, {status: st}); }, 'Event ' + st);
 ACT.savePlan = () => {
   const lines = D.plan.lines.filter(l => l.itemId && num(l.qty) > 0).map(l => ({itemId: l.itemId, qty: num(l.qty)}));
@@ -2015,14 +2023,32 @@ async function sync(full) {
     S.me = r.me; S.isAdmin = r.me.role === 'Admin';
     if (!r.unchanged) { if (r.users) S.users = r.users; applyDocs(r.docs, true); }
     VER = r.ver; S.lastSync = Date.now(); S.syncErr = '';
+    if (!opsDraftRestored) opsDraftRestore();
     if (wasAdmin !== S.isAdmin) schedule();
   } catch (e) { if (!e.auth) S.syncErr = e.message; }
   finally { S.syncing = false; schedule(); }
 }
+
+/* ---- auto-save for every page: unsaved entries are kept on this device and come back after a refresh ---- */
+const OPS_DRAFT_KEY = 'rcs_ops_drafts_v1';
+const OPS_DRAFT_KEYS = ['purchase', 'expense', 'advance', 'move', 'event', 'count', 'sale', 'req', 'recipe', 'prod', 'evp'];
+let opsDraftT = 0, opsDraftRestored = false;
+const opsDraftKey = () => OPS_DRAFT_KEY + ':' + (S.me?.username || '');
+function opsDraftSave() { if (!S.me || !opsDraftRestored) return; clearTimeout(opsDraftT); opsDraftT = setTimeout(opsDraftWrite, 400); }
+function opsDraftWrite() { if (!S.me || !opsDraftRestored) return; try { const o = {}; OPS_DRAFT_KEYS.forEach(k => { if (D[k] != null) o[k] = D[k]; }); localStorage.setItem(opsDraftKey(), JSON.stringify({at: Date.now(), d: o, ui: {eventId: D.ui.eventId}})); } catch (e) {} }
+function opsDraftRestore() {
+  if (opsDraftRestored || !S.me) return; opsDraftRestored = true;
+  try { const x = JSON.parse(localStorage.getItem(opsDraftKey()) || 'null'); if (!x || !x.d || Date.now() - x.at > 7 * 864e5) return;
+    let n = 0; OPS_DRAFT_KEYS.forEach(k => { if (x.d[k] != null) { D[k] = x.d[k]; n++; } });
+    if (x.ui?.eventId && S.events[x.ui.eventId] && D.ui.tab === 'events' && !D.ui.eventId) D.ui.eventId = x.ui.eventId;
+    if (n) render(); } catch (e) {}
+}
+document.addEventListener('input', opsDraftSave, true); document.addEventListener('change', opsDraftSave, true); document.addEventListener('click', () => setTimeout(opsDraftSave, 0), true);
+window.addEventListener('pagehide', opsDraftWrite); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') opsDraftWrite(); });
 const TOKEN_KEY = 'rcs_ops_token';
 function saveToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} try { t ? sessionStorage.setItem('rcs_token', t) : sessionStorage.removeItem('rcs_token'); } catch (e) {} }
 function readToken() { try { return sessionStorage.getItem('rcs_token') || localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
-function endSession(msg) { S.token = ''; S.me = null; S.isAdmin = false; S.lastSync = 0; S.loginMsg = msg || ''; CACHE.clear(); VER = 0; AFTER = 0; saveToken(''); closeModal(); rebuild(); render(); }
+function endSession(msg) { opsDraftWrite(); opsDraftRestored = false; S.token = ''; S.me = null; S.isAdmin = false; S.lastSync = 0; S.loginMsg = msg || ''; CACHE.clear(); VER = 0; AFTER = 0; saveToken(''); closeModal(); rebuild(); render(); }
 function loginView() {
   return `<div class="card login"><h2>Staff login</h2>
    <p class="lede" style="text-align:center">Use the same username and password as the inquiry dashboard.</p>

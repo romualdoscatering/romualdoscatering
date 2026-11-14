@@ -2601,6 +2601,21 @@ function route(){
 }
 window.addEventListener("hashchange",route);
 window.addEventListener("beforeunload",e=>{if(state.menuDirty||state.aboutDirty){e.preventDefault();e.returnValue=""}});
+/* ============ AUTO-SAVE: forms and editor drafts are kept on this device, so a refresh never loses typing ============ */
+const SITE_DRAFT_KEY="rcs_site_drafts_v1";
+const SITE_DRAFT_KEYS=["form","mForm","kForm","gForm","trayForm","trayCart","traySize","customTier","pax","pkg","pkgSel","chefPick","kOpt","gOpt","gPath",
+  "kDraft","kDirty","gDraft","gDirty","trayDraft","trayDirty","trayOrig","mDraft","mDirty","pDraft","pDirty","aboutDraft","aboutDirty"];
+let siteDraftT=0;
+function siteDraftSave(){clearTimeout(siteDraftT);siteDraftT=setTimeout(siteDraftWrite,400)}
+function siteDraftWrite(){try{const o={};SITE_DRAFT_KEYS.forEach(k=>{if(state[k]!==undefined&&state[k]!==null)o[k]=state[k]});o.custom=[...(state.custom||[])];
+  ["kDraft","gDraft","trayDraft","trayOrig","mDraft","pDraft","aboutDraft"].forEach(k=>{const d=k.replace(/Draft|Orig/,"")+"Dirty",dk={trayOrig:"trayDirty",kDraft:"kDirty",gDraft:"gDirty",trayDraft:"trayDirty",mDraft:"mDirty",pDraft:"pDirty",aboutDraft:"aboutDirty"}[k];if(!state[dk])delete o[k]});
+  localStorage.setItem(SITE_DRAFT_KEY,JSON.stringify({at:Date.now(),d:o}))}catch(e){}}
+function siteDraftRestore(){try{const x=JSON.parse(localStorage.getItem(SITE_DRAFT_KEY)||"null");if(!x||!x.d||Date.now()-x.at>7*864e5)return;
+  const d=x.d;SITE_DRAFT_KEYS.forEach(k=>{if(d[k]!==undefined)state[k]=d[k]});if(Array.isArray(d.custom))state.custom=new Set(d.custom);
+  ["form","mForm","kForm","gForm","trayForm"].forEach(k=>{if(d[k]&&typeof d[k]==="object")state[k]={...(state[k]||{}),...d[k]}})}catch(e){}}
+document.addEventListener("input",siteDraftSave,true);document.addEventListener("change",siteDraftSave,true);document.addEventListener("click",siteDraftSave,true);
+window.addEventListener("pagehide",siteDraftWrite);document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="hidden")siteDraftWrite()});
+siteDraftRestore();
 async function init(){
   const t=stored("rcs_token");
   if(t){state.token=t;const me=await api("me");if(me.ok)setSession(t,me.user);else setSession(null,null)}

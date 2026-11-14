@@ -62,7 +62,8 @@ function doPost(e) {
       case 'sheetSync':
       case 'archiveSync':
       case 'opsUpload':
-      case 'opsFile': return out(handleOps(req));
+      case 'opsFile':
+      case 'opsOcr': return out(handleOps(req));
       default:          return out({ ok: false, error: 'Unknown action.' });
     }
   } catch (err) {

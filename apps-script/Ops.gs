@@ -32,6 +32,7 @@ function handleOps(req) {
     case 'archiveSync': return archiveSync(me);
     case 'opsUpload': return opsUpload(me, req);
     case 'opsFile': return opsFile(me, req);
+    case 'opsOcr': return opsOcr(me, req);
     default:         return { ok: false, error: 'Unknown action.' };
   }
 }
@@ -605,4 +606,28 @@ function opsFile(me, req) {
   if (!inside) return { ok: false, error: 'Not a receipt file.' };
   const blob = f.getBlob();
   return { ok: true, mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
+}
+
+/** Reads the text of a receipt photo or PDF (printed or handwritten) with Google's OCR:
+ *  the file is converted to a temporary Google Doc in the receipts folder, its text is read, and the temporary Doc is deleted. */
+function opsOcr(me, req) {
+  const b64 = String(req.data || ''), mime = req.mime === 'application/pdf' ? 'application/pdf' : 'image/jpeg';
+  if (!b64 || b64.length > 20 * 1024 * 1024) return { ok: false, error: 'The file is missing or too large.' };
+  let bytes; try { bytes = Utilities.base64Decode(b64); } catch (e) { return { ok: false, error: 'The file could not be read.' }; }
+  const token = ScriptApp.getOAuthToken(), boundary = 'rcs' + Utilities.getUuid().replace(/-/g, '');
+  const meta = JSON.stringify({ name: 'OCR temp ' + Utilities.getUuid().slice(0, 8), mimeType: 'application/vnd.google-apps.document', parents: [receiptsFolder().getId()] });
+  const head = '--' + boundary + '\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n' + meta + '\r\n--' + boundary + '\r\nContent-Type: ' + mime + '\r\n\r\n';
+  const body = Utilities.newBlob(head).getBytes().concat(bytes).concat(Utilities.newBlob('\r\n--' + boundary + '--').getBytes());
+  const up = UrlFetchApp.fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&ocrLanguage=en&fields=id', {
+    method: 'post', contentType: 'multipart/related; boundary=' + boundary, payload: body, headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
+  if (up.getResponseCode() >= 300) return { ok: false, error: 'OCR upload failed (' + up.getResponseCode() + ')', detail: up.getContentText().slice(0, 300) };
+  const id = JSON.parse(up.getContentText()).id;
+  let text = '';
+  try {
+    const ex = UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/' + id + '/export?mimeType=text/plain', { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
+    if (ex.getResponseCode() < 300) text = ex.getContentText();
+  } finally {
+    try { UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/' + id, { method: 'delete', headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true }); } catch (e) {}
+  }
+  return { ok: true, text: String(text || '').replace(/^﻿/, '').slice(0, 20000) };
 }
