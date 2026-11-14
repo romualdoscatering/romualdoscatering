@@ -873,12 +873,24 @@ function arcRow(e) {
     contact: d.contact || '', mobile: d.mobile || '', email: d.email || '', source: d.source || '', venue: d.venue || e.venue || '', pkg: k === 'catering' ? (d.pkg || '') : orderLabel(os, k),
     paxBooked: num(d.pax || e.pax) || '', paxServed: a.servedPax !== undefined && a.servedPax !== '' ? num(a.servedPax) : (num(d.pax || e.pax) || ''), menu: menuText(d, k),
     allergy: d.allergy || '', special: d.special || '', sheetStatus: (SHEET_STATUS.find(x => x[0] === d.status) || SHEET_STATUS[0])[1], preparedBy: d.preparedBy || '',
+    ...arcMoney(e),
     outcome: arcOutLabel(a.outcome), fulfilledOn: a.fulfilledOn || '', billed: a.billed !== undefined && a.billed !== '' ? num(a.billed) : '', payment: a.payment || '', remarks: a.remarks || '',
     archivedOn: a.at ? new Date(a.at).toLocaleString('en-PH', {year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'}) : '', archivedBy: a.by || ''};
 }
+function arcMoney(e) {
+  const s = eventStats(e), R = rcptStats(e), sh = e.sheet || {}, contract = num(e.contract), other = r2(s.used + s.exp), cost = r2(R.total + other), pax = num(e.pricing?.pax || e.pax || sh.pax);
+  return {contract: contract || '', perHead: e.pricing?.perHead ? num(e.pricing.perHead) : (contract && pax ? r2(contract / pax) : ''), pricingNote: e.pricing?.note || '',
+    receipts: R.total, receiptsN: R.n, receiptsCheck: R.n ? (R.todo ? `${R.n - R.todo} of ${R.n} verified` : `all ${R.n} verified`) : 'no receipts', otherCost: other || '', totalCost: cost,
+    margin: contract ? r2(contract - cost) : '', marginPct: contract ? r2((contract - cost) / contract * 100) : '', costPerGuest: pax ? r2(cost / pax) : ''};
+}
+const ARC_MONEY = ['contract', 'perHead', 'pricingNote', 'receipts', 'receiptsCheck', 'otherCost', 'totalCost', 'margin', 'marginPct', 'costPerGuest', 'billed', 'payment'];
+const ARC_PESO = ['contract', 'perHead', 'receipts', 'otherCost', 'totalCost', 'margin', 'costPerGuest', 'billed'];
+const arcCols = () => ARC_COLS.filter(([k]) => S.isAdmin || !ARC_MONEY.includes(k));
 const ARC_COLS = [['ref', 'Reference no.'], ['date', 'Event / order date'], ['kind', 'Service'], ['type', 'Event type / pick-up or delivery'], ['client', 'Client'], ['contact', 'Contact person'], ['mobile', 'Mobile'], ['email', 'Email'], ['source', 'How they found us'],
   ['venue', 'Venue / address'], ['pkg', 'Package / order'], ['paxBooked', 'Guests booked'], ['paxServed', 'Guests served'], ['menu', 'Menu / items'], ['allergy', 'Allergies / dietary'], ['special', 'Special requests'],
-  ['sheetStatus', 'Event sheet status'], ['preparedBy', 'Prepared by'], ['outcome', 'Outcome'], ['fulfilledOn', 'Fulfilled on'], ['billed', 'Amount billed (₱)'], ['payment', 'Payment'], ['remarks', 'Remarks / client feedback'], ['archivedOn', 'Archived on'], ['archivedBy', 'Archived by']];
+  ['sheetStatus', 'Event sheet status'], ['preparedBy', 'Prepared by'],
+  ['contract', 'Contract price (₱)'], ['perHead', 'Price per guest (₱)'], ['pricingNote', 'Pricing notes'], ['receipts', 'Receipts total (₱)'], ['receiptsCheck', 'Receipts checked'], ['otherCost', 'Other recorded costs (₱)'],
+  ['totalCost', 'Total cost (₱)'], ['margin', 'Gross margin (₱)'], ['marginPct', 'Margin %'], ['costPerGuest', 'Cost per guest (₱)'], ['outcome', 'Outcome'], ['fulfilledOn', 'Fulfilled on'], ['billed', 'Amount billed (₱)'], ['payment', 'Payment'], ['remarks', 'Remarks / client feedback'], ['archivedOn', 'Archived on'], ['archivedBy', 'Archived by']];
 const ARC = {url: '', synced: 0, syncing: false};
 function arcFiltered() {
   const f = D.ui, q = (f.arcQ || '').trim().toLowerCase();
@@ -906,7 +918,7 @@ V.archive = () => {
     return `<tr><td>${fmtD(d.date || e.date)}</td><td><b>${esc(d.client || e.client || e.name)}</b> <span class="chip ${k === 'catering' ? '' : 'warn'}" ${k === 'catering' ? 'style="background:#E3E7F0;color:#1A2C54"' : ''}>${sheetKindLabel(k)}</span><div class="small mut">${esc(sheetRef(d))}${d.venue ? ' · ' + esc(d.venue) : ''}</div></td><td class="n">${esc(d.pax || e.pax || '')}</td>
       <td class="row"><button class="sm pri" data-act="arcMark" data-arg="${e.id}">Mark fulfilled &amp; archive</button><button class="sm ghost" data-act="arcMark" data-arg="${e.id}|cancelled">Didn't push through</button></td></tr>`; };
   const row = ([e, r]) => `<tr class="click" data-act="arcView" data-arg="${e.id}"><td>${fmtD(r.date)}<div class="small mut">${esc(r.ref)}</div></td><td><b>${esc(r.client)}</b><div class="small mut">${esc([r.kind, r.type, r.venue].filter(Boolean).join(' · '))}</div></td>
-    <td class="small">${esc(r.pkg)}</td><td class="n">${esc(r.paxServed)}</td>${S.isAdmin ? `<td class="n">${r.billed !== '' ? peso(r.billed) : ''}<div class="small mut">${esc(r.payment)}</div></td>` : ''}
+    <td class="small">${esc(r.pkg)}</td><td class="n">${esc(r.paxServed)}</td>${S.isAdmin ? `<td class="n">${r.contract !== '' ? peso(r.contract) : '<span class="mut">—</span>'}<div class="small mut">cost ${peso(r.totalCost)}</div></td><td class="n ${num(r.margin) < 0 ? 'bad-t' : 'ok-t'}">${r.margin !== '' ? peso(r.margin) + `<div class="small">${r.marginPct.toFixed(1)}%</div>` : ''}</td><td class="n">${r.billed !== '' ? peso(r.billed) : ''}<div class="small mut">${esc(r.payment)}</div></td>` : ''}
     <td><span class="chip ${r.outcome === 'Fulfilled' ? 'ok' : 'mut'}">${esc(r.outcome)}</span></td><td class="small mut">${esc(r.archivedBy)}<div>${esc(r.archivedOn)}</div></td><td>›</td></tr>`;
   return `<h2>Archive</h2>
   <p class="lede">Finished events and fulfilled orders, kept for documentation and traceability. Every archived event is also copied to an Excel-ready sheet automatically.</p>
@@ -920,8 +932,8 @@ V.archive = () => {
     ${sel('ui.arcYear', opt('', 'All years') + years.map(y => opt(y, y)).join(''))}${sel('ui.arcMonth', opt('', 'All months') + MON.map((m, i) => opt(String(i + 1).padStart(2, '0'), m)).join(''))}
     ${sel('ui.arcKind', opt('', 'All services') + ['Catering', 'Food trays', 'Food packs'].map(k => opt(k, k)).join(''))}${sel('ui.arcOut', opt('', 'All outcomes') + ARC_OUT.map(([v, l]) => opt(v, l)).join(''))}</div>
    <div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:10px">
-    <span class="chip ok">${ful.length} fulfilled</span><span class="chip">${served.toLocaleString('en-PH')} guests served</span><span class="chip" style="background:#E3E7F0;color:#1A2C54">${byKind('Catering')} catering</span><span class="chip warn">${byKind('Food trays')} tray orders</span><span class="chip warn">${byKind('Food packs')} pack orders</span>${S.isAdmin && billed ? `<span class="chip">${peso(billed)} billed</span>` : ''}</div>
-   ${list.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th>Package / order</th><th class="n">Served</th>${S.isAdmin ? '<th class="n">Billed</th>' : ''}<th>Outcome</th><th>Archived</th><th></th></tr></thead><tbody>${list.map(row).join('')}</tbody></table></div>` : `<div class="empty">${all.length ? 'Nothing matches these filters.' : 'No archived events yet. Finished events appear above for you to archive.'}</div>`}
+    <span class="chip ok">${ful.length} fulfilled</span><span class="chip">${served.toLocaleString('en-PH')} guests served</span><span class="chip" style="background:#E3E7F0;color:#1A2C54">${byKind('Catering')} catering</span><span class="chip warn">${byKind('Food trays')} tray orders</span><span class="chip warn">${byKind('Food packs')} pack orders</span>${S.isAdmin && billed ? `<span class="chip">${peso(billed)} billed</span>` : ''}${S.isAdmin ? (() => { const L = ful.map(([, r]) => r), C = L.reduce((a, r) => a + (num(r.contract) || 0), 0), K = L.reduce((a, r) => a + num(r.totalCost), 0); return C || K ? `<span class="chip" style="background:#E3E7F0;color:#1A2C54">Contracts ${peso(C)}</span><span class="chip">Costs ${peso(K)}</span><span class="chip ${C - K < 0 ? 'bad' : 'ok'}">Margin ${peso(C - K)}${C ? ' · ' + ((C - K) / C * 100).toFixed(1) + '%' : ''}</span>` : ''; })() : ''}</div>
+   ${list.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th>Package / order</th><th class="n">Served</th>${S.isAdmin ? '<th class="n">Contract / cost</th><th class="n">Margin</th><th class="n">Billed</th>' : ''}<th>Outcome</th><th>Archived</th><th></th></tr></thead><tbody>${list.map(row).join('')}</tbody></table></div>` : `<div class="empty">${all.length ? 'Nothing matches these filters.' : 'No archived events yet. Finished events appear above for you to archive.'}</div>`}
   </div>`;
 };
 ACT.arcResync = () => arcSync(false);
@@ -954,9 +966,11 @@ ACT.arcView = id => {
   const e = S.events[id]; if (!e) return; const r = arcRow(e);
   const tr = (l, v) => v !== '' && v != null ? `<tr><th style="text-align:left;padding:4px 10px 4px 0;vertical-align:top;white-space:nowrap" class="small mut">${esc(l)}</th><td style="padding:4px 0">${esc(v)}</td></tr>` : '';
   openModal(`<div class="row"><h3 style="margin:0">${esc(r.client)}</h3><span class="chip ${r.outcome === 'Fulfilled' ? 'ok' : 'mut'}">${esc(r.outcome)}</span><span class="spacer"></span><button class="sm" data-mact="pdf">PDF</button><button class="sm ghost" data-mact="close">✕</button></div>
-   <table style="margin-top:10px;width:100%">${ARC_COLS.filter(([k]) => S.isAdmin || (k !== 'billed' && k !== 'payment')).map(([k, l]) => tr(l, k === 'billed' && r[k] !== '' ? peso(r[k]) : k === 'date' || k === 'fulfilledOn' ? fmtLong(r[k]) : r[k])).join('')}</table>
+   <table style="margin-top:10px;width:100%">${arcCols().map(([k, l]) => tr(l, ARC_PESO.includes(k) && r[k] !== '' ? peso(r[k]) : k === 'marginPct' && r[k] !== '' ? r[k].toFixed(1) + '%' : k === 'date' || k === 'fulfilledOn' ? fmtLong(r[k]) : r[k])).join('')}</table>
+   ${S.isAdmin ? `<p class="small" style="margin:8px 0 0"><a href="#" data-mact="costing">Open this event's contract price &amp; receipts →</a></p>` : ''}
    <div class="row end" style="margin-top:14px">${S.isAdmin ? '<button class="ghost danger" data-mact="unarc">Take out of archive</button>' : ''}<button data-mact="edit">Edit record</button><button class="pri" data-mact="close">Done</button></div>`, {
     pdf: () => { closeModal(); ACT.pdfSheet(id); },
+    costing: () => { closeModal(); ACT.openEvent(id); },
     edit: () => { closeModal(); ACT.arcMark(id); },
     unarc: () => { if (!confirm('Take this event out of the archive? It goes back to the "waiting to be archived" list.')) return; closeModal(); guard(async () => { await upd('events/' + id, {archive: null}); arcSync(true); }, 'Taken out of the archive'); }
   });
@@ -978,29 +992,38 @@ function zipStore(files) {
 function xlsxBlob(sheets) {
   const x = v => String(v).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
   const col = i => { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
-  const sheetXml = ({rows, widths}) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
+  const sheetXml = s => { const {rows, widths} = s; return  `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
     + `<cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>`
-    + rows.map((r, ri) => `<row r="${ri + 1}">${r.map((v, ci) => { const ref = col(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : ' s="2"';
+    + rows.map((r, ri) => `<row r="${ri + 1}">${r.map((v, ci) => { const ref = col(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : (s.money || []).includes(ci) && typeof v === 'number' ? ' s="3"' : (s.bold || []).includes(ri) ? ' s="4"' : ' s="2"';
       return typeof v === 'number' && isFinite(v) ? `<c r="${ref}"${st}><v>${v}</v></c>` : v === '' || v == null ? '' : `<c r="${ref}" t="inlineStr"${st}><is><t xml:space="preserve">${x(v)}</t></is></c>`; }).join('')}</row>`).join('')
-    + `</sheetData>${rows.length > 1 ? `<autoFilter ref="A1:${col(rows[0].length - 1)}${rows.length}"/>` : ''}</worksheet>`;
+    + `</sheetData>${rows.length > 1 ? `<autoFilter ref="A1:${col(rows[0].length - 1)}${rows.length - (s.bold || []).length}"/>` : ''}</worksheet>`; };
   const files = [['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`],
     ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
     ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((s, i) => `<sheet name="${x(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets>${sheets.map((s, i) => s.rows.length > 1 ? `<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">'${x(s.name)}'!$A$1:$${col(s.rows[0].length - 1)}$${s.rows.length}</definedName></definedNames>` : '').join('').replace(/<\/definedNames><definedNames>/g, '')}</workbook>`],
     ['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
-    ['xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1A2C54"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`]];
+    ['xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="3"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font><font><b/><sz val="11"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1A2C54"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf><xf numFmtId="4" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyAlignment="1"><alignment vertical="top"/></xf><xf numFmtId="4" fontId="2" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`]];
   sheets.forEach((s, i) => files.push([`xl/worksheets/sheet${i + 1}.xml`, sheetXml(s)]));
   return zipStore(files);
 }
 ACT.arcXlsx = () => {
   const list = arcFiltered(); if (!list.length) return toast('Nothing to export with these filters.', true);
-  const cols = ARC_COLS.filter(([k]) => S.isAdmin || (k !== 'billed' && k !== 'payment'));
+  const cols = arcCols();
   const W = {ref: 18, date: 13, kind: 12, type: 18, client: 26, contact: 20, mobile: 15, email: 24, source: 16, venue: 30, pkg: 24, paxBooked: 9, paxServed: 9, menu: 60, allergy: 22, special: 26, sheetStatus: 18, preparedBy: 16, outcome: 14, fulfilledOn: 13, billed: 14, payment: 18, remarks: 40, archivedOn: 20, archivedBy: 16};
-  const events = {name: 'Archived events', widths: cols.map(([k]) => W[k] || 14), rows: [cols.map(c => c[1]), ...list.map(([, r]) => cols.map(([k]) => r[k] === '' ? '' : r[k]))]};
+  Object.assign(W, {contract: 15, perHead: 13, pricingNote: 30, receipts: 15, receiptsCheck: 16, otherCost: 15, totalCost: 15, margin: 15, marginPct: 10, costPerGuest: 13});
+  const events = {name: 'Archived events', widths: cols.map(([k]) => W[k] || 14), money: cols.map(([k], i) => ARC_PESO.includes(k) ? i : -1).filter(i => i >= 0),
+    rows: [cols.map(c => c[1]), ...list.map(([, r]) => cols.map(([k]) => r[k] === '' ? '' : r[k]))]};
+  if (S.isAdmin) { const sumK = k => r2(list.reduce((a, [, r]) => a + (num(r[k]) || 0), 0)), tc = sumK('contract'), tcost = sumK('totalCost');
+    events.rows.push(cols.map(([k], i) => i === 0 ? 'TOTAL' : ['contract', 'receipts', 'otherCost', 'totalCost', 'margin', 'billed'].includes(k) ? sumK(k) : k === 'marginPct' ? (tc ? r2((tc - tcost) / tc * 100) : '') : k === 'paxServed' ? sumK(k) : ''));
+    events.bold = [events.rows.length - 1]; }
   const items = {name: 'Menu & items', widths: [18, 13, 26, 12, 22, 40, 8, 26], rows: [['Reference no.', 'Date', 'Client', 'Service', 'Course / type', 'Dish / item', 'Qty', 'Note']]};
   list.forEach(([e, r]) => { const d = sheetOf(e), k = d.kind || 'catering';
     (d.menu || []).filter(m => (m.dish || '').trim()).forEach(m => items.rows.push([r.ref, r.date, r.client, r.kind, k === 'catering' ? (m.course || '') : ({main: k === 'packs' ? 'Meal pack' : 'Tray', drink: 'Drink', addon: 'Add-on'})[m.t || 'main'] || '', m.dish, k === 'catering' ? '' : (num(m.qty) || 1), m.note || ''])); });
   const f = D.ui, tag = [f.arcYear, f.arcMonth && ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][+f.arcMonth - 1], f.arcKind].filter(Boolean).join(' ');
-  const blob = xlsxBlob([events, items]), a = document.createElement('a');
+  const sheets = [events, items];
+  if (S.isAdmin) { const rc = {name: 'Receipts', widths: [18, 13, 26, 13, 24, 14, 14, 18, 22, 60, 30], money: [5, 6], rows: [['Reference no.', 'Event date', 'Client', 'Receipt date', 'Store / supplier', 'Amount (₱)', 'Auto-read (₱)', 'Uploaded by', 'Verified by', 'Items on the receipt', 'Note']]};
+    list.forEach(([e, r]) => Object.values(e.receipts || {}).filter(Boolean).sort((a, b) => String(a.date).localeCompare(String(b.date))).forEach(x => rc.rows.push([r.ref, r.date, r.client, x.date || '', x.store || '', num(x.amount), x.ocrAmount === '' || x.ocrAmount == null ? '' : num(x.ocrAmount), x.by || '', x.verified ? (x.verified.name || x.verified.user || '') + ' · ' + new Date(x.verified.at).toLocaleDateString('en-PH') : 'not yet verified', (x.items || []).map(i => i.name + ' ' + i.amount).join('; '), x.note || ''])));
+    sheets.push(rc); }
+  const blob = xlsxBlob(sheets), a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = `Romualdos Event Archive${tag ? ' ' + tag : ''} ${today()}.xlsx`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
   toast('Excel file downloaded');
 };
@@ -1234,7 +1257,7 @@ ACT.evpRmExtra = i => { D.evp.extras.splice(+i, 1); render(); };
 ACT.savePricing = () => {
   const P = D.evp, e = S.events[P.eventId]; if (!e) return; const T = pricingTotal(P);
   const pricing = {perHead: num(P.perHead), pax: num(P.pax), discount: num(P.discount), extras: P.extras.filter(x => x.label.trim() || num(x.amount)).map(x => ({label: x.label.trim(), amount: num(x.amount)})), custom: T.custom ? num(P.custom) : '', note: P.note.trim(), by: S.me?.name || S.me?.username || '', at: Date.now()};
-  guard(async () => { await upd('events/' + e.id, {pricing, contract: T.total, pax: num(P.pax) || e.pax || ''}); D.evp = null; }, 'Contract price saved');
+  guard(async () => { await upd('events/' + e.id, {pricing, contract: T.total, pax: num(P.pax) || e.pax || ''}); D.evp = null; if (e.archive) arcSync(true); }, 'Contract price saved');
 };
 /* ---- receipts: upload, auto-read total (OCR), human check ---- */
 function rcptStats(e) {
@@ -1316,7 +1339,7 @@ function rcptOne(eventId, file, n, of) {
           if (!up.ok) throw new Error(up.error || 'Upload failed');
           const rid = 'r' + genId();
           const rec = {fileId: up.id, mime, amount: r2(num(amt)), ocrAmount: ocr && ocr.total != null ? ocr.total : '', items: ocr && ocr.items ? ocr.items.slice(0, 40) : [], store: $('#r-store').value.trim(), date: $('#r-date').value || today(), note: $('#r-note').value.trim(), by: S.me?.name || S.me?.username || '', at: Date.now()};
-          await upd('events/' + eventId, {receipts: {[rid]: rec}});
+          await upd('events/' + eventId, {receipts: {[rid]: rec}}); if (S.events[eventId]?.archive) arcSync(true);
           closeModal(); toast('Receipt saved'); render(); end('next');
         } catch (err) { b.disabled = false; b.textContent = 'Save receipt'; toast(err.message, true); }
       }});
@@ -1351,12 +1374,12 @@ ACT.rcptEdit = rid => {
    <label>Note<input id="r-note" value="${esc(r.note)}"></label>${r.ocrAmount !== '' && r.ocrAmount != null ? `<p class="small mut">Auto-read amount: ${peso(r.ocrAmount)}</p>` : ''}${mBtns()}`, {
     save: () => { if (!(num($('#r-amt').value) > 0)) return toast('Enter the amount.', true);
       const ch = {amount: r2(num($('#r-amt').value)), store: $('#r-store').value.trim(), date: $('#r-date').value || r.date, note: $('#r-note').value.trim(), editedBy: S.me?.name || S.me?.username || '', editedAt: Date.now()};
-      closeModal(); guard(async () => { await upd('events/' + e.id, {receipts: {[rid]: ch}}); }, 'Receipt updated'); }});
+      closeModal(); guard(async () => { await upd('events/' + e.id, {receipts: {[rid]: ch}}); if (S.events[e.id]?.archive) arcSync(true); }, 'Receipt updated'); }});
 };
 ACT.rcptVerify = arg => { const [rid, on] = arg.split('|'); const e = S.events[D.ui.eventId]; if (!e) return;
-  guard(async () => { await upd('events/' + e.id, {receipts: {[rid]: {verified: on === '1' ? {name: S.me?.name || S.me?.username || '', at: Date.now()} : null}}}); }, on === '1' ? 'Receipt verified' : 'Check undone'); };
+  guard(async () => { await upd('events/' + e.id, {receipts: {[rid]: {verified: on === '1' ? {name: S.me?.name || S.me?.username || '', at: Date.now()} : null}}}); if (S.events[e.id]?.archive) arcSync(true); }, on === '1' ? 'Receipt verified' : 'Check undone'); };
 ACT.rcptDel = rid => { const e = S.events[D.ui.eventId], r = e?.receipts?.[rid]; if (!r || !confirm(`Remove the ${peso(r.amount)} receipt${r.store ? ' from ' + r.store : ''}?`)) return;
-  guard(async () => { await upd('events/' + e.id, {receipts: {[rid]: null}}); }, 'Receipt removed'); };
+  guard(async () => { await upd('events/' + e.id, {receipts: {[rid]: null}}); if (S.events[e.id]?.archive) arcSync(true); }, 'Receipt removed'); };
 
 /* ============ REPORTS ============ */
 V.reports = () => {

@@ -531,12 +531,22 @@ const ARCHIVE_SHEET = 'Event Archive';
 const ARCHIVE_ITEMS_SHEET = 'Event Archive - Menu';
 const ARCHIVE_HEAD = ['Reference no.', 'Event / order date', 'Service', 'Event type / pick-up or delivery', 'Client', 'Contact person', 'Mobile', 'Email', 'How they found us',
   'Venue / address', 'Package / order', 'Guests booked', 'Guests served', 'Menu / items', 'Allergies / dietary', 'Special requests', 'Event sheet status', 'Prepared by',
+  'Contract price (₱)', 'Price per guest (₱)', 'Pricing notes', 'Receipts total (₱)', 'Receipts checked', 'Other recorded costs (₱)', 'Total cost (₱)', 'Gross margin (₱)', 'Margin %', 'Cost per guest (₱)',
   'Outcome', 'Fulfilled on', 'Amount billed (₱)', 'Payment', 'Remarks / client feedback', 'Archived on', 'Archived by', 'Record id'];
 function archRef(sh, id) { return sh.ref || ('EV-' + String(sh.date || '').replace(/-/g, '').slice(0, 8) + '-' + String(id || '').slice(-3).toUpperCase()); }
 function archiveSync(me) {
   return withLock(function () {
     const sh = opsSheet(), ss = sh.getParent();
-    const evs = readAll(sh).filter(function (r) { return r.coll === 'events'; }).map(function (r) { const d = toDoc(r).data; d._id = r.path.split('/')[1]; return d; })
+    const all = readAll(sh), live = function (d) { return d.status !== 'void'; };
+    const other = {};
+    all.forEach(function (r) {
+      if (r.coll !== 'expenses' && r.coll !== 'moves') return; const d = toDoc(r).data; if (!live(d) || !d.eventId) return;
+      let v = 0; if (r.coll === 'expenses') v = Number(d.amount) || 0;
+      else if (d.type === 'issue' || d.type === 'return') v = (d.lines || []).reduce(function (a, l) { return a + (Number(l.qty) || 0) * (Number(l.cost) || 0); }, 0) * (d.type === 'return' ? -1 : 1);
+      other[d.eventId] = (other[d.eventId] || 0) + v;
+    });
+    const rcRows = [];
+    const evs = all.filter(function (r) { return r.coll === 'events'; }).map(function (r) { const d = toDoc(r).data; d._id = r.path.split('/')[1]; return d; })
       .filter(function (e) { return e.status !== 'void' && e.archive; });
     const ST = { draft: 'Draft', approval: 'For client approval', approved: 'Approved by client', cancelled: 'Cancelled' };
     const OUT = { fulfilled: 'Fulfilled', cancelled: 'Cancelled', noshow: 'Did not push through' };
@@ -546,10 +556,19 @@ function archiveSync(me) {
       const menu = (s.menu || []).filter(function (m) { return String(m.dish || '').trim(); });
       const mt = menu.map(function (m) { return (k !== 'catering' && m.qty ? m.qty + ' × ' : '') + m.dish + (k === 'catering' && m.course ? ' (' + m.course + ')' : '') + (m.note ? ' [' + m.note + ']' : ''); }).join('; ');
       const paxB = Number(s.pax || e.pax) || '';
+      const rec = Object.keys(e.receipts || {}).map(function (k) { return e.receipts[k]; }).filter(Boolean);
+      const rTot = Math.round(rec.reduce(function (a, x) { return a + (Number(x.amount) || 0); }, 0) * 100) / 100, rTodo = rec.filter(function (x) { return !x.verified; }).length;
+      const oth = Math.round((other[e._id] || 0) * 100) / 100, cost = Math.round((rTot + oth) * 100) / 100, contract = Number(e.contract) || 0, pr = e.pricing || {};
+      const paxC = Number(pr.pax || e.pax || s.pax) || 0;
+      const money = [contract || '', pr.perHead ? Number(pr.perHead) : (contract && paxC ? Math.round(contract / paxC * 100) / 100 : ''), pr.note || '', rTot,
+        rec.length ? (rTodo ? (rec.length - rTodo) + ' of ' + rec.length + ' verified' : 'all ' + rec.length + ' verified') : 'no receipts', oth || '', cost,
+        contract ? Math.round((contract - cost) * 100) / 100 : '', contract ? Math.round((contract - cost) / contract * 1000) / 10 : '', paxC ? Math.round(cost / paxC * 100) / 100 : ''];
+      rec.forEach(function (x) { rcRows.push([archRef(s, e._id), date, s.client || e.client || e.name || '', x.date || '', x.store || '', Number(x.amount) || 0, x.ocrAmount === '' || x.ocrAmount == null ? '' : Number(x.ocrAmount), x.by || '',
+        x.verified ? (x.verified.name || x.verified.user || '') : 'not yet verified', (x.items || []).map(function (i) { return i.name + ' ' + i.amount; }).join('; '), x.note || '']); });
       rows.push([ref, date, bookKind(s), k === 'catering' ? (s.type || '') : (s.fulfil || ''), s.client || e.client || e.name || '', s.contact || '', s.mobile ? "'" + s.mobile : '', s.email || '', s.source || '',
         s.venue || e.venue || '', k === 'catering' ? (s.pkg || '') : orderLabel(s), paxB, a.servedPax !== undefined && a.servedPax !== '' ? Number(a.servedPax) : paxB, mt, s.allergy || '', s.special || '',
-        ST[s.status] || 'Draft', s.preparedBy || '', OUT[a.outcome] || 'Fulfilled', a.fulfilledOn || '', a.billed !== undefined && a.billed !== '' ? Number(a.billed) : '', a.payment || '', a.remarks || '',
-        a.at ? Utilities.formatDate(new Date(a.at), 'Asia/Manila', 'yyyy-MM-dd HH:mm') : '', a.by || '', e._id]);
+        ST[s.status] || 'Draft', s.preparedBy || ''].concat(money).concat([OUT[a.outcome] || 'Fulfilled', a.fulfilledOn || '', a.billed !== undefined && a.billed !== '' ? Number(a.billed) : '', a.payment || '', a.remarks || '',
+        a.at ? Utilities.formatDate(new Date(a.at), 'Asia/Manila', 'yyyy-MM-dd HH:mm') : '', a.by || '', e._id]));
       menu.forEach(function (m) {
         const t = lineType(m, k);
         items.push([ref, date, s.client || e.client || e.name || '', bookKind(s), k === 'catering' ? (m.course || '') : (t === 'drink' ? 'Drink' : t === 'addon' ? 'Add-on' : k === 'packs' ? 'Meal pack' : 'Tray'), m.dish, k === 'catering' ? '' : (parseFloat(m.qty) || 1), m.note || '']);
@@ -567,9 +586,10 @@ function archiveSync(me) {
       (widths || []).forEach(function (w, i) { t.setColumnWidth(i + 1, w); });
       return t;
     };
-    const main = write(ARCHIVE_SHEET, ARCHIVE_HEAD, rows, [120, 95, 85, 130, 180, 140, 110, 170, 120, 200, 160, 70, 70, 360, 150, 170, 120, 110, 100, 95, 100, 130, 260, 120, 110, 90]);
+    const main = write(ARCHIVE_SHEET, ARCHIVE_HEAD, rows, [120, 95, 85, 130, 180, 140, 110, 170, 120, 200, 160, 70, 70, 360, 150, 170, 120, 110, 110, 100, 200, 110, 120, 120, 110, 110, 80, 100, 100, 95, 100, 130, 260, 120, 110, 90]);
+    write('Event Archive - Receipts', ['Reference no.', 'Event date', 'Client', 'Receipt date', 'Store / supplier', 'Amount (₱)', 'Auto-read (₱)', 'Uploaded by', 'Verified by', 'Items on the receipt', 'Note'], rcRows, [120, 95, 180, 95, 160, 100, 100, 110, 130, 360, 200]);
     write(ARCHIVE_ITEMS_SHEET, ['Reference no.', 'Date', 'Client', 'Service', 'Course / type', 'Dish / item', 'Qty', 'Note'], items, [120, 95, 180, 85, 130, 260, 60, 180]);
-    try { if (rows.length) main.getRange(2, 21, rows.length, 1).setNumberFormat('₱#,##0.00'); } catch (e) {}
+    try { if (rows.length) [19, 20, 22, 24, 25, 26, 28, 31].forEach(function (c) { main.getRange(2, c, rows.length, 1).setNumberFormat('₱#,##0.00'); }); } catch (e) {}
     return { ok: true, count: rows.length, url: ss.getUrl() + '#gid=' + main.getSheetId() };
   });
 }
