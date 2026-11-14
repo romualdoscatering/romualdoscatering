@@ -329,7 +329,7 @@ function alerts() {
 }
 
 /* ============ rendering infra ============ */
-const TABS_ALL = [['dash', 'Dashboard'], ['prs', 'Requests'], ['advances', 'Cash advances'], ['purchases', 'Purchases & expenses'], ['stock', 'Stock'], ['usage', 'Use & waste'], ['recipes', 'Recipes & production'], ['sheets', 'Event sheets'], ['events', 'Catering events'], ['reports', 'Reports'], ['setup', 'Setup']];
+const TABS_ALL = [['dash', 'Dashboard'], ['prs', 'Requests'], ['advances', 'Cash advances'], ['purchases', 'Purchases & expenses'], ['stock', 'Stock'], ['usage', 'Use & waste'], ['recipes', 'Recipes & production'], ['sheets', 'Event sheets'], ['events', 'Catering events'], ['archive', 'Archive'], ['reports', 'Reports'], ['setup', 'Setup']];
 const tabsFor = () => TABS_ALL.filter(t => t[0] !== 'setup' || S.isAdmin);
 let TABS = TABS_ALL;
 const V = {};
@@ -694,7 +694,7 @@ V.sheets = () => {
   D.sheet ||= newSheet(); maybeRestoreDraft();
   const d = D.sheet, f = D.ui, k = d.kind || 'catering', cat = k === 'catering';
   const evs = Object.values(S.events).filter(e => e.status !== 'void').sort((a, b) => a.date.localeCompare(b.date));
-  const up = evs.filter(e => e.date >= today()), past = evs.filter(e => e.date < today()).reverse();
+  const up = evs.filter(e => e.date >= today() && !e.archive), past = evs.filter(e => e.date < today() && !e.archive).reverse();
   const lab = (t, inner, cls = '') => `<label class="${cls}">${t}${inner}</label>`;
   const inp = (k, ph = '', type = 'text', extra = '') => `<input type="${type}" data-b="sheet.${k}" placeholder="${esc(ph)}" ${extra}>`;
   const listRow = e => { const sh = sheetOf(e), st = SHEET_STATUS.find(x => x[0] === sh.status) || SHEET_STATUS[0];
@@ -739,7 +739,8 @@ V.sheets = () => {
   </div>
   <div class="card"><h3>Upcoming events (${up.length})</h3>
    ${up.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th class="n">Pax</th><th>Status</th><th></th></tr></thead><tbody>${up.map(listRow).join('')}</tbody></table></div>` : '<div class="empty">No upcoming events yet.</div>'}
-   ${past.length ? `<details style="margin-top:10px"><summary class="small">Past events (${past.length})</summary><div class="tw"><table><tbody>${past.map(listRow).join('')}</tbody></table></div></details>` : ''}
+   ${past.length ? `<details style="margin-top:10px" open><summary class="small">Past events not yet archived (${past.length}) · <a href="#archive">mark them fulfilled in the Archive →</a></summary><div class="tw"><table><tbody>${past.map(listRow).join('')}</tbody></table></div></details>` : ''}
+   <p class="small mut" style="margin:10px 0 0">Finished events and fulfilled orders are kept in the <a href="#archive">Archive</a>, with an Excel copy.</p>
   </div>`;
 };
 ACT.newSheet = async () => { await flushSheet(); AS.dirty = false; AS.restoredAt = 0; AS.lastOk = 0; draftClear(); D.sheet = newSheet(); render(); document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'}); };
@@ -857,6 +858,149 @@ ACT.delSheet = id => {
   if (!confirm(`Delete the event sheet for ${name} (${fmtD(e.date)})?` + (linked ? `\n\n${linked} purchase/expense/stock record${linked === 1 ? ' is' : 's are'} linked to this event. They stay in their own pages.` : '') + '\n\nThis removes it from the list.')) return;
   if (D.sheet?.id === id) { clearTimeout(AS.timer); clearTimeout(AS.localTimer); AS.dirty = false; AS.err = ''; AS.restoredAt = 0; AS.lastOk = 0; draftClear(); D.sheet = newSheet(); }
   guard(async () => { await upd('events/' + id, {status: 'void', voidReason: 'Event sheet deleted', voidBy: S.me?.name || S.me?.username || '', voidAt: Date.now()}); bookingSync(id, false); }, 'Event sheet deleted');
+};
+
+/* ============ ARCHIVE: finished events & fulfilled clients ============ */
+const ARC_OUT = [['fulfilled', 'Fulfilled'], ['cancelled', 'Cancelled'], ['noshow', 'Did not push through']];
+const ARC_PAY = ['', 'Paid in full', 'Partially paid / balance due', 'Unpaid', 'Complimentary'];
+const arcOutLabel = v => (ARC_OUT.find(x => x[0] === v) || ARC_OUT[0])[1];
+const menuText = (d, k) => (d.menu || []).filter(m => (m.dish || '').trim()).map(m => (k !== 'catering' && m.qty ? m.qty + ' × ' : '') + m.dish + (k === 'catering' && m.course ? ' (' + m.course + ')' : '') + (m.note ? ' [' + m.note + ']' : '')).join('; ');
+function arcRow(e) {
+  const d = sheetOf(e), k = d.kind || 'catering', a = e.archive || {}, os = orderSum((d.menu || []).filter(m => m.dish), k);
+  return {id: e.id, ref: sheetRef(d), date: d.date || e.date || '', kind: sheetKindLabel(k), type: k === 'catering' ? (d.type || '') : (d.fulfil || ''), client: d.client || e.client || e.name || '',
+    contact: d.contact || '', mobile: d.mobile || '', email: d.email || '', source: d.source || '', venue: d.venue || e.venue || '', pkg: k === 'catering' ? (d.pkg || '') : orderLabel(os, k),
+    paxBooked: num(d.pax || e.pax) || '', paxServed: a.servedPax !== undefined && a.servedPax !== '' ? num(a.servedPax) : (num(d.pax || e.pax) || ''), menu: menuText(d, k),
+    allergy: d.allergy || '', special: d.special || '', sheetStatus: (SHEET_STATUS.find(x => x[0] === d.status) || SHEET_STATUS[0])[1], preparedBy: d.preparedBy || '',
+    outcome: arcOutLabel(a.outcome), fulfilledOn: a.fulfilledOn || '', billed: a.billed !== undefined && a.billed !== '' ? num(a.billed) : '', payment: a.payment || '', remarks: a.remarks || '',
+    archivedOn: a.at ? new Date(a.at).toLocaleString('en-PH', {year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'}) : '', archivedBy: a.by || ''};
+}
+const ARC_COLS = [['ref', 'Reference no.'], ['date', 'Event / order date'], ['kind', 'Service'], ['type', 'Event type / pick-up or delivery'], ['client', 'Client'], ['contact', 'Contact person'], ['mobile', 'Mobile'], ['email', 'Email'], ['source', 'How they found us'],
+  ['venue', 'Venue / address'], ['pkg', 'Package / order'], ['paxBooked', 'Guests booked'], ['paxServed', 'Guests served'], ['menu', 'Menu / items'], ['allergy', 'Allergies / dietary'], ['special', 'Special requests'],
+  ['sheetStatus', 'Event sheet status'], ['preparedBy', 'Prepared by'], ['outcome', 'Outcome'], ['fulfilledOn', 'Fulfilled on'], ['billed', 'Amount billed (₱)'], ['payment', 'Payment'], ['remarks', 'Remarks / client feedback'], ['archivedOn', 'Archived on'], ['archivedBy', 'Archived by']];
+const ARC = {url: '', synced: 0, syncing: false};
+function arcFiltered() {
+  const f = D.ui, q = (f.arcQ || '').trim().toLowerCase();
+  return Object.values(S.events).filter(e => e.status !== 'void' && e.archive).map(e => [e, arcRow(e)])
+    .filter(([e, r]) => (!f.arcYear || r.date.slice(0, 4) === f.arcYear) && (!f.arcMonth || r.date.slice(5, 7) === f.arcMonth) && (!f.arcKind || r.kind === f.arcKind) && (!f.arcOut || (e.archive.outcome || 'fulfilled') === f.arcOut)
+      && (!q || [r.ref, r.client, r.contact, r.mobile, r.email, r.venue, r.pkg, r.menu, r.remarks, r.type].join(' ').toLowerCase().includes(q)))
+    .sort((a, b) => b[1].date.localeCompare(a[1].date));
+}
+function arcSync(quiet) {
+  if (ARC.syncing) return; ARC.syncing = true;
+  api('archiveSync', {}).then(r => { ARC.syncing = false; if (r.ok) { ARC.url = r.url || ARC.url; ARC.synced = Date.now(); if (D.ui.tab === 'archive') render(); } else if (!quiet) toast(r.error || 'Excel copy not updated', true); })
+    .catch(e => { ARC.syncing = false; if (!quiet) toast('Excel copy not updated: ' + e.message, true); });
+}
+V.archive = () => {
+  if (!ARC.synced && !ARC.syncing && S.lastSync) arcSync(true);
+  const f = D.ui, t = today();
+  const due = Object.values(S.events).filter(e => e.status !== 'void' && !e.archive && e.date && e.date < t).sort((a, b) => b.date.localeCompare(a.date));
+  const all = Object.values(S.events).filter(e => e.status !== 'void' && e.archive);
+  const years = [...new Set(all.map(e => (sheetOf(e).date || e.date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  const list = arcFiltered(), ful = list.filter(([e]) => (e.archive.outcome || 'fulfilled') === 'fulfilled');
+  const served = ful.reduce((a, [, r]) => a + (num(r.paxServed) || 0), 0), billed = ful.reduce((a, [, r]) => a + (num(r.billed) || 0), 0);
+  const byKind = k => ful.filter(([, r]) => r.kind === k).length;
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const dueRow = e => { const d = sheetOf(e), k = d.kind || 'catering';
+    return `<tr><td>${fmtD(d.date || e.date)}</td><td><b>${esc(d.client || e.client || e.name)}</b> <span class="chip ${k === 'catering' ? '' : 'warn'}" ${k === 'catering' ? 'style="background:#E3E7F0;color:#1A2C54"' : ''}>${sheetKindLabel(k)}</span><div class="small mut">${esc(sheetRef(d))}${d.venue ? ' · ' + esc(d.venue) : ''}</div></td><td class="n">${esc(d.pax || e.pax || '')}</td>
+      <td class="row"><button class="sm pri" data-act="arcMark" data-arg="${e.id}">Mark fulfilled &amp; archive</button><button class="sm ghost" data-act="arcMark" data-arg="${e.id}|cancelled">Didn't push through</button></td></tr>`; };
+  const row = ([e, r]) => `<tr class="click" data-act="arcView" data-arg="${e.id}"><td>${fmtD(r.date)}<div class="small mut">${esc(r.ref)}</div></td><td><b>${esc(r.client)}</b><div class="small mut">${esc([r.kind, r.type, r.venue].filter(Boolean).join(' · '))}</div></td>
+    <td class="small">${esc(r.pkg)}</td><td class="n">${esc(r.paxServed)}</td>${S.isAdmin ? `<td class="n">${r.billed !== '' ? peso(r.billed) : ''}<div class="small mut">${esc(r.payment)}</div></td>` : ''}
+    <td><span class="chip ${r.outcome === 'Fulfilled' ? 'ok' : 'mut'}">${esc(r.outcome)}</span></td><td class="small mut">${esc(r.archivedBy)}<div>${esc(r.archivedOn)}</div></td><td>›</td></tr>`;
+  return `<h2>Archive</h2>
+  <p class="lede">Finished events and fulfilled orders, kept for documentation and traceability. Every archived event is also copied to an Excel-ready sheet automatically.</p>
+  ${due.length ? `<div class="card" style="border-left:4px solid var(--warn,#B7791F)"><h3>Finished, waiting to be archived (${due.length})</h3><p class="small mut" style="margin:-4px 0 8px">These events are past their date. Confirm how each went to move it into the archive.</p>
+   <div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th class="n">Pax</th><th></th></tr></thead><tbody>${due.map(dueRow).join('')}</tbody></table></div></div>` : ''}
+  <div class="card"><div class="row" style="margin-bottom:8px"><h3 style="margin:0">Archived events (${list.length}${list.length !== all.length ? ' of ' + all.length : ''})</h3><span class="spacer"></span>
+    <button class="sm pri" data-act="arcXlsx">⬇ Download Excel (.xlsx)</button>${ARC.url ? `<a class="sm" style="text-decoration:none;padding:6px 10px;border:1px solid var(--line,#ccc);border-radius:8px" href="${esc(ARC.url)}" target="_blank" rel="noopener">Open Google Sheet copy ↗</a>` : ''}<button class="sm ghost" data-act="arcResync" title="Rebuild the Google Sheet copy now">${ARC.syncing ? 'Updating…' : '↻ Update sheet copy'}</button></div>
+   <style>.arcf select{width:auto;flex:0 0 auto}.arcf input{width:auto}</style>
+   <div class="row arcf" style="gap:8px;flex-wrap:wrap;margin-bottom:10px">
+    <input data-b="ui.arcQ" data-rr placeholder="Search client, ref no., mobile, venue, menu…" style="flex:1;min-width:220px">
+    ${sel('ui.arcYear', opt('', 'All years') + years.map(y => opt(y, y)).join(''))}${sel('ui.arcMonth', opt('', 'All months') + MON.map((m, i) => opt(String(i + 1).padStart(2, '0'), m)).join(''))}
+    ${sel('ui.arcKind', opt('', 'All services') + ['Catering', 'Food trays', 'Food packs'].map(k => opt(k, k)).join(''))}${sel('ui.arcOut', opt('', 'All outcomes') + ARC_OUT.map(([v, l]) => opt(v, l)).join(''))}</div>
+   <div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:10px">
+    <span class="chip ok">${ful.length} fulfilled</span><span class="chip">${served.toLocaleString('en-PH')} guests served</span><span class="chip" style="background:#E3E7F0;color:#1A2C54">${byKind('Catering')} catering</span><span class="chip warn">${byKind('Food trays')} tray orders</span><span class="chip warn">${byKind('Food packs')} pack orders</span>${S.isAdmin && billed ? `<span class="chip">${peso(billed)} billed</span>` : ''}</div>
+   ${list.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th>Package / order</th><th class="n">Served</th>${S.isAdmin ? '<th class="n">Billed</th>' : ''}<th>Outcome</th><th>Archived</th><th></th></tr></thead><tbody>${list.map(row).join('')}</tbody></table></div>` : `<div class="empty">${all.length ? 'Nothing matches these filters.' : 'No archived events yet. Finished events appear above for you to archive.'}</div>`}
+  </div>`;
+};
+ACT.arcResync = () => arcSync(false);
+ACT.arcMark = arg => {
+  const [id, preset] = String(arg).split('|'), e = S.events[id]; if (!e) return;
+  const d = sheetOf(e), a = e.archive || {}, edit = !!e.archive;
+  const out = a.outcome || preset || (d.status === 'cancelled' ? 'cancelled' : 'fulfilled');
+  openModal(`<h3 style="margin-top:0">${edit ? 'Edit archive record' : 'Archive this event'}</h3>
+   <p class="small mut" style="margin-top:-6px">${esc(d.client || e.name)} · ${fmtD(d.date || e.date)} · ${esc(sheetKindLabel(d.kind))} · ${esc(sheetRef(d))}</p>
+   <div class="grid">
+    <label>Outcome<select id="a-out">${ARC_OUT.map(([v, l]) => `<option value="${v}" ${v === out ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+    <label>Fulfilled on<input id="a-date" type="date" value="${esc(a.fulfilledOn || d.date || e.date || '')}"></label>
+    <label>Guests served<input id="a-pax" type="number" inputmode="numeric" min="0" value="${esc(a.servedPax ?? (d.pax || e.pax || ''))}"></label>
+    ${S.isAdmin ? `<label>Amount billed ₱ <span class="small mut">(optional)</span><input id="a-bill" type="number" inputmode="decimal" min="0" step="any" value="${esc(a.billed ?? (num(e.contract) || ''))}"></label>
+    <label>Payment<select id="a-pay">${ARC_PAY.map(v => `<option value="${esc(v)}" ${v === (a.payment || '') ? 'selected' : ''}>${v || '— not recorded —'}</option>`).join('')}</select></label>` : ''}
+   </div>
+   <label>Remarks / client feedback<textarea id="a-rem" rows="3" placeholder="e.g. Client happy, asked about Christmas trays. 5 extra packs added on the day.">${esc(a.remarks || '')}</textarea></label>
+   ${mBtns(edit ? 'Save changes' : 'Archive')}`, {
+    save: () => {
+      const g = sel => document.querySelector(sel);
+      const rec = {...a, outcome: g('#a-out').value, fulfilledOn: g('#a-date').value, servedPax: g('#a-pax').value === '' ? '' : num(g('#a-pax').value), remarks: g('#a-rem').value.trim(),
+        at: a.at || Date.now(), by: a.by || S.me?.name || S.me?.username || ''};
+      if (S.isAdmin) { rec.billed = g('#a-bill').value === '' ? '' : num(g('#a-bill').value); rec.payment = g('#a-pay').value; }
+      if (edit) { rec.editedAt = Date.now(); rec.editedBy = S.me?.name || S.me?.username || ''; }
+      closeModal();
+      guard(async () => { await upd('events/' + id, {archive: rec}); arcSync(true); }, edit ? 'Archive record updated' : 'Archived');
+    }});
+};
+ACT.arcView = id => {
+  const e = S.events[id]; if (!e) return; const r = arcRow(e);
+  const tr = (l, v) => v !== '' && v != null ? `<tr><th style="text-align:left;padding:4px 10px 4px 0;vertical-align:top;white-space:nowrap" class="small mut">${esc(l)}</th><td style="padding:4px 0">${esc(v)}</td></tr>` : '';
+  openModal(`<div class="row"><h3 style="margin:0">${esc(r.client)}</h3><span class="chip ${r.outcome === 'Fulfilled' ? 'ok' : 'mut'}">${esc(r.outcome)}</span><span class="spacer"></span><button class="sm" data-mact="pdf">PDF</button><button class="sm ghost" data-mact="close">✕</button></div>
+   <table style="margin-top:10px;width:100%">${ARC_COLS.filter(([k]) => S.isAdmin || (k !== 'billed' && k !== 'payment')).map(([k, l]) => tr(l, k === 'billed' && r[k] !== '' ? peso(r[k]) : k === 'date' || k === 'fulfilledOn' ? fmtLong(r[k]) : r[k])).join('')}</table>
+   <div class="row end" style="margin-top:14px">${S.isAdmin ? '<button class="ghost danger" data-mact="unarc">Take out of archive</button>' : ''}<button data-mact="edit">Edit record</button><button class="pri" data-mact="close">Done</button></div>`, {
+    pdf: () => { closeModal(); ACT.pdfSheet(id); },
+    edit: () => { closeModal(); ACT.arcMark(id); },
+    unarc: () => { if (!confirm('Take this event out of the archive? It goes back to the "waiting to be archived" list.')) return; closeModal(); guard(async () => { await upd('events/' + id, {archive: null}); arcSync(true); }, 'Taken out of the archive'); }
+  });
+};
+/* ---- minimal .xlsx writer (no library): inline strings, bold header, frozen first row, two sheets ---- */
+const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = b => { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; };
+function zipStore(files) {
+  const enc = new TextEncoder(), parts = [], cen = []; let off = 0;
+  const u16 = n => [n & 255, (n >>> 8) & 255], u32 = n => [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+  files.forEach(([name, text]) => { const nb = enc.encode(name), db = enc.encode(text), crc = crc32(db);
+    const hd = [...u32(0x04034b50), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(db.length), ...u32(db.length), ...u16(nb.length), ...u16(0)];
+    parts.push(new Uint8Array(hd), nb, db);
+    cen.push(new Uint8Array([...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(0), ...u16(0x21), ...u32(crc), ...u32(db.length), ...u32(db.length), ...u16(nb.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0), ...u32(0), ...u32(off)]), nb);
+    off += hd.length + nb.length + db.length; });
+  const cs = cen.reduce((a, b) => a + b.length, 0);
+  return new Blob([...parts, ...cen, new Uint8Array([...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(files.length), ...u16(files.length), ...u32(cs), ...u32(off), ...u16(0)])], {type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+function xlsxBlob(sheets) {
+  const x = v => String(v).replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '');
+  const col = i => { let s = ''; i++; while (i) { const m = (i - 1) % 26; s = String.fromCharCode(65 + m) + s; i = Math.floor((i - 1) / 26); } return s; };
+  const sheetXml = ({rows, widths}) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
+    + `<cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join('')}</cols><sheetData>`
+    + rows.map((r, ri) => `<row r="${ri + 1}">${r.map((v, ci) => { const ref = col(ci) + (ri + 1), st = ri === 0 ? ' s="1"' : ' s="2"';
+      return typeof v === 'number' && isFinite(v) ? `<c r="${ref}"${st}><v>${v}</v></c>` : v === '' || v == null ? '' : `<c r="${ref}" t="inlineStr"${st}><is><t xml:space="preserve">${x(v)}</t></is></c>`; }).join('')}</row>`).join('')
+    + `</sheetData>${rows.length > 1 ? `<autoFilter ref="A1:${col(rows[0].length - 1)}${rows.length}"/>` : ''}</worksheet>`;
+  const files = [['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheets.map((s, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join('')}</Types>`],
+    ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
+    ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>${sheets.map((s, i) => `<sheet name="${x(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets>${sheets.map((s, i) => s.rows.length > 1 ? `<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">'${x(s.name)}'!$A$1:$${col(s.rows[0].length - 1)}$${s.rows.length}</definedName></definedNames>` : '').join('').replace(/<\/definedNames><definedNames>/g, '')}</workbook>`],
+    ['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((s, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ['xl/styles.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Arial"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1A2C54"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="3"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"><alignment vertical="center" wrapText="1"/></xf><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`]];
+  sheets.forEach((s, i) => files.push([`xl/worksheets/sheet${i + 1}.xml`, sheetXml(s)]));
+  return zipStore(files);
+}
+ACT.arcXlsx = () => {
+  const list = arcFiltered(); if (!list.length) return toast('Nothing to export with these filters.', true);
+  const cols = ARC_COLS.filter(([k]) => S.isAdmin || (k !== 'billed' && k !== 'payment'));
+  const W = {ref: 18, date: 13, kind: 12, type: 18, client: 26, contact: 20, mobile: 15, email: 24, source: 16, venue: 30, pkg: 24, paxBooked: 9, paxServed: 9, menu: 60, allergy: 22, special: 26, sheetStatus: 18, preparedBy: 16, outcome: 14, fulfilledOn: 13, billed: 14, payment: 18, remarks: 40, archivedOn: 20, archivedBy: 16};
+  const events = {name: 'Archived events', widths: cols.map(([k]) => W[k] || 14), rows: [cols.map(c => c[1]), ...list.map(([, r]) => cols.map(([k]) => r[k] === '' ? '' : r[k]))]};
+  const items = {name: 'Menu & items', widths: [18, 13, 26, 12, 22, 40, 8, 26], rows: [['Reference no.', 'Date', 'Client', 'Service', 'Course / type', 'Dish / item', 'Qty', 'Note']]};
+  list.forEach(([e, r]) => { const d = sheetOf(e), k = d.kind || 'catering';
+    (d.menu || []).filter(m => (m.dish || '').trim()).forEach(m => items.rows.push([r.ref, r.date, r.client, r.kind, k === 'catering' ? (m.course || '') : ({main: k === 'packs' ? 'Meal pack' : 'Tray', drink: 'Drink', addon: 'Add-on'})[m.t || 'main'] || '', m.dish, k === 'catering' ? '' : (num(m.qty) || 1), m.note || ''])); });
+  const f = D.ui, tag = [f.arcYear, f.arcMonth && ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][+f.arcMonth - 1], f.arcKind].filter(Boolean).join(' ');
+  const blob = xlsxBlob([events, items]), a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `Romualdos Event Archive${tag ? ' ' + tag : ''} ${today()}.xlsx`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  toast('Excel file downloaded');
 };
 function printSheet(id, w) {
   const e = S.events[id]; if (!e) { if (w) w.close(); return toast('Save the event sheet first.', true); }

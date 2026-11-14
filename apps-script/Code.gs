@@ -59,7 +59,8 @@ function doPost(e) {
       // ---- operations app (purchasing, stock, requisitions) — see Ops.gs ----
       case 'opsSync':
       case 'opsWrite':
-      case 'sheetSync': return out(handleOps(req));
+      case 'sheetSync':
+      case 'archiveSync': return out(handleOps(req));
       default:          return out({ ok: false, error: 'Unknown action.' });
     }
   } catch (err) {

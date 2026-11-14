@@ -29,6 +29,7 @@ function handleOps(req) {
     case 'opsSync':  return opsSync(me, req);
     case 'opsWrite': return opsWrite(me, req.ops);
     case 'sheetSync': return sheetSync(me, req);
+    case 'archiveSync': return archiveSync(me);
     default:         return { ok: false, error: 'Unknown action.' };
   }
 }
@@ -143,6 +144,9 @@ function checkStaff(coll, before, after) {
     if (after.status !== before.status && ['approved', 'rejected'].indexOf(after.status) >= 0) forbid('Only Admin accounts can approve or reject requisitions.');
     if (before.status === 'approved' && after.status === 'cancelled') forbid('Only Admin accounts can cancel an approved requisition.');
   }
+  if (coll === 'events' && before.archive && !after.archive) forbid('Only Admin accounts can take an event out of the archive.');
+  if (coll === 'events' && !same((before.archive || {}).billed, (after.archive || {}).billed)) forbid('Only Admin accounts can record the amount billed.');
+  if (coll === 'events' && !same((before.archive || {}).payment, (after.archive || {}).payment)) forbid('Only Admin accounts can record payments.');
   if (coll === 'recipes') return;                 // the small team keeps recipes up to date together
   if (coll === 'advances' && before.status === 'liquidated' && !same(before, after)) forbid('A liquidated advance can only be changed by an Admin.');
   if (coll === 'counts' && !same(before.lines, after.lines)) forbid('Posted counts cannot be changed.');
@@ -499,4 +503,53 @@ function dailyBookingJob() {
     '<p style="font-size:12px"><a href="' + BOOK.OPS_URL + '" style="color:#631B1C">Open in Romualdo\'s Ops</a></p></div>';
   MailApp.sendEmail({ to: BOOK.EMAILS.join(','), subject: subject, body: text, htmlBody: html, name: 'Romualdo\'s Bookings' });
   P.setProperty(dkey, String(Date.now()));
+}
+
+
+/* ---------------- Event archive: Excel-ready copy in the Ops spreadsheet ---------------- */
+const ARCHIVE_SHEET = 'Event Archive';
+const ARCHIVE_ITEMS_SHEET = 'Event Archive - Menu';
+const ARCHIVE_HEAD = ['Reference no.', 'Event / order date', 'Service', 'Event type / pick-up or delivery', 'Client', 'Contact person', 'Mobile', 'Email', 'How they found us',
+  'Venue / address', 'Package / order', 'Guests booked', 'Guests served', 'Menu / items', 'Allergies / dietary', 'Special requests', 'Event sheet status', 'Prepared by',
+  'Outcome', 'Fulfilled on', 'Amount billed (₱)', 'Payment', 'Remarks / client feedback', 'Archived on', 'Archived by', 'Record id'];
+function archRef(sh, id) { return sh.ref || ('EV-' + String(sh.date || '').replace(/-/g, '').slice(0, 8) + '-' + String(id || '').slice(-3).toUpperCase()); }
+function archiveSync(me) {
+  return withLock(function () {
+    const sh = opsSheet(), ss = sh.getParent();
+    const evs = readAll(sh).filter(function (r) { return r.coll === 'events'; }).map(function (r) { const d = toDoc(r).data; d._id = r.path.split('/')[1]; return d; })
+      .filter(function (e) { return e.status !== 'void' && e.archive; });
+    const ST = { draft: 'Draft', approval: 'For client approval', approved: 'Approved by client', cancelled: 'Cancelled' };
+    const OUT = { fulfilled: 'Fulfilled', cancelled: 'Cancelled', noshow: 'Did not push through' };
+    const rows = [], items = [];
+    evs.forEach(function (e) {
+      const s = e.sheet || {}, k = s.kind || 'catering', a = e.archive || {}, date = s.date || e.date || '', ref = archRef(s, e._id);
+      const menu = (s.menu || []).filter(function (m) { return String(m.dish || '').trim(); });
+      const mt = menu.map(function (m) { return (k !== 'catering' && m.qty ? m.qty + ' × ' : '') + m.dish + (k === 'catering' && m.course ? ' (' + m.course + ')' : '') + (m.note ? ' [' + m.note + ']' : ''); }).join('; ');
+      const paxB = Number(s.pax || e.pax) || '';
+      rows.push([ref, date, bookKind(s), k === 'catering' ? (s.type || '') : (s.fulfil || ''), s.client || e.client || e.name || '', s.contact || '', s.mobile ? "'" + s.mobile : '', s.email || '', s.source || '',
+        s.venue || e.venue || '', k === 'catering' ? (s.pkg || '') : orderLabel(s), paxB, a.servedPax !== undefined && a.servedPax !== '' ? Number(a.servedPax) : paxB, mt, s.allergy || '', s.special || '',
+        ST[s.status] || 'Draft', s.preparedBy || '', OUT[a.outcome] || 'Fulfilled', a.fulfilledOn || '', a.billed !== undefined && a.billed !== '' ? Number(a.billed) : '', a.payment || '', a.remarks || '',
+        a.at ? Utilities.formatDate(new Date(a.at), 'Asia/Manila', 'yyyy-MM-dd HH:mm') : '', a.by || '', e._id]);
+      menu.forEach(function (m) {
+        const t = lineType(m, k);
+        items.push([ref, date, s.client || e.client || e.name || '', bookKind(s), k === 'catering' ? (m.course || '') : (t === 'drink' ? 'Drink' : t === 'addon' ? 'Add-on' : k === 'packs' ? 'Meal pack' : 'Tray'), m.dish, k === 'catering' ? '' : (parseFloat(m.qty) || 1), m.note || '']);
+      });
+    });
+    rows.sort(function (a, b) { return String(b[1]).localeCompare(String(a[1])); });
+    items.sort(function (a, b) { return String(b[1]).localeCompare(String(a[1])); });
+    const write = function (name, head, data, widths) {
+      let t = ss.getSheetByName(name); if (!t) t = ss.insertSheet(name);
+      t.clear(); const all = [head].concat(data);
+      t.getRange(1, 1, all.length, head.length).setValues(all);
+      t.getRange(1, 1, 1, head.length).setFontWeight('bold').setBackground('#1A2C54').setFontColor('#FFFFFF');
+      t.setFrozenRows(1);
+      if (data.length) t.getRange(2, 1, data.length, head.length).setVerticalAlignment('top').setWrap(true);
+      (widths || []).forEach(function (w, i) { t.setColumnWidth(i + 1, w); });
+      return t;
+    };
+    const main = write(ARCHIVE_SHEET, ARCHIVE_HEAD, rows, [120, 95, 85, 130, 180, 140, 110, 170, 120, 200, 160, 70, 70, 360, 150, 170, 120, 110, 100, 95, 100, 130, 260, 120, 110, 90]);
+    write(ARCHIVE_ITEMS_SHEET, ['Reference no.', 'Date', 'Client', 'Service', 'Course / type', 'Dish / item', 'Qty', 'Note'], items, [120, 95, 180, 85, 130, 260, 60, 180]);
+    try { if (rows.length) main.getRange(2, 21, rows.length, 1).setNumberFormat('₱#,##0.00'); } catch (e) {}
+    return { ok: true, count: rows.length, url: ss.getUrl() + '#gid=' + main.getSheetId() };
+  });
 }
