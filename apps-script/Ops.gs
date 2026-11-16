@@ -17,7 +17,7 @@ const OPS = {
   SHEET: 'docs',
   HEAD: ['path', 'coll', 'data', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'],
   STAFF_RECHECK_SECONDS: 120,      // how often an active session is re-checked against the staff file
-  COLLS: ['config', 'items', 'events', 'advances', 'purchases', 'expenses', 'moves', 'counts', 'sales', 'prs', 'recipes'],
+  COLLS: ['config', 'items', 'events', 'advances', 'purchases', 'expenses', 'moves', 'counts', 'sales', 'prs', 'recipes', 'bills'],
   MAX_OPS: 50,
   MAX_DOC_CHARS: 45000
 };
@@ -102,7 +102,8 @@ function opsSync(me, req) {
   const base = { ok: true, ver: ver, me: { username: me.username, name: me.name, role: me.role }, now: Date.now() };
   if (req.ver && Number(req.ver) === ver) { base.unchanged = true; return base; }
   const after = Number(req.after) || 0;
-  base.docs = readAll(opsSheet()).filter(function (r) { return r.updatedAt > after; }).map(toDoc);
+  const admin = me.role === 'Admin';
+  base.docs = readAll(opsSheet()).filter(function (r) { return r.updatedAt > after && (admin || r.coll !== 'bills'); }).map(toDoc);
   base.users = opsUsers();
   return base;
 }
@@ -131,6 +132,11 @@ const same = function (a, b) { return JSON.stringify(a === undefined ? null : a)
 /** What a Staff account may NOT do. Admin may do everything. */
 function checkStaff(coll, before, after) {
   if (coll === 'config') forbid('Only Admin accounts can change the setup lists.');
+  if (coll === 'bills') forbid('Only Admin accounts can make or change billing statements.');
+  if (coll === 'events') {
+    const sb = before.sheet || {}, sa = after.sheet || {}, prices = function (sh) { return (sh.menu || []).filter(function (m) { return m.price; }).map(function (m) { return m.dish + '=' + m.price; }).sort().join('|'); };
+    if (!same(sb.bill || null, sa.bill || null) || prices(sb) !== prices(sa)) forbid('Only Admin accounts can change billing and prices on an event sheet.');
+  }
   if (!before) {                                   // creating
     if (after.status === 'void') forbid('Only Admin accounts can void records.');
     if (coll === 'prs' && after.status !== 'submitted') forbid('New requisitions must be submitted for approval.');

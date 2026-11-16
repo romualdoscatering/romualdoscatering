@@ -195,7 +195,7 @@ const MT = {
 
 /* ============ state ============ */
 const ACT = {};
-const S = {state: 'login', prs: [], token: '', me: null, isAdmin: false, users: [], lastSync: 0, syncErr: '', syncing: false, loginMsg: '',
+const S = {state: 'login', prs: [], bills: [], token: '', me: null, isAdmin: false, users: [], lastSync: 0, syncErr: '', syncing: false, loginMsg: '',
   config: {...DEFAULT_CONFIG}, items: {}, events: {}, advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: {}, names: {}, busy: false};
 
 const newPurchase = (o = {}) => ({date: today(), book: 'R', eventId: '', supplier: '', buyer: '', receiptNo: '', advanceId: '', prId: '', prNo: '', lines: [{itemId: '', qty: '', cost: ''}], other: [], ...o});
@@ -329,8 +329,8 @@ function alerts() {
 }
 
 /* ============ rendering infra ============ */
-const TABS_ALL = [['dash', 'Dashboard'], ['prs', 'Requests'], ['advances', 'Cash advances'], ['purchases', 'Purchases & expenses'], ['stock', 'Stock'], ['usage', 'Use & waste'], ['recipes', 'Recipes & production'], ['sheets', 'Event sheets'], ['events', 'Catering events'], ['archive', 'Archive'], ['reports', 'Reports'], ['setup', 'Setup']];
-const tabsFor = () => TABS_ALL.filter(t => t[0] !== 'setup' || S.isAdmin);
+const TABS_ALL = [['dash', 'Dashboard'], ['prs', 'Requests'], ['advances', 'Cash advances'], ['purchases', 'Purchases & expenses'], ['stock', 'Stock'], ['usage', 'Use & waste'], ['recipes', 'Recipes & production'], ['sheets', 'Event sheets'], ['events', 'Catering events'], ['archive', 'Archive'], ['billing', 'Billing'], ['reports', 'Reports'], ['setup', 'Setup']];
+const tabsFor = () => TABS_ALL.filter(t => (t[0] !== 'setup' && t[0] !== 'billing') || S.isAdmin);
 let TABS = TABS_ALL;
 const V = {};
 let pendingR = false;
@@ -359,12 +359,14 @@ function render() {
     <datalist id="dl-units">${UNITS.map(s => `<option value="${s}">`).join('')}</datalist>`;
   $('#view').innerHTML = banner + (V[tab] ? V[tab]() : '') + dl;
   $('#view').querySelectorAll('[data-b]').forEach(el => { const v = getPath(D, el.dataset.b); if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? ''; });
-  if ($('#view [data-live="evtot"]')) live();
+  if ($('#view [data-live]')) live();
 }
 function live() {
   document.querySelectorAll('#view [data-live]').forEach(el => {
     const [k, a, b] = el.dataset.live.split(':'); let h;
     if (k === 'line') { const l = D[a].lines[b]; h = peso(num(l.qty) * num(l.cost)); }
+    else if (k === 'bline') { const B = getPath(D, a), x = B?.sections?.[b]; if (!x) return; const pax = a === 'sheet.bill' ? D.sheet.pax : D.bill?.pax; const q = String(x.qty ?? '').trim() !== '' ? num(x.qty) : num(pax); h = num(x.rate) ? peso(num(x.rate) * q) : ''; }
+    else if (k === 'btot') { h = billTotalsHtml(a === 'sheet.bill' ? sheetBillCalc(D.sheet) : billCalc(D.bill, D.bill?.pax)); }
     else if (k === 'flag') h = priceFlag(D[a].lines[b]);
     else if (k === 'total') h = peso(sum(D[a].lines, l => num(l.qty) * num(l.cost)));
     else if (k === 'rcpt') h = peso(itemsTotal(D.purchase) + otherTotal(D.purchase));
@@ -694,6 +696,7 @@ const sheetOf = e => e.sheet ? {...newSheet(), ...e.sheet, id: e.id} : newSheet(
 const sheetRef = d => d.ref || ('EV-' + (d.date || '').replace(/-/g, '').slice(0, 8) + '-' + (d.id || '').slice(-3).toUpperCase());
 V.sheets = () => {
   D.sheet ||= newSheet(); maybeRestoreDraft();
+  if (S.isAdmin && !D.sheet.bill) D.sheet.bill = (D.sheet.kind || 'catering') === 'catering' ? newBillParts() : {...newBillParts(), sections: []};
   const d = D.sheet, f = D.ui, k = d.kind || 'catering', cat = k === 'catering';
   const evs = Object.values(S.events).filter(e => e.status !== 'void').sort((a, b) => a.date.localeCompare(b.date));
   const up = evs.filter(e => e.date >= today() && !e.archive), past = evs.filter(e => e.date < today() && !e.archive).reverse();
@@ -702,7 +705,7 @@ V.sheets = () => {
   const listRow = e => { const sh = sheetOf(e), st = SHEET_STATUS.find(x => x[0] === sh.status) || SHEET_STATUS[0];
     return `<tr class="click" data-act="editSheet" data-arg="${e.id}"><td>${fmtD(e.date)}</td><td><b>${esc(sh.client || e.name)}</b>${sh.kind && sh.kind !== 'catering' ? ` <span class="chip warn">${sheetKindLabel(sh.kind)}</span>` : ` <span class="chip" style="background:#E3E7F0;color:#1A2C54">Catering</span>`}<div class="small mut">${esc([sh.kind && sh.kind !== 'catering' ? sh.fulfil : sh.type, sh.venue].filter(Boolean).join(' · '))}</div></td><td class="n">${esc(sh.pax || e.pax || '')}</td>
       <td><span class="chip ${sh.status === 'approved' ? 'ok' : sh.status === 'approval' ? 'warn' : sh.status === 'cancelled' ? 'mut' : 'info'}">${st[1]}</span></td>
-      <td class="row"><button class="sm" data-act="editSheet" data-arg="${e.id}">Edit</button><button class="sm pri" data-act="pdfSheet" data-arg="${e.id}">PDF</button>${S.isAdmin ? `<button class="sm ghost" data-act="delSheet" data-arg="${e.id}" title="Delete this event sheet" style="color:#9B1C1C">Delete</button>` : ''}</td></tr>`; };
+      <td class="row"><button class="sm" data-act="editSheet" data-arg="${e.id}">Edit</button><button class="sm pri" data-act="pdfSheet" data-arg="${e.id}">${S.isAdmin && sheetBillCalc(sh).any ? 'PDF + billing' : 'PDF'}</button>${S.isAdmin && sheetBillCalc(sh).any ? `<button class="sm" data-act="pdfSheetNoBill" data-arg="${e.id}" title="Event sheet only, without prices">No prices</button>` : ''}${S.isAdmin ? `<button class="sm ghost" data-act="delSheet" data-arg="${e.id}" title="Delete this event sheet" style="color:#9B1C1C">Delete</button>` : ''}</td></tr>`; };
   return `<h2>Event sheets</h2>
   <p class="lede">Encode each event's details once. <b>Generate PDF</b> makes a polished event sheet with the Romualdo's logo, for the kitchen and for the client to approve. Billing is not included; that stays with the admin and finance.</p>
   <div class="card" id="sheetForm"><div class="row" style="margin-bottom:6px"><h3 style="margin:0">${d.id ? 'Edit event sheet' : 'New event sheet'}</h3><span id="sheetSaveState" class="save-state ${AS.err ? 'warn' : AS.dirty ? 'busy' : 'ok'}">${esc(saveStateText())}</span><span class="spacer"></span>${d.id ? '<button class="sm ghost" data-act="newSheet">＋ Start a new one instead</button>' : ''}</div>
@@ -729,10 +732,12 @@ V.sheets = () => {
     ${lab(d.fulfil === 'Delivery' ? 'Delivery address & landmark' : 'Pick-up location', inp('venue', d.fulfil === 'Delivery' ? '' : "Romualdo's, 13 Juna Ave. (leave blank)", 'text', 'autocapitalize="words"'))}${lab('Good for (pax, optional)', inp('pax', '', 'number', 'inputmode="numeric" min="0"'))}</div>
    <h4 class="sub">3. ${k === 'packs' ? 'Food packs' : 'Trays'} ordered</h4>
    <p class="small mut" style="margin:0 0 6px">${k === 'packs' ? 'One line per meal-pack variant (e.g. 24 Chicken Teriyaki + 1 Fried Chicken = 25 packs). Put drinks and extra trays on their own lines; they are listed but not counted as packs. Mixed drinks: one line each, e.g. 13 Sprite and 12 Royal, or one line "Softdrinks" with a note "half Sprite, half Royal".' : 'One line per tray. Drinks and other extras go on their own lines and are not counted as trays.'}</p>
-   <div class="tw"><table class="lines"><thead><tr><th>Item</th><th style="width:130px">Type</th><th style="width:80px">Qty</th><th style="width:220px">Note <span class="small mut">(e.g. less spicy)</span></th><th style="width:30px"></th></tr></thead><tbody>
-    ${d.menu.map((m, i) => `<tr><td><input data-b="sheet.menu.${i}.dish" placeholder="${k === 'packs' ? 'e.g. Chicken Teriyaki, Yasai Itame, Lumpia Shanghai, Rice' : 'e.g. Baked Rosemary Chicken (large tray)'}" autocapitalize="words"></td><td>${sel(`sheet.menu.${i}.t`, LINE_TYPES(k).map(([v, l]) => opt(v, l)).join(''), false)}</td><td><input data-b="sheet.menu.${i}.qty" type="number" inputmode="numeric" min="0" placeholder="1"></td><td><input data-b="sheet.menu.${i}.note"></td><td><button class="sm ghost" data-act="rmCourse" data-arg="${i}" title="Remove">✕</button></td></tr>`).join('')}
+   <div class="tw"><table class="lines"><thead><tr><th>Item</th><th style="width:130px">Type</th><th style="width:80px">Qty</th><th style="width:220px">Note <span class="small mut">(e.g. less spicy)</span></th>${S.isAdmin ? '<th style="width:110px">Price each ₱ <span class="small mut">(optional)</span></th>' : ''}<th style="width:30px"></th></tr></thead><tbody>
+    ${d.menu.map((m, i) => `<tr><td><input data-b="sheet.menu.${i}.dish" placeholder="${k === 'packs' ? 'e.g. Chicken Teriyaki, Yasai Itame, Lumpia Shanghai, Rice' : 'e.g. Baked Rosemary Chicken (large tray)'}" autocapitalize="words"></td><td>${sel(`sheet.menu.${i}.t`, LINE_TYPES(k).map(([v, l]) => opt(v, l)).join(''), false)}</td><td><input data-b="sheet.menu.${i}.qty" type="number" inputmode="numeric" min="0" placeholder="1"></td><td><input data-b="sheet.menu.${i}.note"></td>${S.isAdmin ? `<td><input data-b="sheet.menu.${i}.price" type="number" inputmode="decimal" min="0" step="any" placeholder="₱"></td>` : ''}<td><button class="sm ghost" data-act="rmCourse" data-arg="${i}" title="Remove">✕</button></td></tr>`).join('')}
    </tbody></table></div>
    <div class="row" style="margin-top:6px"><button class="sm" data-act="addCourse">＋ Add item</button><span class="spacer"></span><span class="small" data-live="osum"></span></div>`}
+   ${S.isAdmin ? `<details class="billbox" ${sheetBillCalc(d).any || D.ui.billOpen ? 'open' : ''} ontoggle="D.ui.billOpen=this.open" style="margin:14px 0 4px;border:1px dashed var(--line,#ccc);border-radius:10px;padding:8px 12px"><summary><b>Billing (optional, Admins)</b> <span class="small mut">Add prices to print the event details and the billing together. Leave blank for the event sheet only.</span></summary>
+    <div style="margin-top:10px">${cat ? '' : '<p class="small mut" style="margin:0 0 6px">Prices typed in the order table above are billed automatically (price × qty). Add anything else below.</p>'}${billEditor('sheet.bill', {items: false, defPax: d.pax, secLabel: cat ? 'Package / item' : 'Other priced item', secPh: cat ? 'e.g. Catering package' : 'e.g. Delivery to Bangkal', secAdd: cat ? 'package or item' : 'item'})}</div></details>` : ''}
    <h4 class="sub">${cat ? 5 : 4}. Notes</h4>
    <div class="grid">${lab('Allergies / dietary needs', `<textarea data-b="sheet.allergy" rows="2"></textarea>`)}${lab('Special requests', `<textarea data-b="sheet.special" rows="2"></textarea>`)}</div>
    <h4 class="sub">${cat ? 6 : 5}. Approval</h4>
@@ -777,9 +782,16 @@ function sheetTouched() {
 }
 function sheetPayload(d) {
   const client = titleCase(d.client);
-  const sheet = {...d, client, pax: num(d.pax) || '', kind: d.kind || 'catering', menu: d.menu.filter(m => (m.dish || '').trim() || (m.note || '').trim()).map(m => ({course: (m.course || '').trim(), dish: (m.dish || '').trim(), qty: String(m.qty || '').trim(), ...(d.kind && d.kind !== 'catering' ? {t: lineType(m, d.kind)} : {}), note: (m.note || '').trim()})), savedAt: Date.now()};
+  const sheet = {...d, client, pax: num(d.pax) || '', kind: d.kind || 'catering', menu: d.menu.filter(m => (m.dish || '').trim() || (m.note || '').trim()).map(m => ({course: (m.course || '').trim(), dish: (m.dish || '').trim(), qty: String(m.qty || '').trim(), ...(d.kind && d.kind !== 'catering' ? {t: lineType(m, d.kind)} : {}), ...(num(m.price) > 0 ? {price: num(m.price)} : {}), note: (m.note || '').trim()})), savedAt: Date.now()};
   delete sheet.id;
+  const cb = cleanBill(d.bill); if (cb) sheet.bill = cb; else delete sheet.bill;
   return {client, sheet, base: {name: client, client, date: d.date, pax: num(d.pax) || '', venue: (d.venue || '').trim()}};
+}
+function cleanBill(b) {
+  if (!b) return null;
+  const o = {sections: (b.sections || []).filter(x => (x.title || '').trim() || num(x.rate)).map(x => ({title: (x.title || '').trim(), rate: num(x.rate), qty: String(x.qty ?? '').trim() === '' ? '' : num(x.qty)})),
+    extras: (b.extras || []).filter(x => (x.label || '').trim() || num(x.amount)).map(x => ({label: (x.label || '').trim(), amount: num(x.amount)})), discount: num(b.discount), paid: num(b.paid), paidNote: (b.paidNote || '').trim()};
+  return o.sections.length || o.extras.length || o.discount || o.paid || o.paidNote ? o : null;
 }
 async function writeSheet(d) {
   const {client, sheet, base} = sheetPayload(d);
@@ -835,6 +847,7 @@ ACT.saveSheet = mode => {
   }, mode === 'pdf' ? 'Saved — opening the PDF' : 'Event sheet saved').then(ok => { if (!ok && win) win.close(); });
 };
 ACT.pdfSheet = id => printSheet(id, pdfWindow());
+ACT.pdfSheetNoBill = id => printSheet(id, pdfWindow(), true);
 /* Calendar + emailed copy (server side). notify=true after Save: emails the booking copy if anything changed. */
 let calTimer = 0;
 async function bookingSync(id, notify) {
@@ -947,7 +960,7 @@ ACT.arcMark = arg => {
     <label>Outcome<select id="a-out">${ARC_OUT.map(([v, l]) => `<option value="${v}" ${v === out ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     <label>Fulfilled on<input id="a-date" type="date" value="${esc(a.fulfilledOn || d.date || e.date || '')}"></label>
     <label>Guests served<input id="a-pax" type="number" inputmode="numeric" min="0" value="${esc(a.servedPax ?? (d.pax || e.pax || ''))}"></label>
-    ${S.isAdmin ? `<label>Amount billed ₱ <span class="small mut">(optional)</span><input id="a-bill" type="number" inputmode="decimal" min="0" step="any" value="${esc(a.billed ?? (num(e.contract) || ''))}"></label>
+    ${S.isAdmin ? `<label>Amount billed ₱ <span class="small mut">(optional)</span><input id="a-bill" type="number" inputmode="decimal" min="0" step="any" value="${esc(a.billed ?? (sheetBillCalc(d).any ? sheetBillCalc(d).total : (num(e.contract) || '')))}"></label>
     <label>Payment<select id="a-pay">${ARC_PAY.map(v => `<option value="${esc(v)}" ${v === (a.payment || '') ? 'selected' : ''}>${v || '— not recorded —'}</option>`).join('')}</select></label>` : ''}
    </div>
    <label>Remarks / client feedback<textarea id="a-rem" rows="3" placeholder="e.g. Client happy, asked about Christmas trays. 5 extra packs added on the day.">${esc(a.remarks || '')}</textarea></label>
@@ -1027,22 +1040,160 @@ ACT.arcXlsx = () => {
   a.href = URL.createObjectURL(blob); a.download = `Romualdos Event Archive${tag ? ' ' + tag : ''} ${today()}.xlsx`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
   toast('Excel file downloaded');
 };
-function printSheet(id, w) {
-  const e = S.events[id]; if (!e) { if (w) w.close(); return toast('Save the event sheet first.', true); }
-  const d = sheetOf(e), ref = sheetRef(d), st = (SHEET_STATUS.find(x => x[0] === d.status) || SHEET_STATUS[0])[1];
-  const k = d.kind || 'catering', cat = k === 'catering', kl = sheetKindLabel(k);
-  const logo = new URL('../assets/logo.png', location.href).href;
-  const row = (l, v) => v ? `<tr><th>${esc(l)}</th><td>${esc(v)}</td></tr>` : '';
-  const menu = (d.menu || []).filter(m => m.dish);
-  const os = orderSum(menu, k);
-  const times = cat ? [['Call time', d.call], ['Serving', d.serve], ['Pull-out', d.pull]].filter(x => x[1]) : [];
-  const setup = cat ? [['Motif / theme', d.motif], ['Table setup', d.setup], ['Service staff', d.staff], ['Equipment', d.equip]] : [];
-  const notes = [['Allergies & dietary', d.allergy], ['Special requests', d.special]];
-  const hero = cat ? [['Date', fmtLong(d.date)], ['Guests', d.pax ? d.pax + ' pax' : 'To be confirmed'], ['Occasion', d.type || 'To be confirmed']]
-    : [[d.fulfil === 'Delivery' ? 'Delivery date' : 'Pick-up date', fmtLong(d.date)], [d.fulfil === 'Delivery' ? 'Delivery time' : 'Ready by', d.serve ? fmtClock(d.serve) : 'To be confirmed'], ['Order', (orderLabel(os, k) || kl) + (d.fulfil ? ' · ' + d.fulfil : '')]];
-  const docTitle = cat ? 'Event Details' : k === 'packs' ? 'Food Pack Order' : 'Food Tray Order';
-  const title = `${cat ? 'Event Sheet' : docTitle} - ${d.client} - ${fmtLong(d.date).replace(/^\w+, /, '')}`;
-  const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title>
+
+/* ============ BILLING: statements of account + optional billing on event sheets ============
+   A bill is {sections:[{title, rate, qty, items}], extras:[{label, amount}], discount, paid, paidNote}.
+   Sections are priced per head / per tray (rate × qty); a blank qty uses the guest count. Admins only. */
+const PAY_STATUS = [['unpaid', 'Unpaid'], ['partial', 'Partially paid'], ['paid', 'Paid in full'], ['cancelled', 'Cancelled']];
+const BILL_DEFAULTS = {billAddress: 'Door 1 LPS Bldg, Nacilla Village, Ma-a, Davao City 8000', billContact: 'Mobile: (0995) 540-0308 · Email: romualdoscatering@gmail.com · Messenger: Jp Domingo', payInfo: ''};
+const billCfg = k => (S.config[k] ?? '') !== '' ? S.config[k] : BILL_DEFAULTS[k];
+const newBillParts = () => ({sections: [{title: '', rate: '', qty: '', items: ''}], extras: [], discount: '', paid: '', paidNote: ''});
+const newBill = (o = {}) => ({id: '', no: '', issued: today(), due: '', status: 'unpaid', client: '', contact: '', address: '', email: '', mobile: '', eventDate: '', eventTime: '', pax: '', venue: '', eventId: '', notes: '', ...newBillParts(), ...o});
+function billCalc(b, defPax, pre = []) {
+  const qOf = s => String(s.qty ?? '').trim() !== '' ? num(s.qty) : num(defPax);
+  const lines = pre.concat((b?.sections || []).filter(s => (s.title || '').trim() || num(s.rate)).map(s => ({label: (s.title || '').trim() || 'Item', items: s.items || '', rate: num(s.rate), qty: qOf(s), unit: s.unit || ''})))
+    .map(l => ({...l, amount: r2(l.rate * l.qty)}));
+  const extras = (b?.extras || []).filter(x => (x.label || '').trim() || num(x.amount)).map(x => ({label: (x.label || '').trim() || 'Other charge', amount: r2(num(x.amount))}));
+  const subtotal = r2(lines.reduce((a, l) => a + l.amount, 0) + extras.reduce((a, x) => a + x.amount, 0)), discount = r2(num(b?.discount)), total = r2(Math.max(0, subtotal - discount)), paid = r2(num(b?.paid));
+  return {lines, extras, subtotal, discount, total, paid, balance: r2(total - paid), any: subtotal > 0};
+}
+/* priced order lines of a tray / pack sheet become bill lines */
+const sheetPriced = d => (d.kind || 'catering') === 'catering' ? [] : (d.menu || []).filter(m => (m.dish || '').trim() && num(m.price) > 0)
+  .map(m => ({label: m.dish.trim(), items: m.note || '', rate: num(m.price), qty: parseFloat(m.qty) || 1, unit: lineType(m, d.kind) === 'main' ? (d.kind === 'packs' ? 'pack' : 'tray') : ''}));
+const sheetBillCalc = d => billCalc(d.bill || {}, d.pax, sheetPriced(d));
+function billEditor(path, o = {}) {
+  const b = getPath(D, path) || {}, inp = (k, ph = '', ex = '') => `<input data-b="${path}.${k}" placeholder="${esc(ph)}" ${ex}>`, money = 'type="number" inputmode="decimal" min="0" step="any"';
+  return `${o.sections === false ? '' : `<div class="tw"><table class="lines"><thead><tr><th style="min-width:180px">${o.secLabel || 'What is billed'}</th>${o.items ? '<th style="min-width:200px">Items / menu <span class="small mut">(one per line)</span></th>' : ''}<th style="width:120px">Rate ₱</th><th style="width:110px">Qty / pax</th><th class="n" style="width:120px">Amount</th><th style="width:30px"></th></tr></thead><tbody>
+    ${(b.sections || []).map((s, i) => `<tr><td><input data-b="${path}.sections.${i}.title" placeholder="${esc(o.secPh || 'e.g. Lunch (packed meal)')}" autocapitalize="words"></td>${o.items ? `<td><textarea data-b="${path}.sections.${i}.items" rows="2" placeholder="Chicken Teriyaki&#10;Yasai Itame"></textarea></td>` : ''}
+      <td><input data-b="${path}.sections.${i}.rate" ${money} placeholder="per head"></td><td><input data-b="${path}.sections.${i}.qty" type="number" inputmode="decimal" min="0" step="any" placeholder="${esc(o.defPax ? String(o.defPax) : 'guests')}"></td>
+      <td class="n" style="padding-top:12px" data-live="bline:${path}:${i}"></td><td><button class="sm ghost" data-act="billRm" data-arg="${path}|sections|${i}">✕</button></td></tr>`).join('')}
+   </tbody></table></div><div class="row" style="margin:6px 0 10px"><button class="sm" data-act="billAdd" data-arg="${path}|sections">＋ Add ${o.secAdd || 'line'}</button><span class="small mut">Blank qty uses the number of guests.</span></div>`}
+   <div class="small" style="font-weight:600;margin:4px 0">Other charges <span class="mut" style="font-weight:400">(delivery, equipment, staff, overtime…)</span></div>
+   ${(b.extras || []).map((x, i) => `<div class="row" style="gap:8px;margin-bottom:6px"><input data-b="${path}.extras.${i}.label" placeholder="What for" style="flex:2"><input data-b="${path}.extras.${i}.amount" ${money} placeholder="₱" style="flex:1"><button class="sm ghost" data-act="billRm" data-arg="${path}|extras|${i}">✕</button></div>`).join('')}
+   <button class="sm" data-act="billAdd" data-arg="${path}|extras">＋ Add a charge</button>
+   <div class="grid" style="margin-top:10px"><label>Discount ₱${inp('discount', '0', money)}</label><label>Payments received ₱${inp('paid', '0', money)}</label><label>Payment note${inp('paidNote', 'e.g. 50% down via GCash, Nov 2')}</label></div>
+   <div data-live="btot:${path}" style="margin-top:6px"></div>`;
+}
+function billTotalsHtml(C) {
+  return C.any ? `<div class="row" style="gap:14px;flex-wrap:wrap;align-items:baseline"><span class="small mut">Subtotal ${peso(C.subtotal)}${C.discount ? ' − discount ' + peso(C.discount) : ''}${C.paid ? ' · paid ' + peso(C.paid) : ''}</span><span class="spacer"></span><b style="font-size:20px">Total ${peso(C.total)}</b>${C.paid ? `<b style="font-size:16px;color:${C.balance > 0 ? '#9B1C1C' : '#2E7D32'}">Balance ${peso(C.balance)}</b>` : ''}</div>` : '<span class="small mut">No prices yet.</span>';
+}
+ACT.billAdd = arg => { const [path, k] = arg.split('|'), b = getPath(D, path); if (!b) return; (b[k] ||= []).push(k === 'sections' ? {title: '', rate: '', qty: '', items: ''} : {label: '', amount: ''}); render(); if (path.startsWith('sheet.')) sheetTouched(); };
+ACT.billRm = arg => { const [path, k, i] = arg.split('|'), b = getPath(D, path); if (!b) return; b[k].splice(+i, 1); render(); if (path.startsWith('sheet.')) sheetTouched(); };
+
+/* ---- the Billing page (Admins) ---- */
+const billNo = () => { const p = 'SOA-' + today().slice(2, 4) + today().slice(5, 7) + '-'; const n = S.bills.filter(b => String(b.no || '').startsWith(p)).map(b => parseInt(String(b.no).slice(p.length)) || 0); return p + String((n.length ? Math.max(...n) : 0) + 1).padStart(3, '0'); };
+V.billing = () => {
+  if (!S.isAdmin) return '<div class="empty">Billing is for Admin accounts.</div>';
+  D.bill ||= newBill(); const b = D.bill, C = billCalc(b, b.pax);
+  const inp = (k, ph = '', type = 'text', ex = '') => `<input type="${type}" data-b="bill.${k}" placeholder="${esc(ph)}" ${ex}>`, lab = (t, x) => `<label>${t}${x}</label>`;
+  const evs = Object.values(S.events).filter(e => e.status !== 'void').sort((x, y) => y.date.localeCompare(x.date));
+  const list = S.bills.filter(x => x.status !== 'void').sort((x, y) => String(y.issued).localeCompare(String(x.issued)) || (y.createdAt || 0) - (x.createdAt || 0));
+  const out = list.filter(x => x.status !== 'cancelled' && x.status !== 'paid').reduce((a, x) => a + billCalc(x, x.pax).balance, 0);
+  const stChip = st => `<span class="chip ${st === 'paid' ? 'ok' : st === 'partial' ? 'warn' : st === 'cancelled' ? 'mut' : 'bad'}">${(PAY_STATUS.find(p => p[0] === st) || PAY_STATUS[0])[1]}</span>`;
+  return `<h2>Billing</h2>
+  <p class="lede">Make a statement of account for any client in a minute: who to bill, the event, the approved menu with its rate per head, and any charges. <b>Save &amp; generate PDF</b> makes a formatted billing statement. You can also add prices to an event sheet to print the event details and the billing together.</p>
+  <div class="card" id="billForm"><div class="row" style="margin-bottom:6px"><h3 style="margin:0">${b.id ? 'Edit statement ' + esc(b.no) : 'New statement of account'}</h3><span class="spacer"></span>${b.id ? '<button class="sm ghost" data-act="billNew">＋ Start a new one instead</button>' : ''}</div>
+   <div class="row" style="margin:0 0 8px;gap:8px;flex-wrap:wrap"><span class="small"><b>Start from an event sheet</b> (optional):</span><select id="billFromEv" style="width:auto;max-width:420px"><option value="">— choose an event —</option>${evs.map(e => `<option value="${e.id}">${esc(fmtD(e.date))} · ${esc(sheetOf(e).client || e.name)} · ${esc(sheetKindLabel(sheetOf(e).kind))}</option>`).join('')}</select><button class="sm" data-act="billFromEvent">Fill in</button></div>
+   <h4 class="sub">1. Bill to</h4>
+   <div class="grid">${lab('Name / account', inp('client', 'e.g. Landbank, Mindanao Lending Group', 'text', 'autocapitalize="words"'))}${lab('Contact person', inp('contact', 'e.g. Ms. Karina Lascano', 'text', 'autocapitalize="words"'))}${lab('Address', inp('address', '', 'text', 'autocapitalize="words"'))}${lab('Email', inp('email', '', 'email'))}${lab('Mobile / tel. no.', inp('mobile', '', 'tel'))}</div>
+   <h4 class="sub">2. Event</h4>
+   <div class="grid">${lab('Date of event', inp('eventDate', '', 'date'))}${lab('Time of event', inp('eventTime', 'e.g. 9:00 AM – 3:00 PM, or Varied'))}${lab('Guaranteed pax', inp('pax', '33', 'number', 'inputmode="numeric" min="0"'))}${lab('Venue', inp('venue', '', 'text', 'autocapitalize="words"'))}</div>
+   <h4 class="sub">3. Approved menu &amp; rates</h4>
+   <p class="small mut" style="margin:0 0 6px">One line per meal or package, e.g. <i>AM snack</i> at ₱250/head with its items. The amount is the rate × guests.</p>
+   ${billEditor('bill', {items: true, defPax: b.pax, secLabel: 'Meal / package', secPh: 'e.g. AM snack', secAdd: 'meal or package'})}
+   <h4 class="sub">4. Statement</h4>
+   <div class="grid">${lab('Statement no.', inp('no', b.id ? '' : billNo() + ' (automatic)'))}${lab('Date issued', inp('issued', '', 'date'))}${lab('Due date', inp('due', '', 'date'))}${lab('Status', sel('bill.status', PAY_STATUS.map(([v, l]) => opt(v, l)).join(''), false))}</div>
+   <label>Notes on the statement <span class="small mut">(optional)</span><textarea data-b="bill.notes" rows="2" placeholder="e.g. Please settle the balance on or before the event date."></textarea></label>
+   ${billCfg('payInfo') ? '' : '<p class="small mut">Tip: add your bank / GCash details in <a href="#setup">Setup → Billing</a> so they print on every statement.</p>'}
+   <div class="row end" style="margin-top:12px"><button class="ghost" data-act="billNew">Clear</button><button data-act="billSave" data-arg="pdf">Save &amp; generate PDF</button><button class="pri" data-act="billSave">Save</button></div>
+  </div>
+  <div class="card"><div class="row"><h3 style="margin:0">Statements (${list.length})</h3><span class="spacer"></span>${out > 0 ? `<span class="chip bad">${peso(out)} to collect</span>` : ''}</div>
+   ${list.length ? `<div class="tw" style="margin-top:8px"><table><thead><tr><th>No. / issued</th><th>Client</th><th>Event</th><th class="n">Total</th><th class="n">Balance</th><th>Status</th><th></th></tr></thead><tbody>
+    ${list.map(x => { const c = billCalc(x, x.pax); return `<tr class="click" data-act="billEdit" data-arg="${x.id}"><td><b>${esc(x.no)}</b><div class="small mut">${fmtD(x.issued)}</div></td><td><b>${esc(x.client)}</b>${x.contact ? `<div class="small mut">${esc(x.contact)}</div>` : ''}</td><td>${x.eventDate ? fmtD(x.eventDate) : ''}<div class="small mut">${x.pax ? esc(x.pax) + ' pax' : ''}</div></td>
+      <td class="n">${peso(c.total)}</td><td class="n ${c.balance > 0 && x.status !== 'cancelled' ? 'bad-t' : ''}">${peso(c.balance)}</td><td>${stChip(x.status)}</td><td class="row"><button class="sm pri" data-act="billPdf" data-arg="${x.id}">PDF</button><button class="sm ghost" data-act="billDel" data-arg="${x.id}" style="color:#9B1C1C" title="Delete">✕</button></td></tr>`; }).join('')}
+   </tbody></table></div>` : '<div class="empty">No statements yet.</div>'}
+  </div>`;
+};
+ACT.billNew = () => { D.bill = newBill(); render(); };
+ACT.billEdit = id => { const x = S.bills.find(b => b.id === id); if (!x) return; D.bill = JSON.parse(JSON.stringify({...newBill(), ...x, pax: String(x.pax ?? ''), discount: String(x.discount ?? ''), paid: String(x.paid ?? ''),
+  sections: (x.sections || []).map(s => ({...s, rate: String(s.rate ?? ''), qty: String(s.qty ?? '')})), extras: (x.extras || []).map(e => ({...e, amount: String(e.amount ?? '')}))})); render(); document.getElementById('billForm')?.scrollIntoView({behavior: 'smooth'}); };
+ACT.billFromEvent = () => {
+  const id = $('#billFromEv')?.value, e = S.events[id]; if (!e) return toast('Choose an event first.', true);
+  const d = sheetOf(e), k = d.kind || 'catering', b = D.bill, has = (b.sections || []).some(s => s.title || s.rate);
+  if (has && !confirm('Replace the menu lines you already typed with this event\'s?')) return;
+  Object.assign(b, {eventId: id, client: d.client || b.client, contact: d.contact || b.contact, email: d.email || b.email, mobile: d.mobile || b.mobile, eventDate: d.date || b.eventDate,
+    eventTime: d.serve ? fmtClock(d.serve) : b.eventTime, pax: String(d.pax || e.pax || b.pax || ''), venue: d.venue || b.venue});
+  const menu = (d.menu || []).filter(m => (m.dish || '').trim());
+  if (d.bill && ((d.bill.sections || []).some(s => s.title || s.rate) || sheetPriced(d).length)) {
+    b.sections = sheetPriced(d).map(l => ({title: l.label, rate: String(l.rate), qty: String(l.qty), items: l.items})).concat((d.bill.sections || []).map(s => ({...s, rate: String(s.rate ?? ''), qty: String(s.qty ?? ''), items: s.items || (k === 'catering' ? menu.map(m => m.dish).join('\n') : '')})));
+    b.extras = (d.bill.extras || []).map(x => ({label: x.label, amount: String(x.amount ?? '')})); b.discount = String(d.bill.discount || ''); b.paid = String(d.bill.paid || ''); b.paidNote = d.bill.paidNote || '';
+  } else if (k === 'catering') b.sections = [{title: d.pkg ? d.pkg + ' package' : 'Catering package', rate: e.pricing?.perHead ? String(e.pricing.perHead) : '', qty: '', items: menu.map(m => m.dish).join('\n')}];
+  else b.sections = menu.map(m => ({title: m.dish, rate: m.price ? String(m.price) : '', qty: String(m.qty || 1), items: m.note || ''}));
+  render(); toast('Filled in from the event sheet. Check the rates.');
+};
+function billPayload(b) {
+  const clean = {no: (b.no || '').trim() || billNo(), issued: b.issued || today(), due: b.due || '', status: b.status || 'unpaid', client: titleCase(b.client), contact: (b.contact || '').trim(), address: (b.address || '').trim(), email: (b.email || '').trim(), mobile: (b.mobile || '').trim(),
+    eventDate: b.eventDate || '', eventTime: (b.eventTime || '').trim(), pax: num(b.pax) || '', venue: (b.venue || '').trim(), eventId: b.eventId || '', notes: (b.notes || '').trim(),
+    sections: (b.sections || []).filter(s => (s.title || '').trim() || num(s.rate) || (s.items || '').trim()).map(s => ({title: (s.title || '').trim(), rate: num(s.rate), qty: String(s.qty ?? '').trim() === '' ? '' : num(s.qty), items: (s.items || '').trim()})),
+    extras: (b.extras || []).filter(x => (x.label || '').trim() || num(x.amount)).map(x => ({label: (x.label || '').trim(), amount: num(x.amount)})), discount: num(b.discount), paid: num(b.paid), paidNote: (b.paidNote || '').trim()};
+  return clean;
+}
+ACT.billSave = mode => {
+  const b = D.bill; if (!(b.client || '').trim()) return toast('Enter who to bill (name / account).', true);
+  const data = billPayload(b), C = billCalc(data, data.pax); if (!C.any) return toast('Add at least one priced line (rate and guests).', true);
+  const w = mode === 'pdf' ? pdfWindow() : null, id = b.id || genId();
+  guard(async () => { try { await opsWrite([{op: b.id ? 'update' : 'add', path: 'bills/' + id, data}]); } catch (e) { if (w) w.close(); throw e; } D.bill = {...b, id, no: data.no}; if (w) printBill(id, w); }, b.id ? 'Statement updated' : 'Statement saved');
+};
+ACT.billPdf = id => printBill(id, pdfWindow());
+ACT.billDel = id => { const x = S.bills.find(b => b.id === id); if (!x || !confirm(`Delete statement ${x.no} for ${x.client}?`)) return; guard(async () => { await upd('bills/' + id, {status: 'void', voidAt: Date.now()}); if (D.bill?.id === id) D.bill = newBill(); }, 'Statement deleted'); };
+
+/* ---- PDF parts shared by the statement and the event-sheet billing page ---- */
+const BILL_CSS = `.bill-h{display:flex;align-items:center;gap:6mm;padding-bottom:3mm;border-bottom:1pt solid var(--rule)}.bill-h img{height:17mm}.bill-h .meta{margin-left:auto}
+.addr{text-align:center;font-size:8pt;color:var(--lab);margin:2mm 0 0;line-height:1.6}
+.boxes{display:grid;grid-template-columns:1fr 1fr;gap:5mm;margin:4mm 0}.boxes div{border:.9pt solid var(--ink);border-radius:2mm;padding:3mm 4mm}
+.boxes h3{margin:0 0 1.5mm;font:600 6.8pt Montserrat,Arial,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--acc)}
+.boxes p{margin:.6mm 0;font-size:9.4pt}.boxes b{font-weight:600;color:var(--ink)}
+.am{text-align:center;margin:2mm 0 4mm}.am h2{border:0;text-align:center;font-size:14pt;font-style:italic;font-weight:400;margin:0 0 1mm}
+.am .c{font-size:7.2pt;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--acc);margin-top:2.6mm}.am .c i{font-style:normal;color:var(--wine);letter-spacing:.06em}.am .d{font-family:Alta,'Playfair Display',Georgia,serif;font-style:italic;font-size:11pt;line-height:1.3;color:var(--ink)}
+table.bd{width:100%;border-collapse:collapse;margin-top:1mm}.bd th{font-size:6.8pt;letter-spacing:.16em;text-transform:uppercase;color:var(--lab);font-weight:600;text-align:left;border-bottom:.9pt solid var(--ink);padding:1.2mm 1.5mm}
+.bd td{padding:1.5mm;border-bottom:.6pt solid #CFC8B0;vertical-align:top}.bd .r{text-align:right;white-space:nowrap}.bd td.l{font-weight:600;color:var(--ink)}.bd td.l small{display:block;font-weight:400;color:var(--lab);font-size:7.6pt}
+.bd tfoot td{border:0;padding:1mm 1.5mm}.bd tfoot .tt td{border-top:1.4pt solid var(--ink);font-size:12pt;font-weight:700;color:var(--ink);padding-top:2mm}.bd tfoot .bal td{font-size:11pt;font-weight:700;color:var(--wine)}
+.pay{margin-top:4mm;border:.8pt dashed var(--rule);border-radius:2mm;padding:2.5mm 4mm;font-size:8.6pt;white-space:pre-wrap}.pay b{color:var(--ink);font-size:7pt;letter-spacing:.18em;text-transform:uppercase;display:block;margin-bottom:.8mm}
+.pb{page-break-before:always;break-before:page}`;
+function billBreakdownHtml(C, b) {
+  return `<table class="bd"><thead><tr><th>Description</th><th class="r">Rate</th><th class="r">Qty</th><th class="r">Amount</th></tr></thead><tbody>
+${C.lines.map(l => `<tr><td class="l">${esc(l.label)}${l.items && !b.hideItems ? `<small>${esc(l.items.split('\n').filter(Boolean).join(' · '))}</small>` : ''}</td><td class="r">${peso(l.rate)}</td><td class="r">${fq(l.qty)}${l.unit ? ' ' + esc(l.unit) + (l.qty === 1 ? '' : 's') : ''}</td><td class="r">${peso(l.amount)}</td></tr>`).join('')}
+${C.extras.map(x => `<tr><td class="l">${esc(x.label)}</td><td></td><td></td><td class="r">${peso(x.amount)}</td></tr>`).join('')}</tbody>
+<tfoot>${C.discount || C.paid ? `<tr><td colspan="3" class="r">Subtotal</td><td class="r">${peso(C.subtotal)}</td></tr>` : ''}${C.discount ? `<tr><td colspan="3" class="r">Less discount</td><td class="r">− ${peso(C.discount)}</td></tr>` : ''}
+<tr class="tt"><td colspan="3">TOTAL</td><td class="r">${peso(C.total)}</td></tr>
+${C.paid ? `<tr><td colspan="3" class="r">Less payments received${b.paidNote ? ` <span style="color:var(--lab)">(${esc(b.paidNote)})</span>` : ''}</td><td class="r">− ${peso(C.paid)}</td></tr><tr class="bal"><td colspan="3" class="r">BALANCE DUE</td><td class="r">${peso(C.balance)}</td></tr>` : ''}</tfoot></table>`;
+}
+const payBox = () => billCfg('payInfo') ? `<div class="pay"><b>Payment details</b>${esc(billCfg('payInfo'))}</div>` : '';
+function printBill(id, w) {
+  const b = S.bills.find(x => x.id === id); if (!b) { if (w) w.close(); return toast('Save the statement first.', true); }
+  const C = billCalc(b, b.pax), logo = new URL('../assets/logo.png', location.href).href, st = (PAY_STATUS.find(p => p[0] === b.status) || PAY_STATUS[0])[1];
+  const pr = (l, v) => `<p><b>${l}:</b> ${esc(v || '')}</p>`;
+  const html = sheetDocHtml(`Statement of Account ${b.no} - ${b.client}`, `
+<div class="page" id="pg">
+<div class="bill-h"><img src="${logo}" alt="Romualdo's"><div><div class="tag">Catering Services · Davao City</div><h1>Statement of Account</h1><div class="who">${esc(b.client)}</div></div>
+<div class="meta">No. ${esc(b.no)}<br><span class="status">${esc(st)}</span><br>Issued ${esc(fmtLong(b.issued).replace(/^\w+, /, ''))}${b.due ? '<br>Due ' + esc(fmtLong(b.due).replace(/^\w+, /, '')) : ''}</div></div>
+<p class="addr">${esc(billCfg('billAddress'))}<br>${esc(billCfg('billContact'))}</p>
+<div class="boxes"><div><h3>Bill to</h3>${pr('Name / account', b.client + (b.contact ? ' – ' + b.contact : ''))}${pr('Address', b.address)}${b.email ? pr('Email', b.email) : ''}${b.mobile ? pr('Mobile / tel.', b.mobile) : ''}</div>
+<div><h3>Event</h3>${pr('Date of event', b.eventDate ? fmtLong(b.eventDate) : '')}${pr('Time of event', b.eventTime)}${pr('Guaranteed pax', b.pax)}${pr('Venue', b.venue)}</div></div>
+${C.lines.some(l => l.items) ? `<div class="am"><h2>Approved Menu</h2>${C.lines.map(l => `<div class="c">${esc(l.label)}${l.rate ? ` <i>(${peso(l.rate)}${l.unit ? '/' + esc(l.unit) : '/head'})</i>` : ''}</div>${(l.items || '').split('\n').filter(x => x.trim()).map(x => `<div class="d">${esc(x.trim())}</div>`).join('')}`).join('')}</div>` : ''}
+<h2>Breakdown<small>Billing</small></h2>
+${billBreakdownHtml(C, {...b, hideItems: true})}
+${payBox()}${b.notes ? `<p style="margin:3mm 0 0;font-size:8.8pt;white-space:pre-wrap">${esc(b.notes)}</p>` : ''}
+<div class="foot"><div class="sign"><div><b>${esc(b.contact || b.client)}</b>Received by · signature over printed name · date</div><div><b>${esc(S.me?.name || "Romualdo's Catering Services")}</b>Prepared by · Romualdo's Catering Services</div></div>
+<footer>Romualdo's Catering Services · ${esc(billCfg('billAddress'))} · romualdos.ph</footer></div>
+</div>`, true);
+  w = w && !w.closed ? w : window.open('', '_blank');
+  if (!w) return toast('Your browser blocked the PDF window. Allow pop-ups for romualdos.ph and try again.', true);
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+function sheetDocHtml(title, body) {
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,500&family=Montserrat:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -1087,9 +1238,39 @@ table.kv{width:100%;border-collapse:collapse}
 footer{margin-top:4mm;text-align:center;font-size:7.2pt;color:var(--lab);letter-spacing:.03em;border-top:.8pt solid var(--rule);padding-top:2mm}
 @media screen{.page{margin:16px auto;box-shadow:0 2px 14px rgba(0,0,0,.12)}}
 @media print{body{background:#fff}.bar{display:none}}
+${BILL_CSS}
 </style></head><body>
-<div class="bar"><button onclick="window.print()">Save as PDF / Print</button><button class="alt" onclick="window.close()">Close</button><span>Choose <b>Save as PDF</b> as the destination. The sheet fits on one page.</span></div>
-<div class="page" id="pg">
+<div class="bar"><button onclick="window.print()">Save as PDF / Print</button><button class="alt" onclick="window.close()">Close</button><span>Choose <b>Save as PDF</b> as the destination.</span></div>
+${body}<script>
+function fit(){var p=document.getElementById('pg'),H=p.offsetWidth*297/210;p.style.zoom=1;p.style.minHeight='0';var h=p.scrollHeight,z=h>H?Math.max(.55,(H-2)/h):1;p.style.zoom=z;p.style.minHeight=((H-2)/z)+'px';}
+window.addEventListener('load',function(){(document.fonts?document.fonts.ready:Promise.resolve()).then(function(){fit();setTimeout(function(){window.print()},400)})});
+<\/script>
+</body></html>`;
+}
+function printSheet(id, w, noBill) {
+  const e = S.events[id]; if (!e) { if (w) w.close(); return toast('Save the event sheet first.', true); }
+  const d = sheetOf(e), ref = sheetRef(d), st = (SHEET_STATUS.find(x => x[0] === d.status) || SHEET_STATUS[0])[1];
+  const k = d.kind || 'catering', cat = k === 'catering', kl = sheetKindLabel(k);
+  const logo = new URL('../assets/logo.png', location.href).href;
+  const row = (l, v) => v ? `<tr><th>${esc(l)}</th><td>${esc(v)}</td></tr>` : '';
+  const menu = (d.menu || []).filter(m => m.dish);
+  const os = orderSum(menu, k);
+  const times = cat ? [['Call time', d.call], ['Serving', d.serve], ['Pull-out', d.pull]].filter(x => x[1]) : [];
+  const setup = cat ? [['Motif / theme', d.motif], ['Table setup', d.setup], ['Service staff', d.staff], ['Equipment', d.equip]] : [];
+  const notes = [['Allergies & dietary', d.allergy], ['Special requests', d.special]];
+  const hero = cat ? [['Date', fmtLong(d.date)], ['Guests', d.pax ? d.pax + ' pax' : 'To be confirmed'], ['Occasion', d.type || 'To be confirmed']]
+    : [[d.fulfil === 'Delivery' ? 'Delivery date' : 'Pick-up date', fmtLong(d.date)], [d.fulfil === 'Delivery' ? 'Delivery time' : 'Ready by', d.serve ? fmtClock(d.serve) : 'To be confirmed'], ['Order', (orderLabel(os, k) || kl) + (d.fulfil ? ' · ' + d.fulfil : '')]];
+  const docTitle = cat ? 'Event Details' : k === 'packs' ? 'Food Pack Order' : 'Food Tray Order';
+  const BC = S.isAdmin && !noBill ? sheetBillCalc(d) : {any: false}, priced = BC.any && !cat && menu.some(m => num(m.price) > 0);
+  const billPage = BC.any ? `<div class="page pb"><div class="bill-h"><img src="${logo}" alt="Romualdo's"><div><div class="tag">Catering Services · Davao City</div><h1>Billing Statement</h1><div class="who">${esc(d.client)}</div></div><div class="meta">Ref. ${esc(ref)}<br>Issued ${esc(new Date().toLocaleDateString('en-PH', {month: 'long', day: 'numeric', year: 'numeric'}))}</div></div>
+<p class="addr">${esc(billCfg('billAddress'))}<br>${esc(billCfg('billContact'))}</p>
+<div class="boxes"><div><h3>Bill to</h3><p><b>Name:</b> ${esc(d.client)}${d.contact ? ' – ' + esc(d.contact) : ''}</p>${d.mobile ? `<p><b>Mobile:</b> ${esc(d.mobile)}</p>` : ''}${d.email ? `<p><b>Email:</b> ${esc(d.email)}</p>` : ''}</div>
+<div><h3>${cat ? 'Event' : 'Order'}</h3><p><b>${cat ? 'Date of event' : d.fulfil === 'Delivery' ? 'Delivery date' : 'Pick-up date'}:</b> ${esc(fmtLong(d.date))}</p>${d.serve ? `<p><b>Time:</b> ${esc(fmtClock(d.serve))}</p>` : ''}${d.pax ? `<p><b>${cat ? 'Guaranteed pax' : 'Good for'}:</b> ${esc(d.pax)}</p>` : ''}${d.venue ? `<p><b>${cat ? 'Venue' : 'Address'}:</b> ${esc(d.venue)}</p>` : ''}</div></div>
+<h2>Breakdown<small>Billing</small></h2>${billBreakdownHtml(BC, {...(d.bill || {}), hideItems: false})}${payBox()}
+<div class="foot"><div class="sign"><div><b>${esc(d.contact || d.client)}</b>Received by · signature over printed name · date</div><div><b>${esc(S.me?.name || "Romualdo's Catering Services")}</b>Prepared by · Romualdo's Catering Services</div></div>
+<footer>Romualdo's Catering Services · ${esc(billCfg('billAddress'))} · romualdos.ph</footer></div></div>` : '';
+  const title = `${cat ? 'Event Sheet' : docTitle} - ${d.client} - ${fmtLong(d.date).replace(/^\w+, /, '')}`;
+  const html = sheetDocHtml(title, `<div class="page" id="pg">
 <header><img src="${logo}" alt="Romualdo's"><div class="hd"><div class="tag">Catering Services · Davao City</div><h1>${esc(docTitle)}</h1><div class="who">${esc(d.client)}</div></div>
 <div class="meta">Ref. ${esc(ref)}<br><span class="status">${esc(st)}</span><br>Issued ${esc(new Date().toLocaleDateString('en-PH', {month: 'long', day: 'numeric', year: 'numeric'}))}</div></header>
 <div class="hero">${hero.map(([l, v]) => `<div><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join('')}</div>
@@ -1102,17 +1283,13 @@ ${setup.some(x => x[1]) ? `<section><h2>Setup &amp; service<small>On site</small
 ${notes.some(x => x[1]) ? `<section><h2>Notes<small>Please note</small></h2><table class="kv">${notes.map(([l, v]) => row(l, v)).join('')}</table></section>` : ''}
 </div><div>
 ${menu.length ? (cat ? `<div class="menu"><h2>The Menu</h2>${menu.map(m => `<div class="c">${esc(m.course)}</div><div class="d">${esc(m.dish)}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}`).join('')}</div>`
-  : `<div class="menu" style="text-align:left"><h2>The Order</h2><table class="items"><thead><tr><th>Item</th><th class="q">Qty</th></tr></thead><tbody>${[[os.mains, k === 'packs' ? 'Meal packs' : 'Trays', os.main], [os.drinks, 'Drinks', os.drink], [os.addons, 'Add-ons', os.addon]].filter(g => g[0].length).map(([L, h, n]) => `<tr><td colspan="2" style="font-size:6.6pt;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:#8A5A00;padding-top:2.5mm;border:0">${h} · ${n}</td></tr>` + L.map(m => `<tr><td><div class="d" style="font-family:Alta,'Playfair Display',Georgia,serif;font-style:italic;font-size:11pt;color:#14213F">${esc(m.dish)}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}</td><td class="q">${esc(m.qty || '1')}</td></tr>`).join('')).join('')}</tbody></table></div>`) : ''}
+  : `<div class="menu" style="text-align:left"><h2>The Order</h2><table class="items"><thead><tr><th>Item</th><th class="q">Qty</th>${priced ? '<th class="q" style="text-align:right;width:24mm">Price</th>' : ''}</tr></thead><tbody>${[[os.mains, k === 'packs' ? 'Meal packs' : 'Trays', os.main], [os.drinks, 'Drinks', os.drink], [os.addons, 'Add-ons', os.addon]].filter(g => g[0].length).map(([L, h, n]) => `<tr><td colspan="${priced ? 3 : 2}" style="font-size:6.6pt;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:#8A5A00;padding-top:2.5mm;border:0">${h} · ${n}</td></tr>` + L.map(m => `<tr><td><div class="d" style="font-family:Alta,'Playfair Display',Georgia,serif;font-style:italic;font-size:11pt;color:#14213F">${esc(m.dish)}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}</td><td class="q">${esc(m.qty || '1')}</td>${priced ? `<td class="q" style="text-align:right;font-weight:500">${num(m.price) ? peso(num(m.price) * (parseFloat(m.qty) || 1)) : ''}</td>` : ''}</tr>`).join('')).join('')}${priced ? `<tr><td style="font-weight:700;color:#14213F;border-top:1.2pt solid #14213F">${BC.extras.length || BC.discount || BC.lines.length !== sheetPriced(d).length ? 'ITEMS TOTAL' : 'TOTAL'}</td><td style="border-top:1.2pt solid #14213F"></td><td class="q" style="text-align:right;font-weight:700;color:#14213F;border-top:1.2pt solid #14213F">${peso(sheetPriced(d).reduce((a, l) => a + l.rate * l.qty, 0))}</td></tr>` : ''}</tbody></table></div>`) : ''}
 </div></div>
 <div class="foot"><p class="ack">By signing below, the client confirms the ${cat ? 'event details and menu' : 'order details'} above.</p>
 <div class="sign"><div><b>${esc(d.client)}</b>Client signature over printed name · Date</div><div><b>${esc(d.preparedBy || "Romualdo's Catering Services")}</b>Prepared by · Romualdo's Catering Services</div></div>
 <footer>Romualdo's Catering Services · 13 Juna Avenue, Juna Subdivision, Davao City · 0945 542 5300 · romualdoscatering@gmail.com · romualdos.ph</footer></div>
 </div>
-<script>
-function fit(){var p=document.getElementById('pg'),H=p.offsetWidth*297/210;p.style.zoom=1;p.style.minHeight='0';var h=p.scrollHeight,z=h>H?Math.max(.55,(H-2)/h):1;p.style.zoom=z;p.style.minHeight=((H-2)/z)+'px';}
-window.addEventListener('load',function(){(document.fonts?document.fonts.ready:Promise.resolve()).then(function(){fit();setTimeout(function(){window.print()},400)})});
-<\/script>
-</body></html>`;
+` + billPage);
   w = w && !w.closed ? w : window.open('', '_blank');
   if (!w) return toast('Your browser blocked the PDF window. Allow pop-ups for romualdos.ph and try again.', true);
   w.document.open(); w.document.write(html); w.document.close();
@@ -1427,7 +1604,7 @@ V.reports = () => {
 /* ============ SETUP ============ */
 V.setup = () => {
   const items = Object.values(S.items).sort((a, b) => (catIdx(a) - catIdx(b)) || a.name.localeCompare(b.name));
-  if (!D.cfg) D.cfg = {company: S.config.company || '', address: S.config.address || '', departments: (S.config.departments || []).join('\n'), staff: (S.config.staff || []).join('\n'), suppliers: (S.config.suppliers || []).join('\n'), expCats: (S.config.expCats || []).join('\n'), pct: String(S.config.priceAlertPct ?? 10)};
+  if (!D.cfg) D.cfg = {company: S.config.company || '', address: S.config.address || '', departments: (S.config.departments || []).join('\n'), staff: (S.config.staff || []).join('\n'), suppliers: (S.config.suppliers || []).join('\n'), expCats: (S.config.expCats || []).join('\n'), billAddress: billCfg('billAddress'), billContact: billCfg('billContact'), payInfo: S.config.payInfo || '', pct: String(S.config.priceAlertPct ?? 10)};
   return `<h2>Setup</h2>
   <div class="card"><div class="row"><h3>Items you buy (${items.length})</h3><span class="spacer"></span><button class="pri sm" data-act="newItem">＋ Add item</button></div>
    <p class="small mut" style="margin-top:0">One master list for both books. Use the unit you buy and count in (kg for meat and vegetables, pc for eggs, pack for noodles). Par level is the minimum you want on hand in each storeroom.</p>
@@ -1444,6 +1621,12 @@ V.setup = () => {
     <label>Expense categories (one per line)<textarea data-b="cfg.expCats"></textarea></label>
    </div>
    <div class="row"><label style="max-width:240px">Flag price increases above (%)<input type="number" min="1" step="1" data-b="cfg.pct"></label><span class="spacer"></span><button class="pri" data-act="saveCfg">Save lists</button></div>
+  </div>
+  <div class="card"><h3>Billing</h3>
+   <p class="small mut" style="margin-top:0">Printed on every statement of account and billing page.</p>
+   <div class="grid"><label>Business address<input data-b="cfg.billAddress"></label><label>Contact line<input data-b="cfg.billContact"></label></div>
+   <label>Payment details <span class="small mut">(bank, account name and number, GCash…)</span><textarea data-b="cfg.payInfo" rows="3" placeholder="e.g. BDO · Romualdo's Catering Services · Acct. no. …&#10;GCash · 09XX XXX XXXX · J. Domingo"></textarea></label>
+   <div class="row end"><button class="pri" data-act="saveCfg">Save billing details</button></div>
   </div>
   <div class="card"><h3>Logins & roles</h3>
    <p class="small">Logins come from the <b>Romualdos Staff Logins</b> file in the Romualdo's Inquiry App folder on Google Drive, the same file used for the inquiry dashboard. Add a row to give someone access, set <b>Role</b> to Admin or Staff, and set <b>Active = No</b> to block them (takes effect within 2 minutes).</p>
@@ -1984,7 +2167,7 @@ ACT.addCommonItems = () => {
 };
 ACT.saveCfg = () => {
   const lines = s => [...new Set(String(s || '').split('\n').map(x => x.trim()).filter(Boolean))];
-  const data = {company: D.cfg.company.trim(), address: D.cfg.address.trim(), departments: lines(D.cfg.departments), staff: lines(D.cfg.staff), suppliers: lines(D.cfg.suppliers), expCats: lines(D.cfg.expCats), priceAlertPct: num(D.cfg.pct) || 10};
+  const data = {company: D.cfg.company.trim(), address: D.cfg.address.trim(), departments: lines(D.cfg.departments), staff: lines(D.cfg.staff), suppliers: lines(D.cfg.suppliers), expCats: lines(D.cfg.expCats), billAddress: (D.cfg.billAddress || '').trim(), billContact: (D.cfg.billContact || '').trim(), payInfo: (D.cfg.payInfo || '').trim(), priceAlertPct: num(D.cfg.pct) || 10};
   guard(async () => { await setDoc('config/main', {...S.config, ...data}); D.cfg = null; }, 'Lists saved');
 };
 
@@ -2034,7 +2217,7 @@ function applyDocs(docs, fromSync) {
   rebuild();
 }
 function rebuild() {
-  const by = {config: [], items: [], events: [], advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: [], prs: [], recipes: []};
+  const by = {config: [], items: [], events: [], advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: [], prs: [], recipes: [], bills: []};
   for (const [path, d] of CACHE) { const i = path.indexOf('/'); const c = path.slice(0, i); (by[c] ||= []).push({id: path.slice(i + 1), ...d.data}); }
   const desc = a => a.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
   const m = by.config.find(d => d.id === 'main');
@@ -2045,6 +2228,7 @@ function rebuild() {
   S.moves = desc(by.moves); S.counts = desc(by.counts); S.prs = desc(by.prs);
   S.recipes = by.recipes.filter(r => r.status !== 'void').sort((a, b) => String(a.name).localeCompare(b.name));
   S.sales = Object.fromEntries(by.sales.map(d => [d.date, d]));
+  S.bills = desc(by.bills || []);
   schedule();
 }
 async function sync(full) {
@@ -2063,7 +2247,7 @@ async function sync(full) {
 
 /* ---- auto-save for every page: unsaved entries are kept on this device and come back after a refresh ---- */
 const OPS_DRAFT_KEY = 'rcs_ops_drafts_v1';
-const OPS_DRAFT_KEYS = ['purchase', 'expense', 'advance', 'move', 'event', 'count', 'sale', 'req', 'recipe', 'prod', 'evp'];
+const OPS_DRAFT_KEYS = ['bill', 'purchase', 'expense', 'advance', 'move', 'event', 'count', 'sale', 'req', 'recipe', 'prod', 'evp'];
 let opsDraftT = 0, opsDraftRestored = false;
 const opsDraftKey = () => OPS_DRAFT_KEY + ':' + (S.me?.username || '');
 function opsDraftSave() { if (!S.me || !opsDraftRestored) return; clearTimeout(opsDraftT); opsDraftT = setTimeout(opsDraftWrite, 400); }
