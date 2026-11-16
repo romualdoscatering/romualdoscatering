@@ -2458,12 +2458,20 @@ async function submitInquiry(f){
 const API_URL=(window.ROMUALDOS_CONFIG&&window.ROMUALDOS_CONFIG.API_URL)||"";
 async function api(action,payload={}){
   if(!API_URL||API_URL.includes("PASTE_"))return {ok:false,network:true,error:"The inquiry system isn't connected yet."};
-  try{
-    const res=await fetch(API_URL,{method:"POST",body:JSON.stringify({action,token:state.token,...payload})});
-    const data=await res.json();
-    if(data&&data.auth&&state.token&&action!=="login"){endSession(data.error)}
-    return data||{ok:false,error:"Empty response"};
-  }catch(e){return {ok:false,network:true,error:"Can't reach the inquiry system. Check your connection and try again."}}
+  /* Google's server sometimes never answers a request. Each try has a time limit, and sends are retried once
+     (same reference number, so the server keeps only one copy). */
+  const body=JSON.stringify({action,token:state.token,...payload}),send=action==="submit",tries=send||action==="config"?2:1;
+  for(let i=0;i<tries;i++){
+    const ctl=typeof AbortController!=="undefined"?new AbortController():null,tm=setTimeout(()=>ctl&&ctl.abort(),i?30000:20000);
+    let slow=null;if(send){slow=setTimeout(()=>{document.querySelectorAll('#view button[type=submit]').forEach(b=>{if(b.disabled)b.textContent=i?"Trying again…":"Still sending…"})},6000)}
+    try{
+      const res=await fetch(API_URL,{method:"POST",body,signal:ctl?ctl.signal:undefined});
+      const data=await res.json();clearTimeout(tm);clearTimeout(slow);
+      if(data&&data.auth&&state.token&&action!=="login"){endSession(data.error)}
+      return data||{ok:false,error:"Empty response"};
+    }catch(e){clearTimeout(tm);clearTimeout(slow)}
+  }
+  return {ok:false,network:true,error:"Can't reach the inquiry system. Check your connection and try again."};
 }
 function store(k,v){try{v==null?sessionStorage.removeItem(k):sessionStorage.setItem(k,v)}catch{}}
 function stored(k){try{return sessionStorage.getItem(k)}catch{return null}}

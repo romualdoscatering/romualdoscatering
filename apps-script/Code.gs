@@ -163,13 +163,17 @@ function submitInquiry(q, source, honeypot) {
     const db = readDb();
     if (source === 'message' && db.inquiries.some(function (x) { return x.ref === inq.ref; }))
       return { ok: false, error: inq.ref + ' is already in the list.' };
+    if (source === 'web') {                       // the website retries a send that timed out: keep only one copy
+      const same = db.inquiries.filter(function (x) { return x.ref === inq.ref && (x.customer || {}).phone === inq.customer.phone; })[0];
+      if (same) return { ok: true, ref: same.ref, inquiry: same, dup: true };
+    }
     while (db.inquiries.some(function (x) { return x.ref === inq.ref; })) inq.ref = newRef();
     db.inquiries.unshift(inq);
     writeDb(db);
     return { ok: true, ref: inq.ref, inquiry: inq };
   });
   // Email alert for inquiries sent from the website. A failed email never blocks saving the inquiry.
-  if (res.ok && source === 'web') { try { sendInquiryAlert(inq); } catch (e) { console.error('Alert email failed: ' + e); } }
+  if (res.ok && !res.dup && source === 'web') { try { sendInquiryAlert(inq); } catch (e) { console.error('Alert email failed: ' + e); } }
   return res;
 }
 
