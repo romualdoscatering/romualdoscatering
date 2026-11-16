@@ -63,7 +63,9 @@ function doPost(e) {
       case 'archiveSync':
       case 'opsUpload':
       case 'opsFile':
-      case 'opsOcr': return out(handleOps(req));
+      case 'opsOcr':
+      case 'scAttendance':
+      case 'scFile': return out(handleOps(req));
       default:          return out({ ok: false, error: 'Unknown action.' });
     }
   } catch (err) {

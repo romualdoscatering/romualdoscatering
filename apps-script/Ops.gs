@@ -17,7 +17,7 @@ const OPS = {
   SHEET: 'docs',
   HEAD: ['path', 'coll', 'data', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'],
   STAFF_RECHECK_SECONDS: 120,      // how often an active session is re-checked against the staff file
-  COLLS: ['config', 'items', 'events', 'advances', 'purchases', 'expenses', 'moves', 'counts', 'sales', 'prs', 'recipes', 'bills'],
+  COLLS: ['config', 'items', 'events', 'advances', 'purchases', 'expenses', 'moves', 'counts', 'sales', 'prs', 'recipes', 'bills', 'sc'],
   MAX_OPS: 50,
   MAX_DOC_CHARS: 45000
 };
@@ -33,6 +33,8 @@ function handleOps(req) {
     case 'opsUpload': return opsUpload(me, req);
     case 'opsFile': return opsFile(me, req);
     case 'opsOcr': return opsOcr(me, req);
+    case 'scAttendance': return scAttendance(me, req);
+    case 'scFile': return scFile(me, req);
     default:         return { ok: false, error: 'Unknown action.' };
   }
 }
@@ -103,7 +105,7 @@ function opsSync(me, req) {
   if (req.ver && Number(req.ver) === ver) { base.unchanged = true; return base; }
   const after = Number(req.after) || 0;
   const canBill = me.role === 'Admin' || me.role === 'Finance';
-  base.docs = readAll(opsSheet()).filter(function (r) { return r.updatedAt > after && (canBill || r.coll !== 'bills'); }).map(toDoc);
+  base.docs = readAll(opsSheet()).filter(function (r) { return r.updatedAt > after && (canBill || (r.coll !== 'bills' && r.coll !== 'sc')); }).map(toDoc);
   base.users = opsUsers();
   return base;
 }
@@ -137,6 +139,14 @@ function checkStaff(coll, before, after, fin) {
     if (!fin) forbid('Only Admin and Finance accounts can make or change billing statements.');
     if (after.status === 'void' && (!before || before.status !== 'void')) forbid('Only Admin accounts can delete billing statements.');
     if (before && before.status === 'void' && after.status !== 'void') forbid('Only Admin accounts can restore billing statements.');
+    return;
+  }
+  if (coll === 'sc') forbid('Only Admin and Finance accounts can work on the service charge.');
+  if (coll === 'sales') {                          // daily sales: Staff enter, Finance/Admin verify, verified days are locked
+    if (before && before.verified) forbid('This day is already verified. Only an Admin can change it.');
+    if (after.verified && !fin) forbid('Only Finance and Admin accounts can verify a day.');
+    if ((after.cat || []).some(function (c) { return c.applied; }) && !fin) forbid('Only Finance and Admin accounts can apply payments to statements.');
+    if (after.status === 'void' && (!before || before.status !== 'void')) forbid('Only Admin accounts can void records.');
     return;
   }
   if (coll === 'events' && !fin) {
@@ -662,4 +672,103 @@ function opsOcr(me, req) {
     try { UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/' + id, { method: 'delete', headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true }); } catch (e) {}
   }
   return { ok: true, text: String(text || '').replace(/^﻿/, '').slice(0, 20000) };
+}
+
+
+/* ---------------- service charge: attendance from the HR time clock + the SC file for payroll ---------------- */
+const HR = {
+  DB_ID: '1JlkxQ2kJaloueZ1a3ZgONyua91yNXWC7RTA6uIZKDT0',          // Romualdo's HR Database (time clock)
+  SC_FOLDER_ID: '1LJGXhQdZ8d--CsFu9GTkEGXDjzogLiDj'               // Payroll and Service Charges folder
+};
+function needFin(me) { if (me.role !== 'Admin' && me.role !== 'Finance') forbid('Only Admin and Finance accounts can work on the service charge.'); }
+function hrTab(ss, name) {
+  const sh = ss.getSheetByName(name); if (!sh || sh.getLastRow() < 2) return { head: [], rows: [] };
+  const v = sh.getRange(1, 1, sh.getLastRow(), sh.getLastColumn()).getDisplayValues();
+  return { head: v[0].map(function (x) { return String(x).trim(); }), rows: v.slice(1) };
+}
+function hcol(head, re) { for (var i = 0; i < head.length; i++) if (re.test(head[i])) return i; return -1; }
+function isDay(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
+function dayOf(v) { const s = String(v || '').trim(); let m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[0];
+  m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); return m ? m[3] + '-' + ('0' + m[1]).slice(-2) + '-' + ('0' + m[2]).slice(-2) : ''; }
+function scAttendance(me, req) {
+  needFin(me);
+  const from = String(req.from || ''), to = String(req.to || '');
+  if (!isDay(from) || !isDay(to) || from > to) return { ok: false, error: 'Choose a valid cut-off.' };
+  const ss = SpreadsheetApp.openById(HR.DB_ID), present = {}, mark = function (code, d) { if (!code || d < from || d > to) return; (present[code] = present[code] || {})[d] = 1; };
+  const st = hrTab(ss, 'Staff'), cC = hcol(st.head, /^staff\s*code/i), cN = hcol(st.head, /^name/i), cP = hcol(st.head, /^position/i), cA = hcol(st.head, /^active/i), cD = hcol(st.head, /^department/i);
+  const staff = st.rows.filter(function (r) { return String(r[cC]).trim(); }).map(function (r) {
+    return { code: String(r[cC]).trim(), name: String(r[cN]).trim(), position: cP >= 0 ? r[cP] : '', dept: cD >= 0 ? r[cD] : '', active: cA < 0 || !/^(no|false|inactive)$/i.test(String(r[cA]).trim()) };
+  });
+  // a time-in on a day = worked that day
+  const pu = hrTab(ss, 'Punches'), pC = hcol(pu.head, /^staff\s*code/i), pT = hcol(pu.head, /^timestamp/i), pP = hcol(pu.head, /^punch/i), pN = hcol(pu.head, /^note/i);
+  let punches = 0;
+  pu.rows.forEach(function (r) { if (!/^in$/i.test(String(r[pP]).trim())) return; if (pN >= 0 && /^demo$/i.test(String(r[pN]).trim())) return; const d = dayOf(r[pT]); if (d >= from && d <= to) { punches++; mark(String(r[pC]).trim(), d); } });
+  // approved corrections (forgot to time in) count too
+  const co = hrTab(ss, 'Corrections'), kC = hcol(co.head, /^staff\s*code/i), kD = hcol(co.head, /^shift\s*date/i), kP = hcol(co.head, /^punch/i), kS = hcol(co.head, /^status/i);
+  let corrections = 0;
+  co.rows.forEach(function (r) { if (!/^approved/i.test(String(r[kS]).trim())) return; const d = dayOf(r[kD]); if (d < from || d > to) return; corrections++; mark(String(r[kC]).trim(), d); });
+  return { ok: true, staff: staff, present: present, punches: punches, corrections: corrections };
+}
+function scFile(me, req) {
+  needFin(me);
+  const c = req.cut || {}; if (!isDay(c.from) || !isDay(c.to) || !Array.isArray(c.days) || !Array.isArray(c.people) || !c.people.length) return { ok: false, error: 'Nothing to put in the file.' };
+  const days = c.days.slice(0, 16), P = c.people.slice(0, 80), nD = days.length, nP = P.length;
+  const name = 'Romualdos Service Charge - ' + String(c.label || (c.from + ' to ' + c.to)).replace(/[\/\\]/g, '-');
+  const folder = DriveApp.getFolderById(HR.SC_FOLDER_ID), it = folder.getFilesByName(name);
+  let ss;
+  if (it.hasNext()) { ss = SpreadsheetApp.openById(it.next().getId()); }
+  else { ss = SpreadsheetApp.create(name); DriveApp.getFileById(ss.getId()).moveTo(folder); }
+  const tabs = ['Daily SC & Attendance', 'SC Computation', 'SC Release'];
+  tabs.forEach(function (t) { if (!ss.getSheetByName(t)) ss.insertSheet(t); });
+  ss.getSheets().forEach(function (s) { if (tabs.indexOf(s.getName()) < 0) ss.deleteSheet(s); });
+  const A1 = function (r, col) { let s = '', n = col; while (n > 0) { const m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s + (r || ''); };
+  const L = function (col) { return A1(0, col); }, first = 3, last = 2 + nD, top = 'ROMUALDO\'S RESTAURANT – SERVICE CHARGE', sub = 'Cut-off: ' + c.label + (c.release ? '   ·   Release: ' + c.release : '');
+  const dateCell = function (d) { return new Date(d + 'T00:00:00+08:00'); };
+  // 1) Daily SC & attendance: SC per day, ✓ = worked (from the time clock, corrected in /ops)
+  const a = ss.getSheetByName(tabs[0]); a.clear();
+  const pStart = 8, pEnd = pStart + nP - 1;
+  const aRows = [[top], [sub], ['Generated from the Daily sales page and the HR time clock. ✓ = worked that day. Change ticks in /ops (Daily sales → Service charge) and press Update SC file.'], [''],
+    ['DATE', ''].concat(days.map(function (x) { return dateCell(x.d); })).concat(['TOTAL']),
+    ['Service charge', ''].concat(days.map(function (x) { return Number(x.sc) || 0; })).concat(['=SUM(' + A1(6, first) + ':' + A1(6, last) + ')']),
+    ['Shares present', ''].concat(days.map(function (x, i) { const col = L(first + i); return '=SUMIF(' + col + pStart + ':' + col + pEnd + ',"✓",$B$' + pStart + ':$B$' + pEnd + ')'; })).concat([''])];
+  const perRow = 8 + nP; // "per full share" goes under the people
+  const width = 3 + nD;
+  const pad = function (r) { while (r.length < width) r.push(''); return r.slice(0, width); };
+  P.forEach(function (p) { aRows.push(pad([p.name, Number(p.share) || 0].concat(p.present.slice(0, nD).map(function (x) { return x ? '✓' : ''; })).concat(['=COUNTIF(' + A1(aRows.length + 1, first) + ':' + A1(aRows.length + 1, last) + ',"✓")']))); });
+  aRows.push(pad(['Per full share', ''].concat(days.map(function (x, i) { const col = L(first + i); return '=IF(' + col + '7>0,' + col + '6/' + col + '7,0)'; })).concat([''])));
+  a.getRange(1, 1, aRows.length, width).setValues(aRows.map(pad));
+  a.getRange(5, first, 1, nD).setNumberFormat('ddd mmm d'); a.getRange(6, first, 1, nD + 1).setNumberFormat('#,##0.00'); a.getRange(perRow, first, 1, nD).setNumberFormat('#,##0.00');
+  a.getRange(1, 1).setFontWeight('bold').setFontSize(13); a.getRange(5, 1, 3, width).setFontWeight('bold'); a.getRange(pStart, first, nP, nD).setHorizontalAlignment('center');
+  a.setColumnWidth(1, 210); a.setColumnWidths(first, nD, 78); a.setFrozenRows(5); a.setFrozenColumns(2);
+  // 2) SC per person per day
+  const b = ss.getSheetByName(tabs[1]); b.clear();
+  const bRows = [['SC per person per day (automatic)'], [sub], [''], pad(['NAME', 'Share'].concat(days.map(function (x) { return dateCell(x.d); })).concat(['TOTAL']))];
+  P.forEach(function (p, i) { const r = pStart + i, br = 5 + i;
+    bRows.push(pad([p.name, "='" + tabs[0] + "'!B" + r].concat(days.map(function (x, j) { const col = L(first + j); return "=IF('" + tabs[0] + "'!" + col + r + '="✓",\'' + tabs[0] + "'!" + col + '$' + perRow + '*$B' + br + ',0)'; })).concat(['=ROUND(SUM(' + A1(br, first) + ':' + A1(br, last) + '),2)']))); });
+  bRows.push(pad(['TOTAL', ''].concat(days.map(function (x, j) { const col = L(first + j); return '=SUM(' + col + '5:' + col + (4 + nP) + ')'; })).concat(['=SUM(' + A1(5, last + 1) + ':' + A1(4 + nP, last + 1) + ')'])));
+  b.getRange(1, 1, bRows.length, width).setValues(bRows.map(pad));
+  b.getRange(4, first, 1, nD).setNumberFormat('mmm d'); b.getRange(5, first, nP + 1, nD + 1).setNumberFormat('#,##0.00');
+  b.getRange(1, 1).setFontWeight('bold').setFontSize(13); b.getRange(4, 1, 1, width).setFontWeight('bold'); b.getRange(5 + nP, 1, 1, width).setFontWeight('bold');
+  b.setColumnWidth(1, 210); b.setColumnWidths(first, nD + 1, 74); b.setFrozenRows(4); b.setFrozenColumns(2);
+  // 3) Release sheet with signatures
+  const r3 = ss.getSheetByName(tabs[2]); r3.clear();
+  const rRows = [['ROMUALDO\'S RESTAURANT', '', '', '', '', '', '', '', '', '', ''], ['SERVICE CHARGE RELEASE  •  Cut-off: ' + c.label, '', '', '', '', '', '', '', '', '', ''], ['Release date: ' + (c.release || ''), '', '', '', '', '', '', '', '', '', ''], ['', '', '', '', '', '', '', '', '', '', ''],
+    ['No.', 'Full Name', 'Share', 'Days Present', 'SC Earned', 'Less: Deductions (breakages, etc.)', 'Less: Advance already given', 'NET SC TO RECEIVE', 'Remarks', 'Signature', 'Date Received']];
+  P.forEach(function (p, i) { const rr = 6 + i;
+    rRows.push([i + 1, p.name, "='" + tabs[0] + "'!B" + (pStart + i), "='" + tabs[0] + "'!" + A1(pStart + i, last + 1), "='" + tabs[1] + "'!" + A1(5 + i, last + 1), Number(p.ded) || 0, Number(p.adv) || 0, '=E' + rr + '-F' + rr + '-G' + rr, '', '', '']); });
+  const tr = 6 + nP; rRows.push(['', 'TOTAL', '', '', '=SUM(E6:E' + (tr - 1) + ')', '=SUM(F6:F' + (tr - 1) + ')', '=SUM(G6:G' + (tr - 1) + ')', '=SUM(H6:H' + (tr - 1) + ')', '', '', '']);
+  rRows.push(['', '', '', '', '', '', '', '', '', '', '']); rRows.push(['', 'Prepared by: ' + (me.name || me.username), '', '', '', 'Approved by:', '', '', '', '', '']);
+  r3.getRange(1, 1, rRows.length, 11).setValues(rRows);
+  r3.getRange(6, 5, nP + 1, 4).setNumberFormat('#,##0.00'); r3.getRange(1, 1).setFontWeight('bold').setFontSize(13); r3.getRange(5, 1, 1, 11).setFontWeight('bold').setWrap(true); r3.getRange(tr, 1, 1, 11).setFontWeight('bold');
+  r3.setColumnWidth(2, 210); r3.setColumnWidths(6, 2, 120); r3.setColumnWidths(10, 2, 130); r3.setRowHeights(6, nP, 30); r3.setFrozenRows(5);
+  ss.setActiveSheet(r3); SpreadsheetApp.flush();
+  // also leave a copy of the release next to the payroll in the HR Database, so HR sees both together
+  try {
+    const hr = SpreadsheetApp.openById(HR.DB_ID), tn = 'SC ' + c.from + ' to ' + c.to;
+    let t = hr.getSheetByName(tn); if (!t) t = hr.insertSheet(tn, hr.getSheets().length); t.clear();
+    const vals = r3.getRange(1, 1, rRows.length, 11).getDisplayValues();
+    vals.splice(3, 1, ['SC file: ' + ss.getUrl(), '', '', '', '', '', '', '', '', '', '']);
+    t.getRange(1, 1, vals.length, 11).setValues(vals); t.getRange(5, 1, 1, 11).setFontWeight('bold'); t.setColumnWidth(2, 210);
+  } catch (e) { console.log('HR copy skipped: ' + e); }
+  return { ok: true, url: ss.getUrl(), id: ss.getId() };
 }

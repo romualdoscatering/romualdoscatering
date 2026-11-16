@@ -196,7 +196,7 @@ const MT = {
 /* ============ state ============ */
 const ACT = {};
 const S = {state: 'login', prs: [], bills: [], token: '', me: null, isAdmin: false, users: [], lastSync: 0, syncErr: '', syncing: false, loginMsg: '',
-  config: {...DEFAULT_CONFIG}, items: {}, events: {}, advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: {}, names: {}, busy: false};
+  config: {...DEFAULT_CONFIG}, items: {}, events: {}, advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: {}, sc: {}, names: {}, busy: false};
 
 const newPurchase = (o = {}) => ({date: today(), book: 'R', eventId: '', supplier: '', buyer: '', receiptNo: '', advanceId: '', prId: '', prNo: '', lines: [{itemId: '', qty: '', cost: ''}], other: [], ...o});
 const newExpense = (o = {}) => ({date: today(), book: 'R', eventId: '', cat: '', desc: '', amount: '', paidBy: '', receiptNo: '', advanceId: '', ...o});
@@ -206,7 +206,7 @@ const newEvent = () => ({name: '', client: '', date: daysAhead(7), pax: '', cont
 
 const D = {
   purchase: newPurchase(), expense: newExpense(), advance: newAdvance(), move: newMove(), event: newEvent(),
-  plan: null, count: null, sale: {date: today(), amount: ''},
+  plan: null, count: null, sale: null, sc: null,
   ui: {tab: 'dash', pBook: '', pStatus: '', eBook: '', mBook: '', stockBook: 'R', stockQ: '', eventId: '', rFrom: monthStart(), rTo: today(), showAll: {}}
 };
 const getPath = (o, p) => p.split('.').reduce((a, k) => a?.[k], o);
@@ -325,11 +325,17 @@ function alerts() {
     const s = eventStats(e); const unissued = Object.values(s.items).some(x => x.bought > 0) && !s.ms.length;
     if (unissued) A.push(['warn', `Event “${esc(e.name)}” has purchases but nothing was issued to it — its food cost is not recorded yet.`, 'events']);
   });
+  const yd = daysAgo(1);
+  if (S.lastSync && !S.sales[yd]) A.push(['warn', `Yesterday's daily sales (${fmtD(yd)}) are not entered yet. Take a photo of the Z-reading on the Daily sales page.`, 'sales']);
+  const toVer = Object.values(S.sales).filter(s => s.z && !s.verified && s.date < yd);
+  if (S.canBill && toVer.length) A.push(['info', `${toVer.length} day${toVer.length > 1 ? 's' : ''} of sales waiting for verification.`, 'sales']);
+  const shorts2 = Object.values(S.sales).filter(s => s.date >= daysAgo(7) && s.overShort != null && s.overShort < -0.5);
+  if (shorts2.length) A.push(['bad', `Cash drawer was short on ${shorts2.length} day${shorts2.length > 1 ? 's' : ''} this week (${peso(-sum(shorts2, s => s.overShort))} in total).`, 'sales']);
   return A;
 }
 
 /* ============ rendering infra ============ */
-const TABS_ALL = [['dash', 'Dashboard'], ['prs', 'Requests'], ['advances', 'Cash advances'], ['purchases', 'Purchases & expenses'], ['stock', 'Stock'], ['usage', 'Use & waste'], ['recipes', 'Recipes & production'], ['sheets', 'Event sheets'], ['events', 'Catering events'], ['archive', 'Archive'], ['billing', 'Billing'], ['reports', 'Reports'], ['setup', 'Setup']];
+const TABS_ALL = [['dash', 'Dashboard'], ['sales', 'Daily sales'], ['prs', 'Requests'], ['advances', 'Cash advances'], ['purchases', 'Purchases & expenses'], ['stock', 'Stock'], ['usage', 'Use & waste'], ['recipes', 'Recipes & production'], ['sheets', 'Event sheets'], ['events', 'Catering events'], ['archive', 'Archive'], ['billing', 'Billing'], ['reports', 'Reports'], ['setup', 'Setup']];
 const tabsFor = () => TABS_ALL.filter(t => t[0] === 'setup' ? S.isAdmin : t[0] === 'billing' ? S.canBill : true);
 let TABS = TABS_ALL;
 const V = {};
@@ -376,6 +382,7 @@ function live() {
     else if (k === 'osum') { const d = D.sheet, kk = d.kind || 'catering', o = orderSum(d.menu, kk), px = num(d.pax);
       h = !o.main && !o.drink && !o.addon ? '' : `Counts as <b>${esc(orderLabel(o, kk) || '0')}</b>${o.drink ? ' · ' + plural(o.drink, 'drink') : ''}${kk === 'packs' && px && o.main !== px ? ` <span class="bad-t">· ${o.main} packs vs ${px} pax, please check</span>` : ''}`; }
     else if (k === 'evtot') { const T = pricingTotal(D.evp || {}); h = `<div class="small mut">${peso(num(D.evp.perHead))} × ${num(D.evp.pax)} guests = ${peso(T.base)}${T.extras ? ' + charges ' + peso(T.extras) : ''}${T.disc ? ' − discount ' + peso(T.disc) : ''}${T.custom ? ' · <b>custom total used</b>' : ''}</div><div style="font-size:24px;font-weight:700">Contract: ${peso(T.total)}</div>`; }
+    else if (k === 'zchk' || k === 'sccalc' || k === 'salesum') h = saleLive(k);
     else if (k === 'counted') h = D.count.lines.filter(l => l.actual !== '' && l.actual != null).length;
     if (h !== undefined) el.innerHTML = h;
   });
@@ -1568,7 +1575,6 @@ V.reports = () => {
   const top = Object.entries(spend).sort((a, b) => (b[1].R + b[1].C) - (a[1].R + a[1].C)).slice(0, 12);
   const evs = Object.values(S.events).filter(e => e.date >= from && e.date <= to).sort((a, b) => a.date.localeCompare(b.date));
   const voids = [...S.purchases.map(x => ['Purchase', x]), ...S.expenses.map(x => ['Expense', x]), ...S.moves.map(x => ['Stock out', x]), ...S.counts.map(x => ['Count', x])].filter(([, x]) => x.status === 'void' && x.date >= from && x.date <= to);
-  const sales = Object.values(S.sales).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 14);
   return `<h2>Reports</h2>
   <div class="card"><div class="row"><label>From<input type="date" data-b="ui.rFrom" data-rr></label><label>To<input type="date" data-b="ui.rTo" data-rr></label><span class="spacer"></span>
    <button class="sm" data-act="csv" data-arg="purchases">Purchase register CSV</button><button class="sm" data-act="csv" data-arg="expenses">Expense register CSV</button><button class="sm" data-act="csv" data-arg="moves">Stock-out register CSV</button></div></div>
@@ -1592,13 +1598,326 @@ V.reports = () => {
   </div>
   <div class="card"><h3>Catering events in this period</h3>${evs.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Event</th><th class="n">Pax</th><th class="n">Contract</th><th class="n">Ingredients</th><th class="n">Expenses</th><th class="n">Margin</th><th class="n">Cost/pax</th></tr></thead><tbody>${evs.map(e => { const s = eventStats(e); return `<tr class="click" data-act="openEvent" data-arg="${e.id}"><td>${fmtD(e.date)}</td><td>${esc(e.name)}</td><td class="n">${esc(e.pax)}</td><td class="n">${peso(s.contract)}</td><td class="n">${peso(s.used)}</td><td class="n">${peso(s.exp)}</td><td class="n ${s.margin < 0 ? 'bad-t' : ''}">${s.contract ? peso(s.margin) + ' · ' + s.pct.toFixed(0) + '%' : '—'}</td><td class="n">${s.perPax != null ? peso(s.perPax) : '—'}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">No events in this period.</div>'}</div>
   <div class="two">
-   <div class="card"><h3>Restaurant daily sales</h3>
-    <div class="row" style="align-items:flex-end"><label style="flex:1">Date<input type="date" data-b="sale.date"></label><label style="flex:1">Total sales ₱<input type="number" inputmode="decimal" step="any" min="0" data-b="sale.amount"></label><button class="pri" data-act="saveSale">Save</button></div>
-    <p class="small mut">Enter the day's total from the POS / sales book. Used for food cost %.</p>
-    ${sales.length ? `<table><tbody>${sales.map(s => `<tr><td>${fmtD(s.date)}</td><td class="n">${peso(s.R)}</td></tr>`).join('')}</tbody></table>` : ''}
-   </div>
+   <div class="card"><h3>Restaurant daily sales</h3><p class="small">Sales, service charge, catering payments through the POS and the cash count are entered on the <a href="#sales">Daily sales</a> page. Restaurant sales here (for food cost %) come from there.</p></div>
    <div class="card"><h3>Voided records in this period (${voids.length})</h3>${voids.length ? `<table><tbody>${voids.map(([k, x]) => `<tr><td>${fmtD(x.date)}</td><td>${k} ${chipBook(x.book)}</td><td class="small">${esc(x.voidReason)}<div class="mut">by ${esc(x.voidByName || who(x.voidBy) || '—')} · ${fmtT(x.voidAt)}</div></td></tr>`).join('')}</tbody></table>` : '<div class="empty">None.</div>'}</div>
   </div>`;
+};
+
+/* ============ DAILY SALES (restaurant) + SERVICE CHARGE ============
+   sales/<date> = {date, z:{...POS Z-reading}, cat:[catering payments that went through the POS], drawer:{float, paidOut, counted, deposit},
+                   note, R (restaurant sales used for food cost %), sc (service charge for staff), verified:{by, at}}
+   sc/<from>   = one service-charge cut-off: rows of people with their share and the days they worked (from the HR time clock). */
+const Z_FIELDS = [['totalNet', 'Total net sales'], ['sc', 'Service charge'], ['disc', 'Discounts'], ['gross', 'Gross sales (before SC)'], ['totalGross', 'Total gross sales'],
+  ['cash', 'Cash'], ['card', 'Card (CC)'], ['ar', 'Charge / AR'], ['other', 'GCash / other'], ['totalPay', 'Total payment'], ['guests', 'Guest count'], ['tr', 'Transactions'], ['noSc', 'Take-out, trays & packs (no SC)'], ['orFrom', 'Beginning OR'], ['orTo', 'Ending OR']];
+const newSale = (date = today()) => ({date, z: Object.fromEntries(Z_FIELDS.map(([k]) => [k, ''])), cat: [], drawer: {float: '', paidOut: '', counted: '', deposit: ''}, note: ''});
+const sStr = v => v === '' || v == null ? '' : String(v);
+function saleFromDoc(x) {
+  if (!x) return null; const d = newSale(x.date);
+  if (x.z) Object.keys(d.z).forEach(k => { d.z[k] = sStr(x.z[k]); }); else d.z.totalNet = sStr(x.R);   // older entries only had the total
+  d.cat = (x.cat || []).map(c => ({...c, amount: sStr(c.amount)})); d.drawer = Object.fromEntries(Object.keys(d.drawer).map(k => [k, sStr(x.drawer?.[k])])); d.note = x.note || '';
+  return d;
+}
+function saleLoad(date) { D.sale = saleFromDoc(S.sales[date]) || newSale(date); if (D.sale.drawer.float === '' && S.config.cashFloat) D.sale.drawer.float = String(S.config.cashFloat); }
+function drawerOut(date) {   // restaurant purchases & expenses that day not paid from a cash advance → assumed paid from the drawer
+  const L = [...S.expenses.filter(e => live_(e) && e.date === date && e.book === 'R' && !e.advanceId).map(e => ({label: e.cat + (e.desc ? ' · ' + e.desc : ''), amount: num(e.amount)})),
+    ...S.purchases.filter(p => live_(p) && p.date === date && p.book === 'R' && !p.advanceId).map(p => ({label: 'Purchase' + (p.supplier ? ' · ' + p.supplier : ''), amount: num(p.total)}))];
+  return {list: L, total: r2(sum(L, x => x.amount))};
+}
+function saleCalc(d) {
+  const z = d.z, n = k => num(z[k]), cat = r2(sum(d.cat || [], c => num(c.amount)));
+  const pays = r2(n('cash') + n('card') + n('ar') + n('other'));
+  const scCalc = z.gross !== '' ? r2(Math.max(0, n('gross') - n('noSc')) * 0.10) : null;
+  const R = z.totalNet !== '' ? r2(n('totalNet') - n('sc') - cat) : 0;
+  const auto = drawerOut(d.date), dr = d.drawer, paidOut = dr.paidOut !== '' ? num(dr.paidOut) : auto.total;
+  const expected = r2(num(dr.float) + n('cash') - paidOut), overShort = dr.counted !== '' ? r2(num(dr.counted) - expected) : null;
+  return {cat, pays, scCalc, R, paidOut, auto, expected, overShort, left: dr.counted !== '' ? r2(num(dr.counted) - num(dr.deposit)) : null,
+    payOff: z.totalPay !== '' && Math.abs(pays - n('totalPay')) > 0.5 ? r2(pays - n('totalPay')) : 0};
+}
+/* Z-reading reader. Phone photos and Google's reader often split the label and amount columns, so amounts are matched to labels in order (first in, first out). */
+function parseZ(text) {
+  const lines = String(text || '').replace(/\r/g, '').split('\n').map(l => l.replace(/^﻿/, '').trim()).filter(Boolean);
+  const out = {}, pend = [], pays = {}, discs = {}; let inPay = false, seenNet = false, date = '';
+  const L = [[/^total\s*net\s*sales/i, 'totalNet'], [/^total\s*gross/i, 'totalGross'], [/^gross\s*sales/i, 'gross'], [/^service\s*charge|^svc\.?\s*charge|^s\/?c\b/i, 'sc'],
+    [/^total\s*payment/i, 'totalPay'], [/^vatable/i, '_vatable'], [/^vat\s*exempt/i, '_exempt'], [/^vat\s*zero/i, '_zero'], [/^less:?\s*vat/i, '_lessvat'], [/^vat\s*output/i, '_vatout'],
+    [/^void/i, '_void'], [/^diplomat/i, '_dip'], [/^dine\s*-?\s*in/i, '_dine'], [/^take\s*-?\s*out|^takeout|^to\s*go/i, 'takeOut'], [/^delivery/i, '_deliv'], [/^old\s*acc/i, '_old'], [/^new\s*acc/i, '_new'],
+    [/^total\s*discount/i, 'disc:total'], [/^discount|^senior|^pwd|^sc\/pwd|^employee\s*disc|^promo/i, 'disc:']];
+  const money = s => [...s.matchAll(/(?<![\d.])-?\d{1,3}(?:,\d{3})*\.\d{2}(?!\d)|(?<![\d.,])-?\d+\.\d{2}(?!\d)/g)].map(m => parseFloat(m[0].replace(/,/g, '')));
+  const give = v => { const k = pend.shift(); if (!k) return; if (k.startsWith('pay:')) pays[k.slice(4)] = v; else if (k.startsWith('disc:')) discs[k] = v; else if (!(k in out)) out[k] = v; };
+  lines.forEach((l, i) => {
+    const dm = l.match(/^date\s*:?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})/i); if (dm) date = `${dm[3]}-${pad(dm[1])}-${pad(dm[2])}`;
+    const gm = l.match(/^guest\s*count\s*:?\s*(\d+)?/i); if (gm) { const v = gm[1] || (lines[i + 1] || '').match(/^\d+$/)?.[0]; if (v) out.guests = +v; return; }
+    const tm = l.match(/^tr\s*count\s*:?\s*(\d+)?/i); if (tm) { const v = tm[1] || (lines[i + 1] || '').match(/^\d+$/)?.[0]; if (v) out.tr = +v; return; }
+    const om = l.match(/^begin+ing\s*or\s*:?\s*([\d-]{5,})?/i); if (om) { out.orFrom = om[1] || (lines.slice(i + 1, i + 4).find(x => /^\d-?\d{5,}$/.test(x)) || ''); return; }
+    const em = l.match(/^ending\s*or\s*:?\s*([\d-]{5,})?/i); if (em) { out.orTo = em[1] || (lines.slice(i + 1, i + 4).find(x => /^\d-?\d{5,}$/.test(x)) || ''); return; }
+    if (/^payments?\s*:?\s*$/i.test(l)) { inPay = true; return; }
+    if (/^net\s*sales/i.test(l)) { pend.push(seenNet ? '_net2' : '_netClass'); seenNet = true; money(l).forEach(give); return; }
+    if (!seenNet) return;                                 // sales-by-class lines above are skipped
+    let key = null; for (const [re, k] of L) if (re.test(l)) { key = k === 'disc:' ? 'disc:' + l.replace(/[\d.,:\s-]+$/, '').toLowerCase() : k; break; }
+    if (key === 'totalPay') inPay = false;
+    const pm = !key && inPay && l.match(/^([A-Za-z][A-Za-z .\/-]{0,20}?)(?:\s+\d{1,4})?(?:\s+-?[\d,]+\.\d{2})?$/); if (pm) key = 'pay:' + pm[1].toUpperCase().replace(/[^A-Z]/g, '');
+    if (key) pend.push(key);
+    money(l).forEach(give);
+  });
+  const P = {cash: 0, card: 0, ar: 0, other: 0}; let any = false;
+  Object.entries(pays).forEach(([k, v]) => { any = true; if (/^CASH/.test(k)) P.cash += v; else if (/^(CC|CARD|CREDIT|DEBIT|VISA|MASTER|BDO|BPI)/.test(k)) P.card += v; else if (/^(AR|CHARGE|ACCOUNT)/.test(k)) P.ar += v; else P.other += v; });
+  if (any) Object.assign(out, Object.fromEntries(Object.entries(P).map(([k, v]) => [k, r2(v)])));
+  const dsum = Object.entries(discs).filter(([k]) => k !== 'disc:total').reduce((a, [, v]) => a + v, 0) + (discs['disc:total'] || 0);
+  if (Object.keys(discs).length) out.disc = r2(dsum);
+  if (out.takeOut) out.noSc = out.takeOut;
+  Object.keys(out).forEach(k => { if (k.startsWith('_') || k === 'takeOut') delete out[k]; });
+  return {z: out, date, pays};
+}
+function zChecks(z) {   // quick arithmetic checks so a misread is obvious
+  const n = k => num(z[k]), C = [];
+  if (z.totalGross !== '' && z.gross !== '' && z.sc !== '') C.push(['Gross + service charge = total gross', Math.abs(n('gross') + n('sc') - n('totalGross')) < 0.06]);
+  if (z.totalGross !== '' && z.totalNet !== '') C.push(['Total gross − discounts = total net', Math.abs(n('totalGross') - n('disc') - n('totalNet')) < 0.06]);
+  if (z.totalPay !== '') C.push(['Payments add up to the total payment', Math.abs(n('cash') + n('card') + n('ar') + n('other') - n('totalPay')) < 0.06]);
+  return C;
+}
+function catTargets() {   // statements and event sheets a POS payment can be applied to
+  const T = [];
+  S.bills.filter(b => b.status !== 'void' && b.status !== 'cancelled').forEach(b => { const c = billCalc(b, b.pax); if (b.status !== 'paid' || c.balance > 0) T.push(['bill:' + b.id, `Statement ${b.no} · ${b.client}${c.total ? ' · balance ' + peso(c.balance) : ''}`]); });
+  const lo = daysAgo(60), hi = dstr(new Date(Date.now() + 200 * 864e5));
+  Object.values(S.events).filter(e => e.status !== 'void' && e.date >= lo && e.date <= hi).sort((a, b) => a.date.localeCompare(b.date))
+    .forEach(e => { const sh = sheetOf(e); T.push(['event:' + e.id, `${fmtD(e.date)} · ${sh.client || e.name} · ${sheetKindLabel(sh.kind)}${sh.bill ? '' : ' (no billing yet)'}`]); });
+  return T;
+}
+function catLabel(ref) { return (catTargets().find(t => t[0] === ref) || [])[1] || ref; }
+
+V.sales = () => {
+  const mode = S.canBill && D.ui.salesMode === 'sc' ? 'sc' : 'day';
+  const seg = S.canBill ? `<div class="seg" style="margin:0 0 12px"><button type="button" class="${mode === 'day' ? 'on' : ''}" data-act="set" data-arg="ui.salesMode|day">Daily sales</button><button type="button" class="${mode === 'sc' ? 'on' : ''}" data-act="set" data-arg="ui.salesMode|sc">Service charge</button></div>` : '';
+  return `<h2>Daily sales</h2>${seg}` + (mode === 'sc' ? scView() : saleView());
+};
+function saleView() {
+  if (!D.sale || !D.sale.z) saleLoad(today());
+  const d = D.sale, ex = S.sales[d.date], C = saleCalc(d), ver = ex?.verified, locked = ver && !S.isAdmin;
+  const zin = (k, ph = '0.00', ex2 = '') => `<input type="number" inputmode="decimal" step="any" min="0" data-b="sale.z.${k}" placeholder="${ph}" ${locked ? 'disabled' : ''} ${ex2}>`;
+  const lab = (t, x, hint = '') => `<label>${t}${hint ? ` <span class="small mut">${hint}</span>` : ''}${x}</label>`;
+  const T = catTargets();
+  const ym = (D.ui.salesMonth ||= today().slice(0, 7)), days = Object.values(S.sales).filter(s => s.date.startsWith(ym) && s.status !== 'void').sort((a, b) => b.date.localeCompare(a.date));
+  const tot = k => r2(sum(days, s => k === 'R' ? num(s.R) : k === 'sc' ? num(s.sc ?? s.z?.sc) : k === 'cat' ? sum(s.cat || [], c => num(c.amount)) : num(s.z?.[k] ?? (k === 'totalNet' ? s.R : 0))));
+  const months = [...new Set([today().slice(0, 7), ...Object.keys(S.sales).map(k => k.slice(0, 7))])].sort().reverse();
+  return `<p class="lede">One page per day. Take a photo of the POS <b>Z-reading</b> and the numbers fill in by themselves; check them, add any <b>catering payments</b> that went through the POS or card terminal, count the cash drawer, then save. Finance or an Admin verifies the day.</p>
+  <div class="card"><div class="row" style="align-items:flex-end;flex-wrap:wrap;gap:10px"><label style="max-width:190px">Date<input type="date" value="${esc(d.date)}" data-act-change="saleDate" id="saleDate"></label>
+    ${ex ? (ver ? `<span class="chip ok">Verified by ${esc(ver.by || '')}</span>` : '<span class="chip warn">Saved · waiting for verification</span>') : '<span class="chip mut">Not saved yet</span>'}
+    <span class="spacer"></span>${locked ? '' : '<button class="pri" data-act="zPhoto">📷 Read Z-reading photo</button>'}<input type="file" id="zFile" accept="image/*,application/pdf" capture="environment" hidden></div>
+   ${locked ? '<div class="alert info" style="margin-top:10px">This day is verified. Only an Admin can change it.</div>' : ''}
+   <h4 class="sub">1. From the Z-reading</h4>
+   <div class="grid">${lab('Total net sales ₱', zin('totalNet'), 'bottom line of the sales')}${lab('Service charge ₱', zin('sc'), 'goes to the staff')}${lab('Discounts ₱', zin('disc'))}${lab('Guest count', zin('guests', '0', 'step="1"'))}</div>
+   <div class="grid">${lab('Cash ₱', zin('cash'))}${lab('Card (CC) ₱', zin('card'))}${lab('Charge / AR ₱', zin('ar'))}${lab('GCash / other ₱', zin('other'))}</div>
+   <details style="margin-top:6px"><summary class="small">More from the Z-reading (gross sales, totals, OR numbers)</summary>
+    <div class="grid" style="margin-top:6px">${lab('Gross sales ₱', zin('gross'), 'before SC')}${lab('Total gross sales ₱', zin('totalGross'))}${lab('Total payment ₱', zin('totalPay'))}${lab('Transactions', zin('tr', '0', 'step="1"'))}
+    ${lab('Beginning OR', `<input data-b="sale.z.orFrom" ${locked ? 'disabled' : ''}>`)}${lab('Ending OR', `<input data-b="sale.z.orTo" ${locked ? 'disabled' : ''}>`)}</div></details>
+   <div data-live="zchk"></div>
+   <h4 class="sub">2. Service charge check (10%)</h4>
+   <div class="grid">${lab('Take-out, trays &amp; packs ₱', zin('noSc'), 'no service charge on these')}<div data-live="sccalc" style="align-self:end"></div></div>
+   <h4 class="sub">3. Catering payments that went through the POS / card terminal</h4>
+   <p class="small mut" style="margin:0 0 6px">Down payments or balances for catering, trays or packs paid at the counter. They are taken out of the restaurant's sales and, once the day is verified, added to the client's statement as paid.</p>
+   ${(d.cat || []).map((c, i) => `<div class="row" style="gap:8px;margin-bottom:6px;flex-wrap:wrap">
+     <select data-b="sale.cat.${i}.ref" style="flex:2;min-width:220px" ${locked || c.applied ? 'disabled' : ''}><option value="">— which client / event? —</option>${T.map(([v, l]) => opt(v, l)).join('')}${c.ref && !T.some(t => t[0] === c.ref) ? opt(c.ref, c.label || c.ref) : ''}</select>
+     <input type="number" inputmode="decimal" step="any" min="0" data-b="sale.cat.${i}.amount" placeholder="Amount ₱" style="flex:1;min-width:110px" ${locked || c.applied ? 'disabled' : ''}>
+     <select data-b="sale.cat.${i}.method" style="flex:1;min-width:100px" ${locked || c.applied ? 'disabled' : ''}>${opt('card', 'Card')}${opt('cash', 'Cash')}${opt('other', 'GCash / other')}</select>
+     ${c.applied ? '<span class="chip ok">added to statement</span>' : locked ? '' : `<button class="sm ghost" data-act="catRm" data-arg="${i}">✕</button>`}</div>`).join('')}
+   ${locked ? '' : '<button class="sm" data-act="catAdd">＋ Add a catering payment</button>'}
+   <h4 class="sub">4. Cash drawer</h4>
+   <div class="grid">${lab('Opening cash (float) ₱', `<input type="number" inputmode="decimal" step="any" min="0" data-b="sale.drawer.float" ${locked ? 'disabled' : ''}>`)}
+    ${lab('Paid out from the drawer ₱', `<input type="number" inputmode="decimal" step="any" min="0" data-b="sale.drawer.paidOut" placeholder="${C.auto.total.toFixed(2)} (from today's expenses)" ${locked ? 'disabled' : ''}>`)}
+    ${lab('Cash counted at closing ₱', `<input type="number" inputmode="decimal" step="any" min="0" data-b="sale.drawer.counted" ${locked ? 'disabled' : ''}>`)}
+    ${lab('Deposited / turned over ₱', `<input type="number" inputmode="decimal" step="any" min="0" data-b="sale.drawer.deposit" ${locked ? 'disabled' : ''}>`)}</div>
+   <p class="small mut" style="margin:4px 0 0">Today's restaurant expenses and purchases not paid from a cash advance: ${C.auto.list.length ? C.auto.list.map(x => esc(x.label) + ' ' + peso(x.amount)).join(' · ') : 'none recorded'}. <a href="#purchases" data-act="saleExpense">＋ Record an expense</a></p>
+   <label style="margin-top:8px">Notes <span class="small mut">(optional)</span><input data-b="sale.note" placeholder="e.g. power outage 2–4 PM, card terminal offline" ${locked ? 'disabled' : ''}></label>
+   <div data-live="salesum" style="margin-top:12px"></div>
+   <div class="row end" style="margin-top:12px">${!locked ? `<button class="ghost" data-act="saleClear">Clear</button><button class="pri" data-act="saleSave">Save the day</button>` : ''}
+    ${S.canBill && ex && !ver ? '<button class="pri" data-act="saleVerify" style="background:#2E7D32">✓ Verify</button>' : ''}${S.isAdmin && ver ? '<button class="ghost" data-act="saleUnverify">Un-verify</button>' : ''}</div>
+  </div>
+  <div class="card"><div class="row" style="flex-wrap:wrap"><h3 style="margin:0">Days in</h3><select data-b="ui.salesMonth" data-rr style="width:auto">${months.map(m => opt(m, new Date(m + '-01T00:00').toLocaleDateString('en-PH', {month: 'long', year: 'numeric'}))).join('')}</select><span class="spacer"></span>${days.length ? '<button class="sm" data-act="salesXlsx">Excel</button>' : ''}</div>
+   ${days.length ? `<div class="tw" style="margin-top:8px"><table><thead><tr><th>Date</th><th class="n">Net sales</th><th class="n">Service charge</th><th class="n">Catering via POS</th><th class="n">Restaurant sales</th><th class="n">Cash over/short</th><th></th></tr></thead><tbody>
+    ${days.map(s => { const os = s.overShort; return `<tr class="click" data-act="saleOpen" data-arg="${s.date}"><td>${fmtD(s.date)}<div class="small mut">${new Date(s.date + 'T00:00').toLocaleDateString('en-PH', {weekday: 'short'})}</div></td><td class="n">${peso(num(s.z?.totalNet ?? s.R))}</td><td class="n">${s.z ? peso(num(s.z.sc)) : '—'}</td><td class="n">${(s.cat || []).length ? peso(sum(s.cat, c => num(c.amount))) : ''}</td><td class="n"><b>${peso(num(s.R))}</b></td><td class="n ${os < -0.5 ? 'bad-t' : os > 0.5 ? 'warn-t' : ''}">${os == null ? '' : peso(os)}</td><td>${s.verified ? '<span class="chip ok">✓</span>' : s.z ? '<span class="chip warn">to verify</span>' : ''}</td></tr>`; }).join('')}
+    <tr><td><b>Total</b></td><td class="n"><b>${peso(tot('totalNet'))}</b></td><td class="n"><b>${peso(tot('sc'))}</b></td><td class="n"><b>${peso(tot('cat'))}</b></td><td class="n"><b>${peso(tot('R'))}</b></td><td></td><td></td></tr></tbody></table></div>` : '<div class="empty">No days saved this month.</div>'}
+  </div>`;
+}
+function saleLive(k) {
+  const d = D.sale; if (!d || !d.z) return '';
+  const C = saleCalc(d);
+  if (k === 'zchk') { const ch = zChecks(d.z); return ch.length ? `<div class="row" style="gap:6px;flex-wrap:wrap;margin-top:6px">${ch.map(([l, ok]) => `<span class="chip ${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'} ${l}</span>`).join('')}</div>` : ''; }
+  if (k === 'sccalc') { if (C.scCalc == null) return '<span class="small mut">Enter <b>Gross sales</b> (under "More from the Z-reading") to check the 10%: gross sales − take-out/trays/packs, × 10%.</span>';
+    const diff = d.z.sc !== '' ? r2(num(d.z.sc) - C.scCalc) : null;
+    return `<div class="small">10% of ${peso(num(d.z.gross) - num(d.z.noSc))} = <b>${peso(C.scCalc)}</b>${diff == null ? '' : Math.abs(diff) < 1 ? ' <span class="chip ok">matches the POS</span>' : ` <span class="chip warn">POS shows ${peso(num(d.z.sc))} (${diff > 0 ? '+' : ''}${peso(diff)})</span>`}
+      ${S.sales[d.date]?.verified && !S.isAdmin ? '' : ` <button class="sm" data-act="scUse" type="button">Use ${peso(C.scCalc)}</button>`}</div>`; }
+  if (k === 'salesum') {
+    const box = (l, v, cls = '', sub = '') => `<div style="flex:1;min-width:150px;background:#F7F4EA;border-radius:10px;padding:10px 12px"><div class="small mut">${l}</div><div style="font-size:20px;font-weight:700" class="${cls}">${v}</div>${sub ? `<div class="small mut">${sub}</div>` : ''}</div>`;
+    return `<div class="row" style="gap:10px;flex-wrap:wrap">${box('Restaurant sales', peso(C.R), '', 'net sales − service charge − catering')}${box('Service charge for staff', peso(num(d.z.sc)))}${box('Catering payments', peso(C.cat), '', (d.cat || []).length + ' payment' + ((d.cat || []).length === 1 ? '' : 's'))}
+      ${box('Cash over / short', C.overShort == null ? '—' : peso(C.overShort), C.overShort == null ? '' : C.overShort < -0.5 ? 'bad-t' : C.overShort > 0.5 ? 'warn-t' : 'ok-t', `expected in drawer ${peso(C.expected)}`)}</div>
+      ${C.payOff ? `<div class="alert warn" style="margin-top:8px">Cash + card + AR + other is ${peso(C.pays)}, but the Z-reading total payment is ${peso(num(d.z.totalPay))}. Please check the payment amounts.</div>` : ''}`;
+  }
+  return '';
+}
+ACT.saleOpen = date => { saleLoad(date); D.ui.salesMode = 'day'; render(); window.scrollTo(0, 0); };
+ACT.saleDate = () => { const v = $('#saleDate')?.value; if (v) { saleLoad(v); render(); } };
+ACT.saleClear = () => { if (!confirm('Clear the numbers on this page? (Saved days are not affected.)')) return; saleLoad(D.sale.date); if (!S.sales[D.sale.date]?.z) D.sale = newSale(D.sale.date); render(); };
+ACT.catAdd = () => { D.sale.cat.push({ref: '', amount: '', method: 'card'}); render(); };
+ACT.catRm = i => { D.sale.cat.splice(+i, 1); render(); };
+ACT.scUse = () => { const C = saleCalc(D.sale); if (C.scCalc != null) { D.sale.z.sc = C.scCalc.toFixed(2); render(); } };
+ACT.saleExpense = () => { D.expense = newExpense({date: D.sale.date, book: 'R', paidBy: 'Cash drawer'}); };
+function salePayload(d) {
+  const z = {}; Z_FIELDS.forEach(([k]) => { const v = d.z[k]; z[k] = k === 'orFrom' || k === 'orTo' ? String(v || '').trim() : v === '' || v == null ? '' : r2(num(v)); });
+  const C = saleCalc(d);
+  return {date: d.date, z, cat: (d.cat || []).filter(c => c.ref || num(c.amount)).map(c => ({ref: c.ref || '', label: c.ref ? catLabel(c.ref) : '', amount: r2(num(c.amount)), method: c.method || 'card', ...(c.applied ? {applied: c.applied} : {})})),
+    drawer: Object.fromEntries(Object.entries(d.drawer).map(([k, v]) => [k, v === '' ? '' : r2(num(v))])), note: (d.note || '').trim(),
+    R: C.R, sc: r2(num(z.sc)), overShort: C.overShort, status: 'ok'};
+}
+ACT.saleSave = () => {
+  const d = D.sale; if (!d.date) return toast('Choose the date.', true);
+  if (d.z.totalNet === '') return toast('Enter the total net sales (or read the Z-reading photo).', true);
+  if ((d.cat || []).some(c => num(c.amount) > 0 && !c.ref)) return toast('Choose the client / event for each catering payment.', true);
+  const ex = S.sales[d.date], data = salePayload(d); if (ex?.verified) data.verified = ex.verified;
+  guard(async () => { await setDoc('sales/' + d.date, data); saleLoad(d.date); }, 'Day saved');
+};
+ACT.saleVerify = () => {
+  const d = D.sale, ex = S.sales[d.date]; if (!ex) return toast('Save the day first.', true);
+  if (JSON.stringify(salePayload(d)) !== JSON.stringify(salePayload(saleFromDoc(ex)))) return toast('Save your changes first, then verify.', true);
+  const cat = (ex.cat || []).map(c => ({...c})), ops = [], when = fmtD(d.date), applyTo = {};
+  cat.forEach(c => { if (c.applied || !(num(c.amount) > 0) || !c.ref) return;
+    const [kind, id] = c.ref.split(':'), note = `${peso(num(c.amount))} ${c.method === 'cash' ? 'cash' : c.method === 'other' ? 'GCash/other' : 'card'} via POS ${when}`;
+    if (kind === 'bill') { const b = applyTo[c.ref] ||= {...(S.bills.find(x => x.id === id) || {})}; if (!b.id) return; b.paid = r2(num(b.paid) + num(c.amount)); b.paidNote = [b.paidNote, note].filter(Boolean).join('; '); c.applied = Date.now(); }
+    else if (kind === 'event') { const e = S.events[id], bl = applyTo[c.ref] ||= e?.sheet?.bill ? {...e.sheet.bill, _ev: id} : null; if (!bl) return; bl.paid = r2(num(bl.paid) + num(c.amount)); bl.paidNote = [bl.paidNote, note].filter(Boolean).join('; '); c.applied = Date.now(); } });
+  Object.entries(applyTo).forEach(([ref, b]) => { if (!b) return;
+    if (ref.startsWith('bill:')) { const bal = billCalc(b, b.pax).balance; ops.push({op: 'update', path: 'bills/' + b.id, data: {paid: b.paid, paidNote: b.paidNote, status: bal <= 0.5 ? 'paid' : 'partial'}}); }
+    else ops.push({op: 'update', path: 'events/' + b._ev, data: {sheet: {bill: {paid: b.paid, paidNote: b.paidNote}}}}); });
+  const skipped = cat.filter(c => !c.applied && num(c.amount) > 0).length;
+  ops.unshift({op: 'update', path: 'sales/' + d.date, data: {cat, verified: {by: S.me.name || S.me.username, at: Date.now()}}});
+  guard(async () => { await opsWrite(ops); saleLoad(d.date); if (skipped) toast(skipped + ' catering payment' + (skipped > 1 ? 's have' : ' has') + ' no statement yet. Add billing to that event, then record the payment there.', true); }, 'Day verified');
+};
+ACT.saleUnverify = () => { if (!confirm('Un-verify this day so it can be changed? Payments already added to statements stay there.')) return; guard(async () => { await upd('sales/' + D.sale.date, {verified: null}); saleLoad(D.sale.date); }, 'Day un-verified'); };
+ACT.salesXlsx = () => {
+  const ym = D.ui.salesMonth, days = Object.values(S.sales).filter(s => s.date.startsWith(ym) && s.status !== 'void').sort((a, b) => a.date.localeCompare(b.date));
+  const head = ['Date', 'Day', 'Total net sales', 'Service charge', 'Discounts', 'Cash', 'Card', 'AR / charge', 'GCash / other', 'Take-out/trays/packs (no SC)', 'Catering via POS', 'Restaurant sales', 'Cash over/short', 'Guests', 'Verified by', 'Catering details', 'Notes'];
+  const rows = days.map(s => { const z = s.z || {}; return [s.date, new Date(s.date + 'T00:00').toLocaleDateString('en-PH', {weekday: 'short'}), num(z.totalNet ?? s.R), num(z.sc), num(z.disc), num(z.cash), num(z.card), num(z.ar), num(z.other), num(z.noSc), r2(sum(s.cat || [], c => num(c.amount))), num(s.R), s.overShort == null ? '' : s.overShort, z.guests === '' || z.guests == null ? '' : num(z.guests), s.verified?.by || '', (s.cat || []).map(c => `${c.label || c.ref} ${peso(c.amount)} (${c.method})`).join('; '), s.note || '']; });
+  const T = (i) => r2(sum(rows, r => num(r[i])));
+  rows.push(['TOTAL', '', T(2), T(3), T(4), T(5), T(6), T(7), T(8), T(9), T(10), T(11), T(12), T(13), '', '', '']);
+  const blob = xlsxBlob([{name: 'Daily sales', widths: [12, 6, 15, 14, 12, 14, 14, 12, 13, 16, 15, 16, 14, 8, 16, 50, 40], money: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], rows: [head, ...rows], bold: [rows.length]}]);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Romualdos Daily Sales ${ym}.xlsx`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500); toast('Excel file downloaded');
+};
+ACT.zPhoto = () => { const inp = $('#zFile'); if (!inp) return; inp.value = ''; inp.onchange = () => { const f = inp.files[0]; if (f) zRead(f); }; inp.click(); };
+function zRead(file) {
+  const pdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  if (!pdf && !/^image\//.test(file.type)) return toast('Choose a photo or PDF of the Z-reading.', true);
+  const url = pdf ? '' : URL.createObjectURL(file), dataP = pdf ? fileB64(file) : shrinkImage(file, 2400, 0.85);
+  openModal(`<h3 style="margin:0 0 8px">Reading the Z-reading…</h3><div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:14px" class="rcpt-grid">
+    <div style="background:#F3EFE6;border-radius:10px;max-height:460px;overflow:auto">${pdf ? `<div class="empty" style="padding:30px">📄 ${esc(file.name)}</div>` : `<img src="${url}" style="width:100%;display:block" alt="Z-reading">`}</div>
+    <div id="z-res"><div class="alert info">🔎 Reading the numbers…</div></div></div><style>@media(max-width:700px){.rcpt-grid{grid-template-columns:1fr!important}}</style>
+    <div class="row end" style="margin-top:12px"><button data-mact="close">Cancel</button><button class="pri" data-mact="use" id="z-use" disabled>Fill in these numbers</button></div>`, {
+    use: () => { const r = MH._res; if (!r) return; if (r.date && r.date !== D.sale.date) { if (S.sales[r.date] && !confirm(`This Z-reading is for ${fmtD(r.date)}, which is already saved. Open that day and replace its numbers?`)) return; saleLoad(r.date); }
+      Object.entries(r.z).forEach(([k, v]) => { if (k in D.sale.z) D.sale.z[k] = typeof v === 'number' ? (['guests', 'tr'].includes(k) ? String(v) : v.toFixed(2)) : String(v); });
+      if (url) URL.revokeObjectURL(url); closeModal(); render(); toast('Numbers filled in. Please compare with the printout, then save.'); }});
+  const show = (text, how) => { const r = parseZ(text), el = $('#z-res'); if (!el) return; MH._res = r; const got = Object.keys(r.z);
+    if (!got.length) { el.innerHTML = '<div class="alert warn">Couldn\'t find the Z-reading totals in this photo. Try a straighter, closer photo in good light, or type the numbers in.</div>'; return; }
+    const zz = {...newSale().z, ...Object.fromEntries(Object.entries(r.z).map(([k, v]) => [k, String(v)]))};
+    el.innerHTML = `${r.date ? `<p class="small" style="margin:0 0 6px">Date on the reading: <b>${fmtLong(r.date)}</b></p>` : ''}<table class="small" style="width:100%">${Z_FIELDS.filter(([k]) => k in r.z).map(([k, l]) => `<tr><td>${l}</td><td class="n"><b>${['guests', 'tr', 'orFrom', 'orTo'].includes(k) ? esc(r.z[k]) : peso(r.z[k])}</b></td></tr>`).join('')}</table>
+      <div class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px">${zChecks(zz).map(([l, ok]) => `<span class="chip ${ok ? 'ok' : 'bad'}">${ok ? '✓' : '✗'} ${l}</span>`).join('')}</div><p class="small mut" style="margin:8px 0 0">Read by ${how}. Green checks mean the totals agree with each other.</p>`;
+    $('#z-use').disabled = false; };
+  const tess = () => pdf ? Promise.reject(new Error('pdf')) : loadTesseract().then(T => T.recognize(file, 'eng')).then(r => show(r.data.text, 'the on-device reader'));
+  dataP.then(data => api('opsOcr', {data: data.split(',')[1], mime: pdf ? 'application/pdf' : 'image/jpeg'}))
+    .then(r => { if (!r.ok || !String(r.text || '').trim()) throw new Error('empty'); show(r.text, 'Google'); if (!Object.keys(MH._res?.z || {}).length && !pdf) return tess(); })
+    .catch(() => tess().catch(() => { const el = $('#z-res'); if (el) el.innerHTML = '<div class="alert warn">Auto-read is not available right now. Please type the numbers in.</div>'; }));
+}
+
+/* ---------- service charge: each day's SC ÷ the shares of the people who worked that day ---------- */
+const SC_DEFAULT_SHARE = {'1019': 0.5, '1009': 0.5};      // driver and liaison officer: half share (from the Oct 11–25 SC file)
+function cutoffOf(dateStr) {
+  const d = new Date(dateStr + 'T00:00'), y = d.getFullYear(), m = d.getMonth(), day = d.getDate(), ds = (Y, M, D2) => dstr(new Date(Y, M, D2));
+  if (day <= 10) return {from: ds(y, m - 1, 26), to: ds(y, m, 10)}; if (day <= 25) return {from: ds(y, m, 11), to: ds(y, m, 25)}; return {from: ds(y, m, 26), to: ds(y, m + 1, 10)};
+}
+function cutDays(from, to) { const out = []; for (let d = new Date(from + 'T00:00'); dstr(d) <= to && out.length < 16; d.setDate(d.getDate() + 1)) out.push(dstr(d)); return out; }
+const cutLabel = (from, to) => { const a = new Date(from + 'T00:00'), b = new Date(to + 'T00:00'), o = {month: 'short', day: 'numeric'}; return a.toLocaleDateString('en-US', o) + ' – ' + b.toLocaleDateString('en-US', {...o, year: 'numeric'}); };
+const scPresent = (r, d) => r.ovr && d in r.ovr ? !!r.ovr[d] : !!(r.hr && r.hr[d]);
+const daySC = d => { const s = S.sales[d]; return s ? num(s.sc ?? s.z?.sc) : null; };
+function scCalc(cut) {
+  const days = cutDays(cut.from, cut.to), rows = (cut.rows || []).filter(r => !r.off);
+  const perDay = days.map(d => { const sc = daySC(d), shares = r2(sum(rows, r => scPresent(r, d) ? num(r.share) : 0)); return {d, sc, shares, per: shares > 0 && sc ? sc / shares : 0}; });
+  const people = rows.map(r => { const earned = r2(sum(perDay, p => scPresent(r, p.d) ? p.per * num(r.share) : 0)), dp = days.filter(d => scPresent(r, d)).length;
+    return {...r, earned, daysPresent: dp, net: r2(earned - num(r.ded) - num(r.adv))}; });
+  const total = r2(sum(perDay, p => p.sc || 0)), paid = r2(sum(people, p => p.earned));
+  return {days, perDay, people, total, paid, missing: perDay.filter(p => p.sc == null && p.d < today()).map(p => p.d), unshared: perDay.filter(p => p.sc > 0 && !p.shares).map(p => p.d)};
+}
+function scView() {
+  const cur = cutoffOf(today()), list = []; let c = cur; for (let i = 0; i < 8; i++) { list.push(c); c = cutoffOf(dstr(new Date(new Date(c.from + 'T00:00').getTime() - 864e5))); }
+  Object.values(S.sc || {}).forEach(x => { if (!list.some(l => l.from === x.from)) list.push({from: x.from, to: x.to}); }); list.sort((a, b) => b.from.localeCompare(a.from));
+  if (!D.sc || !D.sc.from) { const def = list[1] || list[0]; scOpen(def.from, def.to); }
+  const cut = D.sc, K = scCalc(cut), saved = S.sc?.[cut.from];
+  const cell = (r, i, d) => { const on = scPresent(r, d), ov = r.ovr && d in r.ovr; return `<td class="n" style="padding:1px"><button type="button" class="sm ${on ? 'pri' : 'ghost'}" style="min-width:26px;padding:3px 0;${ov ? 'outline:2px dashed #8A5A00' : ''}" data-act="scTick" data-arg="${i}|${d}" title="${ov ? 'Changed by hand' : r.hr?.[d] ? 'From the time clock' : 'No time-in'}">${on ? '✓' : ''}</button></td>`; };
+  return `<p class="lede">Each day's service charge (from the Daily sales page) is shared by the people who worked that day: <b>day's SC ÷ total shares present</b>, full share = 1, half share = 0.5. Who worked comes from the <b>HR time clock</b>; tap a box to correct it. Then create the SC file for payroll and print the slips.</p>
+  <div class="card"><div class="row" style="flex-wrap:wrap;gap:8px"><label style="max-width:280px">Cut-off<select id="scCut" data-act-change="scCut">${list.map(l => `<option value="${l.from}|${l.to}"${l.from === cut.from ? ' selected' : ''}>${cutLabel(l.from, l.to)}${S.sc?.[l.from] ? ' ✓' : ''}</option>`).join('')}</select></label>
+    <label style="max-width:170px">Release date<input type="date" data-b="sc.release"></label><span class="spacer"></span>
+    <button data-act="scLoad">↻ ${cut.rows?.length ? 'Reload' : 'Load'} attendance from HR</button></div>
+   ${cut.src ? `<p class="small mut" style="margin:6px 0 0">${esc(cut.src)}</p>` : ''}
+   ${K.missing.length ? `<div class="alert warn" style="margin-top:8px">No daily sales saved for ${K.missing.map(fmtD).join(', ')}. Those days count as ₱0 service charge.</div>` : ''}
+   ${K.unshared.length ? `<div class="alert bad" style="margin-top:8px">Nobody is marked present on ${K.unshared.map(fmtD).join(', ')}, so that day's service charge is not shared. Check the attendance.</div>` : ''}
+  </div>
+  ${cut.rows?.length ? `<div class="card"><div class="tw"><table class="small"><thead><tr><th>Name</th><th class="n">Share</th>${K.days.map(d => `<th class="n" style="min-width:34px">${new Date(d + 'T00:00').getDate()}<div class="mut" style="font-weight:400">${new Date(d + 'T00:00').toLocaleDateString('en-PH', {weekday: 'narrow'})}</div></th>`).join('')}<th class="n">Days</th><th class="n">SC earned</th><th class="n">Deduct</th><th class="n">Advance</th><th class="n">Net</th></tr>
+     <tr><td class="mut">Service charge</td><td></td>${K.perDay.map(p => `<td class="n mut" style="font-size:10px">${p.sc == null ? '—' : Math.round(p.sc).toLocaleString()}</td>`).join('')}<td></td><td class="n"><b>${peso(K.total)}</b></td><td colspan="3"></td></tr>
+     <tr><td class="mut">Per full share</td><td></td>${K.perDay.map(p => `<td class="n mut" style="font-size:10px">${p.per ? Math.round(p.per) : ''}</td>`).join('')}<td colspan="5"></td></tr></thead><tbody>
+    ${cut.rows.map((row, i) => { if (row.off) return ''; const r = K.people.find(p => p.name === row.name && p.code === row.code) || {...row, earned: 0, daysPresent: 0, net: 0}; return `<tr><td style="white-space:nowrap"><b>${esc(r.name)}</b><div class="mut" style="font-size:10px">${esc(r.pos || '')}${r.code ? '' : ' added by hand'}</div></td>
+      <td class="n"><select data-b="sc.rows.${i}.share" data-rr style="width:62px;padding:4px">${opt('1', '1')}${opt('0.5', '½')}${opt('0', '0')}</select></td>${K.days.map(d => cell(r, i, d)).join('')}
+      <td class="n">${r.daysPresent}</td><td class="n">${peso(r.earned)}</td><td class="n"><input type="number" inputmode="decimal" min="0" step="any" data-b="sc.rows.${i}.ded" data-rr style="width:70px;padding:4px" placeholder="0"></td><td class="n"><input type="number" inputmode="decimal" min="0" step="any" data-b="sc.rows.${i}.adv" data-rr style="width:70px;padding:4px" placeholder="0"></td><td class="n"><b>${peso(r.net)}</b></td></tr>`; }).join('')}
+    <tr><td><b>Total</b></td><td></td>${K.days.map(() => '<td></td>').join('')}<td></td><td class="n"><b>${peso(K.paid)}</b></td><td class="n">${peso(sum(K.people, p => num(p.ded)))}</td><td class="n">${peso(sum(K.people, p => num(p.adv)))}</td><td class="n"><b>${peso(sum(K.people, p => p.net))}</b></td></tr></tbody></table></div>
+   ${Math.abs(K.paid - K.total) > 0.05 ? `<p class="small warn-t">Shared ${peso(K.paid)} of ${peso(K.total)} (the difference is rounding or days with nobody present).</p>` : ''}
+   <div class="row" style="margin-top:10px;gap:8px;flex-wrap:wrap"><input id="scAddName" placeholder="Add someone not on the time clock (e.g. Sayson, Jeoffrey)" style="flex:1;min-width:220px"><button class="sm" data-act="scAddPerson">＋ Add person</button></div>
+   ${cut.rows.some(r => r.off) ? `<p class="small mut">Not sharing this cut-off: ${cut.rows.filter(r => r.off).map(r => esc(r.name)).join(', ')}.</p>` : ''}
+   <div class="row end" style="margin-top:12px;flex-wrap:wrap">${saved?.file?.url ? `<a class="btn ghost" href="${esc(saved.file.url)}" target="_blank" rel="noopener">Open SC file ↗</a>` : ''}<button data-act="scSlips">Print SC slips</button><button data-act="scSave">Save</button><button class="pri" data-act="scFile">${saved?.file ? 'Update' : 'Create'} SC file for payroll</button></div>
+  </div>` : '<div class="card"><div class="empty">Press <b>Load attendance from HR</b> to bring in who worked each day of this cut-off.</div></div>'}`;
+}
+function scOpen(from, to) {
+  const s = S.sc?.[from];
+  D.sc = s ? JSON.parse(JSON.stringify({...s, rows: (s.rows || []).map(r => ({...r, share: String(r.share), ded: sStr(r.ded), adv: sStr(r.adv)}))})) : {from, to, release: dstr(new Date(new Date(to + 'T00:00').getTime() + 3 * 864e5)), rows: []};
+}
+ACT.scCut = () => { const [f, t] = ($('#scCut')?.value || '').split('|'); if (f) { scOpen(f, t); render(); } };
+ACT.scTick = arg => { const [i, d] = arg.split('|'), r = D.sc.rows[+i]; if (!r) return; const now = scPresent(r, d); r.ovr ||= {}; if (!!(r.hr && r.hr[d]) === !now) delete r.ovr[d]; else r.ovr[d] = now ? 0 : 1; render(); };
+ACT.scAddPerson = () => { const n = titleCase(($('#scAddName')?.value || '').trim()); if (!n) return toast('Type the name first.', true); if (D.sc.rows.some(r => r.name.toLowerCase() === n.toLowerCase())) return toast('Already on the list.', true); D.sc.rows.push({code: '', name: n, pos: '', share: '1', hr: {}, ovr: {}, ded: '', adv: ''}); render(); };
+ACT.scLoad = () => {
+  const cut = D.sc; guard(async () => {
+    const r = await api('scAttendance', {from: cut.from, to: cut.to});
+    const prev = Object.values(S.sc || {}).filter(x => x.from < cut.from).sort((a, b) => b.from.localeCompare(a.from))[0];
+    const shareOf = (code, name) => { const o = cut.rows.find(x => (code && x.code === code) || x.name === name) || prev?.rows?.find(x => (code && x.code === code) || x.name === name); return o ? String(o.share) : String(SC_DEFAULT_SHARE[code] ?? 1); };
+    const rows = r.staff.filter(s => s.active).map(s => { const old = cut.rows.find(x => x.code === s.code) || {}; return {code: s.code, name: s.name, pos: s.position, share: shareOf(s.code, s.name), hr: r.present[s.code] || {}, ovr: old.ovr || {}, ded: old.ded || '', adv: old.adv || ''}; });
+    const manual = [...cut.rows.filter(x => !x.code), ...((prev?.rows || []).filter(x => !x.code && !cut.rows.some(y => y.name === x.name)).map(x => ({...x, share: String(x.share), hr: {}, ovr: {}, ded: '', adv: ''})))];
+    cut.rows = [...rows, ...manual]; cut.src = `Attendance loaded from the HR time clock ${new Date().toLocaleString('en-PH', {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'})}: ${r.punches} time-ins, ${r.corrections} approved corrections.`;
+  }, 'Attendance loaded');
+};
+function scPayload(c) {
+  return {from: c.from, to: c.to, release: c.release || '', src: c.src || '', rows: c.rows.map(r => ({code: r.code || '', name: r.name, pos: r.pos || '', share: num(r.share), hr: r.hr || {}, ovr: r.ovr || {}, ded: r.ded === '' ? '' : r2(num(r.ded)), adv: r.adv === '' ? '' : r2(num(r.adv)), ...(r.off ? {off: 1} : {})})), ...(S.sc?.[c.from]?.file ? {file: S.sc[c.from].file} : {})};
+}
+ACT.scSave = () => { const c = D.sc; if (!c.rows.length) return toast('Load the attendance first.', true); guard(async () => { await setDoc('sc/' + c.from, scPayload(c)); }, 'Service charge saved'); };
+ACT.scFile = (a, btn) => {
+  const c = D.sc; if (!c.rows.length) return toast('Load the attendance first.', true);
+  const K = scCalc(c); if (btn) { btn.disabled = true; btn.textContent = 'Creating the file…'; }
+  guard(async () => {
+    await setDoc('sc/' + c.from, scPayload(c));
+    const r = await api('scFile', {cut: {from: c.from, to: c.to, release: c.release, label: cutLabel(c.from, c.to), days: K.perDay.map(p => ({d: p.d, sc: p.sc || 0})),
+      people: K.people.map(p => ({code: p.code, name: p.name, pos: p.pos, share: num(p.share), present: K.days.map(d => scPresent(p, d) ? 1 : 0), ded: num(p.ded), adv: num(p.adv)}))}});
+    await upd('sc/' + c.from, {file: {url: r.url, id: r.id, at: Date.now()}});
+    window.open(r.url, '_blank');
+  }, 'SC file ready in Drive');
+};
+ACT.scSlips = () => {
+  const c = D.sc, K = scCalc(c); if (!K.people.length) return toast('Load the attendance first.', true);
+  const w = pdfWindow(), rel = c.release ? fmtLong(c.release).replace(/^\w+, /, '') : '', lab = cutLabel(c.from, c.to);
+  const slip = p => `<div class="slip"><div class="sh"><b>ROMUALDO'S RESTAURANT</b><span>SERVICE CHARGE SLIP · ${esc(lab)}</span></div>
+    <table><tr><td>Name</td><td><b>${esc(p.name)}</b></td><td>Release date</td><td>${esc(rel)}</td></tr><tr><td>Share / days present</td><td>${p.share == 0.5 ? '½' : esc(p.share)} share · ${p.daysPresent} day${p.daysPresent === 1 ? '' : 's'}</td><td>Position</td><td>${esc(p.pos || '')}</td></tr></table>
+    <table class="m"><tr><td>Service charge earned</td><td class="r">${peso(p.earned)}</td></tr><tr><td>Less: deductions (breakages, etc.)</td><td class="r">${peso(num(p.ded))}</td></tr><tr><td>Less: advance already given</td><td class="r">${peso(num(p.adv))}</td></tr><tr class="t"><td>NET SC RECEIVED</td><td class="r">${peso(p.net)}</td></tr></table>
+    <div class="sg"><div>Received by (signature over printed name)</div><div>Date received</div></div></div>`;
+  const pages = []; for (let i = 0; i < K.people.length; i += 4) pages.push(K.people.slice(i, i + 4));
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>SC slips ${esc(lab)}</title><style>@page{size:A4;margin:8mm}*{box-sizing:border-box}body{font:10pt Arial,sans-serif;color:#14213F;margin:0}
+    .bar{display:flex;gap:10px;justify-content:center;padding:12px;background:#F7F4EA}.bar button{font:600 13px Arial;border:0;border-radius:8px;padding:10px 18px;background:#1A2C54;color:#fff;cursor:pointer}
+    .pg{height:279mm;display:grid;grid-template-rows:repeat(4,1fr);gap:3mm;page-break-after:always}.pg:last-child{page-break-after:auto}
+    .slip{border:1px dashed #9C9479;padding:3.5mm 5mm;display:flex;flex-direction:column}.sh{display:flex;justify-content:space-between;border-bottom:1.2pt solid #14213F;padding-bottom:1.5mm;margin-bottom:2mm}.sh span{font-size:8pt;letter-spacing:.06em}
+    table{width:100%;border-collapse:collapse;font-size:9.5pt}td{padding:.8mm 1mm}table.m{margin-top:1.5mm}table.m td{border-bottom:.5pt solid #D8D2BC}.r{text-align:right}.t td{font-weight:700;font-size:11pt;border-bottom:0;border-top:1.2pt solid #14213F}
+    .sg{margin-top:auto;display:grid;grid-template-columns:2fr 1fr;gap:10mm;font-size:7.5pt;color:#4A5265}.sg div{border-top:.8pt solid #14213F;padding-top:1mm}
+    @media print{.bar{display:none}}@media screen{body{background:#ECE8DA}.pg{width:194mm;margin:10px auto;background:#fff;padding:4mm}}</style></head><body>
+    <div class="bar"><button onclick="window.print()">Save as PDF / Print</button></div>${pages.map(p => `<div class="pg">${p.map(slip).join('')}</div>`).join('')}<script>window.onload=function(){setTimeout(function(){window.print()},400)}<\/script></body></html>`;
+  const ww = w && !w.closed ? w : window.open('', '_blank'); if (!ww) return toast('Your browser blocked the PDF window.', true);
+  ww.document.open(); ww.document.write(html); ww.document.close();
 };
 
 /* ============ SETUP ============ */
@@ -1630,7 +1949,7 @@ V.setup = () => {
   </div>
   <div class="card"><h3>Logins & roles</h3>
    <p class="small">Logins come from the <b>Romualdos Staff Logins</b> file in the Romualdo's Inquiry App folder on Google Drive, the same file used for the inquiry dashboard. Add a row to give someone access, set <b>Role</b> to Admin or Staff, and set <b>Active = No</b> to block them (takes effect within 2 minutes).</p>
-   <p class="small"><b>Staff</b> can file requisitions, record advances, purchases, receiving, expenses, issues, waste and counts, liquidate advances, and print. <b>Finance</b> can do everything Staff can, plus billing statements, contract prices, prices on event sheets and amounts billed and paid in the Archive. <b>Admins</b> can do all of that and also approve or reject requisitions, void records, change saved amounts, edit items and this Setup page. The server enforces these rules, not just the screen.</p>
+   <p class="small"><b>Staff</b> can file requisitions, record advances, purchases, receiving, expenses, issues, waste and counts, liquidate advances, enter the daily sales, and print. <b>Finance</b> can do everything Staff can, plus verifying daily sales, the service charge, billing statements, contract prices, prices on event sheets and amounts billed and paid in the Archive. <b>Admins</b> can do all of that and also approve or reject requisitions, void records, change saved amounts, edit items and this Setup page. The server enforces these rules, not just the screen.</p>
    <div class="tw"><table><thead><tr><th>Name</th><th>Username</th><th>Role</th></tr></thead><tbody>${S.users.filter(u => u.active !== false).map(u => `<tr><td>${esc(u.name)}</td><td>${esc(u.username)}</td><td>${u.role === 'Admin' ? '<span class="chip c">Admin</span>' : '<span class="chip mut">Staff</span>'}</td></tr>`).join('')}</tbody></table></div></div>
   <div class="card"><h3>How to run it day to day</h3>
    <ol class="steps">
@@ -2092,11 +2411,6 @@ ACT.csv = kind => {
     S.moves.filter(m => m.date >= f && m.date <= t).forEach(m => (m.lines || []).forEach(l => rows.push([m.date, BOOK[m.book].name, MT[m.type]?.short + (m.type === 'transfer' ? ' to ' + BOOK[m.toBook]?.name : ''), evName(m.eventId), m.reason, m.by, m.receivedBy, iname(l.itemId), iunit(l.itemId), l.qty, l.cost, r2(l.qty * l.cost), m.status].map(q).join(',')))); }
   downloadFile(`Romualdos ${kind} ${f} to ${t}.csv`, '\ufeff' + rows.join('\r\n'), 'text/csv;charset=utf-8'); toast('CSV downloaded — opens in Excel / Google Sheets');
 };
-ACT.saveSale = () => {
-  const d = D.sale; if (!d.date || d.amount === '') return toast('Enter date and amount.', true);
-  guard(async () => { await setDoc('sales/' + d.date, {date: d.date, R: r2(num(d.amount))}); D.sale = {date: today(), amount: ''}; }, 'Sales saved');
-};
-
 function itemModal(it, onSaved) {
   openModal(`<h3>${it ? 'Edit item' : 'Add item'}</h3>
    <div class="grid"><label>Name<input id="m-name" value="${esc(it?.name || '')}" placeholder="e.g. Pork liempo"></label>
@@ -2182,6 +2496,7 @@ document.addEventListener('input', e => {
   const p = e.target.dataset?.b; if (!p || !e.target.closest('#view')) return; if (e.target.type === 'checkbox') return; setPath(D, p, e.target.value); live(); if (p.startsWith('sheet.')) sheetTouched(); });
 document.addEventListener('change', e => {
   const el = e.target;
+  if (el.dataset?.actChange && el.closest('#view')) { ACT[el.dataset.actChange]?.(el.value, el); return; }
   if (el.dataset?.item && el.closest('#view')) {
     const [k, i] = el.dataset.item.split('|'), l = D[k].lines[+i], name = titleCase(el.value), ex = findItem(name);
     if (ex) { l.itemId = ex.id; l.newName = ''; if ('cost' in l && !l.cost && ex.lastCost) l.cost = String(ex.lastCost); }
@@ -2217,7 +2532,7 @@ function applyDocs(docs, fromSync) {
   rebuild();
 }
 function rebuild() {
-  const by = {config: [], items: [], events: [], advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: [], prs: [], recipes: [], bills: []};
+  const by = {config: [], items: [], events: [], advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: [], prs: [], recipes: [], bills: [], sc: []};
   for (const [path, d] of CACHE) { const i = path.indexOf('/'); const c = path.slice(0, i); (by[c] ||= []).push({id: path.slice(i + 1), ...d.data}); }
   const desc = a => a.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
   const m = by.config.find(d => d.id === 'main');
@@ -2229,6 +2544,7 @@ function rebuild() {
   S.recipes = by.recipes.filter(r => r.status !== 'void').sort((a, b) => String(a.name).localeCompare(b.name));
   S.sales = Object.fromEntries(by.sales.map(d => [d.date, d]));
   S.bills = desc(by.bills || []);
+  S.sc = Object.fromEntries((by.sc || []).map(d => [d.id, d]));
   schedule();
 }
 async function sync(full) {
@@ -2247,7 +2563,7 @@ async function sync(full) {
 
 /* ---- auto-save for every page: unsaved entries are kept on this device and come back after a refresh ---- */
 const OPS_DRAFT_KEY = 'rcs_ops_drafts_v1';
-const OPS_DRAFT_KEYS = ['bill', 'purchase', 'expense', 'advance', 'move', 'event', 'count', 'sale', 'req', 'recipe', 'prod', 'evp'];
+const OPS_DRAFT_KEYS = ['bill', 'purchase', 'expense', 'advance', 'move', 'event', 'count', 'sale', 'req', 'recipe', 'prod', 'evp', 'sc'];
 let opsDraftT = 0, opsDraftRestored = false;
 const opsDraftKey = () => OPS_DRAFT_KEY + ':' + (S.me?.username || '');
 function opsDraftSave() { if (!S.me || !opsDraftRestored) return; clearTimeout(opsDraftT); opsDraftT = setTimeout(opsDraftWrite, 400); }
