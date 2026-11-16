@@ -1,11 +1,949 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script>window.RC_API_URL = 'https://script.google.com/macros/s/AKfycbxbXsJ85OCUtYluklVpLBe6c3nIDx3cHyhkHjAk-W9j9rKNPOd16MwZxwkbDUIEDxQJ/exec';</script>
+<link rel="icon" href="/favicon.ico">
+<base target="_top">
 <meta charset="utf-8">
-<title>Romualdo's HR</title>
-<meta http-equiv="refresh" content="0; url=https://script.google.com/macros/s/AKfycbxbXsJ85OCUtYluklVpLBe6c3nIDx3cHyhkHjAk-W9j9rKNPOd16MwZxwkbDUIEDxQJ/exec">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Romualdo's Time Clock & HR</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+
+/* Layout idea: kitchen-signage time clock — huge digits and touch keys for the kiosk, dense scan-first lists and a colour grid for HR. */
+:root{
+  --bg:#FBF8EE; --surface:#ffffff; --surface-2:#F4EFDF; --ink:#1A2C54; --text:#1F2433; --muted:#5B6478; --line:#E4DFC8;
+  --accent:#1A2C54; --accent-soft:#E8ECF5; --accent-ink:#ffffff; --gold:#E89908; --gold-soft:#FCEFD3; --wine:#631B1C;
+  --ok:#1d7a3a; --ok-soft:#e6f4ea; --warn:#8a5300; --warn-soft:#fff3d9; --bad:#b42318; --bad-soft:#fdecea;
+  --info:#294074; --info-soft:#e9eefb; --rest:#c9c3ad;
+  --display:'Playfair Display',Georgia,'Times New Roman',serif; --body:'Montserrat','Segoe UI',Roboto,Arial,sans-serif; --num:'Montserrat','Segoe UI',Roboto,Arial,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1626; --surface:#16203a; --surface-2:#1c2846; --ink:#F3EEDD; --text:#E6E2D3; --muted:#A9B0C2; --line:#2b3757;
+  --accent:#F2B33D; --accent-soft:#2d2a1c; --accent-ink:#14213F; --gold:#F2B33D; --gold-soft:#3a2c10; --wine:#e08a8b;
+  --ok:#6fd39b; --ok-soft:#133526; --warn:#f2b860; --warn-soft:#3b2a12; --bad:#f28b82; --bad-soft:#3d1a1a;
+  --info:#9db8ec; --info-soft:#1a2747; --rest:#3a4562; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#0e1626; --surface:#16203a; --surface-2:#1c2846; --ink:#F3EEDD; --text:#E6E2D3; --muted:#A9B0C2; --line:#2b3757;
+  --accent:#F2B33D; --accent-soft:#2d2a1c; --accent-ink:#14213F; --gold:#F2B33D; --gold-soft:#3a2c10; --wine:#e08a8b;
+  --ok:#6fd39b; --ok-soft:#133526; --warn:#f2b860; --warn-soft:#3b2a12; --bad:#f28b82; --bad-soft:#3d1a1a;
+  --info:#9db8ec; --info-soft:#1a2747; --rest:#3a4562; color-scheme:dark;}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);font-size:16px;line-height:1.5}
+h1,h2,h3{font-family:var(--display);font-weight:600;color:var(--ink);letter-spacing:0;margin:0;text-wrap:balance}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.num{font-variant-numeric:tabular-nums}
+header.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:10px 18px;background:#ffffff;color:#1A2C54;border-bottom:3px solid #E89908}
+.brand{display:flex;align-items:center;gap:12px}
+.brand img{height:30px;width:auto;display:block}
+.brand h1{font-size:20px;font-style:italic;font-weight:500;color:#1A2C54;padding-left:12px;border-left:1px solid #E4DFC8}
+.brand span{font-size:12px;color:#5B6478;letter-spacing:.12em;text-transform:uppercase;font-weight:600}
+nav.tabs{display:flex;gap:6px;flex-wrap:wrap}
+nav.tabs a{padding:8px 14px;border-radius:999px;color:#1A2C54;text-decoration:none;font-weight:600;font-size:15px;border:1px solid transparent}
+nav.tabs a[aria-current="page"]{background:#1A2C54;color:#ffffff}
+nav.tabs a:not([aria-current="page"]){border-color:#D9D2B8}
+nav.tabs a:not([aria-current="page"]):hover{background:#FBF8EE}
+.testbar{background:var(--gold-soft);color:var(--ink);padding:6px 16px;font-size:14px;border-bottom:1px solid var(--line)}
+main{padding:16px;max-width:1280px;margin:0 auto}
+section.view{display:none}
+section.view.active{display:block}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.muted{color:var(--muted)}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;font-size:13px;font-weight:600}
+.pill.ok{background:var(--ok-soft);color:var(--ok)} .pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)} .pill.info{background:var(--info-soft);color:var(--info)}
+.pill.rest{background:var(--surface-2);color:var(--muted)}
+.btn{border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:10px 16px;font-weight:600}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.good{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn.danger{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+label{font-weight:600;font-size:14px;display:block;margin-bottom:4px}
+input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.field{display:flex;flex-direction:column;gap:2px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:640px){.grid2{grid-template-columns:1fr}}
+
+/* Kiosk */
+.kiosk{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:16px}
+@media (max-width:860px){.kiosk{grid-template-columns:1fr}}
+.clockpane{padding:24px;display:flex;flex-direction:column;gap:14px;justify-content:space-between;min-height:420px}
+.clock{font-family:var(--num);font-weight:600;letter-spacing:-.02em;color:var(--ink);font-size:clamp(64px,11vw,124px);line-height:.9;font-variant-numeric:tabular-nums}
+.clock small{font-size:.38em;margin-left:8px;color:var(--muted)}
+.date{font-family:var(--display);font-style:italic;font-size:24px;color:var(--ink)}
+.msg{border-radius:12px;padding:16px;font-size:18px;background:var(--surface-2)}
+.msg.ok{background:var(--ok-soft)} .msg.warn{background:var(--warn-soft)} .msg.bad{background:var(--bad-soft)}
+.msg strong{display:block;font-family:var(--display);font-size:28px;line-height:1.15;color:var(--ink)}
+.padpane{padding:20px;display:flex;flex-direction:column;gap:12px}
+.entry{font-family:var(--num);font-weight:600;color:var(--ink);font-size:44px;letter-spacing:.15em;text-align:center;background:var(--surface-2);border-radius:10px;padding:8px;min-height:72px;font-variant-numeric:tabular-nums}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.key{font-family:var(--num);font-size:30px;font-weight:600;color:var(--ink);padding:14px 0;border-radius:12px;border:1px solid var(--line);background:var(--surface);min-height:68px}
+.key:active{transform:scale(.98)}
+.key.go{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-size:26px}
+.key.clear{font-size:22px;color:var(--muted)}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.act{font-family:var(--num);font-size:24px;font-weight:700;color:var(--ink);padding:22px 10px;border-radius:14px;border:2px solid var(--line);background:var(--surface)}
+.act.main{grid-column:1/-1;background:var(--ok);border-color:var(--ok);color:#fff}
+.act.out{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.who{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.who h2{font-size:34px}
+.steps{display:flex;gap:6px;font-size:14px;color:var(--muted)}
+.steps b{color:var(--ink)}
+.kfoot{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:14px;font-size:14px}
+.switch{display:inline-flex;gap:8px;align-items:center}
+.switch input{width:auto}
+.netbanner{padding:10px 14px;border-radius:10px;background:var(--warn-soft);color:var(--ink);font-weight:600;display:none}
+.netbanner.show{display:block}
+details.demo{font-size:14px}
+details.demo table{border-collapse:collapse;margin-top:6px}
+details.demo td{padding:2px 10px 2px 0}
+
+/* HR */
+.hrhead{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.tile{padding:12px 14px;border-left:6px solid var(--line)}
+.tile b{display:block;font-family:var(--num);font-weight:700;color:var(--ink);font-size:38px;line-height:1}
+.tile span{font-size:14px;color:var(--muted)}
+.tile.bad{border-left-color:var(--bad)} .tile.warn{border-left-color:var(--warn)} .tile.info{border-left-color:var(--info)} .tile.ok{border-left-color:var(--ok)}
+.subtabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.subtabs button{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 14px;font-weight:600}
+.subtabs button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.queue{display:flex;flex-direction:column;gap:8px}
+.item{display:grid;grid-template-columns:6px 1fr auto;gap:12px;align-items:center;padding:10px 12px 10px 0;overflow:hidden}
+.item .stripe{align-self:stretch;border-radius:0 4px 4px 0}
+.item .stripe.bad{background:var(--bad)} .item .stripe.warn{background:var(--warn)} .item .stripe.info{background:var(--info)}
+.item h3{font-family:var(--body);font-size:16px;font-weight:700}
+.item p{margin:2px 0 0;font-size:14px;color:var(--muted)}
+.item .btns{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+@media (max-width:640px){.item{grid-template-columns:6px 1fr}.item .btns{grid-column:2;justify-content:flex-start}}
+.gridwrap{overflow-x:auto;padding:4px}
+table.att{border-collapse:separate;border-spacing:3px;font-size:13px}
+table.att th{font-weight:600;color:var(--muted);text-align:center;padding:2px 4px;white-space:nowrap}
+table.att th.name{text-align:left;position:sticky;left:0;background:var(--surface);z-index:1;padding-right:10px}
+table.att td.name{position:sticky;left:0;background:var(--surface);white-space:nowrap;padding-right:10px;font-weight:600}
+table.att td.c{width:34px;height:30px;text-align:center;border-radius:6px;font-weight:700;padding:0}
+td.c button{width:100%;height:100%;border:0;background:transparent;font-weight:700;border-radius:6px}
+.c-ok{background:var(--ok-soft);color:var(--ok)} .c-flag{background:var(--warn-soft);color:var(--warn)}
+.c-late{background:var(--warn-soft);color:var(--warn)} .c-abs{background:var(--warn);color:#fff}
+.c-miss{background:var(--bad);color:#fff} .c-rest{background:var(--surface-2);color:var(--muted)} .c-today{background:var(--info-soft);color:var(--info)}
+.c-none{background:transparent;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:13px;margin:10px 0}
+.legend i{display:inline-block;width:18px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:4px}
+table.list{width:100%;border-collapse:collapse;font-size:14px}
+table.list th,table.list td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+table.list th{font-weight:600;color:var(--muted)}
+.login{max-width:440px;margin:24px auto;padding:22px;display:flex;flex-direction:column;gap:12px}
+.timeline{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.timeline span{background:var(--surface-2);border-radius:8px;padding:4px 8px;font-size:13px}
+.timeline span.missing{background:var(--bad-soft);color:var(--bad);font-weight:700}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--accent);color:var(--accent-ink);padding:12px 18px;border-radius:12px;font-weight:600;max-width:92vw;display:none;z-index:50}
+.toast.show{display:block}
+.scrim{position:fixed;inset:0;background:rgba(10,18,20,.55);display:none;align-items:flex-start;justify-content:center;padding:24px 12px;overflow:auto;z-index:40}
+.scrim.show{display:flex}
+.modal{max-width:620px;width:100%;padding:20px;display:flex;flex-direction:column;gap:12px}
+.modal h2{font-size:28px}
+.row{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.err{color:var(--bad);font-weight:600;font-size:14px;min-height:1em}
+
+/* Guide */
+.guide{display:grid;gap:16px}
+.guide .card{padding:18px}
+.stepsbig{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-top:10px}
+.stepsbig div{background:var(--surface-2);border-radius:12px;padding:14px}
+.stepsbig b{font-family:var(--display);font-size:44px;color:var(--gold);line-height:1;display:block}
+.rules{columns:2 300px;column-gap:24px;padding-left:18px}
+.rules li{margin-bottom:8px;break-inside:avoid}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* Verse of the moment (kiosk home) */
+.verse{margin:0;padding:14px 16px 14px 18px;border-left:4px solid var(--gold);background:var(--surface-2);border-radius:0 12px 12px 0;transition:opacity .4s}
+.verse.fade{opacity:0}
+.verse .vlabel{font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--muted);margin-bottom:4px;display:flex;justify-content:space-between;gap:8px}
+.verse .vlabel button{border:0;background:transparent;color:var(--muted);font:inherit;padding:0;text-decoration:underline;text-underline-offset:2px}
+.verse blockquote{margin:0;font-family:var(--display);font-style:italic;font-size:clamp(17px,1.9vw,21px);line-height:1.4;color:var(--ink)}
+.verse figcaption{margin-top:6px;font-size:13px;font-weight:700;color:var(--wine);letter-spacing:.04em}
+@media (max-width:520px){.brand span{display:none}.brand h1{font-size:17px}}
+
+/* Punch photo */
+.cam{display:flex;gap:12px;align-items:center;background:var(--surface-2);border-radius:12px;padding:8px}
+.cam video{width:112px;height:84px;object-fit:cover;border-radius:8px;background:#000;transform:scaleX(-1);flex:none}
+.cam b{font-size:15px;color:var(--ink)}
+.camnote{font-size:13px;color:var(--muted)} .camnote.warn{color:var(--warn);font-weight:600}
+.photos{display:flex;flex-wrap:wrap;gap:10px}
+.photos figure{margin:0;width:150px}
+.photos img,.photos .nophoto{width:150px;height:112px;object-fit:cover;border-radius:8px;border:1px solid var(--line);display:block}
+.photos .nophoto{display:flex;align-items:center;justify-content:center;background:var(--warn-soft);color:var(--warn);font-weight:700;font-size:13px}
+.photos figcaption{font-size:12px;margin-top:4px}
+
+.lang{display:inline-flex;border:1px solid #D9D2B8;border-radius:999px;overflow:hidden}
+.lang button{border:0;background:transparent;color:#1A2C54;padding:7px 12px;font-weight:600;font-size:14px}
+.lang button[aria-pressed="true"]{background:#E89908;color:#14213F}
+#toplogout{background:transparent;color:#631B1C;border:1.5px solid #631B1C;border-radius:999px;padding:6px 14px;font-size:14px}
+#toplogout:hover{background:#631B1C;color:#fff}
+.headright{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.adminbox{padding:16px;display:flex;flex-direction:column;gap:10px}
+.admingrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.loading{opacity:.6;pointer-events:none}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp 1s linear infinite;vertical-align:-2px}
+@keyframes sp{to{transform:rotate(360deg)}}
+</style>
 </head>
 <body>
-<p>Opening Romualdo's Time Clock… <a href="https://script.google.com/macros/s/AKfycbxbXsJ85OCUtYluklVpLBe6c3nIDx3cHyhkHjAk-W9j9rKNPOd16MwZxwkbDUIEDxQJ/exec">Tap here if it does not open.</a></p>
+<header class="top">
+  <div class="brand"><img src="data:image/png;base64,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" alt="Romualdo's" width="139" height="30"><h1>Time Clock &amp; HR</h1><span>Davao City</span></div>
+  <div class="headright">
+    <nav class="tabs" aria-label="Sections">
+      <a href="#kiosk" data-view="kiosk" data-i18n="tabClock">Clock-in</a>
+      <a href="#hr" data-view="hr">HR / Admin</a>
+      <a href="#guide" data-view="guide" data-i18n="tabGuide">Staff Guide</a>
+    </nav>
+    <button class="btn" id="toplogout" hidden>Log out</button>
+    <div class="lang" role="group" aria-label="Language"><button data-lang="en" aria-pressed="true">English</button><button data-lang="tl" aria-pressed="false">Tagalog</button></div>
+  </div>
+</header>
+<div class="testbar" id="testbar" hidden></div>
+<main>
+
+<section class="view" id="view-kiosk" aria-label="Clock-in kiosk">
+  <div class="netbanner" id="netbanner" role="status"></div>
+  <div class="kiosk" style="margin-top:10px">
+    <div class="card clockpane">
+      <div><div class="clock" id="clock">--:--</div><div class="date" id="date">—</div></div>
+      <figure class="verse" id="verse" aria-live="off"><div class="vlabel"><span data-i18n="verseLabel"></span><button type="button" id="versenext" data-i18n="verseNext"></button></div><blockquote id="vtext"></blockquote><figcaption id="vref"></figcaption></figure>
+      <div class="msg" id="kmsg" aria-live="polite"></div>
+      <div class="muted" style="font-size:14px" data-i18n="shiftNote"></div>
+    </div>
+    <div class="card padpane" id="padpane"></div>
+  </div>
+  <div class="kfoot">
+    <label class="switch" id="offwrap" hidden><input type="checkbox" id="offline"> <span data-i18n="testOffline"></span></label>
+    <details class="demo" id="demowrap" hidden><summary>Demo staff numbers and PINs</summary><div id="demopins"></div></details>
+  </div>
+</section>
+
+<section class="view" id="view-hr" aria-label="HR and Admin">
+  <div id="hrlogin" class="card login">
+    <h2 style="font-size:30px">HR / Admin sign-in</h2>
+    <div class="field"><label for="hrcode">Staff code</label><input id="hrcode" autocomplete="username" placeholder="RC-002"></div>
+    <div class="field"><label for="hrpw">Password</label><input id="hrpw" type="password" autocomplete="current-password"></div>
+    <div class="err" id="hrerr"></div>
+    <button class="btn primary" id="hrgo">Sign in</button>
+    <p class="muted" style="margin:0;font-size:14px" id="hrhint">Forgot your password? Ask the owner to set a new one from the HR database (Romualdo's HR menu).</p>
+  </div>
+  <div id="hrpwchange" class="card login" hidden>
+    <h2 style="font-size:28px">Set your own password</h2>
+    <p class="muted" style="margin:0">You signed in with a temporary password. Choose a new one (at least 8 characters). Don't share it.</p>
+    <div class="field"><label for="pw1">New password</label><input id="pw1" type="password" autocomplete="new-password"></div>
+    <div class="field"><label for="pw2">Type it again</label><input id="pw2" type="password" autocomplete="new-password"></div>
+    <div class="err" id="pwerr"></div>
+    <button class="btn primary" id="pwgo">Save password</button>
+  </div>
+  <div id="hrapp" hidden>
+    <div class="hrhead">
+      <div><h2 style="font-size:32px" id="hrtitle">Cut-off</h2><div class="muted" id="hruser"></div></div>
+      <div class="row"><select id="cutsel" aria-label="Cut-off" style="width:auto"></select><button class="btn" id="hrrefresh">Refresh</button><button class="btn" id="hrout">Log out</button></div>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <div class="subtabs" role="group" aria-label="HR views">
+      <button data-sub="queue" aria-pressed="true">Needs action</button>
+      <button data-sub="grid" aria-pressed="false">Cut-off grid</button>
+      <button data-sub="today" aria-pressed="false">Today</button>
+      <button data-sub="audit" aria-pressed="false">Audit trail</button>
+      <button data-sub="admin" aria-pressed="false">Admin</button>
+    </div>
+    <div id="sub-queue"></div><div id="sub-grid" hidden></div><div id="sub-today" hidden></div><div id="sub-audit" hidden></div><div id="sub-admin" hidden></div>
+  </div>
+</section>
+
+<section class="view" id="view-guide" aria-label="Staff guide"><div class="guide" id="guide"></div></section>
+</main>
+<div class="scrim" id="scrim"><div class="card modal" role="dialog" aria-modal="true" id="modal"></div></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const IS_DEMO = false; const DEMO_PINS = {}; let DB = null;
+function sha256(ascii){
+  function rr(v, a){ return (v >>> a) | (v << (32 - a)); }
+  var mp = Math.pow, maxWord = mp(2, 32), result = '', words = [], i, j;
+  ascii = unescape(encodeURIComponent(ascii));
+  var bitLen = ascii.length * 8, hash = [], k = [], primeCounter = 0, isComposite = {};
+  for (var c = 2; primeCounter < 64; c++) {
+    if (!isComposite[c]) { for (i = 0; i < 313; i += c) isComposite[i] = c;
+      hash[primeCounter] = (mp(c, .5) * maxWord) | 0; k[primeCounter++] = (mp(c, 1/3) * maxWord) | 0; }
+  }
+  hash = hash.slice(0, 8); ascii += '\x80';
+  while (ascii.length % 64 - 56) ascii += '\x00';
+  for (i = 0; i < ascii.length; i++) { j = ascii.charCodeAt(i); words[i >> 2] |= j << ((3 - i) % 4) * 8; }
+  words[words.length] = ((bitLen / maxWord) | 0); words[words.length] = (bitLen);
+  for (j = 0; j < words.length;) {
+    var w = words.slice(j, j += 16), oldHash = hash; hash = hash.slice(0, 8);
+    for (i = 0; i < 64; i++) {
+      var w15 = w[i - 15], w2 = w[i - 2], a = hash[0], e = hash[4];
+      var temp1 = hash[7] + (rr(e, 6) ^ rr(e, 11) ^ rr(e, 25)) + ((e & hash[5]) ^ ((~e) & hash[6])) + k[i]
+        + (w[i] = (i < 16) ? w[i] : (w[i - 16] + (rr(w15, 7) ^ rr(w15, 18) ^ (w15 >>> 3)) + w[i - 7] + (rr(w2, 17) ^ rr(w2, 19) ^ (w2 >>> 10))) | 0);
+      var temp2 = (rr(a, 2) ^ rr(a, 13) ^ rr(a, 22)) + ((a & hash[1]) ^ (a & hash[2]) ^ (hash[1] & hash[2]));
+      hash = [(temp1 + temp2) | 0].concat(hash); hash[4] = (hash[4] + temp1) | 0;
+    }
+    for (i = 0; i < 8; i++) hash[i] = (hash[i] + oldHash[i]) | 0;
+  }
+  for (i = 0; i < 8; i++) for (j = 3; j + 1; j--) { var b = (hash[i] >> (j * 8)) & 255; result += ((b < 16) ? 0 : '') + b.toString(16); }
+  return result;
+}
+function pinHash(code, pin){ return sha256('romualdos|' + code + '|' + pin); }
+</script>
+<script>
+/* ======================= i18n ======================= */
+const T = {
+ en: {
+  tabClock:'Clock-in', tabGuide:'Staff Guide', verseLabel:'Word for today', verseNext:'Another verse',
+  shiftNote:'Shift is 9 hours from your time-in: 8 hours work + 1 hour lunch. Two 15-minute breaks are paid.',
+  testOffline:'Test: no internet signal',
+  greet:'Good day!', startText:'Type your staff number to start. Scan your finger on the biometric machine too.',
+  stepNum:'Staff number', stepPin:'PIN', stepBtn:'Press button', next:'Next', ok:'OK', clear:'Clear', notMe:'Not {name}? Start over',
+  typePin:'Type your PIN', typePinText:'4 digits. Cover the screen with your hand.',
+  notFound:'Staff number not found', notFoundText:'Check your number and try again. Ask HR if you do not have one.',
+  locked:'Locked for 1 minute', lockedText:'Too many wrong PINs. This was reported to HR. Wait, or ask HR to reset your PIN.',
+  wrongPin:'Wrong PIN', wrongPinText:'Try again. {n} tries left.',
+  choose:'Choose what you are doing', chooseText:'Only the buttons that make sense right now are shown.',
+  hi:'Hi, {name}!', shift:'Shift', restToday:'Today is your rest day. Work only if your supervisor approved it.',
+  IN:'Time In', OUT:'Time Out', BRK_OUT:'Start Break', BRK_IN:'End Break', LUNCH_OUT:'Start Lunch', LUNCH_IN:'End Lunch',
+  stNone:'Not clocked in yet today', stWork:'Working since {t}', stBreak:'On break since {t}', stLunch:'At lunch since {t}', stOut:'Timed out at {t}',
+  camTitle:'Smile! A photo is taken when you press a button.', camOn:'Camera on. The photo is for attendance only and is deleted after 90 days.', camOff:'Camera is off. Your punch will be marked "no photo" for HR.', camWait:'Starting camera…',
+  allDone:'You already timed out today. See you next shift!', request:'Request a correction', done:'Done',
+  recorded:'Recorded. Thank you!', late:'You are {n} minutes late. This is recorded and deducted. Please tell your supervisor.',
+  grace:'Within the 5-minute grace period ({n} min). Frequent use is monitored.', onTime:'On time. Have a good shift!', flexStart:'Shift started. Your 9-hour shift (with 1-hour lunch) ends at {t}. Have a good shift!', flexShift:'Flexible shift: 9 hours from your time-in',
+  longLate:'Your schedule says your shift started at {t}. If your shift changed today, tell HR so they can update it. Recorded.',
+  over:'Your {what} was {d} minutes, {x} over the limit. The extra is deducted.', backOk:'{What}: {d} minutes. Welcome back!',
+  break:'break', lunch:'lunch', Break:'Break', Lunch:'Lunch',
+  early:'Early time-out: {n} minutes before your shift ends. This is deducted unless your supervisor approved it.',
+  otNote:'Extra time is paid only if overtime was approved before you stayed.', shiftDone:'Shift complete. Ingat pauli!',
+  savedOffline:'(Saved on this tablet. It will be checked and sent when the signal is back.)',
+  offlinePick:'No signal. Your PIN will be checked when the signal is back. Press what you are doing.',
+  noNet:'No internet. Punches are saved on this tablet{q} and send automatically when the signal comes back.', waiting:' ({n} waiting)',
+  sentBack:'Signal back: {n} saved punch(es) sent.',
+  rqTitle:'Request a correction', rqText:'For a punch you forgot or that did not record. HR checks it against the biometric log and CCTV.',
+  rqDate:'Date', rqType:'Which punch', rqTime:'Actual time', rqWit:'Who can confirm?', rqWitPh:'Supervisor or co-worker name',
+  rqWhy:'What happened?', rqWhyPh:'Example: I forgot to time out because of the catering pull-out.', rqErr:'Please explain what happened (at least 10 letters).',
+  cancel:'Cancel', send:'Send to HR', sentTitle:'Request sent', sentText:'{id} is waiting for HR. Pay for that day stays on hold until it is approved.',
+  devTitle:'This tablet is not set up as the time clock', devText:'HR: open the HR / Admin tab on this tablet, sign in, then press "Register this tablet as the kiosk" in Admin.',
+  netErr:'No connection', netErrText:'Could not reach the server. Try again in a moment.', notAllowed:'That punch is not allowed now. Start over and pick again.',
+ },
+ tl: {
+  tabClock:'Time Clock', tabGuide:'Gabay ng Staff', verseLabel:'Salita para sa araw na ito', verseNext:'Iba pang talata',
+  shiftNote:'Ang shift ay 9 na oras mula sa iyong time-in: 8 oras na trabaho + 1 oras na lunch. Bayad ang dalawang 15-minutong break.',
+  testOffline:'Test: walang internet',
+  greet:'Magandang araw!', startText:'I-type ang iyong staff number para magsimula. I-scan din ang iyong daliri sa biometric machine.',
+  stepNum:'Staff number', stepPin:'PIN', stepBtn:'Pindutin ang button', next:'Susunod', ok:'OK', clear:'Burahin', notMe:'Hindi ikaw si {name}? Ulitin',
+  typePin:'I-type ang iyong PIN', typePinText:'4 na numero. Takpan ang screen gamit ang iyong kamay.',
+  notFound:'Hindi nakita ang staff number', notFoundText:'Tingnan ang iyong numero at subukan ulit. Magtanong sa HR kung wala ka pang numero.',
+  locked:'Naka-lock nang 1 minuto', lockedText:'Sobrang daming maling PIN. Naiulat na ito sa HR. Maghintay, o magpa-reset ng PIN sa HR.',
+  wrongPin:'Maling PIN', wrongPinText:'Subukan ulit. {n} pang subok ang natitira.',
+  choose:'Piliin ang gagawin mo', chooseText:'Ang mga tamang button lang para sa ngayon ang lumalabas.',
+  hi:'Hi, {name}!', shift:'Shift', restToday:'Rest day mo ngayon. Magtrabaho lang kung inaprubahan ng supervisor mo.',
+  IN:'Time In', OUT:'Time Out', BRK_OUT:'Simula ng Break', BRK_IN:'Tapos ang Break', LUNCH_OUT:'Simula ng Lunch', LUNCH_IN:'Tapos ang Lunch',
+  stNone:'Hindi pa naka-time in ngayon', stWork:'Nagtatrabaho mula {t}', stBreak:'Naka-break mula {t}', stLunch:'Naka-lunch mula {t}', stOut:'Nag-time out ng {t}',
+  camTitle:'Ngiti! Kukunan ka ng litrato pagpindot mo ng button.', camOn:'Bukas ang camera. Para lang sa attendance ang litrato at buburahin pagkalipas ng 90 araw.', camOff:'Patay ang camera. Mamarkahan ang punch mo na "walang litrato" para sa HR.', camWait:'Binubuksan ang camera…',
+  allDone:'Naka-time out ka na ngayong araw. Kita tayo sa susunod mong shift!', request:'Mag-file ng correction', done:'Tapos na',
+  recorded:'Naitala. Salamat!', late:'Late ka nang {n} minuto. Naitala na ito at ibabawas sa sahod. Pakisabihan ang iyong supervisor.',
+  grace:'Pasok pa sa 5-minutong grace period ({n} min). Binabantayan ang madalas na paggamit nito.', onTime:'Nasa oras. Magandang shift sa iyo!', flexStart:'Nagsimula na ang shift mo. Matatapos ang 9 na oras (kasama ang 1 oras na lunch) ng {t}. Magandang shift sa iyo!', flexShift:'Flexible na shift: 9 na oras mula sa iyong time-in',
+  longLate:'Ayon sa schedule, nagsimula ang shift mo ng {t}. Kung nagbago ang shift mo ngayon, sabihan ang HR para maayos nila. Naitala na.',
+  over:'Ang {what} mo ay {d} minuto, sobra nang {x} minuto. Ibabawas ang sobra.', backOk:'{What}: {d} minuto. Welcome back!',
+  break:'break', lunch:'lunch', Break:'Break', Lunch:'Lunch',
+  early:'Maagang time-out: {n} minuto bago matapos ang shift mo. Ibabawas ito maliban kung inaprubahan ng supervisor.',
+  otNote:'Bayad lang ang sobrang oras kung inaprubahan ang overtime bago ka nag-stay.', shiftDone:'Tapos ang shift. Ingat pauwi!',
+  savedOffline:'(Naka-save sa tablet. Susuriin at ipapadala ito kapag bumalik ang signal.)',
+  offlinePick:'Walang signal. Susuriin ang PIN mo kapag bumalik ang signal. Pindutin ang ginagawa mo.',
+  noNet:'Walang internet. Naka-save ang mga punch sa tablet na ito{q} at kusang ipapadala kapag bumalik ang signal.', waiting:' ({n} naghihintay)',
+  sentBack:'Bumalik ang signal: naipadala ang {n} na naka-save na punch.',
+  rqTitle:'Mag-file ng correction', rqText:'Para sa punch na nakalimutan mo o hindi naitala. Susuriin ito ng HR gamit ang biometric log at CCTV.',
+  rqDate:'Petsa', rqType:'Aling punch', rqTime:'Totoong oras', rqWit:'Sino ang makakapagpatunay?', rqWitPh:'Pangalan ng supervisor o katrabaho',
+  rqWhy:'Ano ang nangyari?', rqWhyPh:'Halimbawa: Nakalimutan kong mag-time out dahil sa catering pull-out.', rqErr:'Pakipaliwanag kung ano ang nangyari (hindi bababa sa 10 letra).',
+  cancel:'Kanselahin', send:'Ipadala sa HR', sentTitle:'Naipadala ang request', sentText:'Naghihintay ang {id} sa HR. Naka-hold ang sahod sa araw na iyon hanggang maaprubahan.',
+  devTitle:'Hindi pa naka-set up ang tablet na ito bilang time clock', devText:'HR: buksan ang HR / Admin tab sa tablet na ito, mag-sign in, at pindutin ang "Register this tablet as the kiosk" sa Admin.',
+  netErr:'Walang koneksyon', netErrText:'Hindi maabot ang server. Subukan ulit maya-maya.', notAllowed:'Hindi puwede ang punch na iyan ngayon. Ulitin at pumili ulit.',
+ }
+};
+const GUIDE = {
+ en: { title:'How to clock in and out', sub:'Do this every time you start, take a break, take lunch and go home. Scan your finger on the biometric machine too.',
+  steps:[['Type your staff number','Your Employee No. (for example 1001). Press Next.'],['Type your 4-digit PIN','Never tell anyone your PIN. Never punch for a co-worker.'],
+   ['Press the button shown','Time In, Start/End Break, Start/End Lunch, or Time Out. Only the right buttons appear.'],['Wait for your name and the message','The screen shows the time it recorded. If it says you are late or over your break, that is already recorded.']],
+  rulesTitle:'Rules to remember', rules:[['A photo is taken at every punch.','Face the tablet when you press the button. It proves you were really here and stops buddy punching. Photos are seen only by HR and deleted after 90 days.'],['Shift = 9 hours.','8 hours of work + 1 hour lunch (lunch is not paid).'],['Two 15-minute breaks','are inside the 8 hours and are paid. Longer breaks are deducted.'],
+   ['Your shift starts at your time-in.','The 9 hours count from that moment. Leaving earlier is undertime and is deducted. Arrive at the time your supervisor set for the day; coming in later than that is a tardiness offense.'],['Late count resets every month:','1st verbal warning, 2nd written warning, 3rd suspension 1–3 days, 4th suspension or termination review.'],
+   ['Overtime','is paid only if your supervisor approved it before you stayed.'],['Forgot to punch?','Press "Request a correction" on the kiosk the same day, or before your next shift. Pay for that day is on hold until HR approves.'],
+   ['Punching for someone else','is dishonesty. It goes to an incident report for both people.'],["Can't come to work?",'Tell your supervisor at least 2 hours before your shift.']],
+  hrDaily:'For HR: every day (5 minutes)', hrDailyL:['Open HR / Admin → Needs action. Red items first.','Approve or deny correction requests. Always pick how you checked it (biometric log, CCTV, supervisor).','Check Today before closing: anyone still "Working" after their shift must time out or file a request.'],
+  hrCut:'For HR: every cut-off', hrCutL:['A cut-off ends on the 10th or the 25th. On the next two days (11th–12th or 26th–27th), late time-outs come in and HR clears the list: Select all shown → Mark selected reviewed, and fix the few real problems.','On the night of the 12th and the 27th the app makes the payroll files by itself (print file + HR record) and emails them. Pay day stays the 15th and the 30th.','Look at the Cut-off grid row by row for patterns (same person late every Monday).','You can also press "Build final payroll" in Admin any time to remake the files after a late fix. Get the owner\'s sign-off before paying.'],
+  rollTitle:'Rolling it out (3 weeks)', rollHead:['Week','What happens','Pay effect'],
+  roll:[['1 · Practice','10-minute talk at the start of each shift. Everyone gets a staff number and PIN and practices on the tablet and the biometric machine. HR fixes mistakes with them on the spot.','None. The old method is still used for pay.'],
+   ['2 · Side by side','The old method and the app both run. HR compares totals at the end of the week and explains any difference to each person.','None. Coaching only for misses.'],
+   ['3 · Live','The app is the official record. Missed punches hold pay until approved. Tardiness counts toward the Handbook penalties.','Full rules apply.']],
+  talkTitle:'Short talk for the first briefing:', talk:'"From now on the tablet and the fingerprint machine are our time card. They protect you: every minute you work is recorded and paid, including approved overtime and holiday pay. If you forget, file a request the same day. No one is punished in the first two weeks; we are all learning."' },
+ tl: { title:'Paano mag-time in at mag-time out', sub:'Gawin ito tuwing magsisimula ka, magbe-break, magla-lunch, at uuwi. I-scan din ang iyong daliri sa biometric machine.',
+  steps:[['I-type ang iyong staff number','Ang iyong Employee No. (halimbawa 1001). Pindutin ang Susunod.'],['I-type ang iyong 4-digit na PIN','Huwag sabihin kanino man ang iyong PIN. Huwag mag-punch para sa katrabaho.'],
+   ['Pindutin ang button na lumabas','Time In, Simula/Tapos ng Break, Simula/Tapos ng Lunch, o Time Out. Ang mga tamang button lang ang lalabas.'],['Hintayin ang iyong pangalan at ang mensahe','Ipapakita ng screen ang oras na naitala. Kung sinabi nitong late ka o sobra sa break, naitala na iyon.']],
+  rulesTitle:'Mga patakarang dapat tandaan', rules:[['May litrato sa bawat punch.','Humarap sa tablet pagpindot mo ng button. Patunay ito na nandito ka talaga, at para walang magpa-punch para sa iba. HR lang ang nakakakita ng litrato, at buburahin ito pagkalipas ng 90 araw.'],['Ang shift ay 9 na oras.','8 oras na trabaho + 1 oras na lunch (hindi bayad ang lunch).'],['Dalawang 15-minutong break','ay kasama sa 8 oras at bayad. Ibabawas ang sobra sa break.'],
+   ['Nagsisimula ang shift mo sa iyong time-in.','Doon nagsisimula ang bilang ng 9 na oras. Kapag umuwi nang mas maaga, undertime iyon at ibabawas. Pumasok sa oras na itinakda ng supervisor para sa araw na iyon; ang pagdating nang mas huli roon ay tardiness offense.'],['Nire-reset buwan-buwan ang bilang ng late:','1st verbal warning, 2nd written warning, 3rd suspension nang 1–3 araw, 4th suspension o pagsusuri para sa termination.'],
+   ['Ang overtime','ay bayad lang kung inaprubahan ng supervisor mo bago ka nag-stay.'],['Nakalimutang mag-punch?','Pindutin ang "Mag-file ng correction" sa kiosk sa parehong araw, o bago ang susunod mong shift. Naka-hold ang sahod sa araw na iyon hanggang aprubahan ng HR.'],
+   ['Ang pag-punch para sa iba','ay pandaraya. Magkakaroon ng incident report ang parehong tao.'],['Hindi makakapasok?','Sabihan ang supervisor mo nang hindi bababa sa 2 oras bago ang shift mo.']],
+  hrDaily:'Para sa HR: araw-araw (5 minuto)', hrDailyL:['Buksan ang HR / Admin → Needs action. Unahin ang mga pula.','Aprubahan o tanggihan ang mga correction request. Laging piliin kung paano mo ito sinuri (biometric log, CCTV, supervisor).','Tingnan ang Today bago magsara: sinumang "Working" pa pagkatapos ng shift ay dapat mag-time out o mag-file ng request.'],
+  hrCut:'Para sa HR: tuwing cut-off', hrCutL:['Natatapos ang cut-off sa ika-10 o ika-25. Sa sumunod na dalawang araw (ika-11–12 o ika-26–27), papasok pa ang mga late na time-out, at aayusin ng HR ang listahan: Select all shown → Mark selected reviewed, at ayusin ang iilang tunay na problema.','Sa gabi ng ika-12 at ika-27, kusang gagawin ng app ang payroll files (print file + HR record) at ipapadala sa email. Sahod pa rin tuwing ika-15 at ika-30.','Tingnan ang Cut-off grid kada tao para makita ang pattern (hal. laging late tuwing Lunes).','Puwede ring pindutin ang "Build final payroll" sa Admin para gawin ulit ang files kapag may huling inayos. Ipa-sign-off sa may-ari bago magpasahod.'],
+  rollTitle:'Pagsisimula (3 linggo)', rollHead:['Linggo','Ano ang mangyayari','Epekto sa sahod'],
+  roll:[['1 · Pagsasanay','10-minutong usapan sa simula ng bawat shift. Bibigyan ang lahat ng staff number at PIN, at magpa-practice sa tablet at sa biometric machine. Itatama ng HR ang mga mali kasama nila.','Wala. Ang dating paraan pa rin ang gamit sa sahod.'],
+   ['2 · Sabay','Parehong tumatakbo ang dating paraan at ang app. Ikukumpara ng HR ang kabuuan sa dulo ng linggo at ipapaliwanag sa bawat isa ang anumang pagkakaiba.','Wala. Coaching lang sa mga nakalimutan.'],
+   ['3 · Live','Ang app na ang opisyal na record. Naka-hold ang sahod kapag kulang ang punch hanggang maaprubahan. Bibilangin ang late sa mga parusa sa Handbook.','Buong patakaran na.']],
+  talkTitle:'Maikling usapan para sa unang briefing:', talk:'"Mula ngayon, ang tablet at ang fingerprint machine na ang ating time card. Proteksyon ito para sa inyo: bawat minutong pinagtrabahuhan ninyo ay naitatala at binabayaran, kasama ang aprubadong overtime at holiday pay. Kung makalimutan ninyo, mag-file ng request sa parehong araw. Walang paparusahan sa unang dalawang linggo; lahat tayo ay nag-aaral pa."' }
+};
+let LANG = 'en';
+try { LANG = localStorage.getItem('rc_lang') || 'en'; } catch (e) {}
+function t(k, v){ let s = (T[LANG][k] ?? T.en[k] ?? k); if (v) Object.keys(v).forEach(x => s = s.split('{' + x + '}').join(v[x])); return s; }
+function applyLang(){
+  document.documentElement.lang = LANG === 'tl' ? 'fil' : 'en';
+  document.querySelectorAll('[data-lang]').forEach(b => b.setAttribute('aria-pressed', b.dataset.lang === LANG ? 'true' : 'false'));
+  document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+  renderGuide(); if (K.step) { if (K.step === 'code' && !K.keepMsg) setMsg('', t('greet'), t('startText')); renderPad(); } tick(); updateNet();
+}
+document.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { LANG = b.dataset.lang; try { localStorage.setItem('rc_lang', LANG); } catch (e) {} applyLang(); });
+
+/* ======================= helpers ======================= */
+const TZ = 'Asia/Manila';
+const pad = n => String(n).padStart(2, '0');
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmt12(m){ m = ((m % 1440) + 1440) % 1440; let h = Math.floor(m/60), mi = m % 60, ap = h >= 12 ? 'PM' : 'AM'; h = h % 12 || 12; return h + ':' + pad(mi) + ' ' + ap; }
+function hm2min(s){ if (!s) return null; const [h, m] = String(s).split(':').map(Number); return h*60 + m; }
+function phNow(){ const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(new Date()).map(x => [x.type, x.value])); const h = +p.hour % 24; return { iso: `${p.year}-${p.month}-${p.day}`, h, m: +p.minute, s: +p.second, mins: h*60 + +p.minute }; }
+function niceDate(iso){ return new Date(iso + 'T12:00:00+08:00').toLocaleDateString(LANG === 'tl' ? 'fil-PH' : 'en-US', { timeZone: TZ, weekday: 'short', month: 'short', day: 'numeric' }); }
+function dowShort(iso){ return new Date(iso + 'T12:00:00+08:00').toLocaleDateString('en-US', { timeZone: TZ, weekday: 'short' }); }
+function toast(msg){ const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 4200); }
+function addDaysIso(iso, n){ const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+const store = { get(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v){ try { localStorage.setItem(k, v); } catch (e) {} } };
+function api(name, args){
+  return new Promise((resolve, reject) => {
+    if (window.RC_API_URL) {
+      fetch(window.RC_API_URL, { method: 'POST', body: JSON.stringify({ name, args: args || {} }) })
+        .then(r => r.json()).then(r => r.error ? reject(r) : resolve(r.data))
+        .catch(e => reject({ error: 'NETWORK', message: String(e && e.message || e) }));
+    } else if (window.google && google.script && google.script.run) {
+      google.script.run.withSuccessHandler(s => { const r = JSON.parse(s); r.error ? reject(r) : resolve(r.data); })
+        .withFailureHandler(e => reject({ error: 'NETWORK', message: String(e && e.message || e) })).api(name, JSON.stringify(args || {}));
+    } else {
+      setTimeout(() => { if (FORCE_OFFLINE && name.startsWith('kiosk')) return reject({ error: 'NETWORK' });
+        try { resolve(JSON.parse(JSON.stringify(window['api_' + name](DB, args || {})))); } catch (e) { reject({ error: e.message, left: e.left }); } }, 90);
+    }
+  });
+}
+
+/* ======================= routing & clock ======================= */
+let VIEW = 'kiosk';
+function route(view){
+  if (view) VIEW = view;
+  document.querySelectorAll('section.view').forEach(x => x.classList.toggle('active', x.id === 'view-' + VIEW));
+  document.querySelectorAll('nav.tabs a').forEach(a => a.setAttribute('aria-current', a.dataset.view === VIEW ? 'page' : 'false'));
+  if (VIEW === 'hr') showHR();
+}
+document.querySelectorAll('nav.tabs a').forEach(a => a.addEventListener('click', e => { e.preventDefault(); route(a.dataset.view); }));
+function tick(){
+  const n = phNow();
+  document.getElementById('clock').innerHTML = `${(n.h % 12) || 12}:${pad(n.m)}<small>:${pad(n.s)} ${n.h >= 12 ? 'PM' : 'AM'}</small>`;
+  document.getElementById('date').textContent = new Date().toLocaleDateString(LANG === 'tl' ? 'fil-PH' : 'en-US', { timeZone: TZ, weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+setInterval(tick, 1000);
+
+/* ======================= verse of the moment (World English Bible, public domain) ======================= */
+const VERSES = [
+ ['Whatever you do, work heartily, as for the Lord, and not for men.', 'Colossians 3:23'],
+ ['I can do all things through Christ, who strengthens me.', 'Philippians 4:13'],
+ ['Commit your deeds to the LORD, and your plans shall succeed.', 'Proverbs 16:3'],
+ ['Be strong and courageous. Don\'t be afraid. Don\'t be dismayed, for the LORD your God is with you wherever you go.', 'Joshua 1:9'],
+ ['Those who wait for the LORD will renew their strength. They will mount up with wings like eagles. They will run, and not be weary. They will walk, and not faint.', 'Isaiah 40:31'],
+ ['Let\'s not be weary in doing good, for we will reap in due season, if we don\'t give up.', 'Galatians 6:9'],
+ ['Trust in the LORD with all your heart, and don\'t lean on your own understanding. In all your ways acknowledge him, and he will make your paths straight.', 'Proverbs 3:5–6'],
+ ['His compassion doesn\'t fail. They are new every morning. Great is your faithfulness.', 'Lamentations 3:22–23'],
+ ['This is the day that the LORD has made. We will rejoice and be glad in it.', 'Psalm 118:24'],
+ ['Let the favor of the Lord our God be on us. Establish the work of our hands for us.', 'Psalm 90:17'],
+ ['Do you see a man skilled in his work? He will serve kings.', 'Proverbs 22:29'],
+ ['Whatever your hand finds to do, do it with your might.', 'Ecclesiastes 9:10'],
+ ['Let your light shine before men, that they may see your good works, and glorify your Father who is in heaven.', 'Matthew 5:16'],
+ ['Through love be servants to one another.', 'Galatians 5:13'],
+ ['Be kind to one another, tender hearted, forgiving each other, just as God also in Christ forgave you.', 'Ephesians 4:32'],
+ ['Not lagging in diligence; fervent in spirit; serving the Lord.', 'Romans 12:11'],
+ ['In all hard work there is profit, but the talk of the lips leads only to poverty.', 'Proverbs 14:23'],
+ ['Don\'t forget to be doing good and sharing, for with such sacrifices God is well pleased.', 'Hebrews 13:16'],
+ ['As each has received a gift, employ it in serving one another.', '1 Peter 4:10'],
+ ['God is our refuge and strength, a very present help in trouble.', 'Psalm 46:1'],
+ ['Come to me, all you who labor and are heavily burdened, and I will give you rest.', 'Matthew 11:28'],
+ ['In nothing be anxious, but in everything, by prayer and petition with thanksgiving, let your requests be made known to God.', 'Philippians 4:6'],
+ ['Don\'t you be afraid, for I am with you. Don\'t be dismayed, for I am your God. I will strengthen you. Yes, I will help you.', 'Isaiah 41:10'],
+ ['Rejoice always. Pray without ceasing. In everything give thanks.', '1 Thessalonians 5:16–18'],
+ ['Act justly, love mercy, and walk humbly with your God.', 'Micah 6:8'],
+ ['Whatever you do, in word or in deed, do all in the name of the Lord Jesus, giving thanks to God the Father through him.', 'Colossians 3:17'],
+ ['A cheerful heart makes good medicine.', 'Proverbs 17:22'],
+ ['Each counting others better than himself; each of you not just looking to his own things, but each of you also to the things of others.', 'Philippians 2:3–4']
+];
+let vLast = -1;
+function newVerse(){
+  const box = document.getElementById('verse'); if (!box) return;
+  let i; do { i = Math.floor(Math.random() * VERSES.length); } while (i === vLast && VERSES.length > 1); vLast = i;
+  box.classList.add('fade');
+  setTimeout(() => { document.getElementById('vtext').textContent = '\u201C' + VERSES[i][0] + '\u201D'; document.getElementById('vref').textContent = VERSES[i][1]; box.classList.remove('fade'); }, document.getElementById('vtext').textContent ? 400 : 0);
+}
+document.getElementById('versenext').onclick = newVerse;
+newVerse(); setInterval(newVerse, 4 * 60 * 1000);
+
+/* ======================= kiosk ======================= */
+let FORCE_OFFLINE = false;
+const K = { step: '', entry: '', code: null, pin: '', info: null, timer: null, offline: false, device: store.get('rc_kiosk_device') || '', deviceOk: true };
+function setMsg(kind, title, text){ const m = document.getElementById('kmsg'); m.className = 'msg ' + (kind || ''); m.innerHTML = `<strong>${esc(title)}</strong>${esc(text)}`; }
+function queue(){ try { return JSON.parse(store.get('rc_queue') || '[]'); } catch (e) { return []; } }
+function setQueue(q){ store.set('rc_queue', JSON.stringify(q)); updateNet(); }
+function updateNet(){
+  const b = document.getElementById('netbanner'), q = queue().length;
+  if (K.offline || q) { b.textContent = t('noNet', { q: q ? t('waiting', { n: q }) : '' }); b.classList.add('show'); } else b.classList.remove('show');
+}
+async function flushQueue(){
+  const q = queue(); if (!q.length || FORCE_OFFLINE) return;
+  let sent = 0; const rest = [];
+  for (const p of q) {
+    try { await api('kioskPunch', { device: K.device, code: p.code, pinHash: p.pinHash, type: p.type, clientMs: p.clientMs, offline: true, photo: p.photo, noPhoto: p.noPhoto }); sent++; }
+    catch (e) { if (e.error === 'NETWORK') rest.push(p); else sent++; }
+  }
+  K.offline = rest.length > 0; setQueue(rest);
+  if (sent) toast(t('sentBack', { n: sent }));
+}
+setInterval(flushQueue, 30000);
+window.addEventListener('online', flushQueue);
+function keypadHtml(goLabel){
+  return `<div class="keypad">${['1','2','3','4','5','6','7','8','9','C','0','GO'].map(k => k === 'GO' ? `<button class="key go" data-k="GO">${esc(goLabel)}</button>` : k === 'C' ? `<button class="key clear" data-k="C">${esc(t('clear'))}</button>` : `<button class="key" data-k="${k}">${k}</button>`).join('')}</div>`;
+}
+function stateText(list){
+  if (!list.length) return t('stNone');
+  const last = list[list.length - 1], tm = fmt12(last.mins);
+  return { IN: t('stWork', { t: tm }), BRK_IN: t('stWork', { t: tm }), LUNCH_IN: t('stWork', { t: tm }), BRK_OUT: t('stBreak', { t: tm }), LUNCH_OUT: t('stLunch', { t: tm }), OUT: t('stOut', { t: tm }) }[last.type];
+}
+/* ======================= punch photo (camera) ======================= */
+const CAM = { stream: null, err: '', starting: null };
+async function startCam(){
+  if (CAM.stream) return attachCam();
+  if (CAM.starting) return CAM.starting;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { CAM.err = 'camera not supported on this device'; return; }
+  CAM.starting = navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false })
+    .then(st => { CAM.stream = st; CAM.err = ''; attachCam(); })
+    .catch(e => { CAM.err = /NotAllowed|Permission/i.test(e && e.name || '') ? 'camera permission blocked' : 'camera not available'; showCamState(); })
+    .finally(() => { CAM.starting = null; });
+  return CAM.starting;
+}
+function attachCam(){ const v = document.getElementById('camv'); if (v && CAM.stream && v.srcObject !== CAM.stream) { v.srcObject = CAM.stream; v.play().catch(() => {}); } showCamState(); }
+function showCamState(){ const n = document.getElementById('camnote'); if (!n) return; n.textContent = CAM.stream ? t('camOn') : CAM.err ? t('camOff') : t('camWait'); n.className = 'camnote' + (CAM.err && !CAM.stream ? ' warn' : ''); }
+function stopCam(){ if (CAM.stream) { CAM.stream.getTracks().forEach(tr => tr.stop()); CAM.stream = null; } }
+function snapPhoto(){
+  const v = document.getElementById('camv');
+  if (!CAM.stream || !v || !v.videoWidth) return { noPhoto: CAM.err || 'camera not ready' };
+  const c = document.createElement('canvas'), w = 320, h = Math.round(w * v.videoHeight / v.videoWidth);
+  c.width = w; c.height = h; const g = c.getContext('2d'); g.drawImage(v, 0, 0, w, h);
+  g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0, h - 18, w, 18); g.fillStyle = '#fff'; g.font = '12px sans-serif';
+  const n = phNow(); g.fillText(`${K.code} · ${n.iso} ${pad(n.h)}:${pad(n.m)}:${pad(n.s)}`, 6, h - 5);
+  try { return { photo: c.toDataURL('image/jpeg', 0.6) }; } catch (e) { return { noPhoto: 'photo capture failed' }; }
+}
+
+function renderPad(){
+  const p = document.getElementById('padpane'); clearTimeout(K.timer);
+  if (!K.deviceOk) { p.innerHTML = `<div class="msg warn"><strong>${esc(t('devTitle'))}</strong>${esc(t('devText'))}</div>`; return; }
+  if (K.step === 'code' || K.step === 'pin') {
+    const isPin = K.step === 'pin', shown = isPin ? '•'.repeat(K.entry.length) : K.entry;
+    p.innerHTML = `<div class="steps"><span><b>${isPin ? '✓' : '1'}</b> ${esc(t('stepNum'))}</span><span>›</span><span><b>2</b> ${esc(t('stepPin'))}</span><span>›</span><span><b>3</b> ${esc(t('stepBtn'))}</span></div>
+      <div class="entry num">${shown || '&nbsp;'}</div>${keypadHtml(isPin ? t('ok') : t('next'))}
+      ${isPin ? `<button class="btn" id="kback">${esc(t('notMe', { name: '#' + K.code }))}</button>` : ''}`;
+    p.querySelectorAll('.key').forEach(b => b.onclick = () => keyPress(b.dataset.k));
+    const kb = document.getElementById('kback'); if (kb) kb.onclick = () => resetKiosk();
+  } else if (K.step === 'actions') {
+    const i = K.info;
+    const acts = K.offline ? ['IN','BRK_OUT','BRK_IN','LUNCH_OUT','LUNCH_IN','OUT'] : i.actions;
+    p.innerHTML = K.offline
+      ? `<div class="who"><h2>${esc(K.code)}</h2></div><div class="msg warn" style="font-size:16px">${esc(t('offlinePick'))}</div>`
+      : `<div class="who"><h2>${esc(t('hi', { name: firstName(i.name) }))}</h2><span class="muted">${esc(i.code)} · ${esc(i.pos)}</span></div>
+         <div class="muted">${i.start == null ? esc(t('flexShift')) : esc(t('shift')) + ' ' + fmt12(i.start) + ' – ' + fmt12(i.start + 540)} · ${esc(stateText(i.today))}</div>
+         ${i.restToday ? `<div class="msg warn" style="font-size:16px">${esc(t('restToday'))}</div>` : ''}`;
+    p.innerHTML += `<div class="cam"><video id="camv" muted playsinline autoplay></video><div><b>${esc(t('camTitle'))}</b><div id="camnote" class="camnote"></div></div></div>`;
+    startCam();
+    p.innerHTML += `<div class="actions">${acts.length ? acts.map(a => `<button class="act ${a === 'IN' ? 'main' : a === 'OUT' ? 'out' : ''}" data-a="${a}">${esc(t(a))}</button>`).join('') : `<div class="msg ok" style="grid-column:1/-1">${esc(t('allDone'))}</div>`}</div>
+      <div class="row" style="justify-content:space-between">${K.offline ? '<span></span>' : `<button class="btn" id="kreq">${esc(t('request'))}</button>`}<button class="btn" id="kdone">${esc(t('done'))}</button></div>`;
+    p.querySelectorAll('.act').forEach(b => b.onclick = () => punch(b.dataset.a, b));
+    const rq = document.getElementById('kreq'); if (rq) rq.onclick = () => { K.step = 'request'; renderPad(); };
+    document.getElementById('kdone').onclick = () => resetKiosk();
+    K.timer = setTimeout(() => resetKiosk(), 30000);
+    attachCam();
+  } else if (K.step === 'request') {
+    const n = phNow(), dates = []; for (let k = 6; k >= 0; k--) dates.push(addDaysIso(n.iso, -k));
+    p.innerHTML = `<h2 style="font-size:28px">${esc(t('rqTitle'))}</h2><p class="muted" style="margin:0">${esc(t('rqText'))}</p>
+      <div class="grid2">
+        <div class="field"><label for="rq-date">${esc(t('rqDate'))}</label><select id="rq-date">${dates.map(d => `<option value="${d}" ${d === n.iso ? 'selected' : ''}>${esc(niceDate(d))}</option>`).join('')}</select></div>
+        <div class="field"><label for="rq-type">${esc(t('rqType'))}</label><select id="rq-type">${['IN','OUT','LUNCH_OUT','LUNCH_IN'].map(x => `<option value="${x}">${esc(t(x))}</option>`).join('')}</select></div>
+        <div class="field"><label for="rq-time">${esc(t('rqTime'))}</label><input id="rq-time" type="time" value="${hmStr(K.info.start == null ? phNow().mins : K.info.start)}"></div>
+        <div class="field"><label for="rq-wit">${esc(t('rqWit'))}</label><input id="rq-wit" placeholder="${esc(t('rqWitPh'))}"></div>
+      </div>
+      <div class="field"><label for="rq-why">${esc(t('rqWhy'))}</label><textarea id="rq-why" rows="2" placeholder="${esc(t('rqWhyPh'))}"></textarea></div>
+      <div class="err" id="rq-err"></div>
+      <div class="row"><button class="btn" id="rq-cancel">${esc(t('cancel'))}</button><button class="btn primary" id="rq-send">${esc(t('send'))}</button></div>`;
+    document.getElementById('rq-cancel').onclick = () => { K.step = 'actions'; renderPad(); };
+    document.getElementById('rq-send').onclick = async e => {
+      const why = document.getElementById('rq-why').value.trim();
+      if (why.length < 10) { document.getElementById('rq-err').textContent = t('rqErr'); return; }
+      e.target.disabled = true;
+      try {
+        const r = await api('kioskRequest', { device: K.device, code: K.code, pin: K.pin, date: document.getElementById('rq-date').value, punch: document.getElementById('rq-type').value,
+          time: document.getElementById('rq-time').value, witness: document.getElementById('rq-wit').value, reason: why });
+        setMsg('ok', t('sentTitle'), t('sentText', { id: r.id })); resetKiosk(true);
+      } catch (err) { e.target.disabled = false; showKioskError(err); }
+    };
+  }
+}
+function firstName(n){ n = String(n || ''); return (n.includes(',') ? n.split(',')[1] : n).trim().split(' ')[0] || n; }
+function hmStr(m){ return pad(Math.floor(m / 60)) + ':' + pad(m % 60); }
+function showKioskError(e){
+  const code = e && e.error;
+  if (code === 'WRONG_PIN') { setMsg('bad', t('wrongPin'), t('wrongPinText', { n: e.left })); K.entry = ''; K.step = 'pin'; renderPad(); return; }
+  if (code === 'LOCKED') { setMsg('bad', t('locked'), t('lockedText')); resetKiosk(true); return; }
+  if (code === 'NOT_FOUND') { setMsg('bad', t('notFound'), t('notFoundText')); resetKiosk(true); return; }
+  if (code === 'DEVICE') { K.deviceOk = false; renderPad(); return; }
+  if (code === 'NOT_ALLOWED') { setMsg('bad', t('notAllowed'), ''); resetKiosk(true); return; }
+  if (code === 'REASON') { const el = document.getElementById('rq-err'); if (el) el.textContent = t('rqErr'); return; }
+  if (code === 'NETWORK') { setMsg('bad', t('netErr'), t('netErrText')); return; }
+  setMsg('bad', 'Error', (e && e.error) || ''); resetKiosk(true);
+}
+async function keyPress(k){
+  if (k === 'C') { K.entry = ''; renderPad(); return; }
+  if (k !== 'GO') { if (K.entry.length < 4) K.entry += k; renderPad(); return; }
+  if (K.step === 'code') {
+    if (!K.entry) return;
+    K.code = K.entry; K.entry = ''; K.step = 'pin'; setMsg('', t('typePin'), t('typePinText')); renderPad(); return;
+  }
+  if (K.step === 'pin') {
+    if (K.entry.length !== 4) return;
+    K.pin = K.entry; K.entry = '';
+    document.getElementById('padpane').classList.add('loading');
+    try {
+      K.info = await api('kioskAuth', { device: K.device, code: K.code, pin: K.pin }); K.offline = false;
+      K.step = 'actions'; setMsg('', t('choose'), t('chooseText'));
+    } catch (e) {
+      if (e.error === 'NETWORK') { K.offline = true; K.info = null; K.step = 'actions'; setMsg('warn', t('netErr'), t('offlinePick')); updateNet(); }
+      else showKioskError(e);
+    } finally { document.getElementById('padpane').classList.remove('loading'); if (K.step === 'actions') renderPad(); }
+  }
+}
+function feedbackText(fb){
+  let s = t(fb.code, { n: fb.n, t: fmt12(fb.t || 0), what: t(fb.what || 'break'), What: t(fb.what === 'lunch' ? 'Lunch' : 'Break'), d: fb.d, x: fb.x });
+  return fb.name + ': ' + s;
+}
+async function punch(type, btn, snap){
+  btn.disabled = true;
+  snap = snap || snapPhoto();
+  if (K.offline) {
+    const q = queue(), item = { code: K.code, pinHash: [pinHash(K.code, K.pin), pinHash('RC-' + K.code.padStart(3, '0'), K.pin)], type, clientMs: Date.now(), photo: snap.photo, noPhoto: snap.noPhoto };
+    if (JSON.stringify(q).length > 3000000) { delete item.photo; item.noPhoto = 'tablet storage full while offline'; }
+    q.push(item); setQueue(q);
+    setMsg('warn', `${t(type)} · ${fmt12(phNow().mins)}`, `${K.code}: ${t('savedOffline')}`); resetKiosk(true); return;
+  }
+  try {
+    const fb = await api('kioskPunch', { device: K.device, code: K.code, pin: K.pin, type, photo: snap.photo, noPhoto: snap.noPhoto });
+    setMsg(fb.kind, `${t(type)} · ${fmt12(fb.mins)}`, feedbackText(fb));
+    resetKiosk(true);
+  } catch (e) {
+    if (e.error === 'NETWORK') { K.offline = true; return punch(type, btn, snap); }
+    showKioskError(e);
+  }
+}
+function resetKiosk(keepMsg){
+  stopCam();
+  K.step = 'code'; K.entry = ''; K.code = null; K.pin = ''; K.info = null; K.keepMsg = !!keepMsg;
+  if (keepMsg !== true) setMsg('', t('greet'), t('startText'));
+  renderPad();
+}
+document.getElementById('offline').onchange = e => { FORCE_OFFLINE = e.target.checked; K.offline = FORCE_OFFLINE; updateNet(); if (!FORCE_OFFLINE) flushQueue(); };
+
+/* ======================= guide ======================= */
+function renderGuide(){
+  const g = GUIDE[LANG];
+  document.getElementById('guide').innerHTML = `
+    <div class="card"><h2 style="font-size:34px">${esc(g.title)}</h2><p class="muted" style="margin:4px 0 0">${esc(g.sub)}</p>
+      <div class="stepsbig">${g.steps.map((s, i) => `<div><b>${i + 1}</b><strong>${esc(s[0])}</strong><br>${esc(s[1])}</div>`).join('')}</div></div>
+    <div class="card"><h2 style="font-size:28px">${esc(g.rulesTitle)}</h2><ul class="rules">${g.rules.map(r => `<li><b>${esc(r[0])}</b> ${esc(r[1])}</li>`).join('')}</ul></div>
+    <div class="grid2">
+      <div class="card"><h2 style="font-size:26px">${esc(g.hrDaily)}</h2><ol>${g.hrDailyL.map(x => `<li>${esc(x)}</li>`).join('')}</ol></div>
+      <div class="card"><h2 style="font-size:26px">${esc(g.hrCut)}</h2><ol>${g.hrCutL.map(x => `<li>${esc(x)}</li>`).join('')}</ol></div>
+    </div>
+    <div class="card"><h2 style="font-size:26px">${esc(g.rollTitle)}</h2>
+      <div style="overflow-x:auto"><table class="list"><tr>${g.rollHead.map(h => `<th>${esc(h)}</th>`).join('')}</tr>${g.roll.map(r => `<tr>${r.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`).join('')}</table></div>
+      <p class="muted" style="margin:10px 0 0"><b>${esc(g.talkTitle)}</b> ${esc(g.talk)}</p></div>`;
+}
+
+/* ======================= HR ======================= */
+const H = { token: sessionStorage_get('rc_hr_token'), data: null, sub: 'queue', cutoff: null, showResolved: false };
+function sessionStorage_get(k){ try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+function sessionStorage_set(k, v){ try { v === null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k, v); } catch (e) {} }
+const LBL = { IN:'Time In', OUT:'Time Out', LUNCH_OUT:'Start Lunch', LUNCH_IN:'End Lunch', BRK_OUT:'Start Break', BRK_IN:'End Break' };
+function showHR(){
+  document.getElementById('hrlogin').hidden = !!H.token; document.getElementById('hrapp').hidden = !H.token || !H.data;
+  if (!H.mustChange) document.getElementById('hrpwchange').hidden = true;
+  document.getElementById('toplogout').hidden = !H.token;
+  if (H.token && !H.data) loadHR();
+}
+async function loadHR(){
+  document.getElementById('hrapp').classList.add('loading');
+  try { H.data = await api('hrData', { token: H.token, cutoff: H.cutoff }); H.cutoff = H.data.cutoff.id; renderHR(); }
+  catch (e) { if (/expired/i.test(e.error || '')) { H.token = null; sessionStorage_set('rc_hr_token', null); } toast(e.error === 'NETWORK' ? 'No connection. Try Refresh.' : e.error); showHR(); }
+  finally { document.getElementById('hrapp').classList.remove('loading'); }
+}
+document.getElementById('hrgo').onclick = async () => {
+  const err = document.getElementById('hrerr'); err.textContent = '';
+  try {
+    const r = await api('hrLogin', { code: document.getElementById('hrcode').value, password: document.getElementById('hrpw').value });
+    document.getElementById('hrpw').value = ''; H.token = r.token; sessionStorage_set('rc_hr_token', r.token);
+    if (r.mustChange) { H.mustChange = true; document.getElementById('hrlogin').hidden = true; document.getElementById('hrpwchange').hidden = false; document.getElementById('toplogout').hidden = false; return; }
+    showHR();
+  } catch (e) { err.textContent = e.error === 'NETWORK' ? 'No connection. Try again.' : e.error; }
+};
+document.getElementById('hrpw').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('hrgo').click(); });
+document.getElementById('pwgo').onclick = async () => {
+  const a = document.getElementById('pw1').value, b = document.getElementById('pw2').value, err = document.getElementById('pwerr');
+  if (a !== b) { err.textContent = 'The two passwords are different.'; return; }
+  try { await api('hrChangePassword', { token: H.token, password: a }); H.mustChange = false; document.getElementById('pw1').value = ''; document.getElementById('pw2').value = ''; toast('Password saved.'); showHR(); } catch (e) { err.textContent = e.error; }
+};
+async function logOut(){ try { await api('hrSignOut', { token: H.token }); } catch (e) {} H.token = null; H.data = null; H.mustChange = false; sessionStorage_set('rc_hr_token', null); document.getElementById('hrcode').value = ''; showHR(); toast('Logged out.'); }
+document.getElementById('hrout').onclick = logOut;
+document.getElementById('toplogout').onclick = logOut;
+document.getElementById('hrrefresh').onclick = () => loadHR();
+document.getElementById('cutsel').onchange = e => { H.cutoff = e.target.value; loadHR(); };
+document.querySelectorAll('.subtabs button').forEach(b => b.onclick = () => { H.sub = b.dataset.sub; renderHR(); });
+
+function renderHR(){
+  const d = H.data; showHR();
+  document.getElementById('hrtitle').textContent = 'Cut-off ' + d.cutoff.label;
+  document.getElementById('hruser').textContent = `Signed in: ${d.me.name} · ${d.me.role}`;
+  document.getElementById('cutsel').innerHTML = d.cutoffs.map(c => `<option value="${c.id}" ${c.id === d.cutoff.id ? 'selected' : ''}>${esc(c.label)}</option>`).join('');
+  const open = d.issues.filter(i => !i.resolved);
+  const inNow = d.staff.filter(s => { const L = d.todayPunches[s.code] || []; return L.length && L[L.length - 1].type !== 'OUT'; }).length;
+  document.getElementById('tiles').innerHTML = [
+    ['bad', d.held, 'Days with pay on hold'], ['bad', d.pending, 'Requests to approve'], ['warn', open.filter(i => i.kind === 'late').length, 'Late arrivals (open)'],
+    ['warn', open.filter(i => i.kind === 'absent').length, 'Absences (open)'], ['info', open.length, 'Open items'], ['ok', inNow, 'Clocked in now']
+  ].map(([k, v, l]) => `<div class="card tile ${k}"><b class="num">${v}</b><span>${l}</span></div>`).join('');
+  document.querySelectorAll('.subtabs button').forEach(b => b.setAttribute('aria-pressed', b.dataset.sub === H.sub ? 'true' : 'false'));
+  ['queue','grid','today','audit','admin'].forEach(k => document.getElementById('sub-' + k).hidden = k !== H.sub);
+  ({ queue: renderQueue, grid: renderGrid, today: renderToday, audit: renderAudit, admin: renderAdmin })[H.sub]();
+}
+function staffOf(code){ return H.data.staff.find(s => s.code === code) || { name: code, pos: '', start: 480, code }; }
+const KINDS = [['all','All'],['hold','Pay on hold'],['request','Requests'],['late','Late'],['absent','Absent'],['auto','No punch (paid full shift)'],['other','Other']];
+function kindGroup(i){ if (i.sev === 'bad' && i.kind !== 'request') return 'hold'; if (['request','late','absent','auto'].includes(i.kind)) return i.kind; return 'other'; }
+function renderQueue(){
+  H.filter = H.filter || 'all'; H.sel = H.sel || {};
+  const all = H.data.issues.filter(i => H.showResolved || !i.resolved);
+  const list = all.filter(i => H.filter === 'all' || kindGroup(i) === H.filter), el = document.getElementById('sub-queue');
+  const count = k => all.filter(i => !i.resolved && (k === 'all' || kindGroup(i) === k)).length;
+  const selN = list.filter(i => H.sel[i.key] && !i.resolved).length;
+  el.innerHTML = `<div class="subtabs" style="margin-bottom:8px">${KINDS.map(([k, l]) => `<button data-f="${k}" aria-pressed="${H.filter === k}">${l} (${count(k)})</button>`).join('')}</div>
+    <div class="card" style="padding:10px 12px;margin-bottom:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between">
+      <label class="switch"><input type="checkbox" id="selall" ${list.some(i => !i.resolved) && list.filter(i => !i.resolved).every(i => H.sel[i.key]) ? 'checked' : ''}> Select all shown</label>
+      <div class="row" style="align-items:center"><span class="muted" id="selinfo">${selN} selected</span>
+        <button class="btn good" id="bulkapprove" ${selN ? '' : 'disabled'}>Approve selected requests</button>
+        <button class="btn primary" id="bulkok" ${selN ? '' : 'disabled'}>Mark selected reviewed</button></div></div>
+    <div class="row" style="justify-content:space-between;margin-bottom:8px"><span class="muted">Tick several items and handle them in one click. Open one only when it needs a decision.</span>
+    <label class="switch"><input type="checkbox" id="showres" ${H.showResolved ? 'checked' : ''}> Show resolved</label></div>
+    <div class="queue">${list.length ? list.map((i, n) => { const s = staffOf(i.code);
+      return `<div class="card item" style="grid-template-columns:6px auto 1fr auto"><div class="stripe ${i.resolved ? '' : i.sev}"></div>
+        <div>${i.resolved ? '' : `<input type="checkbox" data-sel="${n}" ${H.sel[i.key] ? 'checked' : ''} aria-label="Select" style="width:20px;height:20px">`}</div>
+        <div><h3>${esc(s.name)} <span class="muted" style="font-weight:400">· ${esc(s.code)} · ${esc(s.pos)}</span></h3>
+        <p><b>${esc(niceDate(i.date))}</b> · ${esc(i.title)}. ${esc(i.sub)}</p>${i.resolved ? `<p><span class="pill ok">Resolved</span> ${esc(i.resolved)}</p>` : ''}</div>
+        <div class="btns">${i.resolved ? '' : `<button class="btn ${i.sev === 'bad' ? 'primary' : ''}" data-act="${n}">${({ request: 'Review', missing: 'Enter time', auto: 'Enter real time', ot: 'Decide OT', late: 'Record action', absent: 'Classify', deducted: 'Review', grace: 'Review', offline: 'Review', nophoto: 'Review' })[i.kind] || 'Review'}</button>`}<button class="btn" data-day="${esc(i.code)}|${i.date}">View day</button></div></div>`; }).join('')
+      : '<div class="card" style="padding:18px">Nothing here. Days with pay on hold: ' + H.data.held + '.</div>'}</div>`;
+  el.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { H.filter = b.dataset.f; renderQueue(); });
+  document.getElementById('showres').onchange = e => { H.showResolved = e.target.checked; renderHR(); };
+  document.getElementById('selall').onchange = e => { list.forEach(i => { if (!i.resolved) H.sel[i.key] = e.target.checked; }); renderQueue(); };
+  el.querySelectorAll('[data-sel]').forEach(c => c.onchange = () => { const i = list[+c.dataset.sel]; H.sel[i.key] = c.checked; renderQueue(); });
+  const chosen = () => list.filter(i => H.sel[i.key] && !i.resolved);
+  document.getElementById('bulkapprove').onclick = async () => {
+    const ids = chosen().filter(i => i.kind === 'request').map(i => i.id);
+    if (!ids.length) { toast('No correction requests are selected.'); return; }
+    try { const r = await api('hrBulkApprove', { token: H.token, ids }); H.sel = {}; toast(`Approved ${r.done}${r.skipped ? `, skipped ${r.skipped} (filed by you or already decided)` : ''}.`); loadHR(); } catch (e) { toast(e.error); }
+  };
+  document.getElementById('bulkok').onclick = async () => {
+    const items = chosen().filter(i => i.kind !== 'request').map(i => ({ key: i.key, kind: i.kind, code: i.code, date: i.date }));
+    if (!items.length) { toast('Only requests are selected. Use "Approve selected requests".'); return; }
+    try { const r = await api('hrBulkResolve', { token: H.token, items, decision: 'Reviewed' }); H.sel = {}; toast(`Marked ${r.done} item(s) reviewed.`); loadHR(); } catch (e) { toast(e.error); }
+  };
+  el.querySelectorAll('[data-act]').forEach(b => b.onclick = () => openAction(list[+b.dataset.act]));
+  el.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { const [c, d] = b.dataset.day.split('|'); openDay(c, d); });
+}
+function modal(html){ const m = document.getElementById('modal'); m.innerHTML = html; document.getElementById('scrim').classList.add('show'); const f = m.querySelector('select,input,textarea'); if (f) f.focus(); }
+function closeModal(){ document.getElementById('scrim').classList.remove('show'); }
+document.getElementById('scrim').addEventListener('click', e => { if (e.target.id === 'scrim') closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+function dayOf(code, iso){ return (H.data.att[code] || {})[iso] || (iso === H.data.today ? H.data.todayAtt[code] : null); }
+function timeline(code, iso){
+  const d = dayOf(code, iso); if (!d) return '<div class="timeline"><span>No punches</span></div>';
+  const order = ['IN','BRK1_OUT','BRK1_IN','LUNCH_OUT','LUNCH_IN','BRK2_OUT','BRK2_IN','OUT'];
+  const nm = k => LBL[k.replace(/\d/, '')] || k;
+  const items = order.filter(k => d.p[k] || k === 'IN' || k === 'OUT').map(k => d.p[k] ? `<span>${esc(nm(k))} ${fmt12(hm2min(d.p[k]))}</span>` : `<span class="missing">${esc(nm(k))}: missing</span>`);
+  return `<div class="timeline">${items.join('')}</div>`;
+}
+async function act(name, args, okMsg){
+  const btns = document.querySelectorAll('#modal button'); btns.forEach(b => b.disabled = true);
+  try { await api(name, Object.assign({ token: H.token }, args)); closeModal(); toast(okMsg); await loadHR(); }
+  catch (e) { const er = document.getElementById('m-err'); if (er) er.textContent = e.error === 'NETWORK' ? 'No connection. Try again.' : e.error; btns.forEach(b => b.disabled = false); }
+}
+function openAction(i){
+  const s = staffOf(i.code), me = H.data.me.name;
+  const head = `<h2>${esc(s.name)} · ${esc(niceDate(i.date))}</h2><div class="muted">${esc(s.code)} · ${shiftTxt(s)}</div>`;
+  const note = req => `<div class="field"><label for="m-note">Note${req ? '' : ' (optional)'}</label><textarea id="m-note" rows="2"></textarea></div><div class="err" id="m-err"></div>`;
+  const val = id => (document.getElementById(id) || {}).value || '';
+  const checkOpts = '<option value="">Choose…</option><option>Biometric machine log</option><option>CCTV</option><option>Supervisor confirmed</option><option>Delivery/catering record</option><option>Other (explain in note)</option>';
+  if (i.kind === 'request') {
+    const own = i.by === me && H.data.twoPerson;
+    modal(`${head}<div><b>Raw punches (never changed):</b>${timeline(i.code, i.date)}</div>
+      <div class="card" style="padding:12px;background:var(--surface-2)"><b>${esc(i.id)}: ${esc(LBL[i.punch])} at ${fmt12(hm2min(i.time))}</b><br>${esc(i.reason)}<br><span class="muted">Filed by ${esc(i.by)} via ${esc(i.via)}</span></div>
+      ${own ? `<div class="msg bad" style="font-size:15px">You filed this, so you can't decide it. The other approver must review it.</div>` : ''}
+      <div class="field"><label for="m-ver">How did you check it?</label><select id="m-ver">${checkOpts}</select></div>${note(false)}
+      <div class="row"><button class="btn" id="m-x">Cancel</button><button class="btn danger" id="m-deny" ${own ? 'disabled' : ''}>Deny</button><button class="btn good" id="m-ok" ${own ? 'disabled' : ''}>Approve</button></div>`);
+    document.getElementById('m-ok').onclick = () => act('hrDecideCorrection', { id: i.id, decision: 'Approved', checked: val('m-ver'), note: val('m-note') }, `${i.id} approved. Day recalculated.`);
+    document.getElementById('m-deny').onclick = () => act('hrDecideCorrection', { id: i.id, decision: 'Denied', checked: val('m-ver'), note: val('m-note') }, `${i.id} denied.`);
+  } else if (i.kind === 'missing' || i.kind === 'auto') {
+    const miss = i.missingPunch, def = miss === 'IN' ? s.start : s.start + 540;
+    modal(`${head}<div><b>Raw punches:</b>${timeline(i.code, i.date)}</div>
+      <div class="grid2"><div class="field"><label for="m-time">Correct ${esc(LBL[miss])} time</label><input id="m-time" type="time" value="${hmStr(def % 1440)}"></div>
+      <div class="field"><label for="m-ver">Where the time came from</label><select id="m-ver">${checkOpts.replace('<option>Supervisor confirmed</option>', '<option selected>Supervisor confirmed</option>')}</select></div></div>
+      ${H.data.twoPerson ? '<div class="msg" style="font-size:15px">A second person must approve this before pay is released.</div>' : ''}${note(false)}
+      <div class="row"><button class="btn" id="m-x">Cancel</button><button class="btn primary" id="m-ok">Save time</button></div>`);
+    document.getElementById('m-ok').onclick = () => act('hrFileCorrection', { code: i.code, date: i.date, punch: miss, time: val('m-time'), checked: val('m-ver'), note: val('m-note') }, H.data.twoPerson ? 'Correction filed. A second approver must review it.' : 'Saved. The day is recalculated.');
+  } else if (i.kind === 'ot') {
+    modal(`${head}<div><b>Punches:</b>${timeline(i.code, i.date)}</div><p style="margin:0">${esc(i.sub)}. Overtime is paid only when approved. Approving now records a late approval.</p>
+      <div class="field"><label for="m-hrs">Approve how many hours?</label><select id="m-hrs"><option value="0">0 (not payable, no prior approval)</option><option>0.5</option><option>1</option><option>1.5</option><option>2</option><option>3</option></select></div>${note(true)}
+      <div class="row"><button class="btn" id="m-x">Cancel</button><button class="btn primary" id="m-ok">Save decision</button></div>`);
+    document.getElementById('m-ok').onclick = () => act('hrDecideIssue', { key: i.key, kind: 'ot', code: i.code, date: i.date, hours: val('m-hrs'), note: val('m-note') }, 'Saved.');
+  } else if (i.kind === 'late') {
+    const n = H.data.issues.filter(x => x.kind === 'late' && x.code === i.code && x.date.slice(0, 7) === i.date.slice(0, 7) && x.date <= i.date).length;
+    const opts = ['Coaching only', 'Verbal warning (documented)', 'Written warning', 'Suspension 1–3 days (needs notice & hearing)', 'Excused with proof (e.g. medical, flood)'];
+    const sug = opts[Math.min(n, 4) === 4 ? 3 : Math.min(n, 3)];
+    modal(`${head}<p style="margin:0">${esc(i.title)}. Late #${n} this month in this list. Handbook 1.2 suggests: <b>${esc(sug)}</b>.</p>
+      <div class="field"><label for="m-act">Action</label><select id="m-act">${opts.map(o => `<option ${o === sug ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></div>${note(false)}
+      <div class="row"><button class="btn" id="m-x">Cancel</button><button class="btn primary" id="m-ok">Record</button></div>`);
+    document.getElementById('m-ok').onclick = () => act('hrDecideIssue', { key: i.key, kind: 'late', code: i.code, date: i.date, decision: 'Tardiness: ' + val('m-act'), note: val('m-note') }, 'Recorded.');
+  } else if (i.kind === 'absent') {
+    modal(`${head}<p style="margin:0">${esc(i.sub)}</p><div class="field"><label for="m-act">Classify</label><select id="m-act"><option>Notified, unpaid (personal)</option><option>Sick, notified (unpaid unless leave credits)</option><option>Approved leave with pay</option><option>AWOL, no notice (incident report)</option></select></div>${note(false)}
+      <div class="row"><button class="btn" id="m-x">Cancel</button><button class="btn primary" id="m-ok">Save</button></div>`);
+    document.getElementById('m-ok').onclick = () => act('hrDecideIssue', { key: i.key, kind: 'absent', code: i.code, date: i.date, decision: val('m-act'), note: val('m-note') }, 'Saved. Paid leave is credited in payroll.');
+  } else {
+    modal(`${head}<p style="margin:0">${esc(i.title)}. ${esc(i.sub)}</p>${i.kind === 'nophoto' || i.kind === 'offline' ? '<div id="m-photos" class="photos"></div>' : ''}${note(false)}<div class="row"><button class="btn" id="m-x">Cancel</button><button class="btn primary" id="m-ok">Mark reviewed</button></div>`);
+    if (document.getElementById('m-photos')) loadPhotos(i.code, i.date);
+    document.getElementById('m-ok').onclick = () => act('hrDecideIssue', { key: i.key, kind: i.kind, code: i.code, date: i.date, decision: 'Reviewed: ' + i.title, note: val('m-note') }, 'Saved.');
+  }
+  document.getElementById('m-x').onclick = closeModal;
+}
+function openDay(code, iso){
+  const s = staffOf(code), d = dayOf(code, iso);
+  const body = d ? `<table class="list"><tr><th>Day type</th><td>${esc(d.dayType)}</td></tr><tr><th>Status</th><td>${esc(d.status)}</td></tr>
+     <tr><th>Late / undertime / overbreak</th><td class="num">${d.late} / ${d.ut} / ${d.ob} min</td></tr><tr><th>Paid hours</th><td class="num">${(+d.reg).toFixed(2)} regular · ${d.ot} OT${d.paidOff ? ' · ' + d.paidOff + ' paid off-day' : ''}</td></tr>
+     <tr><th>Flags</th><td>${d.flags.length ? d.flags.map(esc).join('<br>') : 'None'}</td></tr></table>` : '<p>No data for this day.</p>';
+  modal(`<h2>${esc(s.name)} · ${esc(niceDate(iso))}</h2><div class="muted">${esc(s.code)} · ${shiftTxt(s)} · rest day ${esc(s.rest)}</div>
+    <div><b>Punches:</b>${timeline(code, iso)}</div><div id="m-photos" class="photos"><span class="muted"><span class="spin"></span> Loading punch photos…</span></div>${body}<div class="row"><button class="btn primary" id="m-x">Close</button></div>`);
+  document.getElementById('m-x').onclick = closeModal;
+  loadPhotos(code, iso);
+}
+async function loadPhotos(code, iso){
+  const el = document.getElementById('m-photos'); if (!el) return;
+  try { const list = await api('hrDayPhotos', { token: H.token, code, date: iso });
+    el.innerHTML = list.length ? list.map(p => `<figure>${p.img ? `<img src="${esc(p.img)}" alt="${esc(LBL[p.type] || p.type)} photo">` : `<div class="nophoto">No photo</div>`}<figcaption><b>${esc(LBL[p.type] || p.type)}</b> ${esc(String(p.at).slice(11, 16))}${p.note ? `<br><span class="muted">${esc(p.note)}</span>` : ''}</figcaption></figure>`).join('')
+      : '<span class="muted">No tablet PIN punches this day (biometric or none), so no photos.</span>';
+  } catch (e) { el.innerHTML = `<span class="muted">Photos could not load: ${esc(e.error || '')}</span>`; }
+}
+function cellFor(d){
+  if (!d) return ['c-none', ''];
+  if (/^INCOMPLETE/.test(d.status)) return ['c-miss', '!'];
+  if (d.status === 'Absent') return ['c-abs', 'A'];
+  if (d.status === 'Paid leave') return ['c-today', 'PL'];
+  if (/^(Rest|Holiday|Day off)/.test(d.status)) return ['c-rest', /^Day off/.test(d.status) ? 'O' : 'R'];
+  if (d.status === 'Not yet') return ['c-none', ''];
+  if (d.status === 'Working') return ['c-today', 'In'];
+  if (d.late > 0) return ['c-late', 'L'];
+  if (d.ob || d.ut || d.flags.some(f => /Unapproved|rest day|Offline/i.test(f))) return ['c-flag', '•'];
+  return ['c-ok', '✓'];
+}
+function renderGrid(){
+  const D = H.data, head = D.days.map(iso => `<th title="${esc(niceDate(iso))}">${dowShort(iso)[0]}<br>${+iso.slice(-2)}</th>`).join('');
+  const rows = D.staff.map(s => `<tr><td class="name">${esc(s.name)} <span class="muted" style="font-weight:400">${esc(s.code.slice(3))}</span></td>${D.days.map(iso => { const [c, tx] = cellFor(D.att[s.code][iso]); return `<td class="c ${c}"><button data-day="${esc(s.code)}|${iso}" aria-label="${esc(s.name)} ${esc(niceDate(iso))}">${tx}</button></td>`; }).join('')}</tr>`).join('');
+  const el = document.getElementById('sub-grid');
+  el.innerHTML = `<div class="card" style="padding:12px"><div class="legend"><span><i class="c-ok"></i>OK</span><span><i class="c-late"></i>L late</span><span><i class="c-flag"></i>• deduction or flag</span><span><i class="c-abs"></i>A absent</span><span><i class="c-miss"></i>! missing punch (pay on hold)</span><span><i class="c-rest"></i>R rest day / holiday</span><span><i class="c-today"></i>In now · PL paid leave</span></div>
+    <div class="gridwrap"><table class="att"><thead><tr><th class="name">Staff</th>${head}</tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="muted" style="margin:8px 0 0;font-size:14px">Tap any square to see that day's punches.</p></div>`;
+  el.querySelectorAll('[data-day]').forEach(b => b.onclick = () => { const [c, d] = b.dataset.day.split('|'); openDay(c, d); });
+}
+function shiftTxt(s){ return s.start == null ? 'flexible shift' : 'shift ' + fmt12(s.start) + ' – ' + fmt12(s.start + 540); }
+function renderToday(){
+  const D = H.data, n = phNow();
+  const rows = D.staff.map(s => { const L = D.todayPunches[s.code] || [], d = D.todayAtt[s.code] || {}, last = L[L.length - 1];
+    let pill = d.status === 'Rest day' && !L.length ? '<span class="pill rest">Rest day</span>' : !L.length ? (s.start != null && n.mins > s.start + 5 && d.scheduled ? '<span class="pill bad">Not in yet</span>' : '<span class="pill rest">Not started</span>')
+      : last.type === 'OUT' ? '<span class="pill ok">Out</span>' : /BRK_OUT|LUNCH_OUT/.test(last.type) ? '<span class="pill info">On break</span>' : '<span class="pill ok">Working</span>';
+    const inP = L.find(p => p.type === 'IN'), late = inP && s.start != null ? inP.mins - s.start : 0;
+    return `<tr><td><b>${esc(s.name)}</b><br><span class="muted">${esc(s.code)} · ${esc(s.pos)}</span></td><td class="num">${s.start == null ? (inP ? fmt12(inP.mins) + ' – ' + fmt12(inP.mins + 540) : 'Flexible') : fmt12(s.start) + ' – ' + fmt12(s.start + 540)}</td><td>${pill} ${late > 5 ? `<span class="pill warn">Late ${late} min</span>` : ''}</td>
+      <td>${L.map(p => `${esc(LBL[p.type])} ${fmt12(p.mins)} <span class="muted">${esc(p.src || '')}${p.offline ? ' · offline' : ''}</span>`).join('<br>') || '—'}</td></tr>`; }).join('');
+  document.getElementById('sub-today').innerHTML = `<div class="card" style="overflow-x:auto"><table class="list"><thead><tr><th>Staff</th><th>Shift</th><th>Now</th><th>Punches today</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+function renderAudit(){
+  document.getElementById('sub-audit').innerHTML = `<div class="card" style="overflow-x:auto"><table class="list"><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Details</th></tr></thead><tbody>
+    ${H.data.audit.map(a => `<tr><td class="num" style="white-space:nowrap">${esc(a['At'])}</td><td>${esc(a['User'])}</td><td>${esc(a['Action'])}</td><td>${esc(a['Details'])}</td></tr>`).join('')}</tbody></table></div>
+    <p class="muted" style="font-size:14px">Every approval, denial and change is listed with who did it. The app has no way to delete from this list.</p>`;
+}
+function renderAdmin(){
+  const D = H.data;
+  document.getElementById('sub-admin').innerHTML = `<div class="admingrid">
+    <div class="card adminbox"><h3 style="font-family:var(--display);font-size:24px">Build final payroll: ${esc(D.cutoff.label)}</h3>
+      <p class="muted" style="margin:0">The payroll files are made automatically on the night of the 12th and 27th. Press this only to make them earlier or again after a late fix: it refreshes the Payroll tab and keeps a frozen copy named "Payroll ${esc(D.cutoff.id)}". Blocked while any day has pay on hold.</p>
+      <div class="err" id="b-err"></div><button class="btn primary" id="b-go" ${D.held ? 'disabled' : ''}>Build final payroll</button><div id="b-out"></div></div>
+    <div class="card adminbox"><h3 style="font-family:var(--display);font-size:24px">Kiosk tablet</h3>
+      <p class="muted" style="margin:0">Only registered tablets can record punches, so no one can clock in from home. Open this page on the reception tablet, sign in, and press the button.</p>
+      <div class="field"><label for="d-name">Tablet name</label><input id="d-name" value="Reception tablet"></div>
+      <button class="btn" id="d-go">Register this tablet as the kiosk</button><div class="muted" id="d-out">${K.device ? 'This browser is already registered as a kiosk.' : 'This browser is not a kiosk.'}</div></div>
+    <div class="card adminbox"><h3 style="font-family:var(--display);font-size:24px">Set a staff PIN</h3>
+      <div class="grid2"><div class="field"><label for="p-code">Staff</label><select id="p-code">${D.staff.map(s => `<option value="${esc(s.code)}">${esc(s.code)} ${esc(s.name)}${s.hasPin ? '' : ' (no PIN yet)'}</option>`).join('')}</select></div>
+      <div class="field"><label for="p-pin">New 4-digit PIN</label><input id="p-pin" inputmode="numeric" maxlength="4" autocomplete="off"></div></div>
+      <div class="err" id="p-err"></div><button class="btn" id="p-go">Save PIN</button>
+      <p class="muted" style="margin:0;font-size:14px">Give the PIN to the staff member privately. PINs are stored scrambled; nobody can read them back.</p></div>
+  </div>`;
+  document.getElementById('b-go').onclick = async e => {
+    const todayIso = phNow().iso || '';
+    if (todayIso && D.cutoff.to && todayIso <= D.cutoff.to && !confirm('This cut-off is not over yet (it ends ' + D.cutoff.to + '). Days after today will count as not worked. Build the FINAL payroll anyway?')) return;
+    e.target.disabled = true; document.getElementById('b-out').innerHTML = '<span class="spin"></span> Building…';
+    try { const r = await api('hrBuildCutoff', { token: H.token, cutoff: D.cutoff.id });
+      document.getElementById('b-out').innerHTML = r.url ? `Done. Total net pay ₱${(+r.totalNet).toLocaleString('en-PH', { minimumFractionDigits: 2 })}.<br><a href="${esc(r.printUrl)}" target="_blank" rel="noopener">Print file: register, payslips, signing sheet</a><br><a href="${esc(r.url)}" target="_blank" rel="noopener">HR record: ${esc(r.sheet)}</a><br><span class="muted">Both are in Google Drive and were emailed to the owner.</span>` : `Done: ${r.rows} attendance rows. ${esc(r.note || '')}`;
+    } catch (er) { document.getElementById('b-err').textContent = er.error; document.getElementById('b-out').textContent = ''; }
+    e.target.disabled = false;
+  };
+  document.getElementById('d-go').onclick = async () => {
+    try { const r = await api('hrRegisterDevice', { token: H.token, name: document.getElementById('d-name').value });
+      K.device = r.device; store.set('rc_kiosk_device', r.device); K.deviceOk = true; document.getElementById('d-out').textContent = `Registered "${r.name}". Go to the Clock-in tab.`; renderPad(); }
+    catch (e) { document.getElementById('d-out').textContent = e.error; }
+  };
+  document.getElementById('p-go').onclick = async () => {
+    const err = document.getElementById('p-err'); err.textContent = '';
+    try { await api('hrSetPin', { token: H.token, code: document.getElementById('p-code').value, pin: document.getElementById('p-pin').value }); document.getElementById('p-pin').value = ''; toast('PIN saved.'); loadHR(); }
+    catch (e) { err.textContent = e.error; }
+  };
+}
+
+/* ======================= start ======================= */
+(async function init(){
+  if (IS_DEMO) {
+    document.getElementById('testbar').hidden = false;
+    document.getElementById('testbar').innerHTML = '<b>Demo.</b> 20 dummy staff with Oct 26 – Nov 15 punches, running in your browser. Nothing is saved when you close this page. Kiosk PINs are under the keypad; HR sign-in is RC-002 or RC-001 with password <b>Romualdos2026</b>.';
+    document.getElementById('offwrap').hidden = false; document.getElementById('demowrap').hidden = false;
+    H.cutoff = '2026-11-10';
+    document.getElementById('demopins').innerHTML = '<table>' + Object.keys(DEMO_PINS).map(c => `<tr><td>${+c.slice(3)}</td><td>${c}</td><td class="num">${DEMO_PINS[c]}</td></tr>`).join('') + '</table>';
+  }
+  applyLang(); resetKiosk(); route(['kiosk','hr','guide'].includes((location.hash||'').slice(1)) ? location.hash.slice(1) : 'kiosk');
+  try { const info = await api('kioskInfo', { device: K.device }); K.deviceOk = info.device; renderPad(); } catch (e) { /* offline at start: keep going */ }
+  flushQueue();
+})();
+</script>
 </body>
 </html>
