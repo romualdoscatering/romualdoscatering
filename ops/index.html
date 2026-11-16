@@ -330,7 +330,7 @@ function alerts() {
 
 /* ============ rendering infra ============ */
 const TABS_ALL = [['dash', 'Dashboard'], ['prs', 'Requests'], ['advances', 'Cash advances'], ['purchases', 'Purchases & expenses'], ['stock', 'Stock'], ['usage', 'Use & waste'], ['recipes', 'Recipes & production'], ['sheets', 'Event sheets'], ['events', 'Catering events'], ['archive', 'Archive'], ['billing', 'Billing'], ['reports', 'Reports'], ['setup', 'Setup']];
-const tabsFor = () => TABS_ALL.filter(t => (t[0] !== 'setup' && t[0] !== 'billing') || S.isAdmin);
+const tabsFor = () => TABS_ALL.filter(t => t[0] === 'setup' ? S.isAdmin : t[0] === 'billing' ? S.canBill : true);
 let TABS = TABS_ALL;
 const V = {};
 let pendingR = false;
@@ -696,7 +696,7 @@ const sheetOf = e => e.sheet ? {...newSheet(), ...e.sheet, id: e.id} : newSheet(
 const sheetRef = d => d.ref || ('EV-' + (d.date || '').replace(/-/g, '').slice(0, 8) + '-' + (d.id || '').slice(-3).toUpperCase());
 V.sheets = () => {
   D.sheet ||= newSheet(); maybeRestoreDraft();
-  if (S.isAdmin && !D.sheet.bill) D.sheet.bill = (D.sheet.kind || 'catering') === 'catering' ? newBillParts() : {...newBillParts(), sections: []};
+  if (S.canBill && !D.sheet.bill) D.sheet.bill = (D.sheet.kind || 'catering') === 'catering' ? newBillParts() : {...newBillParts(), sections: []};
   const d = D.sheet, f = D.ui, k = d.kind || 'catering', cat = k === 'catering';
   const evs = Object.values(S.events).filter(e => e.status !== 'void').sort((a, b) => a.date.localeCompare(b.date));
   const up = evs.filter(e => e.date >= today() && !e.archive), past = evs.filter(e => e.date < today() && !e.archive).reverse();
@@ -705,7 +705,7 @@ V.sheets = () => {
   const listRow = e => { const sh = sheetOf(e), st = SHEET_STATUS.find(x => x[0] === sh.status) || SHEET_STATUS[0];
     return `<tr class="click" data-act="editSheet" data-arg="${e.id}"><td>${fmtD(e.date)}</td><td><b>${esc(sh.client || e.name)}</b>${sh.kind && sh.kind !== 'catering' ? ` <span class="chip warn">${sheetKindLabel(sh.kind)}</span>` : ` <span class="chip" style="background:#E3E7F0;color:#1A2C54">Catering</span>`}<div class="small mut">${esc([sh.kind && sh.kind !== 'catering' ? sh.fulfil : sh.type, sh.venue].filter(Boolean).join(' · '))}</div></td><td class="n">${esc(sh.pax || e.pax || '')}</td>
       <td><span class="chip ${sh.status === 'approved' ? 'ok' : sh.status === 'approval' ? 'warn' : sh.status === 'cancelled' ? 'mut' : 'info'}">${st[1]}</span></td>
-      <td class="row"><button class="sm" data-act="editSheet" data-arg="${e.id}">Edit</button><button class="sm pri" data-act="pdfSheet" data-arg="${e.id}">${S.isAdmin && sheetBillCalc(sh).any ? 'PDF + billing' : 'PDF'}</button>${S.isAdmin && sheetBillCalc(sh).any ? `<button class="sm" data-act="pdfSheetNoBill" data-arg="${e.id}" title="Event sheet only, without prices">No prices</button>` : ''}${S.isAdmin ? `<button class="sm ghost" data-act="delSheet" data-arg="${e.id}" title="Delete this event sheet" style="color:#9B1C1C">Delete</button>` : ''}</td></tr>`; };
+      <td class="row"><button class="sm" data-act="editSheet" data-arg="${e.id}">Edit</button><button class="sm pri" data-act="pdfSheet" data-arg="${e.id}">${S.canBill && sheetBillCalc(sh).any ? 'PDF + billing' : 'PDF'}</button>${S.canBill && sheetBillCalc(sh).any ? `<button class="sm" data-act="pdfSheetNoBill" data-arg="${e.id}" title="Event sheet only, without prices">No prices</button>` : ''}${S.canBill ? `<button class="sm ghost" data-act="delSheet" data-arg="${e.id}" title="Delete this event sheet" style="color:#9B1C1C">Delete</button>` : ''}</td></tr>`; };
   return `<h2>Event sheets</h2>
   <p class="lede">Encode each event's details once. <b>Generate PDF</b> makes a polished event sheet with the Romualdo's logo, for the kitchen and for the client to approve. Billing is not included; that stays with the admin and finance.</p>
   <div class="card" id="sheetForm"><div class="row" style="margin-bottom:6px"><h3 style="margin:0">${d.id ? 'Edit event sheet' : 'New event sheet'}</h3><span id="sheetSaveState" class="save-state ${AS.err ? 'warn' : AS.dirty ? 'busy' : 'ok'}">${esc(saveStateText())}</span><span class="spacer"></span>${d.id ? '<button class="sm ghost" data-act="newSheet">＋ Start a new one instead</button>' : ''}</div>
@@ -732,11 +732,11 @@ V.sheets = () => {
     ${lab(d.fulfil === 'Delivery' ? 'Delivery address & landmark' : 'Pick-up location', inp('venue', d.fulfil === 'Delivery' ? '' : "Romualdo's, 13 Juna Ave. (leave blank)", 'text', 'autocapitalize="words"'))}${lab('Good for (pax, optional)', inp('pax', '', 'number', 'inputmode="numeric" min="0"'))}</div>
    <h4 class="sub">3. ${k === 'packs' ? 'Food packs' : 'Trays'} ordered</h4>
    <p class="small mut" style="margin:0 0 6px">${k === 'packs' ? 'One line per meal-pack variant (e.g. 24 Chicken Teriyaki + 1 Fried Chicken = 25 packs). Put drinks and extra trays on their own lines; they are listed but not counted as packs. Mixed drinks: one line each, e.g. 13 Sprite and 12 Royal, or one line "Softdrinks" with a note "half Sprite, half Royal".' : 'One line per tray. Drinks and other extras go on their own lines and are not counted as trays.'}</p>
-   <div class="tw"><table class="lines"><thead><tr><th>Item</th><th style="width:130px">Type</th><th style="width:80px">Qty</th><th style="width:220px">Note <span class="small mut">(e.g. less spicy)</span></th>${S.isAdmin ? '<th style="width:110px">Price each ₱ <span class="small mut">(optional)</span></th>' : ''}<th style="width:30px"></th></tr></thead><tbody>
-    ${d.menu.map((m, i) => `<tr><td><input data-b="sheet.menu.${i}.dish" placeholder="${k === 'packs' ? 'e.g. Chicken Teriyaki, Yasai Itame, Lumpia Shanghai, Rice' : 'e.g. Baked Rosemary Chicken (large tray)'}" autocapitalize="words"></td><td>${sel(`sheet.menu.${i}.t`, LINE_TYPES(k).map(([v, l]) => opt(v, l)).join(''), false)}</td><td><input data-b="sheet.menu.${i}.qty" type="number" inputmode="numeric" min="0" placeholder="1"></td><td><input data-b="sheet.menu.${i}.note"></td>${S.isAdmin ? `<td><input data-b="sheet.menu.${i}.price" type="number" inputmode="decimal" min="0" step="any" placeholder="₱"></td>` : ''}<td><button class="sm ghost" data-act="rmCourse" data-arg="${i}" title="Remove">✕</button></td></tr>`).join('')}
+   <div class="tw"><table class="lines"><thead><tr><th>Item</th><th style="width:130px">Type</th><th style="width:80px">Qty</th><th style="width:220px">Note <span class="small mut">(e.g. less spicy)</span></th>${S.canBill ? '<th style="width:110px">Price each ₱ <span class="small mut">(optional)</span></th>' : ''}<th style="width:30px"></th></tr></thead><tbody>
+    ${d.menu.map((m, i) => `<tr><td><input data-b="sheet.menu.${i}.dish" placeholder="${k === 'packs' ? 'e.g. Chicken Teriyaki, Yasai Itame, Lumpia Shanghai, Rice' : 'e.g. Baked Rosemary Chicken (large tray)'}" autocapitalize="words"></td><td>${sel(`sheet.menu.${i}.t`, LINE_TYPES(k).map(([v, l]) => opt(v, l)).join(''), false)}</td><td><input data-b="sheet.menu.${i}.qty" type="number" inputmode="numeric" min="0" placeholder="1"></td><td><input data-b="sheet.menu.${i}.note"></td>${S.canBill ? `<td><input data-b="sheet.menu.${i}.price" type="number" inputmode="decimal" min="0" step="any" placeholder="₱"></td>` : ''}<td><button class="sm ghost" data-act="rmCourse" data-arg="${i}" title="Remove">✕</button></td></tr>`).join('')}
    </tbody></table></div>
    <div class="row" style="margin-top:6px"><button class="sm" data-act="addCourse">＋ Add item</button><span class="spacer"></span><span class="small" data-live="osum"></span></div>`}
-   ${S.isAdmin ? `<details class="billbox" ${sheetBillCalc(d).any || D.ui.billOpen ? 'open' : ''} ontoggle="D.ui.billOpen=this.open" style="margin:14px 0 4px;border:1px dashed var(--line,#ccc);border-radius:10px;padding:8px 12px"><summary><b>Billing (optional, Admins)</b> <span class="small mut">Add prices to print the event details and the billing together. Leave blank for the event sheet only.</span></summary>
+   ${S.canBill ? `<details class="billbox" ${sheetBillCalc(d).any || D.ui.billOpen ? 'open' : ''} ontoggle="D.ui.billOpen=this.open" style="margin:14px 0 4px;border:1px dashed var(--line,#ccc);border-radius:10px;padding:8px 12px"><summary><b>Billing (optional, Admins)</b> <span class="small mut">Add prices to print the event details and the billing together. Leave blank for the event sheet only.</span></summary>
     <div style="margin-top:10px">${cat ? '' : '<p class="small mut" style="margin:0 0 6px">Prices typed in the order table above are billed automatically (price × qty). Add anything else below.</p>'}${billEditor('sheet.bill', {items: false, defPax: d.pax, secLabel: cat ? 'Package / item' : 'Other priced item', secPh: cat ? 'e.g. Catering package' : 'e.g. Delivery to Bangkal', secAdd: cat ? 'package or item' : 'item'})}</div></details>` : ''}
    <h4 class="sub">${cat ? 5 : 4}. Notes</h4>
    <div class="grid">${lab('Allergies / dietary needs', `<textarea data-b="sheet.allergy" rows="2"></textarea>`)}${lab('Special requests', `<textarea data-b="sheet.special" rows="2"></textarea>`)}</div>
@@ -898,7 +898,7 @@ function arcMoney(e) {
 }
 const ARC_MONEY = ['contract', 'perHead', 'pricingNote', 'receipts', 'receiptsCheck', 'otherCost', 'totalCost', 'margin', 'marginPct', 'costPerGuest', 'billed', 'payment'];
 const ARC_PESO = ['contract', 'perHead', 'receipts', 'otherCost', 'totalCost', 'margin', 'costPerGuest', 'billed'];
-const arcCols = () => ARC_COLS.filter(([k]) => S.isAdmin || !ARC_MONEY.includes(k));
+const arcCols = () => ARC_COLS.filter(([k]) => S.canBill || !ARC_MONEY.includes(k));
 const ARC_COLS = [['ref', 'Reference no.'], ['date', 'Event / order date'], ['kind', 'Service'], ['type', 'Event type / pick-up or delivery'], ['client', 'Client'], ['contact', 'Contact person'], ['mobile', 'Mobile'], ['email', 'Email'], ['source', 'How they found us'],
   ['venue', 'Venue / address'], ['pkg', 'Package / order'], ['paxBooked', 'Guests booked'], ['paxServed', 'Guests served'], ['menu', 'Menu / items'], ['allergy', 'Allergies / dietary'], ['special', 'Special requests'],
   ['sheetStatus', 'Event sheet status'], ['preparedBy', 'Prepared by'],
@@ -931,7 +931,7 @@ V.archive = () => {
     return `<tr><td>${fmtD(d.date || e.date)}</td><td><b>${esc(d.client || e.client || e.name)}</b> <span class="chip ${k === 'catering' ? '' : 'warn'}" ${k === 'catering' ? 'style="background:#E3E7F0;color:#1A2C54"' : ''}>${sheetKindLabel(k)}</span><div class="small mut">${esc(sheetRef(d))}${d.venue ? ' · ' + esc(d.venue) : ''}</div></td><td class="n">${esc(d.pax || e.pax || '')}</td>
       <td class="row"><button class="sm pri" data-act="arcMark" data-arg="${e.id}">Mark fulfilled &amp; archive</button><button class="sm ghost" data-act="arcMark" data-arg="${e.id}|cancelled">Didn't push through</button></td></tr>`; };
   const row = ([e, r]) => `<tr class="click" data-act="arcView" data-arg="${e.id}"><td>${fmtD(r.date)}<div class="small mut">${esc(r.ref)}</div></td><td><b>${esc(r.client)}</b><div class="small mut">${esc([r.kind, r.type, r.venue].filter(Boolean).join(' · '))}</div></td>
-    <td class="small">${esc(r.pkg)}</td><td class="n">${esc(r.paxServed)}</td>${S.isAdmin ? `<td class="n">${r.contract !== '' ? peso(r.contract) : '<span class="mut">—</span>'}<div class="small mut">cost ${peso(r.totalCost)}</div></td><td class="n ${num(r.margin) < 0 ? 'bad-t' : 'ok-t'}">${r.margin !== '' ? peso(r.margin) + `<div class="small">${r.marginPct.toFixed(1)}%</div>` : ''}</td><td class="n">${r.billed !== '' ? peso(r.billed) : ''}<div class="small mut">${esc(r.payment)}</div></td>` : ''}
+    <td class="small">${esc(r.pkg)}</td><td class="n">${esc(r.paxServed)}</td>${S.canBill ? `<td class="n">${r.contract !== '' ? peso(r.contract) : '<span class="mut">—</span>'}<div class="small mut">cost ${peso(r.totalCost)}</div></td><td class="n ${num(r.margin) < 0 ? 'bad-t' : 'ok-t'}">${r.margin !== '' ? peso(r.margin) + `<div class="small">${r.marginPct.toFixed(1)}%</div>` : ''}</td><td class="n">${r.billed !== '' ? peso(r.billed) : ''}<div class="small mut">${esc(r.payment)}</div></td>` : ''}
     <td><span class="chip ${r.outcome === 'Fulfilled' ? 'ok' : 'mut'}">${esc(r.outcome)}</span></td><td class="small mut">${esc(r.archivedBy)}<div>${esc(r.archivedOn)}</div></td><td>›</td></tr>`;
   return `<h2>Archive</h2>
   <p class="lede">Finished events and fulfilled orders, kept for documentation and traceability. Every archived event is also copied to an Excel-ready sheet automatically.</p>
@@ -945,8 +945,8 @@ V.archive = () => {
     ${sel('ui.arcYear', opt('', 'All years') + years.map(y => opt(y, y)).join(''))}${sel('ui.arcMonth', opt('', 'All months') + MON.map((m, i) => opt(String(i + 1).padStart(2, '0'), m)).join(''))}
     ${sel('ui.arcKind', opt('', 'All services') + ['Catering', 'Food trays', 'Food packs'].map(k => opt(k, k)).join(''))}${sel('ui.arcOut', opt('', 'All outcomes') + ARC_OUT.map(([v, l]) => opt(v, l)).join(''))}</div>
    <div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:10px">
-    <span class="chip ok">${ful.length} fulfilled</span><span class="chip">${served.toLocaleString('en-PH')} guests served</span><span class="chip" style="background:#E3E7F0;color:#1A2C54">${byKind('Catering')} catering</span><span class="chip warn">${byKind('Food trays')} tray orders</span><span class="chip warn">${byKind('Food packs')} pack orders</span>${S.isAdmin && billed ? `<span class="chip">${peso(billed)} billed</span>` : ''}${S.isAdmin ? (() => { const L = ful.map(([, r]) => r), C = L.reduce((a, r) => a + (num(r.contract) || 0), 0), K = L.reduce((a, r) => a + num(r.totalCost), 0); return C || K ? `<span class="chip" style="background:#E3E7F0;color:#1A2C54">Contracts ${peso(C)}</span><span class="chip">Costs ${peso(K)}</span><span class="chip ${C - K < 0 ? 'bad' : 'ok'}">Margin ${peso(C - K)}${C ? ' · ' + ((C - K) / C * 100).toFixed(1) + '%' : ''}</span>` : ''; })() : ''}</div>
-   ${list.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th>Package / order</th><th class="n">Served</th>${S.isAdmin ? '<th class="n">Contract / cost</th><th class="n">Margin</th><th class="n">Billed</th>' : ''}<th>Outcome</th><th>Archived</th><th></th></tr></thead><tbody>${list.map(row).join('')}</tbody></table></div>` : `<div class="empty">${all.length ? 'Nothing matches these filters.' : 'No archived events yet. Finished events appear above for you to archive.'}</div>`}
+    <span class="chip ok">${ful.length} fulfilled</span><span class="chip">${served.toLocaleString('en-PH')} guests served</span><span class="chip" style="background:#E3E7F0;color:#1A2C54">${byKind('Catering')} catering</span><span class="chip warn">${byKind('Food trays')} tray orders</span><span class="chip warn">${byKind('Food packs')} pack orders</span>${S.canBill && billed ? `<span class="chip">${peso(billed)} billed</span>` : ''}${S.canBill ? (() => { const L = ful.map(([, r]) => r), C = L.reduce((a, r) => a + (num(r.contract) || 0), 0), K = L.reduce((a, r) => a + num(r.totalCost), 0); return C || K ? `<span class="chip" style="background:#E3E7F0;color:#1A2C54">Contracts ${peso(C)}</span><span class="chip">Costs ${peso(K)}</span><span class="chip ${C - K < 0 ? 'bad' : 'ok'}">Margin ${peso(C - K)}${C ? ' · ' + ((C - K) / C * 100).toFixed(1) + '%' : ''}</span>` : ''; })() : ''}</div>
+   ${list.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th>Package / order</th><th class="n">Served</th>${S.canBill ? '<th class="n">Contract / cost</th><th class="n">Margin</th><th class="n">Billed</th>' : ''}<th>Outcome</th><th>Archived</th><th></th></tr></thead><tbody>${list.map(row).join('')}</tbody></table></div>` : `<div class="empty">${all.length ? 'Nothing matches these filters.' : 'No archived events yet. Finished events appear above for you to archive.'}</div>`}
   </div>`;
 };
 ACT.arcResync = () => arcSync(false);
@@ -960,7 +960,7 @@ ACT.arcMark = arg => {
     <label>Outcome<select id="a-out">${ARC_OUT.map(([v, l]) => `<option value="${v}" ${v === out ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
     <label>Fulfilled on<input id="a-date" type="date" value="${esc(a.fulfilledOn || d.date || e.date || '')}"></label>
     <label>Guests served<input id="a-pax" type="number" inputmode="numeric" min="0" value="${esc(a.servedPax ?? (d.pax || e.pax || ''))}"></label>
-    ${S.isAdmin ? `<label>Amount billed ₱ <span class="small mut">(optional)</span><input id="a-bill" type="number" inputmode="decimal" min="0" step="any" value="${esc(a.billed ?? (sheetBillCalc(d).any ? sheetBillCalc(d).total : (num(e.contract) || '')))}"></label>
+    ${S.canBill ? `<label>Amount billed ₱ <span class="small mut">(optional)</span><input id="a-bill" type="number" inputmode="decimal" min="0" step="any" value="${esc(a.billed ?? (sheetBillCalc(d).any ? sheetBillCalc(d).total : (num(e.contract) || '')))}"></label>
     <label>Payment<select id="a-pay">${ARC_PAY.map(v => `<option value="${esc(v)}" ${v === (a.payment || '') ? 'selected' : ''}>${v || '— not recorded —'}</option>`).join('')}</select></label>` : ''}
    </div>
    <label>Remarks / client feedback<textarea id="a-rem" rows="3" placeholder="e.g. Client happy, asked about Christmas trays. 5 extra packs added on the day.">${esc(a.remarks || '')}</textarea></label>
@@ -969,7 +969,7 @@ ACT.arcMark = arg => {
       const g = sel => document.querySelector(sel);
       const rec = {...a, outcome: g('#a-out').value, fulfilledOn: g('#a-date').value, servedPax: g('#a-pax').value === '' ? '' : num(g('#a-pax').value), remarks: g('#a-rem').value.trim(),
         at: a.at || Date.now(), by: a.by || S.me?.name || S.me?.username || ''};
-      if (S.isAdmin) { rec.billed = g('#a-bill').value === '' ? '' : num(g('#a-bill').value); rec.payment = g('#a-pay').value; }
+      if (S.canBill) { rec.billed = g('#a-bill').value === '' ? '' : num(g('#a-bill').value); rec.payment = g('#a-pay').value; }
       if (edit) { rec.editedAt = Date.now(); rec.editedBy = S.me?.name || S.me?.username || ''; }
       closeModal();
       guard(async () => { await upd('events/' + id, {archive: rec}); arcSync(true); }, edit ? 'Archive record updated' : 'Archived');
@@ -980,7 +980,7 @@ ACT.arcView = id => {
   const tr = (l, v) => v !== '' && v != null ? `<tr><th style="text-align:left;padding:4px 10px 4px 0;vertical-align:top;white-space:nowrap" class="small mut">${esc(l)}</th><td style="padding:4px 0">${esc(v)}</td></tr>` : '';
   openModal(`<div class="row"><h3 style="margin:0">${esc(r.client)}</h3><span class="chip ${r.outcome === 'Fulfilled' ? 'ok' : 'mut'}">${esc(r.outcome)}</span><span class="spacer"></span><button class="sm" data-mact="pdf">PDF</button><button class="sm ghost" data-mact="close">✕</button></div>
    <table style="margin-top:10px;width:100%">${arcCols().map(([k, l]) => tr(l, ARC_PESO.includes(k) && r[k] !== '' ? peso(r[k]) : k === 'marginPct' && r[k] !== '' ? r[k].toFixed(1) + '%' : k === 'date' || k === 'fulfilledOn' ? fmtLong(r[k]) : r[k])).join('')}</table>
-   ${S.isAdmin ? `<p class="small" style="margin:8px 0 0"><a href="#" data-mact="costing">Open this event's contract price &amp; receipts →</a></p>` : ''}
+   ${S.canBill ? `<p class="small" style="margin:8px 0 0"><a href="#" data-mact="costing">Open this event's contract price &amp; receipts →</a></p>` : ''}
    <div class="row end" style="margin-top:14px">${S.isAdmin ? '<button class="ghost danger" data-mact="unarc">Take out of archive</button>' : ''}<button data-mact="edit">Edit record</button><button class="pri" data-mact="close">Done</button></div>`, {
     pdf: () => { closeModal(); ACT.pdfSheet(id); },
     costing: () => { closeModal(); ACT.openEvent(id); },
@@ -1025,7 +1025,7 @@ ACT.arcXlsx = () => {
   Object.assign(W, {contract: 15, perHead: 13, pricingNote: 30, receipts: 15, receiptsCheck: 16, otherCost: 15, totalCost: 15, margin: 15, marginPct: 10, costPerGuest: 13});
   const events = {name: 'Archived events', widths: cols.map(([k]) => W[k] || 14), money: cols.map(([k], i) => ARC_PESO.includes(k) ? i : -1).filter(i => i >= 0),
     rows: [cols.map(c => c[1]), ...list.map(([, r]) => cols.map(([k]) => r[k] === '' ? '' : r[k]))]};
-  if (S.isAdmin) { const sumK = k => r2(list.reduce((a, [, r]) => a + (num(r[k]) || 0), 0)), tc = sumK('contract'), tcost = sumK('totalCost');
+  if (S.canBill) { const sumK = k => r2(list.reduce((a, [, r]) => a + (num(r[k]) || 0), 0)), tc = sumK('contract'), tcost = sumK('totalCost');
     events.rows.push(cols.map(([k], i) => i === 0 ? 'TOTAL' : ['contract', 'receipts', 'otherCost', 'totalCost', 'margin', 'billed'].includes(k) ? sumK(k) : k === 'marginPct' ? (tc ? r2((tc - tcost) / tc * 100) : '') : k === 'paxServed' ? sumK(k) : ''));
     events.bold = [events.rows.length - 1]; }
   const items = {name: 'Menu & items', widths: [18, 13, 26, 12, 22, 40, 8, 26], rows: [['Reference no.', 'Date', 'Client', 'Service', 'Course / type', 'Dish / item', 'Qty', 'Note']]};
@@ -1033,7 +1033,7 @@ ACT.arcXlsx = () => {
     (d.menu || []).filter(m => (m.dish || '').trim()).forEach(m => items.rows.push([r.ref, r.date, r.client, r.kind, k === 'catering' ? (m.course || '') : ({main: k === 'packs' ? 'Meal pack' : 'Tray', drink: 'Drink', addon: 'Add-on'})[m.t || 'main'] || '', m.dish, k === 'catering' ? '' : (num(m.qty) || 1), m.note || ''])); });
   const f = D.ui, tag = [f.arcYear, f.arcMonth && ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][+f.arcMonth - 1], f.arcKind].filter(Boolean).join(' ');
   const sheets = [events, items];
-  if (S.isAdmin) { const rc = {name: 'Receipts', widths: [18, 13, 26, 13, 24, 14, 14, 18, 22, 60, 30], money: [5, 6], rows: [['Reference no.', 'Event date', 'Client', 'Receipt date', 'Store / supplier', 'Amount (₱)', 'Auto-read (₱)', 'Uploaded by', 'Verified by', 'Items on the receipt', 'Note']]};
+  if (S.canBill) { const rc = {name: 'Receipts', widths: [18, 13, 26, 13, 24, 14, 14, 18, 22, 60, 30], money: [5, 6], rows: [['Reference no.', 'Event date', 'Client', 'Receipt date', 'Store / supplier', 'Amount (₱)', 'Auto-read (₱)', 'Uploaded by', 'Verified by', 'Items on the receipt', 'Note']]};
     list.forEach(([e, r]) => Object.values(e.receipts || {}).filter(Boolean).sort((a, b) => String(a.date).localeCompare(String(b.date))).forEach(x => rc.rows.push([r.ref, r.date, r.client, x.date || '', x.store || '', num(x.amount), x.ocrAmount === '' || x.ocrAmount == null ? '' : num(x.ocrAmount), x.by || '', x.verified ? (x.verified.name || x.verified.user || '') + ' · ' + new Date(x.verified.at).toLocaleDateString('en-PH') : 'not yet verified', (x.items || []).map(i => i.name + ' ' + i.amount).join('; '), x.note || ''])));
     sheets.push(rc); }
   const blob = xlsxBlob(sheets), a = document.createElement('a');
@@ -1083,7 +1083,7 @@ ACT.billRm = arg => { const [path, k, i] = arg.split('|'), b = getPath(D, path);
 /* ---- the Billing page (Admins) ---- */
 const billNo = () => { const p = 'SOA-' + today().slice(2, 4) + today().slice(5, 7) + '-'; const n = S.bills.filter(b => String(b.no || '').startsWith(p)).map(b => parseInt(String(b.no).slice(p.length)) || 0); return p + String((n.length ? Math.max(...n) : 0) + 1).padStart(3, '0'); };
 V.billing = () => {
-  if (!S.isAdmin) return '<div class="empty">Billing is for Admin accounts.</div>';
+  if (!S.canBill) return '<div class="empty">Billing is for Admin and Finance accounts.</div>';
   D.bill ||= newBill(); const b = D.bill, C = billCalc(b, b.pax);
   const inp = (k, ph = '', type = 'text', ex = '') => `<input type="${type}" data-b="bill.${k}" placeholder="${esc(ph)}" ${ex}>`, lab = (t, x) => `<label>${t}${x}</label>`;
   const evs = Object.values(S.events).filter(e => e.status !== 'void').sort((x, y) => y.date.localeCompare(x.date));
@@ -1110,7 +1110,7 @@ V.billing = () => {
   <div class="card"><div class="row"><h3 style="margin:0">Statements (${list.length})</h3><span class="spacer"></span>${out > 0 ? `<span class="chip bad">${peso(out)} to collect</span>` : ''}</div>
    ${list.length ? `<div class="tw" style="margin-top:8px"><table><thead><tr><th>No. / issued</th><th>Client</th><th>Event</th><th class="n">Total</th><th class="n">Balance</th><th>Status</th><th></th></tr></thead><tbody>
     ${list.map(x => { const c = billCalc(x, x.pax); return `<tr class="click" data-act="billEdit" data-arg="${x.id}"><td><b>${esc(x.no)}</b><div class="small mut">${fmtD(x.issued)}</div></td><td><b>${esc(x.client)}</b>${x.contact ? `<div class="small mut">${esc(x.contact)}</div>` : ''}</td><td>${x.eventDate ? fmtD(x.eventDate) : ''}<div class="small mut">${x.pax ? esc(x.pax) + ' pax' : ''}</div></td>
-      <td class="n">${peso(c.total)}</td><td class="n ${c.balance > 0 && x.status !== 'cancelled' ? 'bad-t' : ''}">${peso(c.balance)}</td><td>${stChip(x.status)}</td><td class="row"><button class="sm pri" data-act="billPdf" data-arg="${x.id}">PDF</button><button class="sm ghost" data-act="billDel" data-arg="${x.id}" style="color:#9B1C1C" title="Delete">✕</button></td></tr>`; }).join('')}
+      <td class="n">${peso(c.total)}</td><td class="n ${c.balance > 0 && x.status !== 'cancelled' ? 'bad-t' : ''}">${peso(c.balance)}</td><td>${stChip(x.status)}</td><td class="row"><button class="sm pri" data-act="billPdf" data-arg="${x.id}">PDF</button>${S.isAdmin ? `<button class="sm ghost" data-act="billDel" data-arg="${x.id}" style="color:#9B1C1C" title="Delete">✕</button>` : ''}</td></tr>`; }).join('')}
    </tbody></table></div>` : '<div class="empty">No statements yet.</div>'}
   </div>`;
 };
@@ -1261,7 +1261,7 @@ function printSheet(id, w, noBill) {
   const hero = cat ? [['Date', fmtLong(d.date)], ['Guests', d.pax ? d.pax + ' pax' : 'To be confirmed'], ['Occasion', d.type || 'To be confirmed']]
     : [[d.fulfil === 'Delivery' ? 'Delivery date' : 'Pick-up date', fmtLong(d.date)], [d.fulfil === 'Delivery' ? 'Delivery time' : 'Ready by', d.serve ? fmtClock(d.serve) : 'To be confirmed'], ['Order', (orderLabel(os, k) || kl) + (d.fulfil ? ' · ' + d.fulfil : '')]];
   const docTitle = cat ? 'Event Details' : k === 'packs' ? 'Food Pack Order' : 'Food Tray Order';
-  const BC = S.isAdmin && !noBill ? sheetBillCalc(d) : {any: false}, priced = BC.any && !cat && menu.some(m => num(m.price) > 0);
+  const BC = S.canBill && !noBill ? sheetBillCalc(d) : {any: false}, priced = BC.any && !cat && menu.some(m => num(m.price) > 0);
   const billPage = BC.any ? `<div class="page pb"><div class="bill-h"><img src="${logo}" alt="Romualdo's"><div><div class="tag">Catering Services · Davao City</div><h1>Billing Statement</h1><div class="who">${esc(d.client)}</div></div><div class="meta">Ref. ${esc(ref)}<br>Issued ${esc(new Date().toLocaleDateString('en-PH', {month: 'long', day: 'numeric', year: 'numeric'}))}</div></div>
 <p class="addr">${esc(billCfg('billAddress'))}<br>${esc(billCfg('billContact'))}</p>
 <div class="boxes"><div><h3>Bill to</h3><p><b>Name:</b> ${esc(d.client)}${d.contact ? ' – ' + esc(d.contact) : ''}</p>${d.mobile ? `<p><b>Mobile:</b> ${esc(d.mobile)}</p>` : ''}${d.email ? `<p><b>Email:</b> ${esc(d.email)}</p>` : ''}</div>
@@ -1390,8 +1390,8 @@ function eventDetail(e) {
    <div class="row" style="margin-top:10px">${e.status === 'planned' ? '<button class="sm" data-act="evStatus" data-arg="done">Mark event done</button>' : ''}${e.status === 'done' ? '<button class="sm" data-act="evStatus" data-arg="closed">Close event (lock)</button><button class="sm ghost" data-act="evStatus" data-arg="planned">Reopen</button>' : ''}${e.status === 'closed' ? '<button class="sm ghost" data-act="evStatus" data-arg="done">Reopen</button>' : ''}<button class="sm" data-act="editEv">Edit details</button></div>
    ${e.notes ? `<p class="small" style="white-space:pre-wrap;margin-bottom:0">${esc(e.notes)}</p>` : ''}
   </div>
-  <div class="card"><div class="row"><h3 style="margin:0">Contract price</h3><span class="spacer"></span>${S.isAdmin ? '' : '<span class="small mut">Set by Admins</span>'}</div>
-   ${S.isAdmin ? `<p class="small mut" style="margin:4px 0 10px">Prices vary per guest: enter this client's rate. Add any extra charges or a discount, or type a custom total.</p>
+  <div class="card"><div class="row"><h3 style="margin:0">Contract price</h3><span class="spacer"></span>${S.canBill ? '' : '<span class="small mut">Set by Admins and Finance</span>'}</div>
+   ${S.canBill ? `<p class="small mut" style="margin:4px 0 10px">Prices vary per guest: enter this client's rate. Add any extra charges or a discount, or type a custom total.</p>
    <div class="grid">
     <label>Price per guest ₱${pin('perHead', 'e.g. 650', 'type="number" inputmode="decimal" min="0" step="any"')}</label>
     <label>Number of guests${pin('pax', '', 'type="number" inputmode="numeric" min="0"')}</label>
@@ -1630,7 +1630,7 @@ V.setup = () => {
   </div>
   <div class="card"><h3>Logins & roles</h3>
    <p class="small">Logins come from the <b>Romualdos Staff Logins</b> file in the Romualdo's Inquiry App folder on Google Drive, the same file used for the inquiry dashboard. Add a row to give someone access, set <b>Role</b> to Admin or Staff, and set <b>Active = No</b> to block them (takes effect within 2 minutes).</p>
-   <p class="small"><b>Staff</b> can file requisitions, record advances, purchases, receiving, expenses, issues, waste and counts, liquidate advances, and print. <b>Admins</b> can also approve or reject requisitions, void records, change saved amounts, edit items and this Setup page. The server enforces these rules, not just the screen.</p>
+   <p class="small"><b>Staff</b> can file requisitions, record advances, purchases, receiving, expenses, issues, waste and counts, liquidate advances, and print. <b>Finance</b> can do everything Staff can, plus billing statements, contract prices, prices on event sheets and amounts billed and paid in the Archive. <b>Admins</b> can do all of that and also approve or reject requisitions, void records, change saved amounts, edit items and this Setup page. The server enforces these rules, not just the screen.</p>
    <div class="tw"><table><thead><tr><th>Name</th><th>Username</th><th>Role</th></tr></thead><tbody>${S.users.filter(u => u.active !== false).map(u => `<tr><td>${esc(u.name)}</td><td>${esc(u.username)}</td><td>${u.role === 'Admin' ? '<span class="chip c">Admin</span>' : '<span class="chip mut">Staff</span>'}</td></tr>`).join('')}</tbody></table></div></div>
   <div class="card"><h3>How to run it day to day</h3>
    <ol class="steps">
@@ -2235,12 +2235,12 @@ async function sync(full) {
   if (!S.token || S.syncing) return; S.syncing = true; if (!S.lastSync) schedule();
   try {
     const r = await api('opsSync', {ver: full ? 0 : VER, after: full ? 0 : Math.max(0, AFTER - 15000)});
-    const wasAdmin = S.isAdmin;
-    S.me = r.me; S.isAdmin = r.me.role === 'Admin';
+    const wasAdmin = S.isAdmin, wasBill = S.canBill;
+    S.me = r.me; S.isAdmin = r.me.role === 'Admin'; S.canBill = S.isAdmin || r.me.role === 'Finance';
     if (!r.unchanged) { if (r.users) S.users = r.users; applyDocs(r.docs, true); }
     VER = r.ver; S.lastSync = Date.now(); S.syncErr = '';
     if (!opsDraftRestored) opsDraftRestore();
-    if (wasAdmin !== S.isAdmin) schedule();
+    if (wasAdmin !== S.isAdmin || wasBill !== S.canBill) schedule();
   } catch (e) { if (!e.auth) S.syncErr = e.message; }
   finally { S.syncing = false; schedule(); }
 }
@@ -2264,7 +2264,7 @@ window.addEventListener('pagehide', opsDraftWrite); document.addEventListener('v
 const TOKEN_KEY = 'rcs_ops_token';
 function saveToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} try { t ? sessionStorage.setItem('rcs_token', t) : sessionStorage.removeItem('rcs_token'); } catch (e) {} }
 function readToken() { try { return sessionStorage.getItem('rcs_token') || localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
-function endSession(msg) { opsDraftWrite(); opsDraftRestored = false; S.token = ''; S.me = null; S.isAdmin = false; S.lastSync = 0; S.loginMsg = msg || ''; CACHE.clear(); VER = 0; AFTER = 0; saveToken(''); closeModal(); rebuild(); render(); }
+function endSession(msg) { opsDraftWrite(); opsDraftRestored = false; S.token = ''; S.me = null; S.isAdmin = false; S.canBill = false; S.lastSync = 0; S.loginMsg = msg || ''; CACHE.clear(); VER = 0; AFTER = 0; saveToken(''); closeModal(); rebuild(); render(); }
 function loginView() {
   return `<div class="card login"><h2>Staff login</h2>
    <p class="lede" style="text-align:center">Use the same username and password as the inquiry dashboard.</p>
@@ -2278,7 +2278,7 @@ document.addEventListener('submit', async e => {
   if (e.target.id !== 'loginForm') return; e.preventDefault();
   const u = $('#lg-u').value.trim(), pw = $('#lg-p').value;
   S.loggingIn = true; S.loginMsg = ''; render(); $('#lg-u').value = u;
-  try { const r = await api('login', {username: u, password: pw}); S.token = r.token; S.me = r.user; S.isAdmin = r.user.role === 'Admin'; saveToken(r.token); S.loggingIn = false; route(); sync(true); }
+  try { const r = await api('login', {username: u, password: pw}); S.token = r.token; S.me = r.user; S.isAdmin = r.user.role === 'Admin'; S.canBill = S.isAdmin || r.user.role === 'Finance'; saveToken(r.token); S.loggingIn = false; route(); sync(true); }
   catch (er) { S.loggingIn = false; S.loginMsg = er.message; render(); }
 });
 document.addEventListener('click', e => {

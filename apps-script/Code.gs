@@ -509,7 +509,7 @@ function staffFromRows(rows) {
     const username = pick(row, 'username').toLowerCase();
     const password = pick(row, 'password');
     if (!username || !password) continue;
-    const role = /^admin/i.test(pick(row, 'role')) ? 'Admin' : 'Staff';
+    const rr = pick(row, 'role'), role = /^admin|^owner/i.test(rr) ? 'Admin' : /^financ|^bill|^account/i.test(rr) ? 'Finance' : 'Staff';
     const act = pick(row, 'active').toLowerCase();
     list.push({ name: pick(row, 'full name'), username: username, password: password, role: role,
                 active: !(act === 'no' || act === 'n' || act === 'inactive' || act === 'false') });

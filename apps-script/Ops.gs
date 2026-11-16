@@ -102,8 +102,8 @@ function opsSync(me, req) {
   const base = { ok: true, ver: ver, me: { username: me.username, name: me.name, role: me.role }, now: Date.now() };
   if (req.ver && Number(req.ver) === ver) { base.unchanged = true; return base; }
   const after = Number(req.after) || 0;
-  const admin = me.role === 'Admin';
-  base.docs = readAll(opsSheet()).filter(function (r) { return r.updatedAt > after && (admin || r.coll !== 'bills'); }).map(toDoc);
+  const canBill = me.role === 'Admin' || me.role === 'Finance';
+  base.docs = readAll(opsSheet()).filter(function (r) { return r.updatedAt > after && (canBill || r.coll !== 'bills'); }).map(toDoc);
   base.users = opsUsers();
   return base;
 }
@@ -129,13 +129,19 @@ function deepMerge(a, b) {
 }
 const same = function (a, b) { return JSON.stringify(a === undefined ? null : a) === JSON.stringify(b === undefined ? null : b); };
 
-/** What a Staff account may NOT do. Admin may do everything. */
-function checkStaff(coll, before, after) {
+/** What a Staff account may NOT do. Admin may do everything.
+ *  fin = a Finance account: Staff rights plus billing (statements, contract prices, event-sheet prices, amounts billed and paid). */
+function checkStaff(coll, before, after, fin) {
   if (coll === 'config') forbid('Only Admin accounts can change the setup lists.');
-  if (coll === 'bills') forbid('Only Admin accounts can make or change billing statements.');
-  if (coll === 'events') {
-    const sb = before.sheet || {}, sa = after.sheet || {}, prices = function (sh) { return (sh.menu || []).filter(function (m) { return m.price; }).map(function (m) { return m.dish + '=' + m.price; }).sort().join('|'); };
-    if (!same(sb.bill || null, sa.bill || null) || prices(sb) !== prices(sa)) forbid('Only Admin accounts can change billing and prices on an event sheet.');
+  if (coll === 'bills') {
+    if (!fin) forbid('Only Admin and Finance accounts can make or change billing statements.');
+    if (after.status === 'void' && (!before || before.status !== 'void')) forbid('Only Admin accounts can delete billing statements.');
+    if (before && before.status === 'void' && after.status !== 'void') forbid('Only Admin accounts can restore billing statements.');
+    return;
+  }
+  if (coll === 'events' && !fin) {
+    const sb = (before || {}).sheet || {}, sa = after.sheet || {}, prices = function (sh) { return (sh.menu || []).filter(function (m) { return m.price; }).map(function (m) { return m.dish + '=' + m.price; }).sort().join('|'); };
+    if (!same(sb.bill || null, sa.bill || null) || prices(sb) !== prices(sa)) forbid('Only Admin and Finance accounts can change billing and prices on an event sheet.');
   }
   if (!before) {                                   // creating
     if (after.status === 'void') forbid('Only Admin accounts can void records.');
@@ -154,7 +160,7 @@ function checkStaff(coll, before, after) {
     if (before.status === 'approved' && after.status === 'cancelled') forbid('Only Admin accounts can cancel an approved requisition.');
   }
   if (coll === 'events') {
-    if (!same(before.contract, after.contract) || !same(before.pricing, after.pricing)) forbid('Only Admin accounts can set the contract price.');
+    if (!fin && (!same(before.contract, after.contract) || !same(before.pricing, after.pricing))) forbid('Only Admin and Finance accounts can set the contract price.');
     const rb = before.receipts || {}, ra = after.receipts || {};
     Object.keys(rb).concat(Object.keys(ra)).forEach(function (k) {
       const b = rb[k] || null, a = ra[k] || null;
@@ -163,8 +169,8 @@ function checkStaff(coll, before, after) {
     });
   }
   if (coll === 'events' && before.archive && !after.archive) forbid('Only Admin accounts can take an event out of the archive.');
-  if (coll === 'events' && !same((before.archive || {}).billed, (after.archive || {}).billed)) forbid('Only Admin accounts can record the amount billed.');
-  if (coll === 'events' && !same((before.archive || {}).payment, (after.archive || {}).payment)) forbid('Only Admin accounts can record payments.');
+  if (coll === 'events' && !fin && !same((before.archive || {}).billed, (after.archive || {}).billed)) forbid('Only Admin and Finance accounts can record the amount billed.');
+  if (coll === 'events' && !fin && !same((before.archive || {}).payment, (after.archive || {}).payment)) forbid('Only Admin and Finance accounts can record payments.');
   if (coll === 'recipes') return;                 // the small team keeps recipes up to date together
   if (coll === 'advances' && before.status === 'liquidated' && !same(before, after)) forbid('A liquidated advance can only be changed by an Admin.');
   if (coll === 'counts' && !same(before.lines, after.lines)) forbid('Posted counts cannot be changed.');
@@ -209,7 +215,7 @@ function opsWrite(me, ops) {
           if (!b) { a.addedBy = me.username; a.at = now; }
         });
       }
-      if (!admin) checkStaff(coll, before, after);
+      if (!admin) checkStaff(coll, before, after, me.role === 'Finance');
       const json = JSON.stringify(after);
       if (json.length > OPS.MAX_DOC_CHARS) forbid('This record is too large. Split it into smaller ones.');
       const row = [o.path, coll, json, after.createdAt, after.createdBy, now, me.username];
