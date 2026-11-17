@@ -2105,7 +2105,8 @@ ACT.kinvSave = () => {
     rows[it.id] = {b: r.b === '' ? '' : num(r.b), i: r.i === '' ? '' : num(r.i), o: r.o === '' ? '' : num(r.o), s: r.s === '' ? '' : num(r.s), e: e === '' ? 0 : e, n: (r.n || '').trim()}; names[it.id] = it.name; cats[it.id] = it.cat || 'Others'; mins[it.id] = kMin(it); if (e < 0) neg.push(it.name); });
   if (!Object.keys(rows).length) return toast('Enter at least one dish.', true);
   if (neg.length && !confirm(`Ending is below zero for: ${neg.join(', ')}. Save anyway?`)) return;
-  guard(async () => { clearTimeout(KAUTO.t); await setDoc('kinv/' + d.date, {date: d.date, by: d.by.trim(), rows, names, cats, mins, status: 'ok'}); if (S.kdraft?.[d.date] && !S.kdraft[d.date].cleared) setDoc('kdraft/' + d.date, {date: d.date, cleared: 1}).catch(() => {}); KAUTO.msg = 'Auto-save on'; kinvLoad(d.date); kinvSync(); }, 'Kitchen stocks saved');
+  const wasSaved = !!S.kinv?.[d.date];
+  guard(async () => { clearTimeout(KAUTO.t); await setDoc('kinv/' + d.date, {date: d.date, by: d.by.trim(), rows, names, cats, mins, status: 'ok'}); if (S.kdraft?.[d.date] && !S.kdraft[d.date].cleared) setDoc('kdraft/' + d.date, {date: d.date, cleared: 1}).catch(() => {}); KAUTO.msg = 'Auto-save on'; kinvLoad(d.date); kinvSync(); kinvMailSend(d.date, wasSaved); }, 'Kitchen stocks saved · report emailed');
 };
 function kinvSync() { api('kinvSync', {}).then(r => { if (r.ok) KINV.url = r.url; }).catch(() => {}); }
 const KINV = {url: ''};
@@ -2147,37 +2148,52 @@ ACT.kinvXlsx = () => {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Romualdos Kitchen Stocks ${wk.from} to ${wk.to}.xlsx`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 };
 /* compact A4 report (1–2 pages): dishes grouped by menu section in two columns, notes listed at the end */
-function kinvReportHtml(title, sub, stats, groups, notes, extra, needs) {
-  const tbl = g => `<div class="blk"><div class="ch">${esc(g.cat)}</div><table><colgroup><col style="width:44%"><col style="width:11.2%"><col style="width:11.2%"><col style="width:11.2%"><col style="width:11.2%"><col style="width:11.2%"></colgroup><thead><tr><th>Dish</th><th>Beg</th><th>In</th><th>Out</th><th>Sold</th><th>End</th></tr></thead><tbody>
-    ${g.rows.map(r => `<tr><td>${esc(r.name)}${r.n ? ' *' : ''}</td><td>${r.b}</td><td>${r.i || ''}</td><td>${r.o || ''}</td><td><b>${r.s || ''}</b></td><td class="${r.e < 0 ? 'neg' : ''}"><b>${r.e}</b></td></tr>`).join('')}</tbody></table></div>`;
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font:8.6pt Arial,sans-serif;color:#14213F;margin:0}
-    .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5pt solid #1A2C54;padding-bottom:4px;margin-bottom:6px}.hd h1{font-size:13pt;margin:0}.hd p{margin:0;font-size:8.5pt;color:#4A5265;text-align:right}
-    .st{display:flex;gap:6px;margin-bottom:7px}.st div{flex:1;background:#F3EFE2;border-radius:4px;padding:4px 6px}.st b{display:block;font-size:11.5pt}.st span{font-size:7.5pt;color:#4A5265;text-transform:uppercase}
-    .cols{column-count:2;column-gap:7mm}.blk{break-inside:avoid;margin-bottom:5px}.ch{background:#F6E3B4;border-left:3pt solid #E89908;font-weight:700;padding:2px 5px;font-size:8.8pt}
-    table{width:100%;border-collapse:collapse;table-layout:fixed}th{font-size:7pt;color:#4A5265;text-align:right;font-weight:600;padding:1px 3px;border-bottom:.6pt solid #9C9479}th:first-child,td:first-child{text-align:left}
-    td{padding:1.4px 3px;text-align:right;border-bottom:.4pt solid #E4DFC8;white-space:nowrap}td:first-child{white-space:normal}td.neg{color:#A3271F}
-    .ex{display:flex;gap:7mm;margin-bottom:6px}.ex>div{flex:1}.ex h3,.nt h3{font-size:9pt;margin:0 0 2px}.ex ol{margin:0;padding-left:16px}.nt{margin-top:6px;break-inside:avoid;flex:1}.foot{display:flex;gap:7mm;align-items:flex-start;margin-top:6px}.pr{width:calc(50% - 3.5mm);break-inside:avoid;border:.8pt solid #E89908;border-radius:4px;padding:4px 6px;background:#FFFBF0}.pr h3{font-size:8.6pt;margin:0 0 2px;color:#7A4E00}.pr table{table-layout:auto}.pr td,.pr th{font-size:7.8pt;padding:1px 3px}.pr p{margin:2px 0 0;font-size:6.8pt;color:#5B6478}.nt p{margin:1px 0}
-    .sg{margin-top:14px;display:flex;gap:12mm;font-size:7.5pt;color:#4A5265}.sg div{flex:1;border-top:.7pt solid #14213F;padding-top:2px}
+/* compact A4 report built only from tables and inline styles, so the browser PDF and the emailed PDF look the same */
+function kinvReportHtml(title, sub, stats, groups, notes, extra, needs, forMail) {
+  const C = {navy: '#1A2C54', gold: '#F6E3B4', orange: '#E89908', cream: '#F3EFE2', line: '#E4DFC8', mut: '#4A5265', red: '#A3271F'};
+  const th = 'font-size:7pt;color:' + C.mut + ';text-align:right;font-weight:600;padding:1px 3px;border-bottom:.6pt solid #9C9479';
+  const td = 'padding:1.4px 3px;text-align:right;border-bottom:.4pt solid ' + C.line + ';font-size:8.4pt';
+  const tbl = g => `<table style="width:100%;border-collapse:collapse;margin-bottom:5px"><tr><td colspan="6" style="background:${C.gold};border-left:3pt solid ${C.orange};font-weight:700;padding:2px 5px;font-size:8.8pt">${esc(g.cat)}</td></tr>
+    <tr><th style="${th};text-align:left;width:44%">Dish</th><th style="${th}">Beg</th><th style="${th}">In</th><th style="${th}">Out</th><th style="${th}">Sold</th><th style="${th}">End</th></tr>
+    ${g.rows.map(r => `<tr><td style="${td};text-align:left">${esc(r.name)}${r.n ? ' *' : ''}</td><td style="${td}">${r.b}</td><td style="${td}">${r.i || ''}</td><td style="${td}">${r.o || ''}</td><td style="${td}"><b>${r.s || ''}</b></td><td style="${td}${r.e < 0 ? ';color:' + C.red : ''}"><b>${r.e}</b></td></tr>`).join('')}</table>`;
+  // split the menu sections into two balanced columns
+  const hOf = g => g.rows.length + 2.2, prodH = needs && needs.length ? needs.length + 3 : 0, noteH = notes.length ? notes.length + 1.5 : 0;
+  const total = sum(groups, hOf) + prodH + noteH; let acc = 0; const L = [], R = [];
+  groups.forEach(g => { (acc + hOf(g) / 2 <= total / 2 ? L : R).push(g); if (acc + hOf(g) / 2 <= total / 2) acc += hOf(g); });
+  const lh = sum(L, hOf), rh = sum(R, hOf), prodLeft = lh <= rh;
+  const prod = needs && needs.length ? `<table style="width:100%;border-collapse:collapse;border:.8pt solid ${C.orange};background:#FFFBF0"><tr><td colspan="4" style="font-weight:700;color:#7A4E00;font-size:8.6pt;padding:3px 5px">For production / purchase request</td></tr>
+      <tr><th style="${th};text-align:left">Dish</th><th style="${th}">End</th><th style="${th}">Par</th><th style="${th}">Need</th></tr>
+      ${needs.map(r => `<tr><td style="${td};font-size:7.8pt;text-align:left">${esc(r.name)}</td><td style="${td};font-size:7.8pt${r.e <= 0 ? ';color:' + C.red : ''}">${r.e}</td><td style="${td};font-size:7.8pt">${r.par}</td><td style="${td};font-size:7.8pt"><b>${r.need}</b></td></tr>`).join('')}
+      <tr><td colspan="4" style="font-size:6.8pt;color:#5B6478;padding:2px 5px">Need = Par − End (dishes below their low level).</td></tr></table>` : '';
+  const nts = notes.length ? `<div style="font-size:9pt;font-weight:700;margin:0 0 2px">Notes / remarks</div>${notes.map(n => `<div style="font-size:8.2pt;margin:1px 0">* ${esc(n)}</div>`).join('')}` : '';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:10mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Arial,sans-serif;color:#14213F;margin:0}
     .bar{text-align:center;padding:10px;background:#F7F4EA}.bar button{font:600 13px Arial;border:0;border-radius:8px;padding:10px 18px;background:#1A2C54;color:#fff;cursor:pointer}@media print{.bar{display:none}}</style></head><body>
-    <div class="bar"><button onclick="print()">Save as PDF / Print</button></div>
-    <div class="hd"><p style="text-align:left">${sub.replace('<br>', ' · ')}</p></div>
-    <div class="st">${stats.map(([l, v]) => `<div><span>${l}</span><b>${v}</b></div>`).join('')}</div>${extra || ''}
-    <div class="cols">${groups.map(tbl).join('')}</div>
-    <div class="foot">${needs && needs.length ? `<div class="pr"><h3>For production / purchase request</h3><table><thead><tr><th>Dish</th><th>End</th><th>Par</th><th>Need</th></tr></thead><tbody>${needs.map(r => `<tr><td>${esc(r.name)}</td><td class="${r.e <= 0 ? 'neg' : ''}">${r.e}</td><td>${r.par}</td><td><b>${r.need}</b></td></tr>`).join('')}</tbody></table><p>Need = Par − End (dishes below their low level).</p></div>` : ''}
-    ${notes.length ? `<div class="nt"><h3>Notes / remarks</h3>${notes.map(n => `<p>* ${esc(n)}</p>`).join('')}</div>` : ''}</div>
-    <div class="sg"><div>Prepared by</div><div>Checked by</div></div>
-    <script>window.onload=function(){setTimeout(function(){print()},400)}<\/script></body></html>`;
+    ${forMail ? '' : '<div class="bar"><button onclick="print()">Save as PDF / Print</button></div>'}
+    <div style="font-size:8.5pt;color:${C.mut};border-bottom:1.5pt solid ${C.navy};padding-bottom:4px;margin-bottom:6px">${sub.replace('<br>', ' · ')}</div>
+    <table style="width:100%;border-collapse:separate;border-spacing:4px 0;margin:0 -4px 7px"><tr>${stats.map(([l, v]) => `<td style="background:${C.cream};padding:4px 6px"><div style="font-size:7.5pt;color:${C.mut};text-transform:uppercase">${l}</div><div style="font-size:11.5pt;font-weight:700">${v}</div></td>`).join('')}</tr></table>
+    ${extra || ''}
+    <table style="width:100%;border-collapse:collapse"><tr><td style="width:50%;vertical-align:top;padding-right:3.5mm">${L.map(tbl).join('')}${prodLeft ? prod : ''}${prodLeft ? '' : nts}</td>
+      <td style="width:50%;vertical-align:top;padding-left:3.5mm">${R.map(tbl).join('')}${prodLeft ? '' : prod}<div style="margin-top:6px">${prodLeft ? nts : ''}</div></td></tr></table>
+    <table style="width:100%;margin-top:14px;font-size:7.5pt;color:${C.mut}"><tr><td style="width:46%;border-top:.7pt solid #14213F;padding-top:2px">Prepared by</td><td style="width:8%"></td><td style="width:46%;border-top:.7pt solid #14213F;padding-top:2px">Checked by</td></tr></table>
+    ${forMail ? '' : '<script>window.onload=function(){setTimeout(function(){print()},400)}<\/script>'}</body></html>`;
 }
 function kinvOpen(html) { const w = window.open('', '_blank'); if (!w) return toast('Your browser blocked the PDF window. Allow pop-ups for romualdos.ph.', true); w.document.open(); w.document.write(html); w.document.close(); }
 const kCatOrder = c => { const i = KINV_CATS.indexOf(c); return i < 0 ? 99 : i; };
-ACT.kinvPrint = () => { const x = S.kinv[D.kinv.date]; if (!x) return toast('Save the day first.', true);
+function kinvDailyHtml(x, forMail) {
   const all = (S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT), groups = {}, notes = [];
-  Object.entries(x.rows || {}).forEach(([id, r]) => { if (!kItems().some(k => k.id === id) && !num(r.b) && !num(r.i) && !num(r.o) && !num(r.s) && !num(r.e)) return; const it = all.find(k => k.id === id), cat = it?.cat || 'Others', name = it?.name || x.names?.[id] || id;
+  Object.entries(x.rows || {}).forEach(([id, r]) => { if (!kItems().some(k => k.id === id) && !num(r.b) && !num(r.i) && !num(r.o) && !num(r.s) && !num(r.e)) return; const it = all.find(k => k.id === id), cat = it?.cat || x.cats?.[id] || 'Others', name = it?.name || x.names?.[id] || id;
     (groups[cat] ||= []).push({name, b: r.b === '' ? 0 : r.b, i: r.i, o: r.o, s: r.s, e: r.e, n: r.n, ord: all.indexOf(it)}); if (r.n) notes.push(name + ': ' + r.n); });
   const G = Object.keys(groups).sort((a, b) => kCatOrder(a) - kCatOrder(b)).map(cat => ({cat, rows: groups[cat].sort((a, b) => a.ord - b.ord)}));
   const R = Object.values(x.rows || {}), neg = R.filter(r => num(r.e) < 0).length;
-  kinvOpen(kinvReportHtml('KITCHEN STOCKS · DAILY REPORT', `${esc(fmtLong(x.date))}<br>Encoded by: <b>${esc(x.by || '')}</b>`,
-    [['Dishes counted', R.length], ['Stock in', r2(sum(R, r => num(r.i)))], ['Pulled out', r2(sum(R, r => num(r.o)))], ['Sold', r2(sum(R, r => num(r.s)))], ['Ending stock', r2(sum(R, r => num(r.e)))], ...(neg ? [['Below zero', neg]] : [])], G, notes, '', (kinvRestockData(x.date) || {rows: []}).rows)); };
+  return kinvReportHtml('Kitchen stocks · ' + x.date, `${esc(fmtLong(x.date))}<br>Encoded by: <b>${esc(x.by || '')}</b>`,
+    [['Dishes counted', R.length], ['Stock in', r2(sum(R, r => num(r.i)))], ['Pulled out', r2(sum(R, r => num(r.o)))], ['Sold', r2(sum(R, r => num(r.s)))], ['Ending stock', r2(sum(R, r => num(r.e)))], ...(neg ? [['Below zero', neg]] : [])], G, notes, '', (kinvRestockData(x.date) || {rows: []}).rows, forMail);
+}
+ACT.kinvPrint = () => { const x = S.kinv[D.kinv.date]; if (!x) return toast('Save the day first.', true); kinvOpen(kinvDailyHtml(x)); };
+function kinvMailSend(date, updated) {
+  const x = S.kinv?.[date]; if (!x) return;
+  const low = (kinvRestockData(date) || {rows: []}).rows.length, sold = r2(sum(Object.values(x.rows || {}), r => num(r.s)));
+  api('kinvMail', {date, updated: !!updated, low, sold, html: kinvDailyHtml(x, true)}).then(r => { if (!r.ok) toast('Report email not sent: ' + (r.error || ''), true); }).catch(() => toast('Report email not sent (no connection). Open the day and press Save again.', true));
+}
 ACT.kinvWeekPrint = () => { const cur = weekOf(today()), wk = weekOf(D.ui.kinvWeek || cur.from), W = kinvWeekData(wk.from, wk.to);
   if (!W.rows.length) return toast('No daily counts saved for this week.', true);
   const all = (S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT), groups = {};
@@ -2185,8 +2201,8 @@ ACT.kinvWeekPrint = () => { const cur = weekOf(today()), wk = weekOf(D.ui.kinvWe
   const G = Object.keys(groups).sort((a, b) => kCatOrder(a) - kCatOrder(b)).map(cat => ({cat, rows: groups[cat].sort((a, b) => a.ord - b.ord)}));
   const top = W.rows.filter(r => r.sold > 0).slice(0, 5), po = W.rows.filter(r => r.out > 0).sort((a, b) => b.out - a.out).slice(0, 5), slow = W.rows.filter(r => r.sold === 0 && (r.start || r.in));
   const missing = cutDays(wk.from, wk.to).filter(x => x <= today() && !S.kinv?.[x]);
-  const extra = `<div class="ex"><div><h3>Best sellers</h3><ol>${top.map(r => `<li>${esc(r.name)} — <b>${r.sold}</b></li>`).join('') || '<li>None</li>'}</ol></div>
-    <div><h3>Most pulled out</h3><ol>${po.map(r => `<li>${esc(r.name)} — <b>${r.out}</b></li>`).join('') || '<li>None</li>'}</ol>${slow.length ? `<p style="margin:3px 0 0"><b>Not sold this week:</b> ${slow.map(r => esc(r.name)).join(', ')}</p>` : ''}</div></div>`;
+  const extra = `<table style="width:100%;border-collapse:collapse;margin-bottom:6px;font-size:8.4pt"><tr><td style="width:50%;vertical-align:top;padding-right:3.5mm"><div style="font-size:9pt;font-weight:700">Best sellers</div>${top.map((r, i) => `<div>${i + 1}. ${esc(r.name)} — <b>${r.sold}</b></div>`).join('') || '<div>None</div>'}</td>
+    <td style="width:50%;vertical-align:top;padding-left:3.5mm"><div style="font-size:9pt;font-weight:700">Most pulled out</div>${po.map((r, i) => `<div>${i + 1}. ${esc(r.name)} — <b>${r.out}</b></div>`).join('') || '<div>None</div>'}${slow.length ? `<div style="margin-top:3px"><b>Not sold this week:</b> ${slow.map(r => esc(r.name)).join(', ')}</div>` : ''}</td></tr></table>`;
   kinvOpen(kinvReportHtml('KITCHEN STOCKS · WEEKLY REPORT', `${esc(cutLabel(wk.from, wk.to))}<br>${W.days.length} day${W.days.length === 1 ? '' : 's'} counted${missing.length ? ' · missing ' + missing.map(fmtD).join(', ') : ''}`,
     [['Dishes', W.rows.length], ['Stock in', r2(sum(W.rows, r => r.in))], ['Pulled out', r2(sum(W.rows, r => r.out))], ['Sold', r2(sum(W.rows, r => r.sold))], ['Ending stock', r2(sum(W.rows, r => r.end))]], G,
     W.rows.filter(r => r.notes).map(r => r.name + ' — ' + r.notes), extra)); };

@@ -36,6 +36,7 @@ function handleOps(req) {
     case 'scAttendance': return scAttendance(me, req);
     case 'scFile': return scFile(me, req);
     case 'kinvSync': return kinvSync(me);
+    case 'kinvMail': return kinvMailSend(me, req);
     default:         return { ok: false, error: 'Unknown action.' };
   }
 }
@@ -239,10 +240,6 @@ function opsWrite(me, ops) {
     updates.forEach(function (u) { sh.getRange(u.row, 1, 1, u.vals.length).setValues([u.vals]); });
     if (appends.length) sh.getRange(sh.getLastRow() + 1, 1, appends.length, OPS.HEAD.length).setValues(appends);
     const ver = bumpVersion();
-    changed.forEach(function (c) {                 // kitchen stocks: email the day's report every time it is saved
-      if (c.path.indexOf('kinv/') !== 0 || c.data.status === 'void') return;
-      try { const cfgRow = byPath['config/main']; kinvMail(c.data, c.data.createdAt !== c.data.updatedAt, cfgRow ? JSON.parse(cfgRow.json) : {}, me); } catch (e) { console.error('Kitchen report email failed: ' + e); }
-    });
     return { ok: true, docs: changed, ver: ver };
   });
 }
@@ -849,4 +846,20 @@ function kinvMail(d, updated, cfg, me) {
   const pdf = Utilities.newBlob('<html><body>' + html + '</body></html>', 'text/html', 'k.html').getAs('application/pdf').setName('Kitchen Stocks ' + d.date + (updated ? ' (updated)' : '') + '.pdf');
   MailApp.sendEmail(KINV_MAIL_TO, 'Kitchen stocks · ' + Utilities.formatDate(new Date(d.date + 'T00:00:00+08:00'), 'Asia/Manila', 'EEE, MMM d, yyyy') + ' · ' + S('s') + ' sold' + (low.length ? ' · ' + low.length + ' low' : '') + (updated ? ' (updated)' : ''),
     'Kitchen stocks daily report for ' + day + ', encoded by ' + (d.by || me.username) + '. Sold: ' + S('s') + '. Pulled out: ' + S('o') + '. See the attached PDF.', { name: "Romualdo's Ops", htmlBody: html, attachments: [pdf] });
+}
+
+/* the app sends the same report it prints; it is attached as a PDF and shown in the email body */
+function kinvMailSend(me, req) {
+  const date = String(req.date || ''), html0 = String(req.html || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || html0.length < 200 || html0.length > 400000) return { ok: false, error: 'Nothing to send.' };
+  if (MailApp.getRemainingDailyQuota() < 1) return { ok: false, error: 'Daily email limit reached.' };
+  const html = html0.replace(/<script[\s\S]*?<\/script>/gi, '');
+  const day = Utilities.formatDate(new Date(date + 'T00:00:00+08:00'), 'Asia/Manila', 'EEE, MMM d, yyyy'), upd = req.updated ? ' (updated)' : '';
+  const low = Number(req.low) || 0, sold = Number(req.sold) || 0;
+  const pdf = Utilities.newBlob(html, 'text/html', 'report.html').getAs('application/pdf').setName('Kitchen Stocks ' + date + upd + '.pdf');
+  const body = html.replace(/^[\s\S]*?<body[^>]*>/i, '').replace(/<\/body>[\s\S]*$/i, '');
+  MailApp.sendEmail(KINV_MAIL_TO, 'Kitchen stocks · ' + day + ' · ' + sold + ' sold' + (low ? ' · ' + low + ' for production' : '') + upd,
+    'Kitchen stocks daily report for ' + day + '. The PDF is attached.', { name: "Romualdo's Ops", attachments: [pdf],
+      htmlBody: '<div style="font-family:Arial,sans-serif;color:#14213F;max-width:760px">' + body + '<p style="font-size:11px;color:#5B6478;margin-top:12px">Sent automatically when the day was saved in Romualdo\'s Ops (Kitchen stocks) by ' + (me.name || me.username) + '. Same copy as the PDF attached.</p></div>' });
+  return { ok: true };
 }
