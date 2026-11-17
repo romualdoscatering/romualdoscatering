@@ -17,7 +17,7 @@ const OPS = {
   SHEET: 'docs',
   HEAD: ['path', 'coll', 'data', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'],
   STAFF_RECHECK_SECONDS: 120,      // how often an active session is re-checked against the staff file
-  COLLS: ['config', 'items', 'events', 'advances', 'purchases', 'expenses', 'moves', 'counts', 'sales', 'prs', 'recipes', 'bills', 'sc', 'kinv'],
+  COLLS: ['config', 'items', 'events', 'advances', 'purchases', 'expenses', 'moves', 'counts', 'sales', 'prs', 'recipes', 'bills', 'sc', 'kinv', 'kdraft'],
   MAX_OPS: 50,
   MAX_DOC_CHARS: 45000
 };
@@ -143,6 +143,7 @@ function checkStaff(coll, before, after, fin) {
     return;
   }
   if (coll === 'sc') forbid('Only Admin and Finance accounts can work on the service charge.');
+  if (coll === 'kdraft') return;
   if (coll === 'kinv') { if (after.status === 'void' && (!before || before.status !== 'void')) forbid('Only Admin accounts can void records.'); return; }
   if (coll === 'sales') {                          // daily sales: Staff enter, Finance/Admin verify, verified days are locked
     if (before && before.verified) forbid('This day is already verified. Only an Admin can change it.');
