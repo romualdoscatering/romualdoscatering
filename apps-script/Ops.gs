@@ -238,6 +238,10 @@ function opsWrite(me, ops) {
     updates.forEach(function (u) { sh.getRange(u.row, 1, 1, u.vals.length).setValues([u.vals]); });
     if (appends.length) sh.getRange(sh.getLastRow() + 1, 1, appends.length, OPS.HEAD.length).setValues(appends);
     const ver = bumpVersion();
+    changed.forEach(function (c) {                 // kitchen stocks: email the day's report every time it is saved
+      if (c.path.indexOf('kinv/') !== 0 || c.data.status === 'void') return;
+      try { const cfgRow = byPath['config/main']; kinvMail(c.data, c.data.createdAt !== c.data.updatedAt, cfgRow ? JSON.parse(cfgRow.json) : {}, me); } catch (e) { console.error('Kitchen report email failed: ' + e); }
+    });
     return { ok: true, docs: changed, ver: ver };
   });
 }
@@ -812,4 +816,34 @@ function kinvSync(me) {
     const t = write('Kitchen Stocks - Weekly', ['Week (Mon to Sun)', 'Dish', 'Beginning', 'Stock in', 'Pull-out', 'Sold', 'Ending', 'Days counted'], weekly);
     return { ok: true, url: ss.getUrl() + '#gid=' + t.getSheetId() };
   });
+}
+
+const KINV_MAIL_TO = 'romualdoscatering@gmail.com';
+const KINV_CAT_ORDER = ['Magandang Umaga!', 'Kakatakam', 'Para Masigla, Sabi ni Mama', 'Sabaw Na?', 'Pampahaba ng Buhay', 'Uy, Patikim!', 'Tara, Dagat', 'Mag-isa Ngunit Masaya', 'Oh, Maiba Naman', 'Para sa Paborito Kong Apo', 'Merienda-serye', 'Others'];
+function kinvMail(d, updated, cfg, me) {
+  if (MailApp.getRemainingDailyQuota() < 1) return;
+  const items = (cfg && cfg.kitchenItems) || [], esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  const groups = {}, notes = [], R = [];
+  Object.keys(d.rows || {}).forEach(function (id) {
+    const r = d.rows[id], it = items.filter(function (x) { return x.id === id; })[0], cat = it ? it.cat : ((d.cats || {})[id] || 'Others'), name = it ? it.name : ((d.names || {})[id] || id);
+    (groups[cat] = groups[cat] || []).push({ name: name, r: r, ord: it ? items.indexOf(it) : 999 }); R.push(r); if (r.n) notes.push(name + ': ' + r.n);
+  });
+  const S = function (k) { return Math.round(R.reduce(function (a, r) { return a + (Number(r[k]) || 0); }, 0) * 100) / 100; };
+  const neg = R.filter(function (r) { return Number(r.e) < 0; }).length;
+  const day = Utilities.formatDate(new Date(d.date + 'T00:00:00+08:00'), 'Asia/Manila', 'EEEE, MMMM d, yyyy');
+  const cats = Object.keys(groups).sort(function (a, b) { const x = KINV_CAT_ORDER.indexOf(a), y = KINV_CAT_ORDER.indexOf(b); return (x < 0 ? 99 : x) - (y < 0 ? 99 : y); });
+  const td = 'padding:3px 6px;border-bottom:1px solid #E4DFC8;text-align:right', tdl = 'padding:3px 6px;border-bottom:1px solid #E4DFC8';
+  const table = '<table style="border-collapse:collapse;width:100%;font-size:12.5px"><tr style="color:#5B6478;font-size:11px"><th style="' + tdl + ';text-align:left">Dish</th><th style="' + td + '">Beg</th><th style="' + td + '">In</th><th style="' + td + '">Out</th><th style="' + td + '">Sold</th><th style="' + td + '">End</th></tr>' +
+    cats.map(function (c) { return '<tr><td colspan="6" style="background:#F6E3B4;border-left:4px solid #E89908;font-weight:700;padding:4px 6px">' + esc(c) + '</td></tr>' +
+      groups[c].sort(function (a, b) { return a.ord - b.ord; }).map(function (g) { const r = g.r;
+        return '<tr><td style="' + tdl + '">' + esc(g.name) + (r.n ? ' *' : '') + '</td><td style="' + td + '">' + esc(r.b) + '</td><td style="' + td + '">' + esc(r.i) + '</td><td style="' + td + '">' + esc(r.o) + '</td><td style="' + td + '"><b>' + esc(r.s) + '</b></td><td style="' + td + (Number(r.e) < 0 ? ';color:#A3271F' : '') + '"><b>' + esc(r.e) + '</b></td></tr>'; }).join(''); }).join('') + '</table>';
+  const stat = function (l, v) { return '<td style="background:#F3EFE2;border-radius:6px;padding:6px 10px"><div style="font-size:10px;color:#5B6478;text-transform:uppercase">' + l + '</div><div style="font-size:17px;font-weight:700">' + v + '</div></td>'; };
+  const html = '<div style="font-family:Arial,sans-serif;color:#14213F;max-width:640px">' +
+    '<div style="background:#1A2C54;color:#fff;padding:12px 16px;border-radius:10px 10px 0 0"><b style="font-size:16px">Kitchen stocks · daily report' + (updated ? ' (updated)' : '') + '</b><div style="font-size:12px;color:#E5DEB2">' + esc(day) + ' · encoded by ' + esc(d.by || me.username) + '</div></div>' +
+    '<table style="border-spacing:6px;margin:6px -6px"><tr>' + stat('Dishes', R.length) + stat('Stock in', S('i')) + stat('Pulled out', S('o')) + stat('Sold', S('s')) + stat('Ending', S('e')) + (neg ? stat('Below zero', neg) : '') + '</tr></table>' + table +
+    (notes.length ? '<p style="font-size:12.5px;margin:10px 0 4px"><b>Notes</b></p>' + notes.map(function (n) { return '<div style="font-size:12.5px">* ' + esc(n) + '</div>'; }).join('') : '') +
+    '<p style="font-size:11px;color:#5B6478;margin-top:14px">Sent automatically when the day is saved in Romualdo\'s Ops (Kitchen stocks). The PDF copy is attached.</p></div>';
+  const pdf = Utilities.newBlob('<html><body>' + html + '</body></html>', 'text/html', 'k.html').getAs('application/pdf').setName('Kitchen Stocks ' + d.date + (updated ? ' (updated)' : '') + '.pdf');
+  MailApp.sendEmail(KINV_MAIL_TO, 'Kitchen stocks · ' + Utilities.formatDate(new Date(d.date + 'T00:00:00+08:00'), 'Asia/Manila', 'EEE, MMM d, yyyy') + ' · ' + S('s') + ' sold' + (updated ? ' (updated)' : ''),
+    'Kitchen stocks daily report for ' + day + ', encoded by ' + (d.by || me.username) + '. Sold: ' + S('s') + '. Pulled out: ' + S('o') + '. See the attached PDF.', { name: "Romualdo's Ops", htmlBody: html, attachments: [pdf] });
 }

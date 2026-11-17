@@ -1976,7 +1976,7 @@ function kinvDay() {
   <div class="card"><div class="grid"><label>Date<input type="date" value="${esc(d.date)}" data-act-change="kinvDate" id="kinvDate"></label>
     <label>Encoded by<input data-b="kinv.by" list="kinvStaff" placeholder="Type your name" autocapitalize="words"><datalist id="kinvStaff">${staffList().map(n => `<option value="${esc(n)}">`).join('')}</datalist></label></div>
     <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">${ex ? `<span class="chip ok">Saved${ex.by ? ' · ' + esc(ex.by) : ''}</span>` : '<span class="chip mut">Not saved yet</span>'}
-     ${d.prevDate && d.fresh ? `<span class="chip">Beginning taken from ${fmtD(d.prevDate)}</span>` : ''}<span class="spacer"></span>${ex ? '<button class="sm ghost" data-act="kinvPrint">Print</button>' : ''}</div>
+     ${d.prevDate && d.fresh ? `<span class="chip">Beginning taken from ${fmtD(d.prevDate)}</span>` : ''}<span class="spacer"></span>${ex ? '<button class="sm" data-act="kinvPrint">🖨 Daily PDF</button>' : ''}</div>
     <input type="search" data-b="kinv.q" id="kinvQ" placeholder="🔎 Find a dish" style="margin-top:10px"></div>
   ${list || '<div class="empty">No dish matches.</div>'}
   <div class="kbar"><div class="small" data-live="ksum">${touched} dishes counted · ${sold} sold</div><span class="spacer"></span><button class="pri" data-act="kinvSave">Save ${fmtD(d.date)}</button></div>`;
@@ -1991,12 +1991,12 @@ ACT.kinvDate = () => { const v = $('#kinvDate')?.value; if (v) { kinvLoad(v); re
 ACT.kNote = id => { D.ui.kNote = id; render(); setTimeout(() => document.querySelector(`[data-kid="${id}"] .knote`)?.focus(), 30); };
 ACT.kinvSave = () => {
   const d = D.kinv; if (!d.by.trim()) { toast('Type the name of the person encoding.', true); return document.querySelector('[data-b="kinv.by"]')?.focus(); }
-  const rows = {}, names = {}; let neg = [];
+  const rows = {}, names = {}, cats = {}; let neg = [];
   kItems().forEach(it => { const r = d.rows[it.id]; if (!r) return; const e = kEnd(r); if (e === '' && !r.n) return;
-    rows[it.id] = {b: r.b === '' ? '' : num(r.b), i: r.i === '' ? '' : num(r.i), o: r.o === '' ? '' : num(r.o), s: r.s === '' ? '' : num(r.s), e: e === '' ? 0 : e, n: (r.n || '').trim()}; names[it.id] = it.name; if (e < 0) neg.push(it.name); });
+    rows[it.id] = {b: r.b === '' ? '' : num(r.b), i: r.i === '' ? '' : num(r.i), o: r.o === '' ? '' : num(r.o), s: r.s === '' ? '' : num(r.s), e: e === '' ? 0 : e, n: (r.n || '').trim()}; names[it.id] = it.name; cats[it.id] = it.cat || 'Others'; if (e < 0) neg.push(it.name); });
   if (!Object.keys(rows).length) return toast('Enter at least one dish.', true);
   if (neg.length && !confirm(`Ending is below zero for: ${neg.join(', ')}. Save anyway?`)) return;
-  guard(async () => { await setDoc('kinv/' + d.date, {date: d.date, by: d.by.trim(), rows, names, status: 'ok'}); kinvLoad(d.date); kinvSync(); }, 'Kitchen stocks saved');
+  guard(async () => { await setDoc('kinv/' + d.date, {date: d.date, by: d.by.trim(), rows, names, cats, status: 'ok'}); kinvLoad(d.date); kinvSync(); }, 'Kitchen stocks saved');
 };
 function kinvSync() { api('kinvSync', {}).then(r => { if (r.ok) KINV.url = r.url; }).catch(() => {}); }
 const KINV = {url: ''};
@@ -2018,7 +2018,7 @@ function kinvWeek() {
   const top = W.rows.filter(r => r.sold > 0).slice(0, 5), slow = W.rows.filter(r => r.sold === 0 && (r.start || r.in)), po = W.rows.filter(r => r.out > 0).sort((a, b) => b.out - a.out);
   const T = k => r2(sum(W.rows, r => r[k]));
   return `<div class="card"><div class="row" style="flex-wrap:wrap;gap:8px"><label style="max-width:300px">Week<select data-b="ui.kinvWeek" data-rr>${weeks.map(x => opt(x.from, cutLabel(x.from, x.to) + (x.from === cur.from ? ' (this week)' : ''))).join('')}</select></label><span class="spacer"></span>
-    ${W.rows.length ? '<button class="sm" data-act="kinvXlsx">Excel</button><button class="sm ghost" data-act="kinvWeekPrint">Print</button>' : ''}${KINV.url ? `<a class="btn sm ghost" href="${esc(KINV.url)}" target="_blank" rel="noopener">Google Sheet ↗</a>` : ''}</div>
+    ${W.rows.length ? '<button class="sm" data-act="kinvXlsx">Excel</button><button class="sm" data-act="kinvWeekPrint">🖨 Weekly PDF</button>' : ''}${KINV.url ? `<a class="btn sm ghost" href="${esc(KINV.url)}" target="_blank" rel="noopener">Google Sheet ↗</a>` : ''}</div>
    <p class="small mut" style="margin:6px 0 0">${W.days.length} of ${all.length} days saved${missing.length ? ` · missing: ${missing.map(fmtD).join(', ')}` : ''}. The weekly report builds itself from the daily counts.</p></div>
   ${W.rows.length ? `<div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:10px">
     <div class="card" style="flex:1;min-width:220px;margin:0"><h4 class="sub" style="margin-top:0">Best sellers</h4>${top.map((r, i) => `<div class="row"><span>${i + 1}. ${esc(r.name)}</span><span class="spacer"></span><b>${r.sold}</b></div>`).join('') || '<span class="mut small">No sales recorded.</span>'}</div>
@@ -2037,20 +2037,49 @@ ACT.kinvXlsx = () => {
   const blob = xlsxBlob([{name: 'Weekly report', widths: [30, 24, 11, 10, 10, 9, 10, 12, 50], rows: [head, ...rows]}, {name: 'Daily counts', widths: [12, 18, 30, 11, 10, 10, 9, 10, 40], rows: daily}]);
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Romualdos Kitchen Stocks ${wk.from} to ${wk.to}.xlsx`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 };
-function kinvPrintDoc(title, sub, head, rows) {
-  const w = window.open('', '_blank'); if (!w) return toast('Your browser blocked the print window.', true);
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:12mm}body{font:10.5pt Arial,sans-serif;color:#14213F}h1{font-size:15pt;margin:0}p{margin:2px 0 10px;color:#4A5265}
-    table{width:100%;border-collapse:collapse}th,td{border:.6pt solid #9C9479;padding:3px 6px;text-align:left}th{background:#1A2C54;color:#fff;font-size:9pt}td.n,th.n{text-align:right}tr.c td{background:#F3EFE2;font-weight:700}
-    .bar{text-align:center;padding:10px}.bar button{font:600 13px Arial;border:0;border-radius:8px;padding:10px 18px;background:#1A2C54;color:#fff}@media print{.bar{display:none}}</style></head><body>
-    <div class="bar"><button onclick="print()">Print / Save as PDF</button></div><h1>ROMUALDO'S — ${esc(title)}</h1><p>${esc(sub)}</p><table><thead><tr>${head.map((h, i) => `<th${i ? ' class="n"' : ''}>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></body></html>`); w.document.close();
+/* compact A4 report (1–2 pages): dishes grouped by menu section in two columns, notes listed at the end */
+function kinvReportHtml(title, sub, stats, groups, notes, extra) {
+  const tbl = g => `<div class="blk"><div class="ch">${esc(g.cat)}</div><table><colgroup><col style="width:44%"><col style="width:11.2%"><col style="width:11.2%"><col style="width:11.2%"><col style="width:11.2%"><col style="width:11.2%"></colgroup><thead><tr><th>Dish</th><th>Beg</th><th>In</th><th>Out</th><th>Sold</th><th>End</th></tr></thead><tbody>
+    ${g.rows.map(r => `<tr><td>${esc(r.name)}${r.n ? ' *' : ''}</td><td>${r.b}</td><td>${r.i || ''}</td><td>${r.o || ''}</td><td><b>${r.s || ''}</b></td><td class="${r.e < 0 ? 'neg' : ''}"><b>${r.e}</b></td></tr>`).join('')}</tbody></table></div>`;
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{font:8.6pt Arial,sans-serif;color:#14213F;margin:0}
+    .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5pt solid #1A2C54;padding-bottom:4px;margin-bottom:6px}.hd h1{font-size:13pt;margin:0}.hd p{margin:0;font-size:8.5pt;color:#4A5265;text-align:right}
+    .st{display:flex;gap:6px;margin-bottom:7px}.st div{flex:1;background:#F3EFE2;border-radius:4px;padding:4px 6px}.st b{display:block;font-size:11.5pt}.st span{font-size:7.5pt;color:#4A5265;text-transform:uppercase}
+    .cols{column-count:2;column-gap:7mm}.blk{break-inside:avoid;margin-bottom:5px}.ch{background:#F6E3B4;border-left:3pt solid #E89908;font-weight:700;padding:2px 5px;font-size:8.8pt}
+    table{width:100%;border-collapse:collapse;table-layout:fixed}th{font-size:7pt;color:#4A5265;text-align:right;font-weight:600;padding:1px 3px;border-bottom:.6pt solid #9C9479}th:first-child,td:first-child{text-align:left}
+    td{padding:1.4px 3px;text-align:right;border-bottom:.4pt solid #E4DFC8;white-space:nowrap}td:first-child{white-space:normal}td.neg{color:#A3271F}
+    .ex{display:flex;gap:7mm;margin-bottom:6px}.ex>div{flex:1}.ex h3,.nt h3{font-size:9pt;margin:0 0 2px}.ex ol{margin:0;padding-left:16px}.nt{margin-top:6px;break-inside:avoid}.nt p{margin:1px 0}
+    .sg{margin-top:14px;display:flex;gap:12mm;font-size:7.5pt;color:#4A5265}.sg div{flex:1;border-top:.7pt solid #14213F;padding-top:2px}
+    .bar{text-align:center;padding:10px;background:#F7F4EA}.bar button{font:600 13px Arial;border:0;border-radius:8px;padding:10px 18px;background:#1A2C54;color:#fff;cursor:pointer}@media print{.bar{display:none}}</style></head><body>
+    <div class="bar"><button onclick="print()">Save as PDF / Print</button></div>
+    <div class="hd"><div><h1>ROMUALDO'S — ${esc(title)}</h1></div><p>${sub}</p></div>
+    <div class="st">${stats.map(([l, v]) => `<div><span>${l}</span><b>${v}</b></div>`).join('')}</div>${extra || ''}
+    <div class="cols">${groups.map(tbl).join('')}</div>
+    ${notes.length ? `<div class="nt"><h3>Notes / remarks</h3>${notes.map(n => `<p>* ${esc(n)}</p>`).join('')}</div>` : ''}
+    <div class="sg"><div>Prepared by</div><div>Checked by</div></div>
+    <script>window.onload=function(){setTimeout(function(){print()},400)}<\/script></body></html>`;
 }
-ACT.kinvPrint = () => { const x = S.kinv[D.kinv.date]; if (!x) return; const items = kItems(); let lastCat = '';
-  const rows = items.filter(it => x.rows[it.id]).map(it => { const r = x.rows[it.id], c = it.cat !== lastCat ? `<tr class="c"><td colspan="7">${esc(it.cat)}</td></tr>` : ''; lastCat = it.cat;
-    return c + `<tr><td>${esc(it.name)}</td><td class="n">${r.b}</td><td class="n">${r.i}</td><td class="n">${r.o}</td><td class="n">${r.s}</td><td class="n"><b>${r.e}</b></td><td>${esc(r.n || '')}</td></tr>`; });
-  kinvPrintDoc('KITCHEN STOCKS – INVENTORY REPORT', `Report date: ${fmtLong(x.date)} · Prepared by: ${x.by || ''}`, ['Item', 'Beginning', 'Stock in', 'Pull-out', 'Sold', 'Ending', 'Notes / Remarks'], rows); };
+function kinvOpen(html) { const w = window.open('', '_blank'); if (!w) return toast('Your browser blocked the PDF window. Allow pop-ups for romualdos.ph.', true); w.document.open(); w.document.write(html); w.document.close(); }
+const kCatOrder = c => { const i = KINV_CATS.indexOf(c); return i < 0 ? 99 : i; };
+ACT.kinvPrint = () => { const x = S.kinv[D.kinv.date]; if (!x) return toast('Save the day first.', true);
+  const all = (S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT), groups = {}, notes = [];
+  Object.entries(x.rows || {}).forEach(([id, r]) => { const it = all.find(k => k.id === id), cat = it?.cat || 'Others', name = it?.name || x.names?.[id] || id;
+    (groups[cat] ||= []).push({name, b: r.b === '' ? 0 : r.b, i: r.i, o: r.o, s: r.s, e: r.e, n: r.n, ord: all.indexOf(it)}); if (r.n) notes.push(name + ': ' + r.n); });
+  const G = Object.keys(groups).sort((a, b) => kCatOrder(a) - kCatOrder(b)).map(cat => ({cat, rows: groups[cat].sort((a, b) => a.ord - b.ord)}));
+  const R = Object.values(x.rows || {}), neg = R.filter(r => num(r.e) < 0).length;
+  kinvOpen(kinvReportHtml('KITCHEN STOCKS · DAILY REPORT', `${esc(fmtLong(x.date))}<br>Encoded by: <b>${esc(x.by || '')}</b>`,
+    [['Dishes counted', R.length], ['Stock in', r2(sum(R, r => num(r.i)))], ['Pulled out', r2(sum(R, r => num(r.o)))], ['Sold', r2(sum(R, r => num(r.s)))], ['Ending stock', r2(sum(R, r => num(r.e)))], ...(neg ? [['Below zero', neg]] : [])], G, notes)); };
 ACT.kinvWeekPrint = () => { const cur = weekOf(today()), wk = weekOf(D.ui.kinvWeek || cur.from), W = kinvWeekData(wk.from, wk.to);
-  kinvPrintDoc('KITCHEN STOCKS – WEEKLY REPORT', `${cutLabel(wk.from, wk.to)} · ${W.days.length} days counted`, ['Dish', 'Beginning', 'Stock in', 'Pull-out', 'Sold', 'Ending', 'Notes'],
-    W.rows.map(r => `<tr><td>${esc(r.name)}</td><td class="n">${r.start}</td><td class="n">${r.in}</td><td class="n">${r.out}</td><td class="n"><b>${r.sold}</b></td><td class="n">${r.end}</td><td>${esc(r.notes)}</td></tr>`)); };
+  if (!W.rows.length) return toast('No daily counts saved for this week.', true);
+  const all = (S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT), groups = {};
+  W.rows.forEach(r => (groups[r.cat] ||= []).push({name: r.name, b: r.start, i: r.in, o: r.out, s: r.sold, e: r.end, n: r.notes, ord: all.findIndex(k => k.id === r.id)}));
+  const G = Object.keys(groups).sort((a, b) => kCatOrder(a) - kCatOrder(b)).map(cat => ({cat, rows: groups[cat].sort((a, b) => a.ord - b.ord)}));
+  const top = W.rows.filter(r => r.sold > 0).slice(0, 5), po = W.rows.filter(r => r.out > 0).sort((a, b) => b.out - a.out).slice(0, 5), slow = W.rows.filter(r => r.sold === 0 && (r.start || r.in));
+  const missing = cutDays(wk.from, wk.to).filter(x => x <= today() && !S.kinv?.[x]);
+  const extra = `<div class="ex"><div><h3>Best sellers</h3><ol>${top.map(r => `<li>${esc(r.name)} — <b>${r.sold}</b></li>`).join('') || '<li>None</li>'}</ol></div>
+    <div><h3>Most pulled out</h3><ol>${po.map(r => `<li>${esc(r.name)} — <b>${r.out}</b></li>`).join('') || '<li>None</li>'}</ol>${slow.length ? `<p style="margin:3px 0 0"><b>Not sold this week:</b> ${slow.map(r => esc(r.name)).join(', ')}</p>` : ''}</div></div>`;
+  kinvOpen(kinvReportHtml('KITCHEN STOCKS · WEEKLY REPORT', `${esc(cutLabel(wk.from, wk.to))}<br>${W.days.length} day${W.days.length === 1 ? '' : 's'} counted${missing.length ? ' · missing ' + missing.map(fmtD).join(', ') : ''}`,
+    [['Dishes', W.rows.length], ['Stock in', r2(sum(W.rows, r => r.in))], ['Pulled out', r2(sum(W.rows, r => r.out))], ['Sold', r2(sum(W.rows, r => r.sold))], ['Ending stock', r2(sum(W.rows, r => r.end))]], G,
+    W.rows.filter(r => r.notes).map(r => r.name + ' — ' + r.notes), extra)); };
 function kinvList() {
   D.klist ||= (S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT).map(x => ({...x}));
   return `<p class="lede">Dishes shown on the daily count. Hidden dishes keep their history.</p><div class="card">
