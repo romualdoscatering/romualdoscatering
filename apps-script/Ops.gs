@@ -17,7 +17,7 @@ const OPS = {
   SHEET: 'docs',
   HEAD: ['path', 'coll', 'data', 'createdAt', 'createdBy', 'updatedAt', 'updatedBy'],
   STAFF_RECHECK_SECONDS: 120,      // how often an active session is re-checked against the staff file
-  COLLS: ['config', 'items', 'events', 'advances', 'purchases', 'expenses', 'moves', 'counts', 'sales', 'prs', 'recipes', 'bills', 'sc'],
+  COLLS: ['config', 'items', 'events', 'advances', 'purchases', 'expenses', 'moves', 'counts', 'sales', 'prs', 'recipes', 'bills', 'sc', 'kinv'],
   MAX_OPS: 50,
   MAX_DOC_CHARS: 45000
 };
@@ -35,6 +35,7 @@ function handleOps(req) {
     case 'opsOcr': return opsOcr(me, req);
     case 'scAttendance': return scAttendance(me, req);
     case 'scFile': return scFile(me, req);
+    case 'kinvSync': return kinvSync(me);
     default:         return { ok: false, error: 'Unknown action.' };
   }
 }
@@ -142,6 +143,7 @@ function checkStaff(coll, before, after, fin) {
     return;
   }
   if (coll === 'sc') forbid('Only Admin and Finance accounts can work on the service charge.');
+  if (coll === 'kinv') { if (after.status === 'void' && (!before || before.status !== 'void')) forbid('Only Admin accounts can void records.'); return; }
   if (coll === 'sales') {                          // daily sales: Staff enter, Finance/Admin verify, verified days are locked
     if (before && before.verified) forbid('This day is already verified. Only an Admin can change it.');
     if (after.verified && !fin) forbid('Only Finance and Admin accounts can verify a day.');
@@ -771,4 +773,43 @@ function scFile(me, req) {
     t.getRange(1, 1, vals.length, 11).setValues(vals); t.getRange(5, 1, 1, 11).setFontWeight('bold'); t.setColumnWidth(2, 210);
   } catch (e) { console.log('HR copy skipped: ' + e); }
   return { ok: true, url: ss.getUrl(), id: ss.getId() };
+}
+
+
+/* ---------------- Kitchen stocks: daily counts + weekly report copied to the Ops spreadsheet ---------------- */
+function kinvSync(me) {
+  return withLock(function () {
+    const sh = opsSheet(), ss = sh.getParent(), all = readAll(sh);
+    const cfg = all.filter(function (r) { return r.path === 'config/main'; }).map(function (r) { return toDoc(r).data; })[0] || {};
+    const names = {}; (cfg.kitchenItems || []).forEach(function (x) { names[x.id] = x.name; });
+    const days = all.filter(function (r) { return r.coll === 'kinv'; }).map(function (r) { return toDoc(r).data; }).filter(function (d) { return d.status !== 'void' && d.date; })
+      .sort(function (a, b) { return String(a.date).localeCompare(String(b.date)); });
+    const nm = function (d, id) { return names[id] || (d.names || {})[id] || id; };
+    const n = function (v) { return v === '' || v == null ? '' : Number(v) || 0; };
+    const daily = [], weeks = {};
+    const monday = function (s) { const d = new Date(s + 'T00:00:00Z'), w = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - w); return Utilities.formatDate(d, 'UTC', 'yyyy-MM-dd'); };
+    days.forEach(function (d) {
+      const wk = monday(d.date); weeks[wk] = weeks[wk] || {};
+      Object.keys(d.rows || {}).forEach(function (id) { const r = d.rows[id];
+        daily.push([d.date, d.by || '', nm(d, id), n(r.b), n(r.i), n(r.o), n(r.s), n(r.e), r.n || '']);
+        const w = weeks[wk][id] = weeks[wk][id] || { name: nm(d, id), start: Number(r.b) || 0, i: 0, o: 0, s: 0, e: 0, days: 0 };
+        w.i += Number(r.i) || 0; w.o += Number(r.o) || 0; w.s += Number(r.s) || 0; w.e = Number(r.e) || 0; w.days++; });
+    });
+    const weekly = [];
+    Object.keys(weeks).sort().reverse().forEach(function (wk) {
+      const end = new Date(wk + 'T00:00:00Z'); end.setUTCDate(end.getUTCDate() + 6);
+      const label = wk + ' to ' + Utilities.formatDate(end, 'UTC', 'yyyy-MM-dd');
+      Object.keys(weeks[wk]).map(function (id) { return weeks[wk][id]; }).sort(function (a, b) { return b.s - a.s; })
+        .forEach(function (w) { weekly.push([label, w.name, w.start, w.i, w.o, w.s, w.e, w.days]); });
+    });
+    daily.reverse();
+    const write = function (name, head, data) {
+      let t = ss.getSheetByName(name); if (!t) t = ss.insertSheet(name); t.clear();
+      const rows = [head].concat(data); t.getRange(1, 1, rows.length, head.length).setValues(rows);
+      t.getRange(1, 1, 1, head.length).setFontWeight('bold').setBackground('#1A2C54').setFontColor('#FFFFFF'); t.setFrozenRows(1); t.setColumnWidth(head.length === 9 ? 3 : 2, 240); return t;
+    };
+    write('Kitchen Stocks - Daily', ['Date', 'Encoded by', 'Dish', 'Beginning', 'Stock in', 'Pull-out', 'Sold', 'Ending', 'Notes'], daily);
+    const t = write('Kitchen Stocks - Weekly', ['Week (Mon to Sun)', 'Dish', 'Beginning', 'Stock in', 'Pull-out', 'Sold', 'Ending', 'Days counted'], weekly);
+    return { ok: true, url: ss.getUrl() + '#gid=' + t.getSheetId() };
+  });
 }

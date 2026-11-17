@@ -196,7 +196,7 @@ const MT = {
 /* ============ state ============ */
 const ACT = {};
 const S = {state: 'login', prs: [], bills: [], token: '', me: null, isAdmin: false, users: [], lastSync: 0, syncErr: '', syncing: false, loginMsg: '',
-  config: {...DEFAULT_CONFIG}, items: {}, events: {}, advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: {}, sc: {}, names: {}, busy: false};
+  config: {...DEFAULT_CONFIG}, items: {}, events: {}, advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: {}, sc: {}, kinv: {}, names: {}, busy: false};
 
 const newPurchase = (o = {}) => ({date: today(), book: 'R', eventId: '', supplier: '', buyer: '', receiptNo: '', advanceId: '', prId: '', prNo: '', lines: [{itemId: '', qty: '', cost: ''}], other: [], ...o});
 const newExpense = (o = {}) => ({date: today(), book: 'R', eventId: '', cat: '', desc: '', amount: '', paidBy: '', receiptNo: '', advanceId: '', ...o});
@@ -206,7 +206,7 @@ const newEvent = () => ({name: '', client: '', date: daysAhead(7), pax: '', cont
 
 const D = {
   purchase: newPurchase(), expense: newExpense(), advance: newAdvance(), move: newMove(), event: newEvent(),
-  plan: null, count: null, sale: null, sc: null,
+  plan: null, count: null, sale: null, sc: null, kinv: null, klist: null,
   ui: {tab: 'dash', pBook: '', pStatus: '', eBook: '', mBook: '', stockBook: 'R', stockQ: '', eventId: '', rFrom: monthStart(), rTo: today(), showAll: {}}
 };
 const getPath = (o, p) => p.split('.').reduce((a, k) => a?.[k], o);
@@ -335,7 +335,7 @@ function alerts() {
 }
 
 /* ============ rendering infra ============ */
-const TABS_ALL = [['dash', 'Dashboard'], ['sales', 'Daily sales'], ['prs', 'Requests'], ['advances', 'Cash advances'], ['purchases', 'Purchases & expenses'], ['stock', 'Stock'], ['usage', 'Use & waste'], ['recipes', 'Recipes & production'], ['sheets', 'Event sheets'], ['events', 'Catering events'], ['archive', 'Archive'], ['billing', 'Billing'], ['reports', 'Reports'], ['setup', 'Setup']];
+const TABS_ALL = [['dash', 'Dashboard'], ['sales', 'Daily sales'], ['kinv', 'Kitchen stocks'], ['prs', 'Requests'], ['advances', 'Cash advances'], ['purchases', 'Purchases & expenses'], ['stock', 'Stock'], ['usage', 'Use & waste'], ['recipes', 'Recipes & production'], ['sheets', 'Event sheets'], ['events', 'Catering events'], ['archive', 'Archive'], ['billing', 'Billing'], ['reports', 'Reports'], ['setup', 'Setup']];
 const tabsFor = () => TABS_ALL.filter(t => t[0] === 'setup' ? S.isAdmin : t[0] === 'billing' ? S.canBill : true);
 let TABS = TABS_ALL;
 const V = {};
@@ -382,6 +382,7 @@ function live() {
     else if (k === 'osum') { const d = D.sheet, kk = d.kind || 'catering', o = orderSum(d.menu, kk), px = num(d.pax);
       h = !o.main && !o.drink && !o.addon ? '' : `Counts as <b>${esc(orderLabel(o, kk) || '0')}</b>${o.drink ? ' · ' + plural(o.drink, 'drink') : ''}${kk === 'packs' && px && o.main !== px ? ` <span class="bad-t">· ${o.main} packs vs ${px} pax, please check</span>` : ''}`; }
     else if (k === 'evtot') { const T = pricingTotal(D.evp || {}); h = `<div class="small mut">${peso(num(D.evp.perHead))} × ${num(D.evp.pax)} guests = ${peso(T.base)}${T.extras ? ' + charges ' + peso(T.extras) : ''}${T.disc ? ' − discount ' + peso(T.disc) : ''}${T.custom ? ' · <b>custom total used</b>' : ''}</div><div style="font-size:24px;font-weight:700">Contract: ${peso(T.total)}</div>`; }
+    else if (k === 'kend' || k === 'ksum') h = kinvLive(k === 'kend' ? 'kend:' + a : k);
     else if (k === 'zchk' || k === 'sccalc' || k === 'salesum') h = saleLive(k);
     else if (k === 'counted') h = D.count.lines.filter(l => l.actual !== '' && l.actual != null).length;
     if (h !== undefined) el.innerHTML = h;
@@ -1920,6 +1921,152 @@ ACT.scSlips = () => {
   ww.document.open(); ww.document.write(html); ww.document.close();
 };
 
+/* ============ KITCHEN STOCKS (restaurant daily dish inventory) ============
+   kinv/<date> = {date, by (typed by the encoder), rows:{itemId:{b,i,o,s,e,n}}, names:{itemId:name}}
+   Ending = Beginning + Stock in − Pull-out − Sold. Beginning comes from the last saved day's ending. */
+const KINV_CATS = ['Magandang Umaga!', 'Kakatakam', 'Para Masigla, Sabi ni Mama', 'Sabaw Na?', 'Pampahaba ng Buhay', 'Uy, Patikim!', 'Tara, Dagat', 'Mag-isa Ngunit Masaya', 'Oh, Maiba Naman', 'Para sa Paborito Kong Apo', 'Merienda-serye', 'Others'];
+const KINV_DEFAULT = [
+  ['Magandang Umaga!', 'Beef Tapa, Classic Adobo (Chicken/Pork), Paksiw na Bangus, Tortang Talong at Tuyo, Homemade Luncheon Meat, Larry’s Bacon, Skinless Longganisa'],
+  ['Kakatakam', 'Sizzling Sisig, Tokwa’t Baboy, Sinugbang Scallops, Pritong Lumpia Ubod, Mangga’t Bagoong'],
+  ['Para Masigla, Sabi ni Mama', 'Crabmeat Laing with Aligue, Ensaladang Talong, Pako Salad, Pinakbet, Pomelo at Dilis Salad'],
+  ['Sabaw Na?', 'Bulalo, Sinigang na Pork Belly, Native Chicken Tinola, Tinolang Isda, Imbao Soup'],
+  ['Pampahaba ng Buhay', 'Palabok, Bihon Guisado, Pancit Canton, Silky Sotanghon, Bam-i'],
+  ['Uy, Patikim!', 'Chicken Inasal Chops, Romualdo’s Fried Chicken, Garlic Fried Chicken, Oxtail Tripe Beef Kare-Kare, Lengua in Mushroom Gravy, Signature Caldereta, Bistek Tagalog, Crispy Pata, Bagnet, Lumpia Shanghai, Inihaw na Liempo, Classic Dinuguan'],
+  ['Tara, Dagat', 'Tuna Bicol Express, Kinilaw na Malasugue, Inihaw na Tuna Belly, Adobong Pusit, Garlic Pepper Shrimp'],
+  ['Mag-isa Ngunit Masaya', 'Pritong Porkchop, Tokwa Sisig'],
+  ['Oh, Maiba Naman', 'Tamarind Wings, Bistek at Kesong Puti Ciabatta, Kimchi Sinigang sa Watermelon, Sinigang Rice, Bulad Rice'],
+  ['Para sa Paborito Kong Apo', 'Chicken Tenders, Chicken Croquettes, Filipino Meaty Spaghetti'],
+  ['Merienda-serye', 'Puto at Dinuguan, Fresh Lumpia']
+].flatMap(([cat, list]) => list.split(', ').map(name => ({id: 'k' + name.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40), name, cat})));
+const kItems = () => (S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT).filter(x => !x.off);
+const KF = [['b', 'Beg'], ['i', 'In'], ['o', 'Pull-out'], ['s', 'Sold']];
+const kEnd = r => r ? (['b', 'i', 'o', 's'].every(k => r[k] === '' || r[k] == null) ? '' : r2(num(r.b) + num(r.i) - num(r.o) - num(r.s))) : '';
+function kinvPrev(date) { const ks = Object.keys(S.kinv || {}).filter(d => d < date && S.kinv[d].status !== 'void').sort(); return ks.length ? S.kinv[ks[ks.length - 1]] : null; }
+function kinvLoad(date) {
+  const ex = S.kinv?.[date], prev = kinvPrev(date), rows = {};
+  kItems().forEach(it => { const r = ex?.rows?.[it.id];
+    if (r) rows[it.id] = {b: sStr(r.b), i: sStr(r.i), o: sStr(r.o), s: sStr(r.s), n: r.n || ''};
+    else { const pe = prev?.rows?.[it.id]?.e; rows[it.id] = {b: !ex && pe !== '' && pe != null && num(pe) !== 0 ? String(pe) : '', i: '', o: '', s: '', n: ''}; } });
+  D.kinv = {date, by: ex?.by || (D.kinv?.by && !ex ? D.kinv.by : '') || '', rows, q: D.kinv?.q || '', prevDate: prev?.date || '', fresh: !ex};
+}
+V.kinv = () => {
+  const mode = D.ui.kinvMode === 'week' ? 'week' : D.ui.kinvMode === 'list' && S.isAdmin ? 'list' : 'day';
+  const seg = `<div class="seg" style="margin:0 0 12px"><button type="button" class="${mode === 'day' ? 'on' : ''}" data-act="set" data-arg="ui.kinvMode|day">Daily count</button><button type="button" class="${mode === 'week' ? 'on' : ''}" data-act="set" data-arg="ui.kinvMode|week">Weekly report</button>${S.isAdmin ? `<button type="button" class="${mode === 'list' ? 'on' : ''}" data-act="set" data-arg="ui.kinvMode|list">Item list</button>` : ''}</div>`;
+  return `<h2>Kitchen stocks</h2>${seg}` + (mode === 'week' ? kinvWeek() : mode === 'list' ? kinvList() : kinvDay());
+};
+function kinvDay() {
+  if (!D.kinv || !D.kinv.rows) kinvLoad(today());
+  const d = D.kinv, ex = S.kinv?.[d.date], q = (d.q || '').trim().toLowerCase(), items = kItems();
+  const cats = [...new Set(items.map(x => x.cat || 'Others'))];
+  const touched = items.filter(it => kEnd(d.rows[it.id]) !== '').length, sold = r2(sum(items, it => num(d.rows[it.id]?.s)));
+  const row = it => { const r = d.rows[it.id] ||= {b: '', i: '', o: '', s: '', n: ''}, e = kEnd(r);
+    return `<div class="kr" data-kid="${it.id}"><div class="kn"><b>${esc(it.name)}</b><button type="button" class="kbtn" data-act="kNote" data-arg="${it.id}" title="Add a note">${r.n ? '📝' : '＋ note'}</button></div>
+      <div class="kg">${KF.map(([k, l]) => `<label><span>${l}</span><input type="number" inputmode="numeric" min="0" step="any" data-b="kinv.rows.${it.id}.${k}" placeholder="0"></label>`).join('')}
+      <div class="ke ${e === '' ? '' : e < 0 ? 'neg' : ''}" data-live="kend:${it.id}"><span>End</span><b>${e === '' ? '—' : e}</b></div></div>
+      ${r.n || D.ui.kNote === it.id ? `<input class="knote" data-b="kinv.rows.${it.id}.n" placeholder="Note (e.g. 2 pcs burnt, staff meal)">` : ''}</div>`; };
+  const list = cats.map(c => { const its = items.filter(x => (x.cat || 'Others') === c && (!q || x.name.toLowerCase().includes(q))); if (!its.length) return '';
+    return `<details class="kcat" open data-kcat="${esc(c)}"><summary>${esc(c)} <span class="mut small">${its.filter(it => kEnd(d.rows[it.id]) !== '').length}/${its.length}</span></summary>${its.map(row).join('')}</details>`; }).join('');
+  return `<style>.kcat{background:#fff;border-radius:12px;margin:0 0 10px;padding:4px 12px 8px;box-shadow:0 1px 0 #E4DFC8}.kcat summary{font-weight:700;padding:10px 0;cursor:pointer;color:#1A2C54}
+    .kr{border-top:1px solid #EFEBDD;padding:9px 0}.kn{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}.kbtn{border:0;background:none;color:#8A6D1E;font-size:12px;padding:2px 4px}
+    .kg{display:grid;grid-template-columns:repeat(4,1fr) 64px;gap:6px}.kg label{margin:0}.kg label span,.ke span{display:block;font-size:10.5px;color:#6B7282;text-transform:uppercase;letter-spacing:.04em}
+    .kg input{padding:9px 6px;font-size:16px;text-align:center;width:100%}.ke{text-align:center;background:#F3EFE2;border-radius:8px;padding:2px 0}.ke b{font-size:18px;line-height:1.9}.ke.neg{background:#FBE3E1;color:#A3271F}
+    .knote{margin-top:6px;font-size:14px}.kbar{position:sticky;bottom:0;background:#FFFDF7;border-top:1px solid #E4DFC8;padding:10px 12px;display:flex;gap:10px;align-items:center;margin:0 -12px;z-index:5}
+    @media(max-width:420px){.kg{grid-template-columns:repeat(4,1fr) 52px;gap:4px}}</style>
+  <p class="lede">Count the cooked dishes / portions at the end of the day. <b>Beginning</b> comes from the last saved day; type what came in, what was pulled out (spoiled, staff meal, transferred) and what was sold. <b>Ending</b> computes itself.</p>
+  <div class="card"><div class="grid"><label>Date<input type="date" value="${esc(d.date)}" data-act-change="kinvDate" id="kinvDate"></label>
+    <label>Encoded by<input data-b="kinv.by" list="kinvStaff" placeholder="Type your name" autocapitalize="words"><datalist id="kinvStaff">${staffList().map(n => `<option value="${esc(n)}">`).join('')}</datalist></label></div>
+    <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">${ex ? `<span class="chip ok">Saved${ex.by ? ' · ' + esc(ex.by) : ''}</span>` : '<span class="chip mut">Not saved yet</span>'}
+     ${d.prevDate && d.fresh ? `<span class="chip">Beginning taken from ${fmtD(d.prevDate)}</span>` : ''}<span class="spacer"></span>${ex ? '<button class="sm ghost" data-act="kinvPrint">Print</button>' : ''}</div>
+    <input type="search" data-b="kinv.q" id="kinvQ" placeholder="🔎 Find a dish" style="margin-top:10px"></div>
+  ${list || '<div class="empty">No dish matches.</div>'}
+  <div class="kbar"><div class="small" data-live="ksum">${touched} dishes counted · ${sold} sold</div><span class="spacer"></span><button class="pri" data-act="kinvSave">Save ${fmtD(d.date)}</button></div>`;
+}
+function kinvLive(k) {
+  if (!D.kinv) return '';
+  if (k.startsWith('kend:')) { const e = kEnd(D.kinv.rows[k.slice(5)]); setTimeout(() => { const el = document.querySelector(`[data-live="${k}"]`); if (el) el.classList.toggle('neg', e !== '' && e < 0); }); return `<span>End</span><b>${e === '' ? '—' : e}</b>`; }
+  if (k === 'ksum') { const items = kItems(); return `${items.filter(it => kEnd(D.kinv.rows[it.id]) !== '').length} dishes counted · ${r2(sum(items, it => num(D.kinv.rows[it.id]?.s)))} sold`; }
+  return '';
+}
+ACT.kinvDate = () => { const v = $('#kinvDate')?.value; if (v) { kinvLoad(v); render(); } };
+ACT.kNote = id => { D.ui.kNote = id; render(); setTimeout(() => document.querySelector(`[data-kid="${id}"] .knote`)?.focus(), 30); };
+ACT.kinvSave = () => {
+  const d = D.kinv; if (!d.by.trim()) { toast('Type the name of the person encoding.', true); return document.querySelector('[data-b="kinv.by"]')?.focus(); }
+  const rows = {}, names = {}; let neg = [];
+  kItems().forEach(it => { const r = d.rows[it.id]; if (!r) return; const e = kEnd(r); if (e === '' && !r.n) return;
+    rows[it.id] = {b: r.b === '' ? '' : num(r.b), i: r.i === '' ? '' : num(r.i), o: r.o === '' ? '' : num(r.o), s: r.s === '' ? '' : num(r.s), e: e === '' ? 0 : e, n: (r.n || '').trim()}; names[it.id] = it.name; if (e < 0) neg.push(it.name); });
+  if (!Object.keys(rows).length) return toast('Enter at least one dish.', true);
+  if (neg.length && !confirm(`Ending is below zero for: ${neg.join(', ')}. Save anyway?`)) return;
+  guard(async () => { await setDoc('kinv/' + d.date, {date: d.date, by: d.by.trim(), rows, names, status: 'ok'}); kinvLoad(d.date); kinvSync(); }, 'Kitchen stocks saved');
+};
+function kinvSync() { api('kinvSync', {}).then(r => { if (r.ok) KINV.url = r.url; }).catch(() => {}); }
+const KINV = {url: ''};
+function weekOf(dateStr) { const d = new Date(dateStr + 'T00:00'), dow = (d.getDay() + 6) % 7; const a = new Date(d); a.setDate(d.getDate() - dow); const b = new Date(a); b.setDate(a.getDate() + 6); return {from: dstr(a), to: dstr(b)}; }
+function kinvWeekData(from, to) {
+  const days = Object.values(S.kinv || {}).filter(x => x.status !== 'void' && x.date >= from && x.date <= to).sort((a, b) => a.date.localeCompare(b.date));
+  const ids = new Set(); days.forEach(x => Object.keys(x.rows || {}).forEach(id => ids.add(id)));
+  const nameOf = id => kItems().find(x => x.id === id)?.name || days.map(x => x.names?.[id]).find(Boolean) || id;
+  const catOf = id => (S.config.kitchenItems || KINV_DEFAULT).find(x => x.id === id)?.cat || 'Others';
+  const rows = [...ids].map(id => { const rs = days.filter(x => x.rows[id]).map(x => ({date: x.date, ...x.rows[id]}));
+    return {id, name: nameOf(id), cat: catOf(id), start: rs.length ? num(rs[0].b) : 0, in: r2(sum(rs, r => num(r.i))), out: r2(sum(rs, r => num(r.o))), sold: r2(sum(rs, r => num(r.s))), end: rs.length ? num(rs[rs.length - 1].e) : 0, days: rs.length,
+      notes: rs.filter(r => r.n).map(r => fmtD(r.date) + ': ' + r.n).join(' · ')}; }).sort((a, b) => b.sold - a.sold || a.name.localeCompare(b.name));
+  return {days, rows};
+}
+function kinvWeek() {
+  const cur = weekOf(today()), weeks = []; let w = cur; for (let i = 0; i < 10; i++) { weeks.push(w); w = weekOf(dstr(new Date(new Date(w.from + 'T00:00').getTime() - 864e5))); }
+  const sel2 = D.ui.kinvWeek || cur.from, wk = weeks.find(x => x.from === sel2) || cur, W = kinvWeekData(wk.from, wk.to);
+  const all = cutDays(wk.from, wk.to), missing = all.filter(x => x <= today() && !S.kinv?.[x]);
+  const top = W.rows.filter(r => r.sold > 0).slice(0, 5), slow = W.rows.filter(r => r.sold === 0 && (r.start || r.in)), po = W.rows.filter(r => r.out > 0).sort((a, b) => b.out - a.out);
+  const T = k => r2(sum(W.rows, r => r[k]));
+  return `<div class="card"><div class="row" style="flex-wrap:wrap;gap:8px"><label style="max-width:300px">Week<select data-b="ui.kinvWeek" data-rr>${weeks.map(x => opt(x.from, cutLabel(x.from, x.to) + (x.from === cur.from ? ' (this week)' : ''))).join('')}</select></label><span class="spacer"></span>
+    ${W.rows.length ? '<button class="sm" data-act="kinvXlsx">Excel</button><button class="sm ghost" data-act="kinvWeekPrint">Print</button>' : ''}${KINV.url ? `<a class="btn sm ghost" href="${esc(KINV.url)}" target="_blank" rel="noopener">Google Sheet ↗</a>` : ''}</div>
+   <p class="small mut" style="margin:6px 0 0">${W.days.length} of ${all.length} days saved${missing.length ? ` · missing: ${missing.map(fmtD).join(', ')}` : ''}. The weekly report builds itself from the daily counts.</p></div>
+  ${W.rows.length ? `<div class="row" style="gap:10px;flex-wrap:wrap;margin-bottom:10px">
+    <div class="card" style="flex:1;min-width:220px;margin:0"><h4 class="sub" style="margin-top:0">Best sellers</h4>${top.map((r, i) => `<div class="row"><span>${i + 1}. ${esc(r.name)}</span><span class="spacer"></span><b>${r.sold}</b></div>`).join('') || '<span class="mut small">No sales recorded.</span>'}</div>
+    <div class="card" style="flex:1;min-width:220px;margin:0"><h4 class="sub" style="margin-top:0">Pulled out (check waste)</h4>${po.slice(0, 5).map(r => `<div class="row"><span>${esc(r.name)}</span><span class="spacer"></span><b class="warn-t">${r.out}</b></div>`).join('') || '<span class="mut small">Nothing pulled out.</span>'}
+     ${slow.length ? `<p class="small mut" style="margin:8px 0 0">In stock but not sold this week: ${slow.map(r => esc(r.name)).join(', ')}</p>` : ''}</div></div>
+   <div class="card"><div class="tw"><table><thead><tr><th>Dish</th><th class="n">Beg</th><th class="n">In</th><th class="n">Out</th><th class="n">Sold</th><th class="n">End</th><th>Notes</th></tr></thead><tbody>
+    ${W.rows.map(r => `<tr><td><b>${esc(r.name)}</b><div class="small mut">${esc(r.cat)}</div></td><td class="n">${r.start}</td><td class="n">${r.in || ''}</td><td class="n ${r.out ? 'warn-t' : ''}">${r.out || ''}</td><td class="n"><b>${r.sold}</b></td><td class="n ${r.end < 0 ? 'bad-t' : ''}">${r.end}</td><td class="small">${esc(r.notes)}</td></tr>`).join('')}
+    <tr><td><b>Total</b></td><td class="n">${T('start')}</td><td class="n">${T('in')}</td><td class="n">${T('out')}</td><td class="n"><b>${T('sold')}</b></td><td class="n">${T('end')}</td><td></td></tr></tbody></table></div></div>` : '<div class="card"><div class="empty">No daily counts saved for this week yet.</div></div>'}`;
+}
+ACT.kinvXlsx = () => {
+  const cur = weekOf(today()), wk = weekOf(D.ui.kinvWeek || cur.from), W = kinvWeekData(wk.from, wk.to);
+  const head = ['Dish', 'Menu section', 'Beginning', 'Stock in', 'Pull-out', 'Sold', 'Ending', 'Days counted', 'Notes'];
+  const rows = W.rows.map(r => [r.name, r.cat, r.start, r.in, r.out, r.sold, r.end, r.days, r.notes]);
+  const daily = [['Date', 'Encoded by', 'Dish', 'Beginning', 'Stock in', 'Pull-out', 'Sold', 'Ending', 'Notes']];
+  W.days.forEach(x => Object.entries(x.rows).forEach(([id, r]) => daily.push([x.date, x.by || '', W.rows.find(w => w.id === id)?.name || x.names?.[id] || id, r.b === '' ? '' : num(r.b), r.i === '' ? '' : num(r.i), r.o === '' ? '' : num(r.o), r.s === '' ? '' : num(r.s), num(r.e), r.n || ''])));
+  const blob = xlsxBlob([{name: 'Weekly report', widths: [30, 24, 11, 10, 10, 9, 10, 12, 50], rows: [head, ...rows]}, {name: 'Daily counts', widths: [12, 18, 30, 11, 10, 10, 9, 10, 40], rows: daily}]);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Romualdos Kitchen Stocks ${wk.from} to ${wk.to}.xlsx`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+};
+function kinvPrintDoc(title, sub, head, rows) {
+  const w = window.open('', '_blank'); if (!w) return toast('Your browser blocked the print window.', true);
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:12mm}body{font:10.5pt Arial,sans-serif;color:#14213F}h1{font-size:15pt;margin:0}p{margin:2px 0 10px;color:#4A5265}
+    table{width:100%;border-collapse:collapse}th,td{border:.6pt solid #9C9479;padding:3px 6px;text-align:left}th{background:#1A2C54;color:#fff;font-size:9pt}td.n,th.n{text-align:right}tr.c td{background:#F3EFE2;font-weight:700}
+    .bar{text-align:center;padding:10px}.bar button{font:600 13px Arial;border:0;border-radius:8px;padding:10px 18px;background:#1A2C54;color:#fff}@media print{.bar{display:none}}</style></head><body>
+    <div class="bar"><button onclick="print()">Print / Save as PDF</button></div><h1>ROMUALDO'S — ${esc(title)}</h1><p>${esc(sub)}</p><table><thead><tr>${head.map((h, i) => `<th${i ? ' class="n"' : ''}>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></body></html>`); w.document.close();
+}
+ACT.kinvPrint = () => { const x = S.kinv[D.kinv.date]; if (!x) return; const items = kItems(); let lastCat = '';
+  const rows = items.filter(it => x.rows[it.id]).map(it => { const r = x.rows[it.id], c = it.cat !== lastCat ? `<tr class="c"><td colspan="7">${esc(it.cat)}</td></tr>` : ''; lastCat = it.cat;
+    return c + `<tr><td>${esc(it.name)}</td><td class="n">${r.b}</td><td class="n">${r.i}</td><td class="n">${r.o}</td><td class="n">${r.s}</td><td class="n"><b>${r.e}</b></td><td>${esc(r.n || '')}</td></tr>`; });
+  kinvPrintDoc('KITCHEN STOCKS – INVENTORY REPORT', `Report date: ${fmtLong(x.date)} · Prepared by: ${x.by || ''}`, ['Item', 'Beginning', 'Stock in', 'Pull-out', 'Sold', 'Ending', 'Notes / Remarks'], rows); };
+ACT.kinvWeekPrint = () => { const cur = weekOf(today()), wk = weekOf(D.ui.kinvWeek || cur.from), W = kinvWeekData(wk.from, wk.to);
+  kinvPrintDoc('KITCHEN STOCKS – WEEKLY REPORT', `${cutLabel(wk.from, wk.to)} · ${W.days.length} days counted`, ['Dish', 'Beginning', 'Stock in', 'Pull-out', 'Sold', 'Ending', 'Notes'],
+    W.rows.map(r => `<tr><td>${esc(r.name)}</td><td class="n">${r.start}</td><td class="n">${r.in}</td><td class="n">${r.out}</td><td class="n"><b>${r.sold}</b></td><td class="n">${r.end}</td><td>${esc(r.notes)}</td></tr>`)); };
+function kinvList() {
+  D.klist ||= (S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT).map(x => ({...x}));
+  return `<p class="lede">Dishes shown on the daily count. Hidden dishes keep their history.</p><div class="card">
+   ${D.klist.map((x, i) => `<div class="row" style="gap:6px;margin-bottom:6px;flex-wrap:wrap;${x.off ? 'opacity:.5' : ''}"><input data-b="klist.${i}.name" style="flex:2;min-width:170px"><select data-b="klist.${i}.cat" style="flex:1;min-width:150px">${[...new Set([...KINV_CATS, x.cat])].map(c => opt(c, c)).join('')}</select>
+     <button class="sm ghost" data-act="kListToggle" data-arg="${i}">${x.off ? 'Show' : 'Hide'}</button>${x.id.startsWith('n') ? `<button class="sm ghost" data-act="kListRm" data-arg="${i}">✕</button>` : ''}</div>`).join('')}
+   <div class="row end" style="margin-top:10px;flex-wrap:wrap"><button data-act="kListAdd">＋ Add dish</button><button class="pri" data-act="kListSave">Save list</button></div></div>`;
+}
+ACT.kListAdd = () => { D.klist.push({id: 'n' + Date.now().toString(36), name: '', cat: 'Others'}); render(); };
+ACT.kListRm = i => { D.klist.splice(+i, 1); render(); };
+ACT.kListToggle = i => { const x = D.klist[+i]; x.off = x.off ? undefined : 1; if (!x.off) delete x.off; render(); };
+ACT.kListSave = () => { const L = D.klist.filter(x => (x.name || '').trim()).map(x => ({id: x.id, name: x.name.trim(), cat: x.cat || 'Others', ...(x.off ? {off: 1} : {})}));
+  guard(async () => { await setDoc('config/main', {...S.config, kitchenItems: L}); D.klist = null; D.kinv = null; }, 'Dish list saved'); };
+
+document.addEventListener('input', e => { if (e.target.id !== 'kinvQ') return; const q = e.target.value.trim().toLowerCase();
+  document.querySelectorAll('#view .kcat').forEach(c => { let n = 0; c.querySelectorAll('.kr').forEach(r => { const on = !q || r.querySelector('.kn b').textContent.toLowerCase().includes(q); r.style.display = on ? '' : 'none'; if (on) n++; }); c.style.display = n ? '' : 'none'; if (q && n) c.open = true; }); });
+
 /* ============ SETUP ============ */
 V.setup = () => {
   const items = Object.values(S.items).sort((a, b) => (catIdx(a) - catIdx(b)) || a.name.localeCompare(b.name));
@@ -2532,7 +2679,7 @@ function applyDocs(docs, fromSync) {
   rebuild();
 }
 function rebuild() {
-  const by = {config: [], items: [], events: [], advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: [], prs: [], recipes: [], bills: [], sc: []};
+  const by = {config: [], items: [], events: [], advances: [], purchases: [], expenses: [], moves: [], counts: [], sales: [], prs: [], recipes: [], bills: [], sc: [], kinv: []};
   for (const [path, d] of CACHE) { const i = path.indexOf('/'); const c = path.slice(0, i); (by[c] ||= []).push({id: path.slice(i + 1), ...d.data}); }
   const desc = a => a.sort((x, y) => (y.createdAt || 0) - (x.createdAt || 0));
   const m = by.config.find(d => d.id === 'main');
@@ -2545,6 +2692,7 @@ function rebuild() {
   S.sales = Object.fromEntries(by.sales.map(d => [d.date, d]));
   S.bills = desc(by.bills || []);
   S.sc = Object.fromEntries((by.sc || []).map(d => [d.id, d]));
+  S.kinv = Object.fromEntries((by.kinv || []).map(d => [d.date || d.id, d]));
   schedule();
 }
 async function sync(full) {
@@ -2563,7 +2711,7 @@ async function sync(full) {
 
 /* ---- auto-save for every page: unsaved entries are kept on this device and come back after a refresh ---- */
 const OPS_DRAFT_KEY = 'rcs_ops_drafts_v1';
-const OPS_DRAFT_KEYS = ['bill', 'purchase', 'expense', 'advance', 'move', 'event', 'count', 'sale', 'req', 'recipe', 'prod', 'evp', 'sc'];
+const OPS_DRAFT_KEYS = ['bill', 'purchase', 'expense', 'advance', 'move', 'event', 'count', 'sale', 'req', 'recipe', 'prod', 'evp', 'sc', 'kinv'];
 let opsDraftT = 0, opsDraftRestored = false;
 const opsDraftKey = () => OPS_DRAFT_KEY + ':' + (S.me?.username || '');
 function opsDraftSave() { if (!S.me || !opsDraftRestored) return; clearTimeout(opsDraftT); opsDraftT = setTimeout(opsDraftWrite, 400); }
