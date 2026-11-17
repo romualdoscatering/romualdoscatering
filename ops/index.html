@@ -2065,7 +2065,7 @@ function kinvReportHtml(title, sub, stats, groups, notes, extra) {
     .sg{margin-top:14px;display:flex;gap:12mm;font-size:7.5pt;color:#4A5265}.sg div{flex:1;border-top:.7pt solid #14213F;padding-top:2px}
     .bar{text-align:center;padding:10px;background:#F7F4EA}.bar button{font:600 13px Arial;border:0;border-radius:8px;padding:10px 18px;background:#1A2C54;color:#fff;cursor:pointer}@media print{.bar{display:none}}</style></head><body>
     <div class="bar"><button onclick="print()">Save as PDF / Print</button></div>
-    <div class="hd"><div><h1>ROMUALDO'S — ${esc(title)}</h1></div><p>${sub}</p></div>
+    <div class="hd"><p style="text-align:left">${sub.replace('<br>', ' · ')}</p></div>
     <div class="st">${stats.map(([l, v]) => `<div><span>${l}</span><b>${v}</b></div>`).join('')}</div>${extra || ''}
     <div class="cols">${groups.map(tbl).join('')}</div>
     ${notes.length ? `<div class="nt"><h3>Notes / remarks</h3>${notes.map(n => `<p>* ${esc(n)}</p>`).join('')}</div>` : ''}
@@ -2115,18 +2115,26 @@ function kinvRestock() {
     : '<div class="empty">Nothing is below its minimum. 👍</div>'}</div>`;
 }
 ACT.kinvRestockPrint = () => { const R = kinvRestockData(D.kinv?.date && S.kinv?.[D.kinv.date] ? D.kinv.date : today()); if (!R || !R.rows.length) return;
-  kinvOpen(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Restock list ${R.date}</title><style>@page{size:A4;margin:12mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font:10pt Arial,sans-serif;color:#14213F;margin:0}
-    .hd{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5pt solid #1A2C54;padding-bottom:4px;margin-bottom:8px}h1{font-size:14pt;margin:0}.hd p{margin:0;text-align:right;font-size:9pt;color:#4A5265}
-    table{width:100%;border-collapse:collapse}th{background:#1A2C54;color:#fff;font-size:8.5pt;padding:4px 6px;text-align:right}th:first-child,td:first-child{text-align:left}td{border-bottom:.5pt solid #C9C2A8;padding:5px 6px;text-align:right}
-    td.w{width:22mm}.c td{background:#F6E3B4;font-weight:700;text-align:left;border-left:3pt solid #E89908}.neg{color:#A3271F}.note{font-size:8.5pt;color:#4A5265}
-    .sg{margin-top:22px;display:flex;gap:12mm;font-size:8.5pt;color:#4A5265}.sg div{flex:1;border-top:.8pt solid #14213F;padding-top:3px}
-    .bar{text-align:center;padding:10px;background:#F7F4EA}.bar button{font:600 13px Arial;border:0;border-radius:8px;padding:10px 18px;background:#1A2C54;color:#fff}@media print{.bar{display:none}}</style></head><body>
+  const big = R.rows.length > 22;
+  kinvOpen(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Restock ${R.date}</title><style>@page{size:A4;margin:11mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    body{font:${big ? '10.5' : '11.5'}pt Arial,sans-serif;color:#1A2C54;margin:0}
+    .meta{display:flex;justify-content:space-between;font-size:9.5pt;color:#294074;margin-bottom:6px}.meta b{color:#1A2C54}
+    table{width:100%;border-collapse:collapse;border:1pt solid #1A2C54}
+    th{background:#1A2C54;color:#fff;font-size:9pt;font-weight:700;letter-spacing:.03em;text-transform:uppercase;padding:6px 7px;text-align:center}th:first-child{text-align:left}
+    td{padding:${big ? '4px' : '6px'} 7px;text-align:center;border-bottom:.6pt solid #D8CDB4;font-size:${big ? '11' : '12'}pt}td:first-child{text-align:left;font-weight:700}
+    tbody tr:nth-child(even) td{background:#FBF6EC}
+    td.end b{display:inline-block;min-width:26px;padding:1px 6px;border-radius:5px;background:#FCEBC2;color:#7A4E00}td.end.zero b{background:#F6D3CF;color:#A3271F}
+    td.sug{background:#F6E3B4!important;font-weight:800;font-size:${big ? '12.5' : '14'}pt;border-left:1.2pt solid #E89908;border-right:1.2pt solid #E89908}
+    td.ap{width:22mm;border-left:.6pt solid #D8CDB4}td.rm{width:34mm;border-left:.6pt solid #D8CDB4}
+    .mut{color:#5B6478;font-weight:400;font-size:8.5pt;display:block}
+    .key{margin-top:6px;font-size:8.5pt;color:#5B6478}.sg{margin-top:20px;display:flex;gap:10mm;font-size:9pt;color:#294074}.sg div{flex:1;border-top:1pt solid #1A2C54;padding-top:3px}
+    .bar{text-align:center;padding:10px;background:#F0DFCC}.bar button{font:600 13px Arial;border:0;border-radius:8px;padding:10px 18px;background:#1A2C54;color:#fff}@media print{.bar{display:none}}</style></head><body>
     <div class="bar"><button onclick="print()">Save as PDF / Print</button></div>
-    <div class="hd"><h1>ROMUALDO'S — KITCHEN RESTOCK LIST</h1><p>Basis for purchase request<br>From the count of <b>${esc(fmtLong(R.date))}</b> · encoded by ${esc(R.by || '')}</p></div>
-    <table><thead><tr><th>Dish</th><th>Ending</th><th>Min</th><th>Avg sold/day</th><th>Suggested</th><th>Approved qty</th><th>Remarks</th></tr></thead><tbody>
-    ${R.rows.map(r => `<tr><td><b>${esc(r.name)}</b><div class="note">${esc(r.cat)}${r.n ? ' · ' + esc(r.n) : ''}</div></td><td class="${r.e <= 0 ? 'neg' : ''}"><b>${r.e}</b></td><td>${r.min}</td><td>${r.avg}</td><td><b>${r.need}</b></td><td class="w"></td><td class="w" style="width:40mm"></td></tr>`).join('')}</tbody></table>
-    <p class="note" style="margin-top:6px">Suggested = enough for about 2 days of sales (average of the last ${R.days} counted day${R.days > 1 ? 's' : ''}), never below the minimum. Write the approved quantity before filing the purchase request.</p>
-    <div class="sg"><div>Prepared by (stockist)</div><div>Checked by (kitchen head)</div><div>Approved by</div></div>
+    <div class="meta"><span>Count of <b>${esc(fmtLong(R.date))}</b></span><span>Encoded by <b>${esc(R.by || '—')}</b></span></div>
+    <table><thead><tr><th style="width:38%">Dish</th><th>End</th><th>Min</th><th>Avg/day</th><th>Suggested</th><th>Approved</th><th>Remarks</th></tr></thead><tbody>
+    ${R.rows.map(r => `<tr><td>${esc(r.name)}${r.n ? `<span class="mut">${esc(r.n)}</span>` : ''}</td><td class="end ${r.e <= 0 ? 'zero' : ''}"><b>${r.e}</b></td><td>${r.min}</td><td>${r.avg}</td><td class="sug">${r.need}</td><td class="ap"></td><td class="rm"></td></tr>`).join('')}</tbody></table>
+    <div class="key">Suggested = about 2 days of sales (last ${R.days} counted day${R.days > 1 ? 's' : ''}), never below Min.</div>
+    <div class="sg"><div>Prepared by (stockist)</div><div>Checked by</div><div>Approved by</div></div>
     <script>window.onload=function(){setTimeout(function(){print()},400)}<\/script></body></html>`); };
 function kinvList() {
   D.klist ||= (S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT).map(x => ({...x}));
