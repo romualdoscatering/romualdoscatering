@@ -1957,6 +1957,7 @@ function kMigrate(L) {
 }
 const kItems = () => kMigrate(S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT).filter(x => !x.off);
 const KF = [['b', 'Beg'], ['i', 'In'], ['o', 'Pull-out'], ['s', 'Sold']];
+const KPAR_DEF = 10, kPar = it => it && it.par !== undefined && it.par !== '' ? num(it.par) : KPAR_DEF;
 const KMIN_DEF = 5, kMin = it => it && it.min !== undefined && it.min !== '' ? num(it.min) : KMIN_DEF;
 const kLow = (it, e) => e !== '' && e < kMin(it);
 const kEnd = r => r ? (['b', 'i', 'o', 's'].every(k => r[k] === '' || r[k] == null) ? '' : r2(num(r.b) + num(r.i) - num(r.o) - num(r.s))) : '';
@@ -1973,7 +1974,7 @@ function kinvLoad(date) {
 }
 V.kinv = () => {
   const mode = D.ui.kinvMode === 'week' ? 'week' : D.ui.kinvMode === 'restock' ? 'restock' : D.ui.kinvMode === 'list' && S.isAdmin ? 'list' : 'day';
-  const seg = `<div class="seg" style="margin:0 0 12px"><button type="button" class="${mode === 'day' ? 'on' : ''}" data-act="set" data-arg="ui.kinvMode|day">Daily count</button><button type="button" class="${mode === 'restock' ? 'on' : ''}" data-act="set" data-arg="ui.kinvMode|restock">Restock list</button><button type="button" class="${mode === 'week' ? 'on' : ''}" data-act="set" data-arg="ui.kinvMode|week">Weekly report</button>${S.isAdmin ? `<button type="button" class="${mode === 'list' ? 'on' : ''}" data-act="set" data-arg="ui.kinvMode|list">Item list</button>` : ''}</div>`;
+  const seg = `<div class="seg" style="margin:0 0 12px"><button type="button" class="${mode === 'day' ? 'on' : ''}" data-act="set" data-arg="ui.kinvMode|day">Daily count</button><button type="button" class="${mode === 'restock' ? 'on' : ''}" data-act="set" data-arg="ui.kinvMode|restock">Restock list</button><button type="button" class="${mode === 'week' ? 'on' : ''}" data-act="set" data-arg="ui.kinvMode|week">Weekly report</button>${S.isAdmin ? `<button type="button" class="${mode === 'list' ? 'on' : ''}" data-act="set" data-arg="ui.kinvMode|list">Dishes &amp; par</button>` : ''}</div>`;
   return `<h2>Kitchen stocks</h2>${seg}` + (mode === 'week' ? kinvWeek() : mode === 'restock' ? kinvRestock() : mode === 'list' ? kinvList() : kinvDay());
 };
 function kinvDay() {
@@ -2002,7 +2003,7 @@ function kinvDay() {
   <div class="card"><div class="grid"><label>Date<input type="date" value="${esc(d.date)}" data-act-change="kinvDate" id="kinvDate"></label>
     <label>Encoded by<input data-b="kinv.by" list="kinvStaff" placeholder="Type your name" autocapitalize="words"><datalist id="kinvStaff">${staffList().map(n => `<option value="${esc(n)}">`).join('')}</datalist></label></div>
     <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">${ex ? `<span class="chip ok">Saved${ex.by ? ' · ' + esc(ex.by) : ''}</span>` : '<span class="chip mut">Not saved yet</span>'}
-     ${d.prevDate && d.fresh && !d.draftAt ? `<span class="chip">Beginning taken from ${fmtD(d.prevDate)}</span>` : ''}${d.draftAt ? `<span class="chip warn">Unsaved work restored (${new Date(d.draftAt).toLocaleTimeString('en-PH', {hour: 'numeric', minute: '2-digit'})})</span>` : ''}<span class="spacer"></span><button class="sm pri" data-act="kPos">📷 Read POS report</button>${ex ? '<button class="sm" data-act="kinvPrint">🖨 Daily PDF</button>' : ''}<input type="file" id="kPosFile" accept="image/*,application/pdf" hidden></div>
+     ${d.prevDate && d.fresh && !d.draftAt ? `<span class="chip">Beginning taken from ${fmtD(d.prevDate)}</span>` : ''}${d.draftAt ? `<span class="chip warn">Unsaved work restored (${new Date(d.draftAt).toLocaleTimeString('en-PH', {hour: 'numeric', minute: '2-digit'})})</span>` : ''}<span class="spacer"></span>${S.isAdmin ? '<button class="sm ghost" data-act="set" data-arg="ui.kinvMode|list">⚙ Dishes &amp; par</button>' : ''}<button class="sm pri" data-act="kPos">📷 Read POS report</button>${ex ? '<button class="sm" data-act="kinvPrint">🖨 Daily PDF</button>' : ''}<input type="file" id="kPosFile" accept="image/*,application/pdf" hidden></div>
     <input type="search" data-b="kinv.q" id="kinvQ" placeholder="🔎 Find a dish" style="margin-top:10px">
     <div class="kflt"><span class="small mut" style="align-self:center">Group by</span>${[['menu', '📋 Menu sections'], ['prot', '🥩 Protein']].map(([v, l]) => `<button type="button" class="sm ${gb === v ? 'on' : 'ghost'}" data-act="kGroup" data-arg="${v}">${l}</button>`).join('')}</div>
     <div class="kflt">${[['all', 'All dishes'], ['stock', 'With stock'], ['low', `⚠ Low stock (${lowN})`]].map(([v, l]) => `<button type="button" class="sm ${flt === v ? 'on' : 'ghost'}" data-act="set" data-arg="ui.kFilter|${v}">${l}</button>`).join('')}</div></div>
@@ -2162,7 +2163,7 @@ function kinvReportHtml(title, sub, stats, groups, notes, extra, needs) {
     <div class="hd"><p style="text-align:left">${sub.replace('<br>', ' · ')}</p></div>
     <div class="st">${stats.map(([l, v]) => `<div><span>${l}</span><b>${v}</b></div>`).join('')}</div>${extra || ''}
     <div class="cols">${groups.map(tbl).join('')}</div>
-    <div class="foot">${needs && needs.length ? `<div class="pr"><h3>For production / purchase request</h3><table><thead><tr><th>Dish</th><th>End</th><th>Min</th><th>Need</th></tr></thead><tbody>${needs.map(r => `<tr><td>${esc(r.name)}</td><td class="${r.e <= 0 ? 'neg' : ''}">${r.e}</td><td>${r.min}</td><td><b>${r.need}</b></td></tr>`).join('')}</tbody></table><p>Need = about 2 days of sales, never below Min.</p></div>` : ''}
+    <div class="foot">${needs && needs.length ? `<div class="pr"><h3>For production / purchase request</h3><table><thead><tr><th>Dish</th><th>End</th><th>Par</th><th>Need</th></tr></thead><tbody>${needs.map(r => `<tr><td>${esc(r.name)}</td><td class="${r.e <= 0 ? 'neg' : ''}">${r.e}</td><td>${r.par}</td><td><b>${r.need}</b></td></tr>`).join('')}</tbody></table><p>Need = Par − End (dishes below their low level).</p></div>` : ''}
     ${notes.length ? `<div class="nt"><h3>Notes / remarks</h3>${notes.map(n => `<p>* ${esc(n)}</p>`).join('')}</div>` : ''}</div>
     <div class="sg"><div>Prepared by</div><div>Checked by</div></div>
     <script>window.onload=function(){setTimeout(function(){print()},400)}<\/script></body></html>`;
@@ -2171,7 +2172,7 @@ function kinvOpen(html) { const w = window.open('', '_blank'); if (!w) return to
 const kCatOrder = c => { const i = KINV_CATS.indexOf(c); return i < 0 ? 99 : i; };
 ACT.kinvPrint = () => { const x = S.kinv[D.kinv.date]; if (!x) return toast('Save the day first.', true);
   const all = (S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT), groups = {}, notes = [];
-  Object.entries(x.rows || {}).forEach(([id, r]) => { const it = all.find(k => k.id === id), cat = it?.cat || 'Others', name = it?.name || x.names?.[id] || id;
+  Object.entries(x.rows || {}).forEach(([id, r]) => { if (!kItems().some(k => k.id === id) && !num(r.b) && !num(r.i) && !num(r.o) && !num(r.s) && !num(r.e)) return; const it = all.find(k => k.id === id), cat = it?.cat || 'Others', name = it?.name || x.names?.[id] || id;
     (groups[cat] ||= []).push({name, b: r.b === '' ? 0 : r.b, i: r.i, o: r.o, s: r.s, e: r.e, n: r.n, ord: all.indexOf(it)}); if (r.n) notes.push(name + ': ' + r.n); });
   const G = Object.keys(groups).sort((a, b) => kCatOrder(a) - kCatOrder(b)).map(cat => ({cat, rows: groups[cat].sort((a, b) => a.ord - b.ord)}));
   const R = Object.values(x.rows || {}), neg = R.filter(r => num(r.e) < 0).length;
@@ -2193,20 +2194,20 @@ ACT.kinvWeekPrint = () => { const cur = weekOf(today()), wk = weekOf(D.ui.kinvWe
 function kinvRestockData(date) {
   const ks = Object.keys(S.kinv || {}).filter(d => d <= date && S.kinv[d].status !== 'void').sort(), x = ks.length ? S.kinv[ks[ks.length - 1]] : null; if (!x) return null;
   const recent = ks.slice(-7).map(d => S.kinv[d]), all = (S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT);
-  const rows = Object.entries(x.rows || {}).map(([id, r]) => { const it = all.find(k => k.id === id) || {id, name: x.names?.[id] || id, cat: x.cats?.[id] || 'Others', min: x.mins?.[id]}, e = num(r.e);
+  const cur = kItems(), rows = Object.entries(x.rows || {}).filter(([id]) => cur.some(k => k.id === id)).map(([id, r]) => { const it = cur.find(k => k.id === id), e = num(r.e);
       const sold = recent.filter(y => y.rows?.[id]).map(y => num(y.rows[id].s)), avg = sold.length ? Math.round(sum(sold, v => v) / sold.length * 10) / 10 : 0, min = kMin(it);
-      const target = Math.max(min, Math.ceil(avg * 2)), need = Math.max(0, Math.ceil(target - e));
-      return {id, name: it.name, cat: it.cat || 'Others', e, min, avg, need, n: r.n || '', ord: all.indexOf(it), off: it.off}; })
-    .filter(r => !r.off && r.e < r.min).sort((a, b) => (a.e - a.min) - (b.e - b.min) || a.ord - b.ord);
+      const par = kPar(it), need = Math.max(0, Math.ceil(par - e));
+      return {id, name: it.name, cat: it.cat || 'Others', e, min, par, avg, need, n: r.n || '', ord: cur.indexOf(it)}; })
+    .filter(r => r.e < r.min).sort((a, b) => (a.e - a.min) - (b.e - b.min) || a.ord - b.ord);
   return {date: x.date, by: x.by, rows, days: recent.length};
 }
 function kinvRestock() {
   const R = kinvRestockData(D.kinv?.date && S.kinv?.[D.kinv.date] ? D.kinv.date : today());
   if (!R) return '<div class="card"><div class="empty">Save a daily count first. The restock list is made from it.</div></div>';
-  return `<p class="lede">Dishes whose <b>ending</b> on ${fmtLong(R.date)} is below the minimum (usually 5). <b>Suggested</b> = enough for about 2 days of sales (average of the last ${R.days} counted day${R.days > 1 ? 's' : ''}), never below the minimum. Print it as the basis of the purchase request.</p>
+  return `<p class="lede">Dishes whose <b>ending</b> on ${fmtLong(R.date)} is below the low level (usually 5). <b>Need</b> = Par − End, to bring each dish back up to its par stock (usually 10). Print it as the basis of the purchase request.</p>
   <div class="card"><div class="row" style="flex-wrap:wrap;gap:8px"><b>${R.rows.length} dish${R.rows.length === 1 ? '' : 'es'} to restock</b><span class="spacer"></span>${R.rows.length ? '<button class="pri sm" data-act="kinvRestockPrint">🖨 Print restock list</button>' : ''}</div>
-   ${R.rows.length ? `<div class="tw" style="margin-top:8px"><table><thead><tr><th>Dish</th><th class="n">End</th><th class="n">Min</th><th class="n">Avg/day</th><th class="n">Need</th></tr></thead><tbody>
-    ${R.rows.map(r => `<tr><td><b>${esc(r.name)}</b><div class="small mut">${esc(r.cat)}${r.n ? ' · ' + esc(r.n) : ''}</div></td><td class="n ${r.e <= 0 ? 'bad-t' : 'warn-t'}"><b>${r.e}</b></td><td class="n">${r.min}</td><td class="n">${r.avg}</td><td class="n"><b>${r.need}</b></td></tr>`).join('')}</tbody></table></div>`
+   ${R.rows.length ? `<div class="tw" style="margin-top:8px"><table><thead><tr><th>Dish</th><th class="n">End</th><th class="n">Par</th><th class="n">Avg sold</th><th class="n">Need</th></tr></thead><tbody>
+    ${R.rows.map(r => `<tr><td><b>${esc(r.name)}</b><div class="small mut">${esc(r.cat)}${r.n ? ' · ' + esc(r.n) : ''}</div></td><td class="n ${r.e <= 0 ? 'bad-t' : 'warn-t'}"><b>${r.e}</b></td><td class="n">${r.par}</td><td class="n">${r.avg}</td><td class="n"><b>${r.need}</b></td></tr>`).join('')}</tbody></table></div>`
     : '<div class="empty">Nothing is below its minimum. 👍</div>'}</div>`;
 }
 ACT.kinvRestockPrint = () => { const R = kinvRestockData(D.kinv?.date && S.kinv?.[D.kinv.date] ? D.kinv.date : today()); if (!R || !R.rows.length) return;
@@ -2226,26 +2227,34 @@ ACT.kinvRestockPrint = () => { const R = kinvRestockData(D.kinv?.date && S.kinv?
     .bar{text-align:center;padding:10px;background:#F0DFCC}.bar button{font:600 13px Arial;border:0;border-radius:8px;padding:10px 18px;background:#1A2C54;color:#fff}@media print{.bar{display:none}}</style></head><body>
     <div class="bar"><button onclick="print()">Save as PDF / Print</button></div>
     <div class="meta"><span>Count of <b>${esc(fmtLong(R.date))}</b></span><span>Encoded by <b>${esc(R.by || '—')}</b></span></div>
-    <table><thead><tr><th style="width:38%">Dish</th><th>End</th><th>Min</th><th>Avg/day</th><th>Suggested</th><th>Approved</th><th>Remarks</th></tr></thead><tbody>
-    ${R.rows.map(r => `<tr><td>${esc(r.name)}${r.n ? `<span class="mut">${esc(r.n)}</span>` : ''}</td><td class="end ${r.e <= 0 ? 'zero' : ''}"><b>${r.e}</b></td><td>${r.min}</td><td>${r.avg}</td><td class="sug">${r.need}</td><td class="ap"></td><td class="rm"></td></tr>`).join('')}</tbody></table>
-    <div class="key">Suggested = about 2 days of sales (last ${R.days} counted day${R.days > 1 ? 's' : ''}), never below Min.</div>
+    <table><thead><tr><th style="width:38%">Dish</th><th>End</th><th>Par</th><th>Avg sold</th><th>Need</th><th>Approved</th><th>Remarks</th></tr></thead><tbody>
+    ${R.rows.map(r => `<tr><td>${esc(r.name)}${r.n ? `<span class="mut">${esc(r.n)}</span>` : ''}</td><td class="end ${r.e <= 0 ? 'zero' : ''}"><b>${r.e}</b></td><td>${r.par}</td><td>${r.avg}</td><td class="sug">${r.need}</td><td class="ap"></td><td class="rm"></td></tr>`).join('')}</tbody></table>
+    <div class="key">Need = Par − End. Avg sold = per day, last ${R.days} counted day${R.days > 1 ? 's' : ''}.</div>
     <div class="sg"><div>Prepared by (stockist)</div><div>Checked by</div><div>Approved by</div></div>
     <script>window.onload=function(){setTimeout(function(){print()},400)}<\/script></body></html>`); };
 function kinvList() {
-  D.klist ||= kMigrate(S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT).map(x => ({...x}));
-  return `<p class="lede">Dishes shown on the daily count. <b>Min</b> is the low-stock level (blank = 5). Hidden dishes keep their history.</p><div class="card">
-   ${D.klist.map((x, i) => `<div class="row" style="gap:6px;margin-bottom:6px;flex-wrap:wrap;${x.off ? 'opacity:.5' : ''}"><input data-b="klist.${i}.name" style="flex:2;min-width:170px"><label style="margin:0;width:78px" title="Flag as low when the ending is below this"><input type="number" min="0" inputmode="numeric" data-b="klist.${i}.min" placeholder="Min 5" style="padding:8px 6px"></label><select data-b="klist.${i}.prot" style="flex:1;min-width:120px" title="Protein group">${opt('', 'Protein: ' + kProt({...x, prot: ''}))}${KPROT.map(p => opt(p, p)).join('')}</select><select data-b="klist.${i}.cat" style="flex:1;min-width:150px">${[...new Set([...KINV_CATS, x.cat])].map(c => opt(c, c)).join('')}</select>
-     <button class="sm ghost" data-act="kListToggle" data-arg="${i}">${x.off ? 'Show' : 'Hide'}</button>${x.id.startsWith('n') ? `<button class="sm ghost" data-act="kListRm" data-arg="${i}">✕</button>` : ''}</div>`).join('')}
-   <div class="row end" style="margin-top:10px;flex-wrap:wrap"><button data-act="kListAdd">＋ Add dish</button><button class="pri" data-act="kListSave">Save list</button></div></div>`;
+  D.klist ||= kMigrate(S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT).map(x => ({...x, par: x.par ?? '', min: x.min ?? ''}));
+  const q = '';
+  return `<style>.kle{display:grid;grid-template-columns:minmax(150px,2fr) 64px 64px minmax(120px,1fr) minmax(130px,1.2fr) auto;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid #EFEBDD}.kle input,.kle select{padding:7px 6px;font-size:14px}.kle input[type=number]{text-align:center}
+    .kle.h{font-size:11px;color:#6B7282;text-transform:uppercase;letter-spacing:.04em;border-bottom:1.5px solid #E4DFC8}@media(max-width:700px){.kle{grid-template-columns:1fr 58px 58px auto}.kle .wide{grid-column:1/-1}.kle.h .wide{display:none}}</style>
+  <p class="lede">Edit the dishes on the daily count. <b>Par</b> = the stock you want on hand (blank = 10). <b>Low at</b> = flag as low below this (blank = 5). The restock list asks for <b>Par − End</b>. Hidden or removed dishes keep their history.</p>
+  <div class="card"><input type="search" id="klQ" placeholder="🔎 Find a dish" style="margin-bottom:8px">
+   <div class="kle h"><span>Dish</span><span>Par</span><span>Low at</span><span class="wide">Protein</span><span class="wide">Menu section</span><span></span></div>
+   ${D.klist.map((x, i) => q && !(x.name || '').toLowerCase().includes(q) ? '' : `<div class="kle" style="${x.off ? 'opacity:.5' : ''}"><input data-b="klist.${i}.name" placeholder="Dish name"><input type="number" min="0" inputmode="numeric" data-b="klist.${i}.par" placeholder="10"><input type="number" min="0" inputmode="numeric" data-b="klist.${i}.min" placeholder="5">
+     <select class="wide" data-b="klist.${i}.prot">${opt('', 'Auto: ' + kProt({...x, prot: ''}))}${KPROT.map(p => opt(p, p)).join('')}</select><select class="wide" data-b="klist.${i}.cat">${[...new Set([...KINV_CATS, x.cat])].map(c => opt(c, c)).join('')}</select>
+     <span class="row" style="gap:4px"><button class="sm ghost" data-act="kListToggle" data-arg="${i}" title="Hide from the daily count">${x.off ? 'Show' : 'Hide'}</button><button class="sm ghost" data-act="kListRm" data-arg="${i}" title="Remove">✕</button></span></div>`).join('')}
+   <div class="row end" style="margin-top:12px;flex-wrap:wrap;gap:8px"><button data-act="kListParAll">Set all Par to 10</button><button data-act="kListAdd">＋ Add dish</button><button class="pri" data-act="kListSave">Save list</button></div></div>`;
 }
+ACT.kListParAll = () => { if (!confirm('Set the par stock of every dish to 10?')) return; D.klist.forEach(x => { x.par = '10'; }); render(); };
 ACT.kListAdd = () => { D.klist.push({id: 'n' + Date.now().toString(36), name: '', cat: 'Others'}); render(); };
-ACT.kListRm = i => { D.klist.splice(+i, 1); render(); };
+ACT.kListRm = i => { const x = D.klist[+i]; if (!confirm(`Remove ${x.name || 'this dish'} from the list? Saved days keep its history.`)) return; D.klist.splice(+i, 1); render(); };
 ACT.kListToggle = i => { const x = D.klist[+i]; x.off = x.off ? undefined : 1; if (!x.off) delete x.off; render(); };
-ACT.kListSave = () => { const L = D.klist.filter(x => (x.name || '').trim()).map(x => ({id: x.id, name: x.name.trim(), cat: x.cat || 'Others', ...(x.min !== undefined && String(x.min).trim() !== '' ? {min: num(x.min)} : {}), ...(x.prot ? {prot: x.prot} : {}), ...(x.off ? {off: 1} : {})}));
+ACT.kListSave = () => { const L = D.klist.filter(x => (x.name || '').trim()).map(x => ({id: x.id, name: x.name.trim(), cat: x.cat || 'Others', ...(x.min !== undefined && String(x.min).trim() !== '' ? {min: num(x.min)} : {}), ...(x.par !== undefined && String(x.par).trim() !== '' ? {par: num(x.par)} : {}), ...(x.prot ? {prot: x.prot} : {}), ...(x.off ? {off: 1} : {})}));
   guard(async () => { await setDoc('config/main', {...S.config, kitchenItems: L}); D.klist = null; D.kinv = null; }, 'Dish list saved'); };
 
 document.addEventListener('keydown', e => { if (e.key !== 'Enter' || !e.target.closest || !e.target.closest('.kg')) return; e.preventDefault();
   const all = [...document.querySelectorAll('#view .kg input')].filter(x => x.offsetParent), i = all.indexOf(e.target); if (all[i + 1]) { all[i + 1].focus(); all[i + 1].select?.(); } else e.target.blur(); });
+document.addEventListener('input', e => { if (e.target.id === 'klQ') { const q = e.target.value.trim().toLowerCase(); document.querySelectorAll('#view .kle:not(.h)').forEach(r => { r.style.display = !q || (r.querySelector('input').value || '').toLowerCase().includes(q) ? '' : 'none'; }); } });
 document.addEventListener('input', e => { if (e.target.id !== 'kinvQ') return; const q = e.target.value.trim().toLowerCase();
   document.querySelectorAll('#view .kcat').forEach(c => { let n = 0; c.querySelectorAll('.kr').forEach(r => { const on = !q || r.querySelector('.kn b').textContent.toLowerCase().includes(q); r.style.display = on ? '' : 'none'; if (on) n++; }); c.style.display = n ? '' : 'none'; if (q && n) c.open = true; }); });
 
