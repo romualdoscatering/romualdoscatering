@@ -2146,7 +2146,7 @@ ACT.kinvXlsx = () => {
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `Romualdos Kitchen Stocks ${wk.from} to ${wk.to}.xlsx`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 };
 /* compact A4 report (1–2 pages): dishes grouped by menu section in two columns, notes listed at the end */
-function kinvReportHtml(title, sub, stats, groups, notes, extra) {
+function kinvReportHtml(title, sub, stats, groups, notes, extra, needs) {
   const tbl = g => `<div class="blk"><div class="ch">${esc(g.cat)}</div><table><colgroup><col style="width:44%"><col style="width:11.2%"><col style="width:11.2%"><col style="width:11.2%"><col style="width:11.2%"><col style="width:11.2%"></colgroup><thead><tr><th>Dish</th><th>Beg</th><th>In</th><th>Out</th><th>Sold</th><th>End</th></tr></thead><tbody>
     ${g.rows.map(r => `<tr><td>${esc(r.name)}${r.n ? ' *' : ''}</td><td>${r.b}</td><td>${r.i || ''}</td><td>${r.o || ''}</td><td><b>${r.s || ''}</b></td><td class="${r.e < 0 ? 'neg' : ''}"><b>${r.e}</b></td></tr>`).join('')}</tbody></table></div>`;
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:10mm}*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font:8.6pt Arial,sans-serif;color:#14213F;margin:0}
@@ -2155,14 +2155,15 @@ function kinvReportHtml(title, sub, stats, groups, notes, extra) {
     .cols{column-count:2;column-gap:7mm}.blk{break-inside:avoid;margin-bottom:5px}.ch{background:#F6E3B4;border-left:3pt solid #E89908;font-weight:700;padding:2px 5px;font-size:8.8pt}
     table{width:100%;border-collapse:collapse;table-layout:fixed}th{font-size:7pt;color:#4A5265;text-align:right;font-weight:600;padding:1px 3px;border-bottom:.6pt solid #9C9479}th:first-child,td:first-child{text-align:left}
     td{padding:1.4px 3px;text-align:right;border-bottom:.4pt solid #E4DFC8;white-space:nowrap}td:first-child{white-space:normal}td.neg{color:#A3271F}
-    .ex{display:flex;gap:7mm;margin-bottom:6px}.ex>div{flex:1}.ex h3,.nt h3{font-size:9pt;margin:0 0 2px}.ex ol{margin:0;padding-left:16px}.nt{margin-top:6px;break-inside:avoid}.nt p{margin:1px 0}
+    .ex{display:flex;gap:7mm;margin-bottom:6px}.ex>div{flex:1}.ex h3,.nt h3{font-size:9pt;margin:0 0 2px}.ex ol{margin:0;padding-left:16px}.nt{margin-top:6px;break-inside:avoid;flex:1}.foot{display:flex;gap:7mm;align-items:flex-start;margin-top:6px}.pr{width:calc(50% - 3.5mm);break-inside:avoid;border:.8pt solid #E89908;border-radius:4px;padding:4px 6px;background:#FFFBF0}.pr h3{font-size:8.6pt;margin:0 0 2px;color:#7A4E00}.pr table{table-layout:auto}.pr td,.pr th{font-size:7.8pt;padding:1px 3px}.pr p{margin:2px 0 0;font-size:6.8pt;color:#5B6478}.nt p{margin:1px 0}
     .sg{margin-top:14px;display:flex;gap:12mm;font-size:7.5pt;color:#4A5265}.sg div{flex:1;border-top:.7pt solid #14213F;padding-top:2px}
     .bar{text-align:center;padding:10px;background:#F7F4EA}.bar button{font:600 13px Arial;border:0;border-radius:8px;padding:10px 18px;background:#1A2C54;color:#fff;cursor:pointer}@media print{.bar{display:none}}</style></head><body>
     <div class="bar"><button onclick="print()">Save as PDF / Print</button></div>
     <div class="hd"><p style="text-align:left">${sub.replace('<br>', ' · ')}</p></div>
     <div class="st">${stats.map(([l, v]) => `<div><span>${l}</span><b>${v}</b></div>`).join('')}</div>${extra || ''}
     <div class="cols">${groups.map(tbl).join('')}</div>
-    ${notes.length ? `<div class="nt"><h3>Notes / remarks</h3>${notes.map(n => `<p>* ${esc(n)}</p>`).join('')}</div>` : ''}
+    <div class="foot">${needs && needs.length ? `<div class="pr"><h3>For production / purchase request</h3><table><thead><tr><th>Dish</th><th>End</th><th>Min</th><th>Need</th></tr></thead><tbody>${needs.map(r => `<tr><td>${esc(r.name)}</td><td class="${r.e <= 0 ? 'neg' : ''}">${r.e}</td><td>${r.min}</td><td><b>${r.need}</b></td></tr>`).join('')}</tbody></table><p>Need = about 2 days of sales, never below Min.</p></div>` : ''}
+    ${notes.length ? `<div class="nt"><h3>Notes / remarks</h3>${notes.map(n => `<p>* ${esc(n)}</p>`).join('')}</div>` : ''}</div>
     <div class="sg"><div>Prepared by</div><div>Checked by</div></div>
     <script>window.onload=function(){setTimeout(function(){print()},400)}<\/script></body></html>`;
 }
@@ -2175,7 +2176,7 @@ ACT.kinvPrint = () => { const x = S.kinv[D.kinv.date]; if (!x) return toast('Sav
   const G = Object.keys(groups).sort((a, b) => kCatOrder(a) - kCatOrder(b)).map(cat => ({cat, rows: groups[cat].sort((a, b) => a.ord - b.ord)}));
   const R = Object.values(x.rows || {}), neg = R.filter(r => num(r.e) < 0).length;
   kinvOpen(kinvReportHtml('KITCHEN STOCKS · DAILY REPORT', `${esc(fmtLong(x.date))}<br>Encoded by: <b>${esc(x.by || '')}</b>`,
-    [['Dishes counted', R.length], ['Stock in', r2(sum(R, r => num(r.i)))], ['Pulled out', r2(sum(R, r => num(r.o)))], ['Sold', r2(sum(R, r => num(r.s)))], ['Ending stock', r2(sum(R, r => num(r.e)))], ...(neg ? [['Below zero', neg]] : [])], G, notes)); };
+    [['Dishes counted', R.length], ['Stock in', r2(sum(R, r => num(r.i)))], ['Pulled out', r2(sum(R, r => num(r.o)))], ['Sold', r2(sum(R, r => num(r.s)))], ['Ending stock', r2(sum(R, r => num(r.e)))], ...(neg ? [['Below zero', neg]] : [])], G, notes, '', (kinvRestockData(x.date) || {rows: []}).rows)); };
 ACT.kinvWeekPrint = () => { const cur = weekOf(today()), wk = weekOf(D.ui.kinvWeek || cur.from), W = kinvWeekData(wk.from, wk.to);
   if (!W.rows.length) return toast('No daily counts saved for this week.', true);
   const all = (S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT), groups = {};
