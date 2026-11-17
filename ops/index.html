@@ -1926,7 +1926,7 @@ ACT.scSlips = () => {
    Ending = Beginning + Stock in − Pull-out − Sold. Beginning comes from the last saved day's ending. */
 const KINV_CATS = ['Magandang Umaga!', 'Kakatakam', 'Para Masigla, Sabi ni Mama', 'Sabaw Na?', 'Pampahaba ng Buhay', 'Uy, Patikim!', 'Tara, Dagat', 'Mag-isa Ngunit Masaya', 'Oh, Maiba Naman', 'Para sa Paborito Kong Apo', 'Merienda-serye', 'Others'];
 const KINV_DEFAULT = [
-  ['Magandang Umaga!', 'Beef Tapa, Chicken Adobo, Pork Adobo, Paksiw na Bangus, Tortang Talong at Tuyo, Homemade Luncheon Meat, Larry’s Bacon, Skinless Longganisa'],
+  ['Magandang Umaga!', 'Beef Tapa, Chicken Adobo, Pork Adobo, Paksiw na Bangus, Tortang Talong at Tuyo, Homemade Luncheon Meat, Larry’s Bacon'],
   ['Kakatakam', 'Sizzling Sisig, Tokwa’t Baboy, Sinugbang Scallops, Pritong Lumpia Ubod, Mangga’t Bagoong'],
   ['Para Masigla, Sabi ni Mama', 'Crabmeat Laing with Aligue, Ensaladang Talong, Pako Salad, Pinakbet, Pomelo at Dilis Salad'],
   ['Sabaw Na?', 'Bulalo, Sinigang na Pork Belly, Native Chicken Tinola, Tinolang Isda, Imbao Soup'],
@@ -1952,8 +1952,8 @@ const KPROT_DEF = {'Beef Tapa': 'Beef', 'Classic Adobo (Chicken/Pork)': 'Chicken
 const kProt = it => (it.prot === 'Vegetables' ? 'Veggies and Produce' : it.prot) || KPROT_DEF[it.name] || (KINV_DEFAULT.find(x => x.id === it.id) && KPROT_DEF[KINV_DEFAULT.find(x => x.id === it.id).name]) || 'Others';
 const kGroupBy = () => { let g = D.ui.kGroup; if (!g) { try { g = localStorage.getItem('rcs_kgroup') || 'menu'; } catch (e) { g = 'menu'; } D.ui.kGroup = g; } return g === 'prot' ? 'prot' : 'menu'; };
 function kMigrate(L) {
-  if (!L.some(x => x.name === 'Classic Adobo (Chicken/Pork)' || x.name === 'Tamarind Wings')) return L;
-  return L.flatMap(x => x.name === 'Classic Adobo (Chicken/Pork)' ? [{...x, id: 'kchicken-adobo', name: 'Chicken Adobo', prot: undefined}, {...x, id: 'kpork-adobo', name: 'Pork Adobo', prot: undefined}] : x.name === 'Tamarind Wings' ? [] : [x]);
+  if (!L.some(x => ['Classic Adobo (Chicken/Pork)', 'Tamarind Wings', 'Skinless Longganisa'].includes(x.name))) return L;
+  return L.flatMap(x => x.name === 'Classic Adobo (Chicken/Pork)' ? [{...x, id: 'kchicken-adobo', name: 'Chicken Adobo', prot: undefined}, {...x, id: 'kpork-adobo', name: 'Pork Adobo', prot: undefined}] : ['Tamarind Wings', 'Skinless Longganisa'].includes(x.name) ? [] : [x]);
 }
 const kItems = () => kMigrate(S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT).filter(x => !x.off);
 const KF = [['b', 'Beg'], ['i', 'In'], ['o', 'Pull-out'], ['s', 'Sold']];
@@ -2002,7 +2002,7 @@ function kinvDay() {
   <div class="card"><div class="grid"><label>Date<input type="date" value="${esc(d.date)}" data-act-change="kinvDate" id="kinvDate"></label>
     <label>Encoded by<input data-b="kinv.by" list="kinvStaff" placeholder="Type your name" autocapitalize="words"><datalist id="kinvStaff">${staffList().map(n => `<option value="${esc(n)}">`).join('')}</datalist></label></div>
     <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">${ex ? `<span class="chip ok">Saved${ex.by ? ' · ' + esc(ex.by) : ''}</span>` : '<span class="chip mut">Not saved yet</span>'}
-     ${d.prevDate && d.fresh && !d.draftAt ? `<span class="chip">Beginning taken from ${fmtD(d.prevDate)}</span>` : ''}${d.draftAt ? `<span class="chip warn">Unsaved work restored (${new Date(d.draftAt).toLocaleTimeString('en-PH', {hour: 'numeric', minute: '2-digit'})})</span>` : ''}<span class="spacer"></span>${ex ? '<button class="sm" data-act="kinvPrint">🖨 Daily PDF</button>' : ''}</div>
+     ${d.prevDate && d.fresh && !d.draftAt ? `<span class="chip">Beginning taken from ${fmtD(d.prevDate)}</span>` : ''}${d.draftAt ? `<span class="chip warn">Unsaved work restored (${new Date(d.draftAt).toLocaleTimeString('en-PH', {hour: 'numeric', minute: '2-digit'})})</span>` : ''}<span class="spacer"></span><button class="sm pri" data-act="kPos">📷 Read POS report</button>${ex ? '<button class="sm" data-act="kinvPrint">🖨 Daily PDF</button>' : ''}<input type="file" id="kPosFile" accept="image/*,application/pdf" hidden></div>
     <input type="search" data-b="kinv.q" id="kinvQ" placeholder="🔎 Find a dish" style="margin-top:10px">
     <div class="kflt"><span class="small mut" style="align-self:center">Group by</span>${[['menu', '📋 Menu sections'], ['prot', '🥩 Protein']].map(([v, l]) => `<button type="button" class="sm ${gb === v ? 'on' : 'ghost'}" data-act="kGroup" data-arg="${v}">${l}</button>`).join('')}</div>
     <div class="kflt">${[['all', 'All dishes'], ['stock', 'With stock'], ['low', `⚠ Low stock (${lowN})`]].map(([v, l]) => `<button type="button" class="sm ${flt === v ? 'on' : 'ghost'}" data-act="set" data-arg="ui.kFilter|${v}">${l}</button>`).join('')}</div></div>
@@ -2024,6 +2024,64 @@ async function kAutoPush() {
   finally { KAUTO.busy = false; }
 }
 document.addEventListener('input', e => { if (e.target.closest && e.target.closest('#view') && /^kinv\.(rows|by)/.test(e.target.dataset?.b || '') && D.kinv) { D.kinv.dirty = Date.now(); kAutoQueue(); } }, true);
+/* ---------- POS sales report → "Sold" (auto-read, then the encoder checks and edits) ---------- */
+const KPOS_ALIAS = {'rfc': 'Romualdo’s Fried Chicken', 'gfc': 'Garlic Fried Chicken', 'shanghai': 'Lumpia Shanghai', 'kare kare': 'Oxtail Tripe Beef Kare-Kare', 'karekare': 'Oxtail Tripe Beef Kare-Kare', 'caldereta': 'Signature Caldereta',
+  'sisig': 'Sizzling Sisig', 'inasal': 'Chicken Inasal Chops', 'liempo': 'Inihaw na Liempo', 'spaghetti': 'Filipino Meaty Spaghetti', 'tenders': 'Chicken Tenders', 'croquettes': 'Chicken Croquettes', 'tinola': 'Native Chicken Tinola',
+  'sinigang': 'Sinigang na Pork Belly', 'lengua': 'Lengua in Mushroom Gravy', 'bicol express': 'Tuna Bicol Express', 'luncheon': 'Homemade Luncheon Meat', 'bacon': 'Larry’s Bacon', 'ubod': 'Pritong Lumpia Ubod', 'laing': 'Crabmeat Laing with Aligue'};
+const kNorm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’']/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+function kBigrams(s) { s = ' ' + s + ' '; const m = new Map(); for (let i = 0; i < s.length - 1; i++) { const g = s.slice(i, i + 2); m.set(g, (m.get(g) || 0) + 1); } return m; }
+function kDice(a, b) { const A = kBigrams(a), B = kBigrams(b); let n = 0, ta = 0, tb = 0; A.forEach(v => ta += v); B.forEach(v => tb += v); A.forEach((v, k) => { n += Math.min(v, B.get(k) || 0); }); return ta + tb ? 2 * n / (ta + tb) : 0; }
+function kMatch(text) {
+  const t = kNorm(text); if (t.length < 3) return null; let best = null;
+  for (const it of kItems()) { const n = kNorm(it.name); let s = kDice(t, n); if (t.includes(n) || (n.includes(t) && t.length >= 5)) s = Math.max(s, .9); if (!best || s > best.s) best = {it, s}; }
+  for (const [k, name] of Object.entries(KPOS_ALIAS)) if ((' ' + t + ' ').includes(' ' + k + ' ')) { const it = kItems().find(x => x.name === name); if (it && (!best || best.s < .8)) best = {it, s: .8}; }
+  return best && best.s >= .5 ? best : null;
+}
+function parsePosItems(text) {
+  const lines = String(text || '').replace(/\r/g, '').split('\n').map(l => l.trim()).filter(Boolean), out = [];
+  const skip = /total|subtotal|vat|cash|change|discount|service|payment|tender|receipt|invoice|or no|date|time|cashier|table|guest|tr count|void|z-?read|x-?read|\btin\b|\bmin\b|serial|permit|accred|thank/i;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i]; if (skip.test(l)) continue;
+    const name = l.replace(/[\d,]+\.\d{2}/g, ' ').replace(/(^|\s)[x@×]\s*\d+|\d+\s*[x@×](\s|$)/gi, ' ').replace(/(^|\s)\d{1,4}(?=\s|$)/g, ' ').replace(/[^A-Za-zÀ-ɏ'’&\- ]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (name.length < 3) continue;
+    let qty = null; const m = l.match(/(?:^|\s)(\d{1,4})\s*[x@×]/i) || l.match(/[x@×]\s*(\d{1,4})(?:\s|$)/i) || l.match(/^(\d{1,4})\s+[A-Za-z]/) || l.match(/[A-Za-z'’)]\s+(\d{1,4})(?:\s+[\d,]+\.\d{2})+\s*$/) || l.match(/[A-Za-z'’)]\s+(\d{1,4})\s*$/);
+    if (m) qty = +m[1];
+    if (qty == null && lines[i + 1] && !/[A-Za-z]{3}/.test(lines[i + 1])) { const n2 = lines[i + 1].match(/^(\d{1,4})(?!\.\d)/); if (n2) { qty = +n2[1]; i++; } }
+    const hit = kMatch(name);
+    out.push({text: name, qty: qty == null ? 1 : qty, guessQty: qty == null, id: hit ? hit.it.id : '', score: hit ? hit.s : 0});
+  }
+  return out;
+}
+ACT.kPos = () => { const inp = $('#kPosFile'); if (!inp) return; inp.value = ''; inp.onchange = () => { const f = inp.files[0]; if (f) kPosRead(f); }; inp.click(); };
+function kPosRead(file) {
+  const pdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  if (!pdf && !/^image\//.test(file.type)) return toast('Choose a photo or PDF of the POS sales report.', true);
+  const url = pdf ? '' : URL.createObjectURL(file), dataP = pdf ? fileB64(file) : shrinkImage(file, 2400, 0.85), opts = kItems().slice().sort((a, b) => a.name.localeCompare(b.name));
+  openModal(`<h3 style="margin:0 0 4px">POS report → Sold</h3><p class="small mut" style="margin:0 0 10px">Check each line. Change the dish or the quantity if needed, untick lines that are not dishes, then apply.</p>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:14px" class="rcpt-grid">
+    <div style="background:#F3EFE6;border-radius:10px;max-height:480px;overflow:auto">${pdf ? `<div class="empty" style="padding:30px">📄 ${esc(file.name)}</div>` : `<img src="${url}" style="width:100%;display:block" alt="POS report">`}</div>
+    <div id="kp-res" style="max-height:480px;overflow:auto"><div class="alert info">🔎 Reading the report…</div></div></div><style>@media(max-width:700px){.rcpt-grid{grid-template-columns:1fr!important}}#kp-res .kpl{display:grid;grid-template-columns:22px minmax(0,1fr) 64px;gap:6px;align-items:center;padding:6px 0;border-bottom:1px solid #EFEBDD}#kp-res .kpl select{font-size:13px;padding:6px}#kp-res .kpl input[type=number]{padding:6px;text-align:center}#kp-res .src{grid-column:2/4;font-size:11px;color:#6B7282;margin-top:-4px}</style>
+    <div class="row" style="margin-top:10px;gap:14px;flex-wrap:wrap"><label class="row" style="gap:6px;margin:0"><input type="radio" name="kpmode" value="replace" checked> Replace Sold</label><label class="row" style="gap:6px;margin:0"><input type="radio" name="kpmode" value="add"> Add to Sold</label></div>
+    <div class="row end" style="margin-top:12px"><button data-mact="close">Cancel</button><button class="pri" data-mact="apply" id="kp-apply" disabled>Put into Sold</button></div>`, {
+    apply: () => { const box = $('#kp-res'), mode = (document.querySelector('input[name=kpmode]:checked') || {}).value || 'replace', tot = {};
+      box.querySelectorAll('.kpl').forEach(r => { if (!r.querySelector('.kpon').checked) return; const id = r.querySelector('select').value, q = num(r.querySelector('input[type=number]').value); if (id && q > 0) tot[id] = (tot[id] || 0) + q; });
+      const n = Object.keys(tot).length; if (!n) return toast('Nothing to apply. Pick a dish for at least one line.', true);
+      Object.entries(tot).forEach(([id, q]) => { const r = D.kinv.rows[id] ||= {b: '', i: '', o: '', s: '', n: ''}; r.s = String(mode === 'add' ? r2(num(r.s) + q) : q); });
+      D.kinv.dirty = Date.now(); kAutoQueue(); if (url) URL.revokeObjectURL(url); closeModal(); render();
+      toast(`Sold filled for ${n} dish${n > 1 ? 'es' : ''}. Check the numbers, then Save.`); }});
+  const show = (text, how) => { const el = $('#kp-res'); if (!el) return 0; const P = parsePosItems(text), L = [...P.filter(x => x.id), ...P.filter(x => !x.id)];
+    if (!L.length) { el.innerHTML = '<div class="alert warn">No dish lines found. Try a straighter, closer photo in good light, or type the sold numbers in.</div>'; return 0; }
+    const sel = id => `<select><option value="">— not a dish / skip —</option>${opts.map(o => `<option value="${o.id}"${o.id === id ? ' selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`;
+    el.innerHTML = `<p class="small" style="margin:0 0 6px">Read by ${how}: <b>${L.filter(x => x.id).length}</b> of ${L.length} lines matched a dish.</p>` +
+      L.map((x, i) => (i && !x.id && L[i - 1].id ? '<p class="small mut" style="margin:10px 0 0">Not matched (tick and pick a dish if it is one):</p>' : '') + `<div class="kpl"><input type="checkbox" class="kpon"${x.id ? ' checked' : ''}>${sel(x.id)}<input type="number" min="0" step="any" inputmode="numeric" value="${x.qty}"${x.guessQty ? ' style="background:#FCEBC2" title="Quantity not found on this line. Please check."' : ''}><div class="src">from: “${esc(x.text)}”${x.id && x.score < .7 ? ' · <b style="color:#8A5A00">check match</b>' : ''}</div></div>`).join('');
+    el.querySelectorAll('.kpl select').forEach(s => s.onchange = () => { s.parentElement.querySelector('.kpon').checked = !!s.value; });
+    $('#kp-apply').disabled = false; return L.filter(x => x.id).length; };
+  const tess = () => pdf ? Promise.reject(new Error('pdf')) : loadTesseract().then(T => T.recognize(file, 'eng')).then(r => show(r.data.text, 'the on-device reader'));
+  dataP.then(data => api('opsOcr', {data: data.split(',')[1], mime: pdf ? 'application/pdf' : 'image/jpeg'}))
+    .then(r => { if (!r.ok || !String(r.text || '').trim()) throw new Error('empty'); if (!show(r.text, 'Google') && !pdf) return tess(); })
+    .catch(() => tess().catch(() => { const el = $('#kp-res'); if (el) el.innerHTML = '<div class="alert warn">Auto-read is not available right now. Please type the sold numbers in.</div>'; }));
+}
+
 function kEndHtml(it, e) { return `<span>End</span><b>${e === '' ? '—' : e}</b>${e !== '' && e < 0 ? '<i>CHECK</i>' : kLow(it, e) ? '<i>LOW</i>' : ''}`; }
 function kSumHtml() { const items = kItems(), R = D.kinv.rows, low = items.filter(it => kLow(it, kEnd(R[it.id]))).length;
   return `${items.filter(it => kEnd(R[it.id]) !== '').length} counted · ${r2(sum(items, it => num(R[it.id]?.s)))} sold${low ? ` · <b style="color:#8A5A00">${low} low</b>` : ''}`; }
