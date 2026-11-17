@@ -1926,7 +1926,7 @@ ACT.scSlips = () => {
    Ending = Beginning + Stock in − Pull-out − Sold. Beginning comes from the last saved day's ending. */
 const KINV_CATS = ['Magandang Umaga!', 'Kakatakam', 'Para Masigla, Sabi ni Mama', 'Sabaw Na?', 'Pampahaba ng Buhay', 'Uy, Patikim!', 'Tara, Dagat', 'Mag-isa Ngunit Masaya', 'Oh, Maiba Naman', 'Para sa Paborito Kong Apo', 'Merienda-serye', 'Others'];
 const KINV_DEFAULT = [
-  ['Magandang Umaga!', 'Beef Tapa, Classic Adobo (Chicken/Pork), Paksiw na Bangus, Tortang Talong at Tuyo, Homemade Luncheon Meat, Larry’s Bacon, Skinless Longganisa'],
+  ['Magandang Umaga!', 'Beef Tapa, Chicken Adobo, Pork Adobo, Paksiw na Bangus, Tortang Talong at Tuyo, Homemade Luncheon Meat, Larry’s Bacon, Skinless Longganisa'],
   ['Kakatakam', 'Sizzling Sisig, Tokwa’t Baboy, Sinugbang Scallops, Pritong Lumpia Ubod, Mangga’t Bagoong'],
   ['Para Masigla, Sabi ni Mama', 'Crabmeat Laing with Aligue, Ensaladang Talong, Pako Salad, Pinakbet, Pomelo at Dilis Salad'],
   ['Sabaw Na?', 'Bulalo, Sinigang na Pork Belly, Native Chicken Tinola, Tinolang Isda, Imbao Soup'],
@@ -1934,24 +1934,28 @@ const KINV_DEFAULT = [
   ['Uy, Patikim!', 'Chicken Inasal Chops, Romualdo’s Fried Chicken, Garlic Fried Chicken, Oxtail Tripe Beef Kare-Kare, Lengua in Mushroom Gravy, Signature Caldereta, Bistek Tagalog, Crispy Pata, Bagnet, Lumpia Shanghai, Inihaw na Liempo, Classic Dinuguan'],
   ['Tara, Dagat', 'Tuna Bicol Express, Kinilaw na Malasugue, Inihaw na Tuna Belly, Adobong Pusit, Garlic Pepper Shrimp'],
   ['Mag-isa Ngunit Masaya', 'Pritong Porkchop, Tokwa Sisig'],
-  ['Oh, Maiba Naman', 'Tamarind Wings, Bistek at Kesong Puti Ciabatta, Kimchi Sinigang sa Watermelon, Sinigang Rice, Bulad Rice'],
+  ['Oh, Maiba Naman', 'Bistek at Kesong Puti Ciabatta, Kimchi Sinigang sa Watermelon, Sinigang Rice, Bulad Rice'],
   ['Para sa Paborito Kong Apo', 'Chicken Tenders, Chicken Croquettes, Filipino Meaty Spaghetti'],
   ['Merienda-serye', 'Puto at Dinuguan, Fresh Lumpia']
 ].flatMap(([cat, list]) => list.split(', ').map(name => ({id: 'k' + name.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40), name, cat})));
-const KPROT = ['Chicken', 'Pork', 'Beef', 'Fish & Seafood', 'Vegetables', 'Rice', 'Noodles & Pasta', 'Others'];
-const KPROT_DEF = {'Beef Tapa': 'Beef', 'Classic Adobo (Chicken/Pork)': 'Chicken', 'Paksiw na Bangus': 'Fish & Seafood', 'Tortang Talong at Tuyo': 'Vegetables', 'Homemade Luncheon Meat': 'Pork', 'Larry\u2019s Bacon': 'Pork', 'Skinless Longganisa': 'Pork',
-  'Sizzling Sisig': 'Pork', 'Tokwa\u2019t Baboy': 'Pork', 'Sinugbang Scallops': 'Fish & Seafood', 'Pritong Lumpia Ubod': 'Vegetables', 'Mangga\u2019t Bagoong': 'Vegetables',
-  'Crabmeat Laing with Aligue': 'Fish & Seafood', 'Ensaladang Talong': 'Vegetables', 'Pako Salad': 'Vegetables', 'Pinakbet': 'Vegetables', 'Pomelo at Dilis Salad': 'Vegetables',
+const KPROT = ['Chicken', 'Pork', 'Beef', 'Fish & Seafood', 'Veggies and Produce', 'Rice', 'Noodles & Pasta', 'Others'];
+const KPROT_DEF = {'Beef Tapa': 'Beef', 'Classic Adobo (Chicken/Pork)': 'Chicken', 'Chicken Adobo': 'Chicken', 'Pork Adobo': 'Pork', 'Paksiw na Bangus': 'Fish & Seafood', 'Tortang Talong at Tuyo': 'Veggies and Produce', 'Homemade Luncheon Meat': 'Pork', 'Larry\u2019s Bacon': 'Pork', 'Skinless Longganisa': 'Pork',
+  'Sizzling Sisig': 'Pork', 'Tokwa\u2019t Baboy': 'Pork', 'Sinugbang Scallops': 'Fish & Seafood', 'Pritong Lumpia Ubod': 'Veggies and Produce', 'Mangga\u2019t Bagoong': 'Veggies and Produce',
+  'Crabmeat Laing with Aligue': 'Fish & Seafood', 'Ensaladang Talong': 'Veggies and Produce', 'Pako Salad': 'Veggies and Produce', 'Pinakbet': 'Veggies and Produce', 'Pomelo at Dilis Salad': 'Veggies and Produce',
   'Bulalo': 'Beef', 'Sinigang na Pork Belly': 'Pork', 'Native Chicken Tinola': 'Chicken', 'Tinolang Isda': 'Fish & Seafood', 'Imbao Soup': 'Fish & Seafood',
   'Palabok': 'Noodles & Pasta', 'Bihon Guisado': 'Noodles & Pasta', 'Pancit Canton': 'Noodles & Pasta', 'Silky Sotanghon': 'Noodles & Pasta', 'Bam-i': 'Noodles & Pasta',
   'Chicken Inasal Chops': 'Chicken', 'Romualdo\u2019s Fried Chicken': 'Chicken', 'Garlic Fried Chicken': 'Chicken', 'Oxtail Tripe Beef Kare-Kare': 'Beef', 'Lengua in Mushroom Gravy': 'Beef', 'Signature Caldereta': 'Beef', 'Bistek Tagalog': 'Beef',
   'Crispy Pata': 'Pork', 'Bagnet': 'Pork', 'Lumpia Shanghai': 'Pork', 'Inihaw na Liempo': 'Pork', 'Classic Dinuguan': 'Pork',
   'Tuna Bicol Express': 'Fish & Seafood', 'Kinilaw na Malasugue': 'Fish & Seafood', 'Inihaw na Tuna Belly': 'Fish & Seafood', 'Adobong Pusit': 'Fish & Seafood', 'Garlic Pepper Shrimp': 'Fish & Seafood',
-  'Pritong Porkchop': 'Pork', 'Tokwa Sisig': 'Vegetables', 'Tamarind Wings': 'Chicken', 'Bistek at Kesong Puti Ciabatta': 'Beef', 'Kimchi Sinigang sa Watermelon': 'Pork', 'Sinigang Rice': 'Rice', 'Bulad Rice': 'Rice',
-  'Chicken Tenders': 'Chicken', 'Chicken Croquettes': 'Chicken', 'Filipino Meaty Spaghetti': 'Noodles & Pasta', 'Puto at Dinuguan': 'Pork', 'Fresh Lumpia': 'Vegetables'};
-const kProt = it => it.prot || KPROT_DEF[it.name] || (KINV_DEFAULT.find(x => x.id === it.id) && KPROT_DEF[KINV_DEFAULT.find(x => x.id === it.id).name]) || 'Others';
+  'Pritong Porkchop': 'Pork', 'Tokwa Sisig': 'Veggies and Produce', 'Bistek at Kesong Puti Ciabatta': 'Beef', 'Kimchi Sinigang sa Watermelon': 'Beef', 'Sinigang Rice': 'Rice', 'Bulad Rice': 'Rice',
+  'Chicken Tenders': 'Chicken', 'Chicken Croquettes': 'Chicken', 'Filipino Meaty Spaghetti': 'Noodles & Pasta', 'Puto at Dinuguan': 'Pork', 'Fresh Lumpia': 'Veggies and Produce'};
+const kProt = it => (it.prot === 'Vegetables' ? 'Veggies and Produce' : it.prot) || KPROT_DEF[it.name] || (KINV_DEFAULT.find(x => x.id === it.id) && KPROT_DEF[KINV_DEFAULT.find(x => x.id === it.id).name]) || 'Others';
 const kGroupBy = () => { let g = D.ui.kGroup; if (!g) { try { g = localStorage.getItem('rcs_kgroup') || 'menu'; } catch (e) { g = 'menu'; } D.ui.kGroup = g; } return g === 'prot' ? 'prot' : 'menu'; };
-const kItems = () => (S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT).filter(x => !x.off);
+function kMigrate(L) {
+  if (!L.some(x => x.name === 'Classic Adobo (Chicken/Pork)' || x.name === 'Tamarind Wings')) return L;
+  return L.flatMap(x => x.name === 'Classic Adobo (Chicken/Pork)' ? [{...x, id: 'kchicken-adobo', name: 'Chicken Adobo', prot: undefined}, {...x, id: 'kpork-adobo', name: 'Pork Adobo', prot: undefined}] : x.name === 'Tamarind Wings' ? [] : [x]);
+}
+const kItems = () => kMigrate(S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT).filter(x => !x.off);
 const KF = [['b', 'Beg'], ['i', 'In'], ['o', 'Pull-out'], ['s', 'Sold']];
 const KMIN_DEF = 5, kMin = it => it && it.min !== undefined && it.min !== '' ? num(it.min) : KMIN_DEF;
 const kLow = (it, e) => e !== '' && e < kMin(it);
@@ -1986,7 +1990,7 @@ function kinvDay() {
       <div class="kg">${KF.map(([k, l]) => `<label><span>${l}</span><input type="number" inputmode="numeric" enterkeyhint="next" min="0" step="any" data-b="kinv.rows.${it.id}.${k}" placeholder="0"></label>`).join('')}
       <div class="ke ${e === '' ? '' : e < 0 ? 'neg' : kLow(it, e) ? 'low' : ''}" data-live="kend:${it.id}">${kEndHtml(it, e)}</div></div>
       ${r.n || D.ui.kNote === it.id ? `<input class="knote" data-b="kinv.rows.${it.id}.n" placeholder="Note (e.g. 2 pcs burnt, staff meal)">` : ''}</div>`; };
-  const list = cats.map(c => { const its = items.filter(x => gOf(x) === c && (!q || x.name.toLowerCase().includes(q)) && show(x)); if (!its.length) return '';
+  const list = cats.map(c => { const its = (gb === 'prot' ? [...items].sort((a, b) => a.name.localeCompare(b.name)) : items).filter(x => gOf(x) === c && (!q || x.name.toLowerCase().includes(q)) && show(x)); if (!its.length) return '';
     return `<details class="kcat" open data-kcat="${esc(c)}"><summary>${esc(c)} <span class="mut small">${its.filter(it => kEnd(d.rows[it.id]) !== '').length}/${its.length}</span></summary>${its.map(row).join('')}</details>`; }).join('');
   return `<style>.kcat{background:#fff;border-radius:12px;margin:0 0 10px;padding:4px 12px 8px;box-shadow:0 1px 0 #E4DFC8}.kcat summary{font-weight:800;font-size:19px;padding:10px 12px;margin:6px -4px 4px;cursor:pointer;color:#1A2C54;background:#F6E3B4;border-left:5px solid #E89908;border-radius:8px}.kcat summary .small{font-size:13px;font-weight:600}
     .kr{border-top:1px solid #EFEBDD;padding:9px 0}.kn{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}.kbtn{border:0;background:none;color:#8A6D1E;font-size:12px;padding:2px 4px}
@@ -2169,7 +2173,7 @@ ACT.kinvRestockPrint = () => { const R = kinvRestockData(D.kinv?.date && S.kinv?
     <div class="sg"><div>Prepared by (stockist)</div><div>Checked by</div><div>Approved by</div></div>
     <script>window.onload=function(){setTimeout(function(){print()},400)}<\/script></body></html>`); };
 function kinvList() {
-  D.klist ||= (S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT).map(x => ({...x}));
+  D.klist ||= kMigrate(S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT).map(x => ({...x}));
   return `<p class="lede">Dishes shown on the daily count. <b>Min</b> is the low-stock level (blank = 5). Hidden dishes keep their history.</p><div class="card">
    ${D.klist.map((x, i) => `<div class="row" style="gap:6px;margin-bottom:6px;flex-wrap:wrap;${x.off ? 'opacity:.5' : ''}"><input data-b="klist.${i}.name" style="flex:2;min-width:170px"><label style="margin:0;width:78px" title="Flag as low when the ending is below this"><input type="number" min="0" inputmode="numeric" data-b="klist.${i}.min" placeholder="Min 5" style="padding:8px 6px"></label><select data-b="klist.${i}.prot" style="flex:1;min-width:120px" title="Protein group">${opt('', 'Protein: ' + kProt({...x, prot: ''}))}${KPROT.map(p => opt(p, p)).join('')}</select><select data-b="klist.${i}.cat" style="flex:1;min-width:150px">${[...new Set([...KINV_CATS, x.cat])].map(c => opt(c, c)).join('')}</select>
      <button class="sm ghost" data-act="kListToggle" data-arg="${i}">${x.off ? 'Show' : 'Hide'}</button>${x.id.startsWith('n') ? `<button class="sm ghost" data-act="kListRm" data-arg="${i}">✕</button>` : ''}</div>`).join('')}
