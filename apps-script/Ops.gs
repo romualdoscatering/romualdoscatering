@@ -829,6 +829,8 @@ function kinvMail(d, updated, cfg, me) {
     (groups[cat] = groups[cat] || []).push({ name: name, r: r, ord: it ? items.indexOf(it) : 999 }); R.push(r); if (r.n) notes.push(name + ': ' + r.n);
   });
   const S = function (k) { return Math.round(R.reduce(function (a, r) { return a + (Number(r[k]) || 0); }, 0) * 100) / 100; };
+  const low = []; Object.keys(d.rows || {}).forEach(function (id) { const it = items.filter(function (x) { return x.id === id; })[0], mn = it && it.min !== undefined && it.min !== '' ? Number(it.min) : ((d.mins || {})[id] !== undefined ? Number(d.mins[id]) : 5);
+    if (Number(d.rows[id].e) < mn) low.push(esc(it ? it.name : ((d.names || {})[id] || id)) + ' <b>' + esc(d.rows[id].e) + '</b>'); });
   const neg = R.filter(function (r) { return Number(r.e) < 0; }).length;
   const day = Utilities.formatDate(new Date(d.date + 'T00:00:00+08:00'), 'Asia/Manila', 'EEEE, MMMM d, yyyy');
   const cats = Object.keys(groups).sort(function (a, b) { const x = KINV_CAT_ORDER.indexOf(a), y = KINV_CAT_ORDER.indexOf(b); return (x < 0 ? 99 : x) - (y < 0 ? 99 : y); });
@@ -840,10 +842,10 @@ function kinvMail(d, updated, cfg, me) {
   const stat = function (l, v) { return '<td style="background:#F3EFE2;border-radius:6px;padding:6px 10px"><div style="font-size:10px;color:#5B6478;text-transform:uppercase">' + l + '</div><div style="font-size:17px;font-weight:700">' + v + '</div></td>'; };
   const html = '<div style="font-family:Arial,sans-serif;color:#14213F;max-width:640px">' +
     '<div style="background:#1A2C54;color:#fff;padding:12px 16px;border-radius:10px 10px 0 0"><b style="font-size:16px">Kitchen stocks · daily report' + (updated ? ' (updated)' : '') + '</b><div style="font-size:12px;color:#E5DEB2">' + esc(day) + ' · encoded by ' + esc(d.by || me.username) + '</div></div>' +
-    '<table style="border-spacing:6px;margin:6px -6px"><tr>' + stat('Dishes', R.length) + stat('Stock in', S('i')) + stat('Pulled out', S('o')) + stat('Sold', S('s')) + stat('Ending', S('e')) + (neg ? stat('Below zero', neg) : '') + '</tr></table>' + table +
+    (low.length ? '<div style="background:#FCEBC2;border-left:4px solid #E89908;padding:8px 10px;margin:8px 0;font-size:13px"><b>⚠ Low stock (' + low.length + '):</b> ' + low.join(' · ') + '<br><span style="font-size:11.5px;color:#5B6478">Print the restock list in Ops → Kitchen stocks → Restock list.</span></div>' : '') + '<table style="border-spacing:6px;margin:6px -6px"><tr>' + stat('Dishes', R.length) + stat('Stock in', S('i')) + stat('Pulled out', S('o')) + stat('Sold', S('s')) + stat('Ending', S('e')) + (neg ? stat('Below zero', neg) : '') + '</tr></table>' + table +
     (notes.length ? '<p style="font-size:12.5px;margin:10px 0 4px"><b>Notes</b></p>' + notes.map(function (n) { return '<div style="font-size:12.5px">* ' + esc(n) + '</div>'; }).join('') : '') +
     '<p style="font-size:11px;color:#5B6478;margin-top:14px">Sent automatically when the day is saved in Romualdo\'s Ops (Kitchen stocks). The PDF copy is attached.</p></div>';
   const pdf = Utilities.newBlob('<html><body>' + html + '</body></html>', 'text/html', 'k.html').getAs('application/pdf').setName('Kitchen Stocks ' + d.date + (updated ? ' (updated)' : '') + '.pdf');
-  MailApp.sendEmail(KINV_MAIL_TO, 'Kitchen stocks · ' + Utilities.formatDate(new Date(d.date + 'T00:00:00+08:00'), 'Asia/Manila', 'EEE, MMM d, yyyy') + ' · ' + S('s') + ' sold' + (updated ? ' (updated)' : ''),
+  MailApp.sendEmail(KINV_MAIL_TO, 'Kitchen stocks · ' + Utilities.formatDate(new Date(d.date + 'T00:00:00+08:00'), 'Asia/Manila', 'EEE, MMM d, yyyy') + ' · ' + S('s') + ' sold' + (low.length ? ' · ' + low.length + ' low' : '') + (updated ? ' (updated)' : ''),
     'Kitchen stocks daily report for ' + day + ', encoded by ' + (d.by || me.username) + '. Sold: ' + S('s') + '. Pulled out: ' + S('o') + '. See the attached PDF.', { name: "Romualdo's Ops", htmlBody: html, attachments: [pdf] });
 }
