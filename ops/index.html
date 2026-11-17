@@ -1934,8 +1934,8 @@ const KINV_DEFAULT = [
   ['Uy, Patikim!', 'Chicken Inasal Chops, Romualdo’s Fried Chicken, Garlic Fried Chicken, Oxtail Tripe Beef Kare-Kare, Lengua in Mushroom Gravy, Signature Caldereta, Bistek Tagalog, Crispy Pata, Bagnet, Lumpia Shanghai, Inihaw na Liempo, Classic Dinuguan'],
   ['Tara, Dagat', 'Tuna Bicol Express, Kinilaw na Malasugue, Inihaw na Tuna Belly, Adobong Pusit, Garlic Pepper Shrimp'],
   ['Mag-isa Ngunit Masaya', 'Pritong Porkchop, Tokwa Sisig'],
-  ['Oh, Maiba Naman', 'Bistek at Kesong Puti Ciabatta, Kimchi Sinigang sa Watermelon, Sinigang Rice, Bulad Rice'],
-  ['Para sa Paborito Kong Apo', 'Chicken Tenders, Chicken Croquettes, Filipino Meaty Spaghetti'],
+  ['Oh, Maiba Naman', 'Kimchi Sinigang sa Watermelon, Sinigang Rice, Bulad Rice'],
+  ['Para sa Paborito Kong Apo', 'Chicken Tenders, Filipino Meaty Spaghetti'],
   ['Merienda-serye', 'Puto at Dinuguan, Fresh Lumpia']
 ].flatMap(([cat, list]) => list.split(', ').map(name => ({id: 'k' + name.toLowerCase().normalize('NFD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40), name, cat})));
 const KPROT = ['Chicken', 'Pork', 'Beef', 'Fish & Seafood', 'Veggies and Produce', 'Rice', 'Noodles & Pasta', 'Others'];
@@ -1952,8 +1952,8 @@ const KPROT_DEF = {'Beef Tapa': 'Beef', 'Classic Adobo (Chicken/Pork)': 'Chicken
 const kProt = it => (it.prot === 'Vegetables' ? 'Veggies and Produce' : it.prot) || KPROT_DEF[it.name] || (KINV_DEFAULT.find(x => x.id === it.id) && KPROT_DEF[KINV_DEFAULT.find(x => x.id === it.id).name]) || 'Others';
 const kGroupBy = () => { let g = D.ui.kGroup; if (!g) { try { g = localStorage.getItem('rcs_kgroup') || 'menu'; } catch (e) { g = 'menu'; } D.ui.kGroup = g; } return g === 'prot' ? 'prot' : 'menu'; };
 function kMigrate(L) {
-  if (!L.some(x => ['Classic Adobo (Chicken/Pork)', 'Tamarind Wings', 'Skinless Longganisa'].includes(x.name))) return L;
-  return L.flatMap(x => x.name === 'Classic Adobo (Chicken/Pork)' ? [{...x, id: 'kchicken-adobo', name: 'Chicken Adobo', prot: undefined}, {...x, id: 'kpork-adobo', name: 'Pork Adobo', prot: undefined}] : ['Tamarind Wings', 'Skinless Longganisa'].includes(x.name) ? [] : [x]);
+  if (!L.some(x => ['Classic Adobo (Chicken/Pork)', 'Tamarind Wings', 'Skinless Longganisa', 'Chicken Croquettes', 'Bistek at Kesong Puti Ciabatta'].includes(x.name))) return L;
+  return L.flatMap(x => x.name === 'Classic Adobo (Chicken/Pork)' ? [{...x, id: 'kchicken-adobo', name: 'Chicken Adobo', prot: undefined}, {...x, id: 'kpork-adobo', name: 'Pork Adobo', prot: undefined}] : ['Tamarind Wings', 'Skinless Longganisa', 'Chicken Croquettes', 'Bistek at Kesong Puti Ciabatta'].includes(x.name) ? [] : [x]);
 }
 const kItems = () => kMigrate(S.config.kitchenItems && S.config.kitchenItems.length ? S.config.kitchenItems : KINV_DEFAULT).filter(x => !x.off);
 const KF = [['b', 'Beg'], ['i', 'In'], ['o', 'Pull-out'], ['s', 'Sold']];
@@ -2026,7 +2026,7 @@ async function kAutoPush() {
 document.addEventListener('input', e => { if (e.target.closest && e.target.closest('#view') && /^kinv\.(rows|by)/.test(e.target.dataset?.b || '') && D.kinv) { D.kinv.dirty = Date.now(); kAutoQueue(); } }, true);
 /* ---------- POS sales report → "Sold" (auto-read, then the encoder checks and edits) ---------- */
 const KPOS_ALIAS = {'rfc': 'Romualdo’s Fried Chicken', 'gfc': 'Garlic Fried Chicken', 'shanghai': 'Lumpia Shanghai', 'kare kare': 'Oxtail Tripe Beef Kare-Kare', 'karekare': 'Oxtail Tripe Beef Kare-Kare', 'caldereta': 'Signature Caldereta',
-  'sisig': 'Sizzling Sisig', 'inasal': 'Chicken Inasal Chops', 'liempo': 'Inihaw na Liempo', 'spaghetti': 'Filipino Meaty Spaghetti', 'tenders': 'Chicken Tenders', 'croquettes': 'Chicken Croquettes', 'tinola': 'Native Chicken Tinola',
+  'sisig': 'Sizzling Sisig', 'inasal': 'Chicken Inasal Chops', 'liempo': 'Inihaw na Liempo', 'spaghetti': 'Filipino Meaty Spaghetti', 'tenders': 'Chicken Tenders', 'tinola': 'Native Chicken Tinola',
   'sinigang': 'Sinigang na Pork Belly', 'lengua': 'Lengua in Mushroom Gravy', 'bicol express': 'Tuna Bicol Express', 'luncheon': 'Homemade Luncheon Meat', 'bacon': 'Larry’s Bacon', 'ubod': 'Pritong Lumpia Ubod', 'laing': 'Crabmeat Laing with Aligue'};
 const kNorm = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’']/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
 function kBigrams(s) { s = ' ' + s + ' '; const m = new Map(); for (let i = 0; i < s.length - 1; i++) { const g = s.slice(i, i + 2); m.set(g, (m.get(g) || 0) + 1); } return m; }
