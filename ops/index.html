@@ -87,6 +87,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--line)}
 .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .lines td{padding:5px 4px;border-bottom:1px dashed var(--line)}
 .lines input,.lines select{padding:7px 8px}
+.bday{border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:10px;padding:10px 12px;margin:0 0 12px;background:#fdfcf8}
+.bday-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}.bday-h b{color:var(--navy)}.bday-h .bday-t{font-size:15px}
+.dmode{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px}
 .lines input[type=number]{min-width:78px}
 .lines select{min-width:170px}
 .acts{white-space:nowrap}.acts .sm+.sm{margin-left:4px}
@@ -408,6 +411,7 @@ function live() {
     const [k, a, b] = el.dataset.live.split(':'); let h;
     if (k === 'line') { const l = D[a].lines[b]; h = peso(num(l.qty) * num(l.cost)); }
     else if (k === 'bline') { const B = getPath(D, a), x = B?.sections?.[b]; if (!x) return; const pax = a === 'sheet.bill' ? D.sheet.pax : D.bill?.pax; const q = String(x.qty ?? '').trim() !== '' ? num(x.qty) : num(pax); const dd = a === 'bill' ? lineDays(x, D.bill) : 1; h = num(x.rate) ? peso(num(x.rate) * q * dd) + (dd > 1 ? `<div class="small mut">${fq(q)} × ${dd} days</div>` : '') : ''; }
+    else if (k === 'bday') { const B = D.bill, C = billCalc({...B, sections: (B.sections || []).filter(x => x.day === a)}, B.pax); h = C.any ? 'Day total ' + peso(C.subtotal) : ''; }
     else if (k === 'btot') { h = billTotalsHtml(a === 'sheet.bill' ? sheetBillCalc(D.sheet) : billCalc(D.bill, D.bill?.pax)); }
     else if (k === 'flag') h = priceFlag(D[a].lines[b]);
     else if (k === 'total') h = peso(sum(D[a].lines, l => num(l.qty) * num(l.cost)));
@@ -1092,10 +1096,12 @@ const PAY_STATUS = [['unpaid', 'Unpaid'], ['partial', 'Partially paid'], ['paid'
 const BILL_DEFAULTS = {billAddress: 'Door 1 LPS Bldg, Nacilla Village, Ma-a, Davao City 8000', billContact: 'Mobile: (0995) 540-0308 · Email: romualdoscatering@gmail.com · Messenger: Jp Domingo', payInfo: ''};
 const billCfg = k => (S.config[k] ?? '') !== '' ? S.config[k] : BILL_DEFAULTS[k];
 const newBillParts = () => ({sections: [{title: '', rate: '', qty: '', items: ''}], extras: [], discount: '', paid: '', paidNote: ''});
-const newBill = (o = {}) => ({id: '', no: '', issued: today(), due: '', status: 'unpaid', client: '', contact: '', address: '', email: '', mobile: '', eventDate: '', eventDateTo: '', eventTime: '', pax: '', venue: '', eventId: '', notes: '', ...newBillParts(), ...o});
+const newBill = (o = {}) => ({id: '', no: '', issued: today(), due: '', status: 'unpaid', client: '', contact: '', address: '', email: '', mobile: '', eventDate: '', eventDateTo: '', eventTime: '', pax: '', venue: '', service: '', diet: '', perDay: false, eventId: '', notes: '', ...newBillParts(), ...o});
 /* multi-day statements: eventDate = first day, eventDateTo = last day (optional) */
 const billDays = b => { if (!b?.eventDate || !b?.eventDateTo || b.eventDateTo <= b.eventDate) return 1; return Math.round((new Date(b.eventDateTo + 'T00:00') - new Date(b.eventDate + 'T00:00')) / 864e5) + 1; };
-const lineDays = (s, b) => { const all = billDays(b); if (all < 2) return 1; const v = String(s.days ?? '').trim(); return v === '' ? all : Math.max(0, num(v)); };
+const isPerDay = b => !!b?.perDay && billDays(b) > 1;
+const billDayKeys = b => Array.from({length: billDays(b)}, (_, i) => { const d = new Date(b.eventDate + 'T00:00'); d.setDate(d.getDate() + i); return dstr(d); });
+const lineDays = (s, b) => { const all = billDays(b); if (all < 2 || isPerDay(b)) return 1; const v = String(s.days ?? '').trim(); return v === '' ? all : Math.max(0, num(v)); };
 function fmtRange(a, z, long) {
   if (!a) return ''; if (!z || z <= a) return long ? fmtLong(a) : fmtD(a);
   const A = new Date(a + 'T00:00'), Z = new Date(z + 'T00:00'), M = d => d.toLocaleDateString('en-PH', {month: long ? 'long' : 'short'});
@@ -1106,7 +1112,7 @@ function fmtRange(a, z, long) {
 const dayList = (a, n) => Array.from({length: n}, (_, i) => { const d = new Date(a + 'T00:00'); d.setDate(d.getDate() + i); return d.toLocaleDateString('en-PH', {weekday: 'short', month: 'short', day: 'numeric'}); });
 function billCalc(b, defPax, pre = []) {
   const qOf = s => String(s.qty ?? '').trim() !== '' ? num(s.qty) : num(defPax);
-  const lines = pre.concat((b?.sections || []).filter(s => (s.title || '').trim() || num(s.rate)).map(s => ({label: (s.title || '').trim() || 'Item', items: s.items || '', rate: num(s.rate), qty: qOf(s), unit: s.unit || '', days: lineDays(s, b)})))
+  const lines = pre.concat((b?.sections || []).filter(s => (s.title || '').trim() || num(s.rate)).map(s => ({label: (s.title || '').trim() || 'Item', items: s.items || '', rate: num(s.rate), qty: qOf(s), unit: s.unit || '', days: lineDays(s, b), day: isPerDay(b) ? s.day || '' : '', time: (s.time || '').trim()})))
     .map(l => ({...l, days: l.days ?? 1, amount: r2(l.rate * l.qty * (l.days ?? 1))}));
   const extras = (b?.extras || []).filter(x => (x.label || '').trim() || num(x.amount)).map(x => ({label: (x.label || '').trim() || 'Other charge', amount: r2(num(x.amount))}));
   const subtotal = r2(lines.reduce((a, l) => a + l.amount, 0) + extras.reduce((a, x) => a + x.amount, 0)), discount = r2(num(b?.discount)), total = r2(Math.max(0, subtotal - discount)), paid = r2(num(b?.paid));
@@ -1116,8 +1122,21 @@ function billCalc(b, defPax, pre = []) {
 const sheetPriced = d => (d.kind || 'catering') === 'catering' ? [] : (d.menu || []).filter(m => (m.dish || '').trim() && num(m.price) > 0)
   .map(m => ({label: m.dish.trim(), items: m.note || '', rate: num(m.price), qty: parseFloat(m.qty) || 1, unit: lineType(m, d.kind) === 'main' ? (d.kind === 'packs' ? 'pack' : 'tray') : ''}));
 const sheetBillCalc = d => billCalc(d.bill || {}, d.pax, sheetPriced(d));
+const BILL_DAY_TEMPLATE = ['AM snacks', 'Lunch', 'PM snacks'];
+function billDaysEditor(b, o) {
+  const money = 'type="number" inputmode="decimal" min="0" step="any"', keys = billDayKeys(b);
+  return keys.map((k, di) => { const rows = (b.sections || []).map((s, i) => [s, i]).filter(([s]) => s.day === k);
+    return `<div class="bday"><div class="bday-h"><b>Day ${di + 1}</b><span>${esc(fmtLong(k))}</span><span class="spacer"></span>${di ? `<button class="sm ghost" data-act="billCopyDay" data-arg="${k}" title="Same meals, times and rates as the day before; menu left blank">⧉ Copy meals from Day ${di}</button>` : ''}<b class="bday-t" data-live="bday:${k}"></b></div>
+     <div class="tw"><table class="lines"><thead><tr><th style="min-width:130px">Meal</th><th style="width:130px">Time</th><th style="min-width:200px">Menu <span class="small mut">(one per line)</span></th><th style="width:100px">Rate ₱</th><th style="width:90px">Qty / pax</th><th class="n" style="width:110px">Amount</th><th style="width:36px"></th></tr></thead><tbody>
+     ${rows.map(([s, i]) => `<tr><td><input data-b="bill.sections.${i}.title" placeholder="e.g. AM snacks" autocapitalize="words"></td><td><input data-b="bill.sections.${i}.time" placeholder="e.g. 8:00 AM"></td><td><textarea data-b="bill.sections.${i}.items" rows="2" placeholder="Egg Sandwich"></textarea></td>
+       <td><input data-b="bill.sections.${i}.rate" ${money} placeholder="per head"></td><td><input data-b="bill.sections.${i}.qty" type="number" inputmode="decimal" min="0" step="any" placeholder="${esc(b.pax ? String(b.pax) : 'guests')}"></td>
+       <td class="n" style="padding-top:12px" data-live="bline:bill:${i}"></td><td><button class="sm ghost" data-act="billRm" data-arg="bill|sections|${i}">✕</button></td></tr>`).join('') || '<tr><td colspan="7" class="small mut" style="padding:10px">No meals for this day yet.</td></tr>'}
+     </tbody></table></div><button class="sm" data-act="billAddDay" data-arg="${k}">＋ Add meal for ${esc(fmtD(k))}</button></div>`; }).join('') + `<p class="small mut" style="margin:6px 0 10px">Blank qty uses the guaranteed pax (${esc(b.pax || '—')}).</p>`;
+}
 function billEditor(path, o = {}) {
-  const b = getPath(D, path) || {}, inp = (k, ph = '', ex = '') => `<input data-b="${path}.${k}" placeholder="${esc(ph)}" ${ex}>`, money = 'type="number" inputmode="decimal" min="0" step="any"';
+  const b = getPath(D, path) || {};
+  if (path === 'bill' && isPerDay(b) && o.sections !== false) return billDaysEditor(b, o) + billEditor(path, {...o, sections: false});
+  const inp = (k, ph = '', ex = '') => `<input data-b="${path}.${k}" placeholder="${esc(ph)}" ${ex}>`, money = 'type="number" inputmode="decimal" min="0" step="any"';
   return `${o.sections === false ? '' : `<div class="tw"><table class="lines"><thead><tr><th style="min-width:180px">${o.secLabel || 'What is billed'}</th>${o.items ? '<th style="min-width:200px">Items / menu <span class="small mut">(one per line)</span></th>' : ''}<th style="width:120px">Rate ₱</th><th style="width:110px">Qty / pax</th>${billDays(b) > 1 ? '<th style="width:90px">Days</th>' : ''}<th class="n" style="width:120px">Amount</th><th style="width:30px"></th></tr></thead><tbody>
     ${(b.sections || []).map((s, i) => `<tr><td><input data-b="${path}.sections.${i}.title" placeholder="${esc(o.secPh || 'e.g. Lunch (packed meal)')}" autocapitalize="words"></td>${o.items ? `<td><textarea data-b="${path}.sections.${i}.items" rows="2" placeholder="Chicken Teriyaki&#10;Yasai Itame"></textarea></td>` : ''}
       <td><input data-b="${path}.sections.${i}.rate" ${money} placeholder="per head"></td><td><input data-b="${path}.sections.${i}.qty" type="number" inputmode="decimal" min="0" step="any" placeholder="${esc(o.defPax ? String(o.defPax) : 'guests')}"></td>${billDays(b) > 1 ? `<td><input data-b="${path}.sections.${i}.days" type="number" inputmode="numeric" min="0" step="1" placeholder="${billDays(b)}" title="Days this line is served. Blank = all ${billDays(b)} days."></td>` : ''}
@@ -1152,10 +1171,11 @@ V.billing = () => {
    <h4 class="sub">1. Bill to</h4>
    <div class="grid">${lab('Name / account', inp('client', 'e.g. Landbank, Mindanao Lending Group', 'text', 'autocapitalize="words"'))}${lab('Contact person', inp('contact', 'e.g. Ms. Karina Lascano', 'text', 'autocapitalize="words"'))}${lab('Address', inp('address', '', 'text', 'autocapitalize="words"'))}${lab('Email', inp('email', '', 'email'))}${lab('Mobile / tel. no.', inp('mobile', '', 'tel'))}</div>
    <h4 class="sub">2. Event</h4>
-   <div class="grid">${lab(billDays(b) > 1 ? 'First day' : 'Date of event', inp('eventDate', '', 'date'))}${lab('Last day <span class="small mut" style="font-weight:400">(if more than 1 day)</span>', inp('eventDateTo', '', 'date', b.eventDate ? `min="${b.eventDate}"` : ''))}${lab('Time of event', inp('eventTime', 'e.g. 9:00 AM – 3:00 PM, or Varied'))}${lab('Guaranteed pax', inp('pax', '33', 'number', 'inputmode="numeric" min="0"'))}${lab('Venue', inp('venue', '', 'text', 'autocapitalize="words"'))}</div>
+   <div class="grid">${lab(billDays(b) > 1 ? 'First day' : 'Date of event', inp('eventDate', '', 'date'))}${lab('Last day <span class="small mut" style="font-weight:400">(if more than 1 day)</span>', inp('eventDateTo', '', 'date', b.eventDate ? `min="${b.eventDate}"` : ''))}${lab('Time of event', inp('eventTime', 'e.g. 9:00 AM – 3:00 PM, or Varied'))}${lab('Guaranteed pax', inp('pax', '33', 'number', 'inputmode="numeric" min="0"'))}${lab('Venue', inp('venue', '', 'text', 'autocapitalize="words"'))}${lab('Service', inp('service', 'e.g. Food packs, Buffet', 'text', 'list="dl-svc"'))}${lab('Food notes / restrictions', inp('diet', 'e.g. Non-pork / no seafood'))}</div><datalist id="dl-svc"><option value="Food packs"><option value="Packed meals"><option value="Buffet"><option value="Food trays"><option value="Grazing station"></datalist>
    ${billDays(b) > 1 ? `<p class="small" style="margin:-4px 0 8px;color:var(--navy)"><b>${billDays(b)} days:</b> ${esc(fmtRange(b.eventDate, b.eventDateTo, true))} · ${dayList(b.eventDate, billDays(b)).join(' · ')}</p>` : ''}
    <h4 class="sub">3. Approved menu &amp; rates</h4>
-   <p class="small mut" style="margin:0 0 6px">One line per meal or package, e.g. <i>AM snack</i> at ₱250/head with its items. The amount is the rate × guests${billDays(b) > 1 ? ' × days' : ''}.</p>
+   ${billDays(b) > 1 ? `<div class="dmode"><span class="small"><b>Menu:</b></span><div class="seg"><button class="${b.perDay ? '' : 'on'}" data-act="billPerDay" data-arg="0">Same every day</button><button class="${b.perDay ? 'on' : ''}" data-act="billPerDay" data-arg="1">Different menu each day</button></div></div>` : ''}
+   <p class="small mut" style="margin:0 0 6px">${isPerDay(b) ? 'Encode each day\'s meals with their delivery time, menu and rate per head. The amount is the rate × guests.' : ''}${isPerDay(b) ? '' : 'One line per meal or package, e.g. <i>AM snack</i> at ₱250/head with its items. '}${isPerDay(b) ? '' : `The amount is the rate × guests${billDays(b) > 1 ? ' × days' : ''}.`}</p>
    ${billEditor('bill', {items: true, defPax: b.pax, secLabel: 'Meal / package', secPh: 'e.g. AM snack', secAdd: 'meal or package'})}
    <h4 class="sub">4. Statement</h4>
    <div class="grid">${lab('Statement no.', inp('no', b.id ? '' : billNo() + ' (automatic)'))}${lab('Date issued', inp('issued', '', 'date'))}${lab('Due date', inp('due', '', 'date'))}${lab('Status', sel('bill.status', PAY_STATUS.map(([v, l]) => opt(v, l)).join(''), false))}</div>
@@ -1171,8 +1191,28 @@ V.billing = () => {
   </div>`;
 };
 ACT.billNew = () => { D.bill = newBill(); render(); };
+ACT.billPerDay = v => {
+  const b = D.bill, on = v === '1'; if (!!b.perDay === on) return;
+  const secs = (b.sections || []).filter(s => (s.title || '').trim() || num(s.rate) || (s.items || '').trim());
+  if (on) {
+    const base = secs.length ? secs : BILL_DAY_TEMPLATE.map(t => ({title: t, rate: '', qty: '', items: ''}));
+    b.sections = billDayKeys(b).flatMap((k, di) => base.map(s => ({title: s.title || '', time: s.time || '', rate: s.rate || '', qty: s.qty || '', items: di ? '' : s.items || '', days: '', day: k})));
+  } else {
+    if (secs.some(s => s.day && s.day !== b.eventDate && (s.items || '').trim()) && !confirm('Switch to the same menu every day? Only Day 1\'s meals are kept.')) return;
+    const d1 = secs.filter(s => !s.day || s.day === b.eventDate); b.sections = (d1.length ? d1 : [{title: '', rate: '', qty: '', items: ''}]).map(s => ({...s, day: '', days: ''}));
+  }
+  b.perDay = on; render();
+};
+ACT.billAddDay = k => { const b = D.bill, secs = b.sections ||= [], last = secs.map(s => s.day).lastIndexOf(k); secs.splice(last < 0 ? secs.length : last + 1, 0, {title: '', time: '', rate: '', qty: '', items: '', days: '', day: k}); render(); };
+ACT.billCopyDay = k => {
+  const b = D.bill, keys = billDayKeys(b), prev = keys[keys.indexOf(k) - 1]; if (!prev) return;
+  const mine = b.sections.filter(s => s.day === k);
+  if (mine.some(s => (s.items || '').trim()) && !confirm(`Replace the meals already typed for ${fmtD(k)}?`)) return;
+  const copy = b.sections.filter(s => s.day === prev).map(s => ({...s, items: '', day: k}));
+  b.sections = b.sections.filter(s => s.day !== k); const at = b.sections.map(s => s.day).lastIndexOf(prev); b.sections.splice(at + 1, 0, ...copy); render();
+};
 ACT.billEdit = id => { const x = S.bills.find(b => b.id === id); if (!x) return; D.bill = JSON.parse(JSON.stringify({...newBill(), ...x, pax: String(x.pax ?? ''), discount: String(x.discount ?? ''), paid: String(x.paid ?? ''),
-  sections: (x.sections || []).map(s => ({...s, rate: String(s.rate ?? ''), qty: String(s.qty ?? ''), days: String(s.days ?? '')})), extras: (x.extras || []).map(e => ({...e, amount: String(e.amount ?? '')}))})); render(); document.getElementById('billForm')?.scrollIntoView({behavior: 'smooth'}); };
+  sections: (x.sections || []).map(s => ({...s, rate: String(s.rate ?? ''), qty: String(s.qty ?? ''), days: String(s.days ?? ''), time: s.time || '', day: s.day || ''})), extras: (x.extras || []).map(e => ({...e, amount: String(e.amount ?? '')}))})); render(); document.getElementById('billForm')?.scrollIntoView({behavior: 'smooth'}); };
 ACT.billFromEvent = () => {
   const id = $('#billFromEv')?.value, e = S.events[id]; if (!e) return toast('Choose an event first.', true);
   const d = sheetOf(e), k = d.kind || 'catering', b = D.bill, has = (b.sections || []).some(s => s.title || s.rate);
@@ -1189,8 +1229,8 @@ ACT.billFromEvent = () => {
 };
 function billPayload(b) {
   const clean = {no: (b.no || '').trim() || billNo(), issued: b.issued || today(), due: b.due || '', status: b.status || 'unpaid', client: titleCase(b.client), contact: (b.contact || '').trim(), address: (b.address || '').trim(), email: (b.email || '').trim(), mobile: (b.mobile || '').trim(),
-    eventDate: b.eventDate || '', eventDateTo: billDays(b) > 1 ? b.eventDateTo : '', eventTime: (b.eventTime || '').trim(), pax: num(b.pax) || '', venue: (b.venue || '').trim(), eventId: b.eventId || '', notes: (b.notes || '').trim(),
-    sections: (b.sections || []).filter(s => (s.title || '').trim() || num(s.rate) || (s.items || '').trim()).map(s => ({title: (s.title || '').trim(), rate: num(s.rate), qty: String(s.qty ?? '').trim() === '' ? '' : num(s.qty), items: (s.items || '').trim(), days: billDays(b) > 1 && String(s.days ?? '').trim() !== '' ? num(s.days) : ''})),
+    eventDate: b.eventDate || '', eventDateTo: billDays(b) > 1 ? b.eventDateTo : '', eventTime: (b.eventTime || '').trim(), pax: num(b.pax) || '', venue: (b.venue || '').trim(), service: (b.service || '').trim(), diet: (b.diet || '').trim(), perDay: isPerDay(b), eventId: b.eventId || '', notes: (b.notes || '').trim(),
+    sections: (b.sections || []).filter(s => (s.title || '').trim() || num(s.rate) || (s.items || '').trim()).map(s => ({title: (s.title || '').trim(), rate: num(s.rate), qty: String(s.qty ?? '').trim() === '' ? '' : num(s.qty), items: (s.items || '').trim(), days: billDays(b) > 1 && !isPerDay(b) && String(s.days ?? '').trim() !== '' ? num(s.days) : '', ...(isPerDay(b) ? {day: s.day || b.eventDate, time: (s.time || '').trim()} : {})})),
     extras: (b.extras || []).filter(x => (x.label || '').trim() || num(x.amount)).map(x => ({label: (x.label || '').trim(), amount: num(x.amount)})), discount: num(b.discount), paid: num(b.paid), paidNote: (b.paidNote || '').trim()};
   return clean;
 }
@@ -1213,12 +1253,15 @@ const BILL_CSS = `.bill-h{display:flex;align-items:center;gap:6mm;padding-bottom
 .am .c{font-size:7.2pt;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--acc);margin-top:2.6mm}.am .c i{font-style:normal;color:var(--wine);letter-spacing:.06em}.am .d{font-family:Alta,'Playfair Display',Georgia,serif;font-style:italic;font-size:11pt;line-height:1.3;color:var(--ink)}
 table.bd{width:100%;border-collapse:collapse;margin-top:1mm}.bd th{font-size:6.8pt;letter-spacing:.16em;text-transform:uppercase;color:var(--lab);font-weight:600;text-align:left;border-bottom:.9pt solid var(--ink);padding:1.2mm 1.5mm}
 .bd td{padding:1.5mm;border-bottom:.6pt solid #CFC8B0;vertical-align:top}.bd .r{text-align:right;white-space:nowrap}.bd td.l{font-weight:600;color:var(--ink)}.bd td.l small{display:block;font-weight:400;color:var(--lab);font-size:7.6pt}
+.bd tr.dh td{background:#F3EFE3;font-size:7.4pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink);padding:1.4mm 1.5mm;border-bottom:.6pt solid var(--rule)}.bd tr.dh td.r{letter-spacing:0;font-size:8.6pt}
+.amd{display:grid;gap:4mm;margin-top:2mm;text-align:center}.amd>div{border:.6pt solid var(--rule);border-radius:2mm;padding:2.4mm 2mm 3mm}.amd h4{margin:0;font:600 7pt Montserrat,Arial,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--ink)}.amd h4 small{display:block;font:italic 400 9pt 'Playfair Display',Georgia,serif;letter-spacing:0;text-transform:none;color:var(--lab);margin-top:.4mm}
+.amd .c{margin-top:2.2mm}.amd .t{font-size:7pt;color:var(--lab);letter-spacing:.04em}.amd .d{font-size:10pt}
 .bd tfoot td{border:0;padding:1mm 1.5mm}.bd tfoot .tt td{border-top:1.4pt solid var(--ink);font-size:12pt;font-weight:700;color:var(--ink);padding-top:2mm}.bd tfoot .bal td{font-size:11pt;font-weight:700;color:var(--wine)}
 .pay{margin-top:4mm;border:.8pt dashed var(--rule);border-radius:2mm;padding:2.5mm 4mm;font-size:8.6pt;white-space:pre-wrap}.pay b{color:var(--ink);font-size:7pt;letter-spacing:.18em;text-transform:uppercase;display:block;margin-bottom:.8mm}
 .pb{page-break-before:always;break-before:page}`;
 function billBreakdownHtml(C, b) {
   return `<table class="bd"><thead><tr><th>Description</th><th class="r">Rate</th><th class="r">Qty</th><th class="r">Amount</th></tr></thead><tbody>
-${C.lines.map(l => `<tr><td class="l">${esc(l.label)}${l.items && !b.hideItems ? `<small>${esc(l.items.split('\n').filter(Boolean).join(' · '))}</small>` : ''}</td><td class="r">${peso(l.rate)}</td><td class="r">${fq(l.qty)}${l.unit ? ' ' + esc(l.unit) + (l.qty === 1 ? '' : 's') : ''}${l.days > 1 ? ` × ${l.days} days` : ''}</td><td class="r">${peso(l.amount)}</td></tr>`).join('')}
+${(C.lines.some(l => l.day) ? [...new Set(C.lines.map(l => l.day))].flatMap(d => { const ls = C.lines.filter(l => l.day === d); return [{dayHead: d, sub: r2(ls.reduce((a, l) => a + l.amount, 0))}, ...ls]; }) : C.lines).map(l => l.dayHead !== undefined ? `<tr class="dh"><td colspan="3">${esc(l.dayHead ? fmtLong(l.dayHead) : 'Other')}</td><td class="r">${peso(l.sub)}</td></tr>` : `<tr><td class="l">${esc(l.label)}${l.time && l.day ? ` <span style="font-weight:400;color:var(--lab)">· ${esc(l.time)}</span>` : ''}${l.items && !b.hideItems ? `<small>${esc(l.items.split('\n').filter(Boolean).join(' · '))}</small>` : ''}</td><td class="r">${peso(l.rate)}</td><td class="r">${fq(l.qty)}${l.unit ? ' ' + esc(l.unit) + (l.qty === 1 ? '' : 's') : ''}${l.days > 1 ? ` × ${l.days} days` : ''}</td><td class="r">${peso(l.amount)}</td></tr>`).join('')}
 ${C.extras.map(x => `<tr><td class="l">${esc(x.label)}</td><td></td><td></td><td class="r">${peso(x.amount)}</td></tr>`).join('')}</tbody>
 <tfoot>${C.discount || C.paid ? `<tr><td colspan="3" class="r">Subtotal</td><td class="r">${peso(C.subtotal)}</td></tr>` : ''}${C.discount ? `<tr><td colspan="3" class="r">Less discount</td><td class="r">− ${peso(C.discount)}</td></tr>` : ''}
 <tr class="tt"><td colspan="3">TOTAL</td><td class="r">${peso(C.total)}</td></tr>
@@ -1235,8 +1278,10 @@ function printBill(id, w) {
 <div class="meta">No. ${esc(b.no)}<br><span class="status">${esc(st)}</span><br>Issued ${esc(fmtLong(b.issued).replace(/^\w+, /, ''))}${b.due ? '<br>Due ' + esc(fmtLong(b.due).replace(/^\w+, /, '')) : ''}</div></div>
 <p class="addr">${esc(billCfg('billAddress'))}<br>${esc(billCfg('billContact'))}</p>
 <div class="boxes"><div><h3>Bill to</h3>${pr('Name / account', b.client + (b.contact ? ' – ' + b.contact : ''))}${pr('Address', b.address)}${b.email ? pr('Email', b.email) : ''}${b.mobile ? pr('Mobile / tel.', b.mobile) : ''}</div>
-<div><h3>Event</h3>${billDays(b) > 1 ? pr('Dates of event', fmtRange(b.eventDate, b.eventDateTo, true) + ` (${billDays(b)} days)`) : pr('Date of event', b.eventDate ? fmtLong(b.eventDate) : '')}${pr('Time of event', b.eventTime)}${pr('Guaranteed pax', b.pax)}${pr('Venue', b.venue)}</div></div>
-${C.lines.some(l => l.items) ? `<div class="am"><h2>Approved Menu</h2>${C.lines.map(l => `<div class="c">${esc(l.label)}${l.rate ? ` <i>(${peso(l.rate)}${l.unit ? '/' + esc(l.unit) : '/head'})</i>` : ''}</div>${(l.items || '').split('\n').filter(x => x.trim()).map(x => `<div class="d">${esc(x.trim())}</div>`).join('')}`).join('')}</div>` : ''}
+<div><h3>Event</h3>${billDays(b) > 1 ? pr('Dates of event', fmtRange(b.eventDate, b.eventDateTo, true) + ` (${billDays(b)} days)`) : pr('Date of event', b.eventDate ? fmtLong(b.eventDate) : '')}${b.perDay && !b.eventTime ? '' : pr('Time of event', b.eventTime)}${pr('Guaranteed pax', b.pax)}${pr('Venue', b.venue)}${b.service ? pr('Service', b.service) : ''}${b.diet ? pr('Food notes', b.diet) : ''}</div></div>
+${C.lines.some(l => l.day) ? (() => { const days = [...new Set(C.lines.map(l => l.day))], n = days.length;
+  return `<div class="am"><h2>Approved Menu</h2>${b.diet ? `<div class="t" style="font-size:8pt;color:var(--wine);letter-spacing:.08em">${esc(b.diet)}</div>` : ''}<div class="amd" style="grid-template-columns:repeat(${Math.min(n, 3)},1fr)">${days.map((d, i) => `<div><h4>Day ${i + 1}<small>${esc(d ? new Date(d + 'T00:00').toLocaleDateString('en-PH', {weekday: 'long', month: 'long', day: 'numeric'}) : '')}</small></h4>${C.lines.filter(l => l.day === d).map(l => `<div class="c">${esc(l.label)}${l.rate ? ` <i>(${peso(l.rate)}/head)</i>` : ''}</div>${l.time ? `<div class="t">${esc(l.time)}</div>` : ''}${(l.items || '').split('\n').filter(x => x.trim()).map(x => `<div class="d">${esc(x.trim())}</div>`).join('')}`).join('')}</div>`).join('')}</div></div>`; })()
+ : C.lines.some(l => l.items) ? `<div class="am"><h2>Approved Menu</h2>${C.lines.map(l => `<div class="c">${esc(l.label)}${l.rate ? ` <i>(${peso(l.rate)}${l.unit ? '/' + esc(l.unit) : '/head'})</i>` : ''}</div>${(l.items || '').split('\n').filter(x => x.trim()).map(x => `<div class="d">${esc(x.trim())}</div>`).join('')}`).join('')}</div>` : ''}
 <h2>Breakdown<small>Billing</small></h2>
 ${billBreakdownHtml(C, {...b, hideItems: true})}
 ${payBox()}${b.notes ? `<p style="margin:3mm 0 0;font-size:8.8pt;white-space:pre-wrap">${esc(b.notes)}</p>` : ''}
@@ -2898,7 +2943,13 @@ document.addEventListener('input', e => {
   const p = e.target.dataset?.b; if (!p || !e.target.closest('#view')) return; if (e.target.type === 'checkbox') return; setPath(D, p, e.target.value); live(); if (p.startsWith('sheet.')) sheetTouched(); });
 document.addEventListener('change', e => {
   const el = e.target;
-  if (/^bill\.eventDate(To)?$/.test(el.dataset?.b || '') && el.closest('#view')) { const b = D.bill; if (b.eventDateTo && b.eventDate && b.eventDateTo <= b.eventDate) { b.eventDateTo = ''; if (el.dataset.b.endsWith('To')) toast('The last day must be after the first day.', true); } render(); return; }
+  if (/^bill\.eventDate(To)?$/.test(el.dataset?.b || '') && el.closest('#view')) { const b = D.bill; if (b.eventDateTo && b.eventDate && b.eventDateTo <= b.eventDate) { b.eventDateTo = ''; if (el.dataset.b.endsWith('To')) toast('The last day must be after the first day.', true); }
+    if (b.perDay) { if (billDays(b) < 2) { b.perDay = false; b.sections = (b.sections || []).filter(s => !s.day || s.day === (b.sections.find(x => x.day)?.day)).map(s => ({...s, day: ''})); }
+      else { const keys = billDayKeys(b), had = [...new Set((b.sections || []).map(s => s.day).filter(Boolean))];
+        if (had.length && !keys.includes(had[0])) { b.sections.forEach(s => { const j = had.indexOf(s.day); if (j >= 0 && j < keys.length) s.day = keys[j]; }); }
+        const tmpl = b.sections.filter(s => s.day === keys[0]); keys.forEach(k => { if (!b.sections.some(s => s.day === k)) b.sections.push(...(tmpl.length ? tmpl : BILL_DAY_TEMPLATE.map(t => ({title: t, rate: '', qty: ''}))).map(s => ({...s, items: '', days: '', day: k}))); });
+        b.sections = b.sections.filter(s => !s.day || keys.includes(s.day)); } }
+    render(); return; }
   if (el.dataset?.actChange && el.closest('#view')) { ACT[el.dataset.actChange]?.(el.value, el); return; }
   if (el.dataset?.item && el.closest('#view')) {
     const [k, i] = el.dataset.item.split('|'), l = D[k].lines[+i], name = titleCase(el.value), ex = findItem(name);
