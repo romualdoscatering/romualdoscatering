@@ -1519,7 +1519,8 @@ const ABOUT_DEFAULT={
 const ABOUT_LISTS=["services","mission","clients","homeHighlights","contactPhones"];
 /* Keys replaced by the Nov 2026 company-profile wording the first time it loads (until an admin saves the pages again). */
 const ABOUT_REV_KEYS=["kicker","headline","story","heroPhoto","heroAlt","vision","missionTitle","mission","servicesTitle","services","teamKicker","teamTitle","team","chefs","teamPhoto","teamCaption","clientsKicker","clientsTitle","clients","ctaTitle","ctaText","homeKicker","homeTitle","homeText","homePhoto","homePhotoAlt","homeHighlights","homeStepsTitle"];
-const SHOOT_GALLERY=()=>[["grazing2026","events","Grazing table for an evening event"],["packed2131","food","Corporate packed meals"],["traybake2209","food","Baked party tray"],["rolls1963","food","Pica-pica rolls"],["buffetline2371","events","Buffet line, ready for guests"],["sandwich1759","food","Tea sandwiches"],["trayfish2185","food","Fish fillet in sauce, party tray"],["snacks1834","food","Merienda bites"],["traybeef2245","food","Beef with mushrooms"],["quesadilla1825","food","Grilled quesadilla wedges"],["packed2116","food","Packed lunch boxes"],["traypasta2299","food","Creamy pasta tray"]].map(([k,c,cap])=>S_(k)&&{...S_(k),category:c,caption:cap}).filter(Boolean);
+const GALLERY_DROP=["gallery/filipino-feast.jpg"];
+const SHOOT_GALLERY=()=>[["grazing2026","events","Grazing table for an evening event"],["packed2131","food","Corporate packed meals"],["traybake2209","food","Baked party tray"],["rolls1963","food","Pica-pica rolls"],["buffetline2371","events","Buffet line, ready for guests"],["sandwich1759","food","Tea sandwiches"],["trayfish2185","food","Fish fillet in sauce, party tray"],["snacks1834","food","Merienda bites"],["traybeef2245","food","Beef with mushrooms"],["canape1774","food","Canapés, plated for guests"],["packed2116","food","Packed lunch boxes"],["traypasta2299","food","Creamy pasta tray"],["buffet2341","events","Hot buffet, served from the chafing dish"]].map(([k,c,cap])=>S_(k)&&{...S_(k),category:c,caption:cap}).filter(Boolean);
 const TRAY_CDN="https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261112_";
 const TRAY_IMG={chicken:"085510_ccb96433-9fec-4c14-9c9d-9d7c973645bc",pork:"085314_70d2c337-f7e0-4b04-b1b4-db665034fd0d",beef:"085908_71cbd089-68e8-4889-a1ef-7d8f48d8091d",seafood:"085641_d8c40549-4fa0-4ba2-b814-8bd91f2c9259",vegetables:"085907_4b5311d5-696c-4d1f-949d-399d913b8bc1",pasta:"085312_60fae33c-6365-4146-a0c4-e7c9619c2adb",salads:"085640_9fec2c5f-831a-4ad3-a00d-796c393c5e4e",rice:"090232_1e1f0948-bcfc-4db1-a501-c49cb2d0b530",desserts:"090233_3f8ad353-abbd-4545-a0f3-e497213ceda7"};
 const trayImg=k=>TRAY_IMG[k]?TRAY_CDN+TRAY_IMG[k]+".jpeg":"assets/trays/"+k+".jpg";
@@ -1557,7 +1558,7 @@ function applyAbout(a,g){
     }
     n.rev=ABOUT_REV;
     state.about=n;
-    if(fresh&&Array.isArray(g)){const have=new Set(g.map(x=>x&&(x.id||x.src)));g=SHOOT_GALLERY().filter(x=>!have.has(x.id)).concat(g)}
+    if(fresh&&Array.isArray(g)){g=g.filter(x=>!GALLERY_DROP.some(d=>String(x&&x.src||"").endsWith(d)));const have=new Set(g.map(x=>x&&(x.id||x.src)));g=SHOOT_GALLERY().filter(x=>!have.has(x.id)).concat(g)}
   }
   if(Array.isArray(g))state.gallery=g.map(cleanPhoto).filter(Boolean);
 }
