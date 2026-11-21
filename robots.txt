@@ -1,6 +1,7 @@
 User-agent: *
 Disallow: /ops/
 Disallow: /hr/
+Disallow: /assets/corporate/
 Allow: /
 
 Sitemap: https://romualdos.ph/sitemap.xml

@@ -124,7 +124,7 @@ function cleanInquiry(q, source) {
     event: { date: str(ev.date, 10), time: str(ev.time, 5), type: str(ev.type, 60), venue: str(ev.venue, 200), pax: Math.floor(num(ev.pax)) },
     notes: str(q.notes, 2000),
     plan: {
-      kind: p.kind === 'package' ? 'package' : p.kind === 'tray' ? 'tray' : 'custom',
+      kind: p.kind === 'package' ? 'package' : p.kind === 'tray' ? 'tray' : p.kind === 'corporate' ? 'corporate' : 'custom',
       fulfil: p.fulfil === 'Delivery' ? 'Delivery' : 'Pick-up', payment: ['Bank transfer', 'Bank deposit', 'GCash'].indexOf(p.payment) >= 0 ? p.payment : '',
       packageId: str(p.packageId, 20), packageName: str(p.packageName, 40),
       pricePerHead: num(p.pricePerHead), basePerHead: num(p.basePerHead), chefPick: !!p.chefPick
@@ -136,6 +136,18 @@ function cleanInquiry(q, source) {
     }),
     estimate: { perHead: num(es.perHead), total: num(es.total) }
   };
+  if (clean.plan.kind === 'corporate') {          // "For Corporate Clients" catalogue download request
+    const k = q.corp || {};
+    clean.corp = { company: str(k.company, 120), position: str(k.position, 80), industry: str(k.industry, 60), city: str(k.city, 120),
+      wants: (Array.isArray(k.wants) ? k.wants : []).slice(0, 12).map(function (x) { return str(x, 60); }).filter(String) };
+    if (!clean.corp.company) throw new Error('Please enter your company name.');
+    if (!clean.event.date) clean.event.date = Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd');
+    clean.event.type = 'Corporate catalogue request';
+    const info = [clean.corp.company, clean.corp.position && 'Position: ' + clean.corp.position, clean.corp.industry && 'Industry: ' + clean.corp.industry,
+      clean.corp.city && 'Location: ' + clean.corp.city, clean.corp.wants.length && 'Interested in: ' + clean.corp.wants.join(', ')].filter(Boolean).join(' · ');
+    clean.notes = str('[Corporate catalogue download] ' + info + (clean.notes ? '\n' + clean.notes : ''), 2000);
+    clean.items = []; clean.estimate = { perHead: 0, total: 0 };
+  }
   if (source === 'message' && q.createdAt && !isNaN(new Date(q.createdAt))) clean.createdAt = new Date(q.createdAt).toISOString();
   if (!clean.customer.name || !clean.customer.phone || !clean.event.date) throw new Error('Name, mobile number and event date are required.');
   if (clean.plan.kind === 'tray') {
@@ -180,6 +192,25 @@ function submitInquiry(q, source, honeypot) {
 }
 
 /* ===================== EMAIL ALERTS ===================== */
+/** Email for a "For Corporate Clients" catalogue download (a sales lead). */
+function sendCorpAlert(q) {
+  const c = q.customer || {}, k = q.corp || {}, ev = q.event || {};
+  const subject = 'New corporate lead: ' + (k.company || c.name) + ' · downloaded the catalogue';
+  const rows = [['Reference', q.ref], ['Company', k.company], ['Contact person', c.name + (k.position ? ' — ' + k.position : '')], ['Mobile', c.phone], ['Email', c.email || '—'],
+    ['Industry', k.industry || '—'], ['Location', k.city || '—'], ['Usual headcount', ev.pax ? ev.pax + ' pax' : '—'], ['Interested in', (k.wants || []).join(', ') || '—']];
+  const note = String(q.notes || '').split('\n').slice(1).join('\n');
+  if (note) rows.push(['Message', note]);
+  const html = '<div style="font-family:Arial,sans-serif;color:#1A2C54;max-width:560px">' +
+    '<div style="background:#1A2C54;color:#fff;padding:14px 18px;border-radius:10px 10px 0 0"><b style="font-size:17px">New corporate lead</b><div style="font-size:12px;color:#E5DEB2">downloaded the Products &amp; Services Catalogue on romualdos.ph</div></div>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:14px;border:1px solid #E4DFC8;border-top:0">' +
+    rows.map(function (r) { return '<tr><td style="padding:8px 12px;border-bottom:1px solid #E4DFC8;color:#5B6478;width:140px;vertical-align:top">' + h(r[0]) + '</td><td style="padding:8px 12px;border-bottom:1px solid #E4DFC8">' + h(r[1]).replace(/\n/g, '<br>') + '</td></tr>'; }).join('') + '</table>' +
+    '<p style="margin:16px 0"><a href="' + CONFIG.SITE_URL + '/#staff" style="background:#E89908;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:700">Open the Inquiries list</a></p>' +
+    '<p style="font-size:12px;color:#5B6478">Follow up within 1 business day. Reply to this email to write to the contact person' + (c.email ? '' : ' (no email given)') + '.</p></div>';
+  const text = 'New corporate lead ' + q.ref + '\n\n' + rows.map(function (r) { return r[0] + ': ' + r[1]; }).join('\n');
+  const opts = { htmlBody: html, name: "Romualdo's Website" };
+  if (c.email) opts.replyTo = c.email;
+  MailApp.sendEmail(CONFIG.ALERT_EMAILS.join(','), subject, text, opts);
+}
 const COURSE_NAMES = { soup: 'Soup', appetizer: 'Appetizer', chicken: 'Chicken', pork: 'Pork', beef: 'Beef', fish: 'Fish / Seafood', veg: 'Vegetables / Salad', pasta: 'Pasta / Noodles', dessert: 'Dessert' };
 function h(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 function pesoTxt(n) { return '₱' + Math.round(Number(n) || 0).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
@@ -191,6 +222,7 @@ function sendInquiryAlert(q) {
   if (!CONFIG.ALERT_EMAILS.length || MailApp.getRemainingDailyQuota() < 1) return;
   const c = q.customer || {}, ev = q.event || {}, p = q.plan || {}, es = q.estimate || {};
   if (p.kind === 'tray') return sendTrayAlert(q);
+  if (p.kind === 'corporate') return sendCorpAlert(q);
   const plan = p.kind === 'package' ? (p.pricePerHead > 0 ? p.packageName + ' Package (' + pesoTxt(p.pricePerHead) + '/head)' : p.packageName + ' (quote requested)') : 'Custom menu';
   const items = p.chefPick ? ['Chef to recommend the menu'] : (q.items || []).map(function (i) { return (COURSE_NAMES[i.cat] || i.cat) + ': ' + i.dish; });
   const subject = 'New inquiry: ' + c.name + ' · ' + (ev.type || 'Event') + ' · ' + niceDate(ev.date) + ' · ' + ev.pax + ' pax';
@@ -316,7 +348,10 @@ const ABOUT_TEXT_FIELDS = {
   kaarawan: 20000,
   grazing: 20000,
   sitePhotos: 8000,
-  packed: 12000
+  packed: 12000,
+  profile: 30000,
+  corporate: 16000,
+  rev: 30
 };
 const ABOUT_LIST_FIELDS = { services: 12, mission: 12, clients: 30, homeHighlights: 8, contactPhones: 6 };
 const ABOUT_PHOTO_FIELDS = ['heroPhoto', 'teamPhoto', 'homePhoto'];

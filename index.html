@@ -573,6 +573,73 @@ footer{border-top:1px solid var(--line);padding:18px 0;font-size:12.5px;color:va
   header img{width:200px}
   h1{font-size:24px}
 }
+
+/* ===== Company-profile look (Nov 2026): numbered gold labels, gold rule under headings, navy stat tiles, wine footer ===== */
+.sec-label{font:700 11.5px/1.2 Montserrat,Inter,sans-serif;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin:34px 0 6px}
+.sec-label.light{color:var(--custard);margin-top:0}
+.pf-h2{font-size:clamp(24px,3vw,32px);color:var(--navy);margin:0 0 10px;position:relative;padding-bottom:12px}
+.pf-h2::after{content:"";position:absolute;left:0;bottom:0;width:46px;height:3px;background:var(--gold);border-radius:2px}
+.pf-h3{font-size:19px;color:var(--navy);margin:22px 0 10px}
+.pf-lead{color:var(--muted);max-width:760px;margin:0 0 16px;font-size:15.5px}
+.pf-sec{margin:34px 0}
+.pf-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:24px 0}
+.pf-stats div{background:var(--navy);color:#fff;border-radius:12px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:4px}
+.pf-stats b{font:700 26px/1.1 "Libre Baskerville",Georgia,serif;color:var(--custard)}
+.pf-stats span{font-size:12.5px;color:#D9DDEA;line-height:1.35}
+.pf-svcs{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px}
+.pf-svc{all:unset;box-sizing:border-box;display:flex;flex-direction:column;background:var(--paper);border:1px solid var(--line);border-top:3px solid var(--gold);border-radius:12px;overflow:hidden;cursor:default}
+button.pf-svc{cursor:pointer;transition:transform .15s,box-shadow .15s}
+button.pf-svc:hover,button.pf-svc:focus-visible{transform:translateY(-2px);box-shadow:0 12px 26px -16px rgba(26,44,84,.5)}
+.pf-svc .ph{display:block;aspect-ratio:4/3;background:var(--custard);overflow:hidden}
+.pf-svc .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.pf-svc b{font-family:"Libre Baskerville",Georgia,serif;color:var(--navy);font-size:16px;padding:12px 14px 4px}
+.pf-svc small{color:var(--muted);font-size:13.5px;line-height:1.45;padding:0 14px 12px;flex:1}
+.pf-svc .go,.pf-svc .price{padding:0 14px 14px;font-weight:700;color:var(--wine);font-size:13px}
+.pf-svc .price{color:var(--navy);font-size:14px}
+.pf-corp{display:grid;grid-template-columns:1.1fr 1fr;background:var(--navy);color:#fff;border-radius:18px;overflow:hidden;margin:34px 0}
+.pf-corp .ph{min-height:240px}.pf-corp .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.pf-corp .tx{padding:28px 28px 30px;display:flex;flex-direction:column;gap:8px;justify-content:center}
+.pf-corp h2{color:#fff;font-size:26px;margin:0}.pf-corp p{color:#D9DDEA;margin:0 0 8px}
+.pf-quote{margin:26px 0 8px;border-left:4px solid var(--gold);padding:6px 0 6px 18px;font:italic 400 clamp(19px,2.4vw,24px)/1.45 "Playfair Display",Georgia,serif;color:var(--navy)}
+.pf-two{display:grid;grid-template-columns:1.2fr 1fr;gap:22px;align-items:start;margin:10px 0 18px}
+.pf-work{list-style:none;padding:0;margin:0;display:grid;gap:10px}
+.pf-work li{position:relative;padding-left:20px}.pf-work li::before{content:"";position:absolute;left:0;top:.55em;width:9px;height:9px;background:var(--gold);border-radius:2px}
+.pf-work b{color:var(--navy)}
+.pf-cards{display:grid;gap:12px}.pf-cards .pf-stats{grid-template-columns:1fr 1fr;margin:0}
+.pf-card{background:var(--cream);border:1px solid var(--line);border-top:3px solid var(--navy);border-radius:12px;padding:14px 16px}
+.pf-card h4{font-family:"Libre Baskerville",Georgia,serif;color:var(--navy);margin:0 0 6px;font-size:16px}.pf-card p{margin:0;color:#3A4358}
+.pf-commit{background:var(--cream);border:1px solid var(--line);border-radius:14px;padding:18px 22px;margin:18px 0}.pf-commit .pf-h3{margin-top:0}.pf-commit p{margin:0}
+.pf-values{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.pf-values div{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.pf-values h4{font-family:"Libre Baskerville",Georgia,serif;color:var(--wine);margin:0 0 6px;font-size:16px}.pf-values p{margin:0;font-size:14px;color:#3A4358}
+.pf-depts{margin:6px 0 24px}.pf-dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.pf-dgrid div{background:var(--navy);color:#fff;border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px}
+.pf-dgrid b{color:var(--custard);font-size:12px;letter-spacing:.14em;text-transform:uppercase}.pf-dgrid span{font-size:13.5px;color:#E7EAF2}
+.pf-table{width:100%;border-collapse:collapse;background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden;font-size:14px}
+.pf-table th{background:var(--navy);color:#fff;text-align:left;font:600 11.5px Montserrat,Inter,sans-serif;letter-spacing:.12em;text-transform:uppercase;padding:10px 12px}
+.pf-table td{padding:10px 12px;border-top:1px solid var(--line);vertical-align:top}.pf-table tbody tr:nth-child(even) td{background:var(--cream)}
+.pf-table .nw{white-space:nowrap;color:var(--muted)}.pf-table .r{text-align:right}.pf-table.small{margin-top:12px;font-size:13.5px}
+.pf-cap{display:grid;grid-template-columns:1.1fr 1fr;gap:22px;align-items:start}.pf-cap .ph{margin:0;border-radius:14px;overflow:hidden;aspect-ratio:4/3;background:var(--custard)}.pf-cap .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.pf-list{margin:0;padding:0;list-style:none;display:grid;gap:8px}.pf-list li{position:relative;padding-left:20px}.pf-list li::before{content:"";position:absolute;left:0;top:.55em;width:8px;height:8px;border-radius:50%;background:var(--gold)}
+.pf-list.two{grid-template-columns:1fr 1fr;column-gap:26px}
+.pf-steps{list-style:none;padding:0;margin:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.pf-steps li{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;gap:10px;align-items:center}
+.pf-steps b{flex:none;width:30px;height:30px;border-radius:50%;background:var(--navy);color:var(--custard);display:grid;place-items:center;font-size:14px}.pf-steps span{font-weight:600;color:var(--navy);font-size:14px}
+.corp-hero{display:grid;grid-template-columns:1.05fr 1fr;background:linear-gradient(135deg,var(--navy),#22386A);color:#fff;border-radius:20px;overflow:hidden;margin:6px 0 10px}
+.corp-hero .tx{padding:34px 32px}.corp-hero h1{color:#fff;font-size:clamp(26px,3.4vw,38px);margin:4px 0 12px}.corp-hero p{color:#DCE1EE}
+.corp-hero .ph{margin:0;min-height:300px}.corp-hero .ph img{width:100%;height:100%;object-fit:cover;display:block}
+.btn.ghost.light{background:transparent;color:#fff;border-color:rgba(255,255,255,.55)}
+.corp-form{background:var(--paper);border:1px solid var(--line);border-top:4px solid var(--gold);border-radius:16px;padding:24px;margin:34px 0 10px;scroll-margin-top:90px}
+.cf-head h2{color:var(--navy);margin:0 0 6px}.cf-head p{color:var(--muted);margin:0 0 16px}
+.cf-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}.cf-grid .full,.cf-grid fieldset{grid-column:1/-1}
+.cf-grid label{display:flex;flex-direction:column;gap:5px;font-weight:600;font-size:13.5px}.cf-grid input:not([type=checkbox]),.cf-grid select,.cf-grid textarea{width:100%;padding:11px 12px;border:1px solid #CFC8AE;border-radius:10px;font:inherit;font-weight:400;background:#fff;color:var(--navy)}.cf-grid input:focus,.cf-grid select:focus,.cf-grid textarea:focus{outline:2px solid var(--gold);outline-offset:1px;border-color:var(--gold)}
+.corp .pf-svcs{grid-template-columns:repeat(auto-fill,minmax(290px,1fr))}.cf-grid .req{color:var(--wine)}
+.cf-wants{border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:flex;flex-wrap:wrap;gap:6px 18px;margin:0}.cf-wants legend{font-weight:700;font-size:13.5px;padding:0 6px}
+.cf-wants .chk{flex-direction:row!important;align-items:center;gap:7px!important;font-weight:500!important}.cf-wants .chk input{width:auto}
+.cf-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.hp{position:absolute;left:-5000px;width:1px;height:1px;opacity:0}
+.cf-done{display:flex;flex-direction:column;align-items:flex-start;gap:10px;background:var(--cream);border-radius:12px;padding:18px}.cf-done .big{font-size:34px}
+footer{background:var(--wine);color:#F3E7D3;border-top:4px solid var(--gold)}footer a{color:var(--custard)}footer b{color:#fff}footer .foot-social a{background:rgba(255,255,255,.12)}footer .foot-social a:hover{background:var(--gold)}
+@media (max-width:760px){.pf-corp,.corp-hero,.pf-two,.pf-cap,.cf-grid{grid-template-columns:1fr}.pf-list.two{grid-template-columns:1fr}.corp-hero .ph,.pf-corp .ph{min-height:200px}.corp-hero .tx{padding:24px 20px}}
 </style>
 </head>
 <body>
@@ -585,11 +652,13 @@ footer{border-top:1px solid var(--line);padding:18px 0;font-size:12.5px;color:va
       <button data-nav="about">About Us</button>
       <div class="dd"><button data-nav="offers" class="dd-btn" aria-haspopup="true">Our Offers <span class="caret" aria-hidden="true">▾</span></button>
         <div class="dd-panel" id="ddPanel" role="menu"></div></div>
+      <button data-nav="corporate">For Corporate Clients</button>
       <button data-nav="contact">Contact Us</button>
       <button data-nav="book" class="nav-book">Book now</button>
       <button data-nav="admin" class="staff hidden" id="navAdmin">Inquiries</button>
       <button data-nav="menu" class="staff hidden" id="navMenu">Menu items</button>
       <button data-nav="aboutEdit" class="staff hidden" id="navAboutEdit">Edit pages</button>
+      <button data-nav="profEdit" class="staff hidden" id="navProfEdit">Edit profile</button>
       <button data-nav="trayEdit" class="staff hidden" id="navTrayEdit">Tray prices</button>
       <button data-nav="rates" class="staff hidden" id="navRates">Custom rates</button>
       <button data-nav="logout" class="staff hidden" id="navLogout">Log out</button>
@@ -621,7 +690,7 @@ footer{border-top:1px solid var(--line);padding:18px 0;font-size:12.5px;color:va
   </section>
 </div></main>
 
-<footer><div class="wrap"><b>Romualdo's Catering Services</b> — catering in Davao City since 2020 · 13 Juna Avenue, Juna Subdivision, Davao City · 0945 542 5300 · romualdoscatering@gmail.com<div class="foot-social"><a href="https://www.facebook.com/romualdoscatering" target="_blank" rel="noopener" aria-label="Romualdo's on Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M13.5 21v-7.5h2.5l.4-3h-2.9V8.6c0-.9.3-1.5 1.5-1.5h1.5V4.4c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v2.4H8v3h2.6V21h2.9z"/></svg></a><a href="https://www.instagram.com/romualdosdavao/" target="_blank" rel="noopener" aria-label="Romualdo's on Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 7.3A4.7 4.7 0 1 0 12 16.7 4.7 4.7 0 0 0 12 7.3zm0 7.7a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm4.9-7.9a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0zM21 8.3c-.1-1.5-.4-2.8-1.5-3.8S17.2 3 15.7 3H8.3C6.8 3 5.5 3.4 4.5 4.5S3 6.8 3 8.3v7.4c0 1.5.4 2.8 1.5 3.8s2.3 1.5 3.8 1.5h7.4c1.5 0 2.8-.4 3.8-1.5s1.5-2.3 1.5-3.8V8.3zm-2 9.2a3 3 0 0 1-1.7 1.7c-1.2.5-4 .4-5.3.4s-4.1.1-5.3-.4a3 3 0 0 1-1.7-1.7c-.5-1.2-.4-4-.4-5.3s-.1-4.1.4-5.3A3 3 0 0 1 6.7 5.2C7.9 4.7 10.7 4.8 12 4.8s4.1-.1 5.3.4a3 3 0 0 1 1.7 1.7c.5 1.2.4 4 .4 5.3s.1 4.1-.4 5.3z"/></svg></a></div><div class="foot-links" style="margin:8px 0;font-size:12.5px"><style>.foot-links a{color:var(--blue)}</style><a href="/catering-packages/">Catering packages</a> · <a href="/food-trays/">Food trays</a> · <a href="/packed-meals/">Packed meals</a> · <a href="/birthday-catering/">Birthday package</a> · <a href="/grazing-stations/">Grazing stations</a> · <a href="/wedding-catering/">Weddings</a> · <a href="/corporate-catering/">Corporate</a> · <a href="/contact/">Contact</a></div><div style="font-size:12.5px;margin-bottom:6px"><b>romualdos.ph is our only official website.</b> We take bookings and payments only here, on our Facebook page and at 0945 542 5300.</div><a href="#staff" id="staffLink" style="color:var(--muted);font-size:12px">Staff login</a></div></footer>
+<footer><div class="wrap"><b>Romualdo's Catering Services</b> — catering in Davao City since 2020 · 13 Juna Avenue, Juna Subdivision, Davao City · 0945 542 5300 · romualdoscatering@gmail.com<div class="foot-social"><a href="https://www.facebook.com/romualdoscatering" target="_blank" rel="noopener" aria-label="Romualdo's on Facebook" title="Facebook"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M13.5 21v-7.5h2.5l.4-3h-2.9V8.6c0-.9.3-1.5 1.5-1.5h1.5V4.4c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v2.4H8v3h2.6V21h2.9z"/></svg></a><a href="https://www.instagram.com/romualdosdavao/" target="_blank" rel="noopener" aria-label="Romualdo's on Instagram" title="Instagram"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 7.3A4.7 4.7 0 1 0 12 16.7 4.7 4.7 0 0 0 12 7.3zm0 7.7a3 3 0 1 1 0-6 3 3 0 0 1 0 6zm4.9-7.9a1.1 1.1 0 1 1-2.2 0 1.1 1.1 0 0 1 2.2 0zM21 8.3c-.1-1.5-.4-2.8-1.5-3.8S17.2 3 15.7 3H8.3C6.8 3 5.5 3.4 4.5 4.5S3 6.8 3 8.3v7.4c0 1.5.4 2.8 1.5 3.8s2.3 1.5 3.8 1.5h7.4c1.5 0 2.8-.4 3.8-1.5s1.5-2.3 1.5-3.8V8.3zm-2 9.2a3 3 0 0 1-1.7 1.7c-1.2.5-4 .4-5.3.4s-4.1.1-5.3-.4a3 3 0 0 1-1.7-1.7c-.5-1.2-.4-4-.4-5.3s-.1-4.1.4-5.3A3 3 0 0 1 6.7 5.2C7.9 4.7 10.7 4.8 12 4.8s4.1-.1 5.3.4a3 3 0 0 1 1.7 1.7c.5 1.2.4 4 .4 5.3s.1 4.1-.4 5.3z"/></svg></a></div><div class="foot-links" style="margin:8px 0;font-size:12.5px"><style>.foot-links a{color:var(--custard)}</style><a href="/catering-packages/">Catering packages</a> · <a href="/food-trays/">Food trays</a> · <a href="/packed-meals/">Packed meals</a> · <a href="/birthday-catering/">Birthday package</a> · <a href="/grazing-stations/">Grazing stations</a> · <a href="/wedding-catering/">Weddings</a> · <a href="/corporate-catering/">Corporate</a> · <a href="/contact/">Contact</a></div><div style="font-size:12.5px;margin-bottom:6px"><b>romualdos.ph is our only official website.</b> We take bookings and payments only here, on our Facebook page and at 0945 542 5300.</div><a href="#staff" id="staffLink" style="color:var(--muted);font-size:12px">Staff login</a></div></footer>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -740,7 +809,7 @@ function closestPackageHint(perHead){
 }
 
 /* ============ NAV ============ */
-const PAGE_HASH={home:"",about:"about",offers:"offers",packed:"packed",packages:"packages",kaarawan:"kaarawan",grazing:"grazing",custom:"custom",trays:"trays",contact:"contact"};
+const PAGE_HASH={home:"",about:"about",offers:"offers",packed:"packed",packages:"packages",kaarawan:"kaarawan",grazing:"grazing",custom:"custom",trays:"trays",corporate:"corporate",contact:"contact"};
 function go(view){state.view=view;
   if(view in PAGE_HASH){const h=PAGE_HASH[view];if((location.hash||"").slice(1)!==h)history.pushState(null,"",h?"#"+h:location.pathname)}
   render();window.scrollTo({top:0,behavior:"smooth"})}
@@ -963,6 +1032,7 @@ function render(){
   $("#navRates").classList.toggle("hidden",!state.canEdit);
   $("#navMenu").classList.toggle("hidden",!state.canEdit);
   $("#navAboutEdit").classList.toggle("hidden",!state.canEdit);
+  $("#navProfEdit").classList.toggle("hidden",!state.canEdit);
   $("#navTrayEdit").classList.toggle("hidden",!state.canEdit);
   $("#navLogout").classList.toggle("hidden",!state.isStaff);
   $("#staffLink").classList.toggle("hidden",state.isStaff);
@@ -986,6 +1056,9 @@ function render(){
   else if(state.view==="rates") v.innerHTML=state.canEdit?viewRates():viewPackages();
   else if(state.view==="menu") v.innerHTML=state.canEdit?viewMenu():viewPackages();
   else if(state.view==="about") v.innerHTML=viewAbout();
+  else if(state.view==="corporate") v.innerHTML=viewCorporate();
+  else if(state.view==="corpEdit") v.innerHTML=state.canEdit?viewCorpEdit():viewCorporate();
+  else if(state.view==="profEdit") v.innerHTML=state.canEdit?viewProfEdit():viewAbout();
   else if(state.view==="aboutEdit") v.innerHTML=state.canEdit?viewAboutEdit():viewAbout();
   else if(state.view==="trayEdit") v.innerHTML=state.canEdit?viewTrayEdit():viewTrays();
   else if(state.view==="kaarEdit") v.innerHTML=state.canEdit?viewKaarEdit():viewKaarawan();
@@ -1183,7 +1256,7 @@ function viewDone(){
 }
 
 /* ---------- Staff: inquiries ---------- */
-function planName(q){return q.plan?.kind==="package"?`${q.plan.packageName} Package`:q.plan?.kind==="tray"?"Food Tray Order":"Custom Menu"}
+function planName(q){return q.plan?.kind==="corporate"?`Corporate catalogue request${q.corp?.company?" · "+q.corp.company:""}`:q.plan?.kind==="package"?`${q.plan.packageName} Package`:q.plan?.kind==="tray"?"Food Tray Order":"Custom Menu"}
 function viewAdmin(){
   const list=state.inquiries;
   const now=list.filter(q=>q.status==="New").length;
@@ -1362,40 +1435,44 @@ function refreshMenuBar(){["#saveMenu","#discardMenu"].forEach(id=>{const b=$(id
 /* ============ ABOUT US ============ */
 /* Wording and photos from Romualdo's Portfolio 2026. Admins can edit every word and photo on the "About page" screen. */
 const P=(src)=>({src:"assets/"+src});
+const SHOT={"grazing1870": "13TQvY1wO3VlNIO0sXUExvXx9vhZE7bAb", "grazing2026": "1CLdvclGlObUdiGSDUwYPUlJUT-TRMY08", "grazing1912": "1IUv1pp5GGk14ED2ZuhzUV4yw8tHLijHp", "logo2449": "1MvvwWnMQF-EWlPmfetQ58D-z78XDiM78", "team2398": "16IGiRAOEL0c78FCxXoF_Sq3RJNQeea1c", "sandwich1759": "16xrDfTdrXVD7t7dsVmlQsi5M7WDLNjob", "sandwich1822": "1ZsCuWVtqS3GyROM942-rooVQDm2Zm1uE", "quesadilla1825": "1mDWTJ5ctJRsYlJYQNEES6WcYPkvwjbSQ", "snacks1834": "1Wih_ZvjmHvfhIOiTN3-qbI5jbt_StbQh", "rolls1963": "12LhS15IEvDaQ6wLuhBkK-Ej7dFYDdzNl", "canape1774": "1YD5r3AMdjQ1Ji8vW8WKO9PpVjw37pIZa", "fried1816": "1DxR_glx8WWUdot6IbKrYFzvPf-xyUMbb", "packed2131": "12Cnq04TFLPZnccK8WB28JL8xknOQ8dKt", "packed2140": "1Hehzka6FmRtuKEg3y2Xy1ElapenBMzeL", "packed2116": "1N1UyGuYkbrLoqk7qyHXTDiMDdGdBHH88", "trayfish2185": "1oG_c1JvZskY1MuWIE12IINrpRrNLe-FU", "traybake2209": "1Q706w48aZ3K-aGnjHYTdXnxzRpGKsLed", "traybeef2245": "1p2QHuK6jRm4TmYIxefcUnaU9QQ9W-k51", "traypasta2299": "17WGwUO66_2h6FHW044ObcRs4D-USc6ab", "traylasagna2224": "1RYoUnlNiw4k3BTdNC-tdGYfNeYiVmaag", "buffet2341": "1LRF4PUM-jPY2F5fB0dyzXF5W1mLfoZQd", "buffetline2371": "1NFq9_MPT4mgl7JbIsLONZVe8qkcQjTYP", "buffetbeef2380": "15XcrEDFRQ9I9eG_Dsi6URgtWWw-1AOZj"};
+const S_=k=>SHOT[k]&&!/^__/.test(SHOT[k])?{id:SHOT[k]}:null;
+const ABOUT_REV="2026-11-profile";
 const ABOUT_DEFAULT={
-  kicker:"About Us · Since 2020",
-  headline:"Exceptional Quality and Refined Elegance",
-  story:"Founded in 2020, Romualdo's Catering Services has steadily grown from a small kitchen operation to a renowned catering service in the city.\n\nWith years of experience and a team of talented chefs and event specialists, we have become a trusted partner for weddings, corporate events, social gatherings, and more.",
-  heroPhoto:P("about/hero-garden-reception.jpg"), heroAlt:"Romualdo's garden reception setup",
+  rev:ABOUT_REV, profile:"", corporate:"",
+  kicker:"01 · Who we are",
+  headline:"Welcome to Romualdo's",
+  story:"Romualdo's Catering Services started in 2020 as a small kitchen with a simple goal: to cook good, honest food and serve it with care.\n\nOver six years we have grown step by step, and we are grateful to have served banks, utilities, builders, schools and many families across Davao City. Today we run our own restaurant and kitchen in Juna Subdivision, with a banquet team and the systems to handle orders from 30 packed lunches to more than 2,000 meals.\n\nOur menus are planned by our chefs — Filipino favorites, international dishes and a few creations of our own — and we are always happy to adjust them to each client's occasion, budget and dietary needs.",
+  heroPhoto:S_("grazing1912")||P("about/hero-garden-reception.jpg"), heroAlt:"Romualdo's grazing table with our wooden logo board",
   badgeYear:"2020", badgeText:"Serving Davao since",
   btnPackages:"See our packages", btnGallery:"View our work",
   visionTitle:"Our Vision",
-  vision:"To elevate ordinary events into extraordinary occasions through exceptional food and hospitality.",
-  missionTitle:"Our Mission & Commitment",
-  mission:["Exceed our clients' expectations with every event we cater.","Approach each occasion — from an intimate dinner party to a lavish wedding reception — with creativity, professionalism and a dedication to excellence.","Work closely with every client to curate a menu that suits their preferences, dietary needs and theme.","Ensure every event runs smoothly, so our clients can relax and enjoy the occasion.","Create lasting memories that our clients and their guests will cherish for years to come."],
-  servicesTitle:"What we cater",
-  services:["Weddings — from intimate garden affairs to grand ballroom receptions","Corporate events — meetings, conferences and galas","Private parties and social gatherings","Special occasions of all sizes","Customized menus for every theme and dietary need"],
-  teamKicker:"Our Team", teamTitle:"Meet our head chefs",
-  team:"Our head chefs, Jasper Patrick Domingo, a graduate of Professional Culinary and Pastry Arts, and John Philip Domingo, a graduate of Culinary & Restaurant Management at Ecole Hôtelière de Lausanne, Switzerland, curate and craft menus for each unique client — showcasing their versatility and making sure every event is memorable.",
-  chefs:[{name:"Chef JP",subtitle:"John Philip Domingo",photo:P("about/chef-jp.jpg")},{name:"Chef Jasper",subtitle:"Jasper Patrick Domingo",photo:P("about/chef-jasper.jpg")}],
-  teamPhoto:P("about/team.jpg"), teamCaption:"The Romualdo's team",
+  vision:"To be a trusted, well-loved name in Davao City's food and catering community — for big celebrations and everyday meals alike.",
+  missionTitle:"Our Mission",
+  mission:["To serve carefully prepared food with warm, professional service — on time and as agreed, whatever the size of the order — so our clients can relax and enjoy their occasion."],
+  servicesTitle:"We cater for",
+  services:["Corporate events","Meetings & trainings","Institutional programs","Weddings","Birthdays & family celebrations","Festivals & community events"],
+  teamKicker:"03 · Our team", teamTitle:"Leadership & our chefs",
+  team:"Chef John Philip D. Domingo, proprietor and head chef, is a graduate of Culinary & Restaurant Management at École Hôtelière de Lausanne, Switzerland. He leads the business, client relationships and menu development.\n\nChef Jasper Patrick Domingo, head chef, is a graduate of Professional Culinary and Pastry Arts. He leads kitchen production and pastry, and curates menus tailored to each client and occasion.\n\nTogether, our chefs plan each menu around the client's occasion and guests, large or small.",
+  chefs:[{name:"Chef John Philip D. Domingo",subtitle:"Proprietor · Head Chef",photo:P("about/chef-jp.jpg")},{name:"Chef Jasper Patrick Domingo",subtitle:"Head Chef",photo:P("about/chef-jasper.jpg")}],
+  teamPhoto:S_("team2398")||P("about/team.jpg"), teamCaption:"Our kitchen team",
   customTitle:"A customized menu, just for you",
   custom:"We understand that every event is unique, which is why we offer customizable menus to suit your preferences, dietary needs, and theme. Whether you desire a traditional feast or a contemporary fusion experience, our culinary experts will work closely with you to curate a menu that exceeds expectations.",
   customButton:"Build your own menu →",
-  clientsKicker:"Trusted by", clientsTitle:"Our corporate clients",
-  clients:["Ulticon Builders Inc.","BDO Unibank","BYD","Apo Agua","LANDBANK"],
+  clientsKicker:"05 · Clients & experience", clientsTitle:"Our corporate & institutional clients",
+  clients:["BDO Unibank","LANDBANK","Apo Agua","Ulticon Builders Inc.","BYD","Schools Division of Davao City","Pag-IBIG","BIR","LTO"],
   galleryTitle:"Our Food & Events",
   galleryIntro:"A taste of the feasts we've prepared and the celebrations we've been part of. Tap a photo to enlarge.",
   labelAll:"All", labelFood:"Food", labelEvents:"Events",
-  ctaTitle:"Ready to elevate your next event?",
-  ctaText:"Browse our 2026 packages or build your own menu for an instant estimate — or call 0945 542 5300 to start planning.",
+  ctaTitle:"Thank you for considering Romualdo's",
+  ctaText:"Browse our 2026 packages, build your own menu for an instant estimate, or call 0945 542 5300 — we'll prepare a written quotation.",
   ctaButton:"See packages",
-  homeKicker:"Welcome to Romualdo's",
-  homeTitle:"Exceptional food for every celebration in Davao",
-  homeText:"From intimate birthdays to grand weddings and corporate events, Romualdo's Catering Services has been bringing exceptional food and warm hospitality to Davao City since 2020.",
-  homePhoto:P("gallery/buffet-setup.jpg"), homePhotoAlt:"Romualdo's buffet setup for an evening celebration",
+  homeKicker:"Romualdo's Catering Services · Davao City",
+  homeTitle:"Real food, real people, dependable service",
+  homeText:"Catering for celebrations — and for the everyday meals that keep people connected. Serving Davao City since 2020, from 30 packed lunches to more than 2,000 meals in one order.",
+  homePhoto:S_("grazing1870")||P("gallery/buffet-setup.jpg"), homePhotoAlt:"Romualdo's grazing table set for an evening event",
   homeBtn1:"See our packages", homeBtn2:"Get to know us",
-  homeHighlights:["Serving Davao City since 2020","Packages from ₱500 per head","Weddings · Birthdays · Debuts · Corporate events","Build your own menu with an instant estimate"],
+  homeHighlights:["Serving Davao City since 2020","30 to 2,000+ guests per order","Corporate · Weddings · Birthdays · Institutional programs","Chef-planned menus, built around you"],
   homeStepsTitle:"Plan your event in four easy steps",
   homePhotosTitle:"A taste of our work",
   contactTitle:"How to contact us",
@@ -1427,6 +1504,9 @@ const ABOUT_DEFAULT={
   tray_desserts:"Mango Lychee | 1,030\nBuko Pandan | 920\nDouble Dark Choco Fudge | 2,300\nBlueberry Cheesecake | 2,200\nPistachio Sans Rival | 2,400"
 };
 const ABOUT_LISTS=["services","mission","clients","homeHighlights","contactPhones"];
+/* Keys replaced by the Nov 2026 company-profile wording the first time it loads (until an admin saves the pages again). */
+const ABOUT_REV_KEYS=["kicker","headline","story","heroPhoto","heroAlt","vision","missionTitle","mission","servicesTitle","services","teamKicker","teamTitle","team","chefs","teamPhoto","teamCaption","clientsKicker","clientsTitle","clients","ctaTitle","ctaText","homeKicker","homeTitle","homeText","homePhoto","homePhotoAlt","homeHighlights"];
+const SHOOT_GALLERY=()=>[["grazing2026","events","Grazing table for an evening event"],["packed2131","food","Corporate packed meals"],["traybake2209","food","Baked party tray"],["rolls1963","food","Pica-pica rolls"],["buffetline2371","events","Buffet line, ready for guests"],["sandwich1759","food","Tea sandwiches"],["trayfish2185","food","Fish fillet in sauce, party tray"],["snacks1834","food","Merienda bites"],["traybeef2245","food","Beef with mushrooms"],["quesadilla1825","food","Grilled quesadilla wedges"],["packed2116","food","Packed lunch boxes"],["traypasta2299","food","Creamy pasta tray"]].map(([k,c,cap])=>S_(k)&&{...S_(k),category:c,caption:cap}).filter(Boolean);
 const TRAY_CDN="https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261112_";
 const TRAY_IMG={chicken:"085510_ccb96433-9fec-4c14-9c9d-9d7c973645bc",pork:"085314_70d2c337-f7e0-4b04-b1b4-db665034fd0d",beef:"085908_71cbd089-68e8-4889-a1ef-7d8f48d8091d",seafood:"085641_d8c40549-4fa0-4ba2-b814-8bd91f2c9259",vegetables:"085907_4b5311d5-696c-4d1f-949d-399d913b8bc1",pasta:"085312_60fae33c-6365-4146-a0c4-e7c9619c2adb",salads:"085640_9fec2c5f-831a-4ad3-a00d-796c393c5e4e",rice:"090232_1e1f0948-bcfc-4db1-a501-c49cb2d0b530",desserts:"090233_3f8ad353-abbd-4545-a0f3-e497213ceda7"};
 const trayImg=k=>TRAY_IMG[k]?TRAY_CDN+TRAY_IMG[k]+".jpeg":"assets/trays/"+k+".jpg";
@@ -1454,13 +1534,17 @@ function cleanPhoto(p){const r=cleanRef(p);if(!r)return null;return {...r,catego
 function applyAbout(a,g){
   if(a&&typeof a==="object"){
     const n=JSON.parse(JSON.stringify(ABOUT_DEFAULT));
+    const fresh=a.rev!==ABOUT_REV;
     for(const k of Object.keys(n)){
+      if(fresh&&ABOUT_REV_KEYS.includes(k))continue;
       if(ABOUT_LISTS.includes(k)){if(Array.isArray(a[k]))n[k]=a[k].map(x=>String(x).trim()).filter(Boolean)}
       else if(ABOUT_PHOTOS.includes(k)){const r=cleanRef(a[k]);if(r)n[k]=r}
       else if(k==="chefs"){if(Array.isArray(a.chefs))n.chefs=a.chefs.filter(c=>c&&typeof c==="object").map(c=>({name:String(c.name||""),subtitle:String(c.subtitle||""),photo:cleanRef(c.photo)}))}
       else if(typeof a[k]==="string")n[k]=a[k];
     }
+    n.rev=ABOUT_REV;
     state.about=n;
+    if(fresh&&Array.isArray(g)){const have=new Set(g.map(x=>x&&(x.id||x.src)));g=SHOOT_GALLERY().filter(x=>!have.has(x.id)).concat(g)}
   }
   if(Array.isArray(g))state.gallery=g.map(cleanPhoto).filter(Boolean);
 }
@@ -1532,6 +1616,7 @@ function viewHome(){
   </section>
   ${viewFilm()}
   ${a.homeHighlights.length?`<ul class="home-highlights">${a.homeHighlights.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
+  ${profStats(profData())}${profServices(profData(),true)}${profCorpBand(profData())}
   <section class="home-steps"><h2>${esc(a.homeStepsTitle)}</h2>
     <div class="steps-grid">${STEPS.map(([v,n,t,d])=>`<button class="step-card" data-go="${v}"><span class="n">${n}</span><b>${t}</b><span>${d}</span><span class="go">Open →</span></button>`).join("")}</div>
   </section>
@@ -2154,10 +2239,13 @@ function viewAbout(){
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">${a.btnPackages?`<button class="btn gold" data-go="packages">${esc(a.btnPackages)}</button>`:""}${a.btnGallery?`<button class="btn ghost" data-scroll="gallerySec">${esc(a.btnGallery)}</button>`:""}</div>
     </div>
   </section>
+  ${profAboutExtra(profData())}
+  ${secLabel(profData().vmKicker)}
   <section class="vm">
     <div class="panel"><div class="label">${esc(a.visionTitle)}</div><p class="vision-text">${esc(a.vision)}</p></div>
-    <div class="panel mission"><div class="label">${esc(a.missionTitle)}</div><ol>${a.mission.map(x=>`<li>${esc(x)}</li>`).join("")}</ol></div>
+    <div class="panel mission"><div class="label">${esc(a.missionTitle)}</div>${a.mission.length===1?`<p class="vision-text">${esc(a.mission[0])}</p>`:`<ol>${a.mission.map(x=>`<li>${esc(x)}</li>`).join("")}</ol>`}</div>
   </section>
+  ${profValues(profData())}
   ${a.services.length?`<section class="services-band"><h2>${esc(a.servicesTitle)}</h2><ul>${a.services.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></section>`:""}
   <section class="team">
     <div class="team-text">${a.teamKicker?`<div class="kicker">${esc(a.teamKicker)}</div>`:""}<h2>${esc(a.teamTitle)}</h2>${paras(a.team)}
@@ -2165,8 +2253,12 @@ function viewAbout(){
     </div>
     ${a.teamPhoto?`<figure class="team-photo">${imgTag(a.teamPhoto,1400,'loading="lazy"',a.teamCaption||"Our team")}${a.teamCaption?`<figcaption>${esc(a.teamCaption)}</figcaption>`:""}</figure>`:""}
   </section>
+  ${profDepts(profData())}
   <section class="custom-band"><div><h2>${esc(a.customTitle)}</h2>${paras(a.custom)}</div>${a.customButton?`<button class="btn gold" data-go="custom">${esc(a.customButton)}</button>`:""}</section>
   ${a.clients.length?`<section class="clients">${a.clientsKicker?`<div class="kicker" style="text-align:center">${esc(a.clientsKicker)}</div>`:""}<h2 style="text-align:center">${esc(a.clientsTitle)}</h2><div class="client-list">${a.clients.map(c=>`<span>${esc(c)}</span>`).join("")}</div></section>`:""}
+  ${profRecord(profData())}
+  ${profCapability(profData())}
+  ${state.canEdit?`<div style="text-align:right;margin:8px 0"><button class="btn small ghost" data-go="profEdit">✎ Edit profile sections</button> <button class="btn small ghost" data-go="aboutEdit">✎ Edit pages</button></div>`:""}
   <section id="gallerySec">
     <div class="gallery-head"><div><h2 style="margin:0">${esc(a.galleryTitle)}</h2>${a.galleryIntro?`<p class="hint" style="margin:4px 0 0">${esc(a.galleryIntro)}</p>`:""}</div>
       ${state.gallery.length?`<div class="tierswitch" role="group" aria-label="Photo filter">${tabs}</div>`:""}</div>
@@ -2331,6 +2423,245 @@ function bindAboutEdit(v){
   const gd=$("#galleryDefaults",v);if(gd)gd.onclick=()=>{const have=new Set(G.map(photoKey));DEFAULT_GALLERY.forEach(p=>{if(!have.has(p.src))G.push({...p})});state.aboutDirty=true;state.aboutMsg="Portfolio photos restored — click Save changes to publish.";keepScroll(render)};
 }
 
+
+/* ============ COMPANY PROFILE CONTENT (Nov 2026) — stored as JSON in about.profile, edited in "Edit profile" ============ */
+const PROFILE_DEFAULT={
+  stats:[{n:"2020",l:"Year founded"},{n:"2,000+",l:"Guests per order"},{n:"1,873",l:"Pax in one corporate order (BDO, Aug 2026)"},{n:"100+",l:"Dishes on our buffet & tray menus"}],
+  svcKicker:"02 · Our services",svcTitle:"What we do",
+  svcIntro:"From sealed corporate packed meals to full-service buffets — every menu planned by our chefs and adjusted to each client's occasion, budget and dietary needs.",
+  svcs:[
+    {t:"Corporate packed meals",d:"Breakfast, snacks, lunch and dinner, individually sealed and labelled — one-time volume orders or standing employee meal programs.",go:"packed",photo:S_("packed2131")},
+    {t:"Snack boxes",d:"AM / PM snacks for meetings, trainings, sportsfests and outreach programs, customized to budget and theme.",go:"packed",photo:S_("sandwich1759")},
+    {t:"Meetings & seminars",d:"Coffee breaks, half-day and whole-day packages, delivered or served on-site.",go:"corporate",photo:S_("canape1774")},
+    {t:"Full-service buffet",d:"Standard and Premium buffet packages with waitstaff, banquet supervisor, dinnerware and full catering equipment.",go:"packages",photo:S_("buffet2341")},
+    {t:"Grazing & live stations",d:"Pica-pica tables, merienda spreads and refined live street-food stations.",go:"grazing",photo:S_("grazing2026")},
+    {t:"Handaan packages",d:"Ready-to-book Filipino celebration packages, including our Maligayang Kaarawan birthday package, with setup, décor and service.",go:"kaarawan",photo:S_("fried1816")},
+    {t:"Party trays & desserts",d:"Ready-to-serve trays across chicken, pork, beef, seafood, vegetables, pasta, salads, rice and desserts.",go:"trays",photo:S_("traybake2209")},
+    {t:"Restaurant",d:"Our dine-in restaurant in Juna Subdivision, with Sunday buffets and themed menus.",go:"contact",photo:S_("logo2449")}],
+  quote:"We show up for celebrations — and for the everyday meals that keep people connected.",
+  workTitle:"How we work",
+  work:[{t:"Chef-planned menus",d:"Our two head chefs plan and check every menu."},{t:"Organized paperwork",d:"Purchase orders, Banquet Event Orders, BIR invoices and statements of account."},{t:"Consistent at any size",d:"The same recipes and quality checks for 30 or 2,000 guests."},{t:"One team",d:"Menu, kitchen, delivery, service and billing handled in-house, so you have one point of contact."}],
+  approachTitle:"Our approach",approach:"Real food, real people, dependable service. We keep styling simple and let the food, the warmth of our team and reliable service speak for themselves.",
+  vmKicker:"02 · What drives us",commitTitle:"Our commitment",
+  commit:"Whether it is a small dinner, a wedding reception or a company-wide event, we prepare each one with the same care and attention. We listen first, keep our promises, and hope every meal we serve becomes part of a good memory.",
+  valuesTitle:"Core values",
+  values:[{t:"Quality",d:"Fresh ingredients, proper technique and the same care for 30 or 2,000 guests."},{t:"Hospitality",d:"We treat every client and guest as if they were in our own home."},{t:"Reliability",d:"We do what we agreed, when we agreed — and tell clients early if anything changes."},{t:"Integrity",d:"Honest pricing, transparent terms and proper documentation."},{t:"Creativity",d:"We keep learning and developing new dishes, from Filipino classics to chef R&D."},{t:"Teamwork",d:"Kitchen, service and admin working as one for each event."}],
+  deptTitle:"How our team is organized",
+  depts:[{t:"Culinary",d:"Head chefs with the kitchen team — cooks, prep and pastry."},{t:"Events & banquets",d:"Banquet supervisor, service team and logistics — packing and delivery."},{t:"Restaurant",d:"Front of house, dining team and reception for orders and inquiries."},{t:"Admin & accounts",d:"Sales, quotations, invoicing, payroll and HR."}],
+  recordKicker:"04 · Selected engagements",recordTitle:"Track record",
+  record:[{c:"BDO Unibank — Sportsfest",s:"Customized AM snacks for 1,873 pax, produced and delivered in a single order",d:"Aug 2026"},{c:"BDO Unibank",s:"Ongoing supply of snacks and packed lunches",d:"2026 – present"},{c:"Schools Division of Davao City / Dangerous Drugs Board",s:"Catering for an institutional partnership program",d:"Dec 2025"},{c:"Corporate clients",s:"Meetings, conferences, corporate galas and themed buffets (Asian, Western / Tex-Mex)",d:"2020 – present"},{c:"Weddings & social events",s:"Garden and ballroom receptions, birthdays, christenings and family celebrations",d:"2020 – present"}],
+  recordNote:"Client references and contact persons are available on request.",
+  capKicker:"06 · Capability & standards",capTitle:"Facilities, systems & quality",capPhoto:S_("buffetline2371"),
+  facilities:"Restaurant and production kitchen at 13 Juna Avenue, Juna Subdivision, Davao City, with dine-in space and a reception counter for orders and walk-in inquiries.\nFull catering equipment: chafing dishes, buffet setups, dinnerware, flatware, glassware and linens.\nInsulated food carriers for safe transport of hot and cold food.\nA Banquet Event Order (BEO) issued and signed off for every event.\nA shared events calendar, so no booking is double-scheduled.",
+  capacity:[{l:"Packed meals / snacks per order",v:"30 – 2,000+ pax"},{l:"Buffet events",v:"30 pax and up"},{l:"Service area",v:"Davao City & nearby"}],
+  processTitle:"From our kitchen to your event",process:"Preparation\nCooking\nPlating & packing\nQuality checks\nLoading\nSetup & service",
+  safetyTitle:"Food safety & quality",
+  safety:"Food handlers with valid health certificates, in hairnets, gloves and clean uniforms.\nFresh ingredients bought daily; first-in, first-out stock rotation.\nSealed, labelled packs with production time and allergen / no-pork markings.\nPost-event feedback within 24 hours, answered by our account officer the same day.",
+  corpBandTitle:"Catering for companies and institutions",
+  corpBandText:"Packed meals, snack boxes, meetings and company events — with POs, BEOs, BIR invoices and one account officer. Download our Products & Services Catalogue.",
+  corpBandBtn:"For corporate clients →",corpBandPhoto:S_("packed2140")
+};
+const PROF_LISTS={stats:4,svcs:12,work:6,values:9,depts:6,record:12,capacity:6};
+function profData(){
+  let x={};try{x=JSON.parse(state.about.profile||"{}")||{}}catch(e){x={}}
+  const d=JSON.parse(JSON.stringify(PROFILE_DEFAULT));
+  for(const k of Object.keys(d)){
+    if(!(k in x))continue;
+    if(PROF_LISTS[k]){if(Array.isArray(x[k]))d[k]=x[k].slice(0,PROF_LISTS[k]).map(o=>{const r={};for(const f of Object.keys(o||{}))r[f]=f==="photo"?kRef(o[f]):String(o[f]??"");return r});continue}
+    if(/Photo$/.test(k)){d[k]=kRef(x[k]);continue}
+    d[k]=String(x[k]??"");
+  }
+  return d;
+}
+const lines=t=>String(t||"").split("\n").map(x=>x.trim()).filter(Boolean);
+const secLabel=t=>t?`<div class="sec-label">${esc(t)}</div>`:"";
+function profStats(P){const st=P.stats.filter(x=>x.n);return st.length?`<div class="pf-stats">${st.map(x=>`<div><b>${esc(x.n)}</b><span>${esc(x.l)}</span></div>`).join("")}</div>`:""}
+function profServices(P,home){
+  const L=P.svcs.filter(x=>x.t);if(!L.length)return "";
+  return `<section class="pf-sec">${secLabel(P.svcKicker)}<h2 class="pf-h2">${esc(P.svcTitle)}</h2>${P.svcIntro?`<p class="pf-lead">${esc(P.svcIntro)}</p>`:""}
+    <div class="pf-svcs">${L.map(x=>`<button class="pf-svc" ${x.go?`data-go="${esc(x.go)}"`:""}><span class="ph">${x.photo?kImg(x.photo,700,x.t,'loading="lazy"'):""}</span><b>${esc(x.t)}</b><small>${esc(x.d)}</small>${x.go?`<span class="go">Learn more →</span>`:""}</button>`).join("")}</div></section>`;
+}
+function profCorpBand(P){
+  if(!P.corpBandTitle)return "";
+  return `<section class="pf-corp">${P.corpBandPhoto?`<div class="ph">${kImg(P.corpBandPhoto,1000,P.corpBandTitle,'loading="lazy"')}</div>`:""}<div class="tx"><div class="sec-label light">For corporate clients</div><h2>${esc(P.corpBandTitle)}</h2><p>${esc(P.corpBandText)}</p>${P.corpBandBtn?`<button class="btn gold" data-go="corporate">${esc(P.corpBandBtn)}</button>`:""}</div></section>`;
+}
+function profAboutExtra(P){
+  return `${P.quote?`<blockquote class="pf-quote">${esc(P.quote)}</blockquote>`:""}
+  <section class="pf-two">
+    <div>${P.work.some(x=>x.t)?`<h3 class="pf-h3">${esc(P.workTitle)}</h3><ul class="pf-work">${P.work.filter(x=>x.t).map(x=>`<li><b>${esc(x.t)}:</b> ${esc(x.d)}</li>`).join("")}</ul>`:""}</div>
+    <div class="pf-cards">${P.approach?`<div class="pf-card"><h4>${esc(P.approachTitle)}</h4><p>${esc(P.approach)}</p></div>`:""}${profStats(P)}</div>
+  </section>`;
+}
+function profValues(P){
+  return `${P.commit?`<section class="pf-commit"><h3 class="pf-h3">${esc(P.commitTitle)}</h3><p>${esc(P.commit)}</p></section>`:""}
+  ${P.values.some(x=>x.t)?`<section class="pf-sec"><h3 class="pf-h3">${esc(P.valuesTitle)}</h3><div class="pf-values">${P.values.filter(x=>x.t).map(x=>`<div><h4>${esc(x.t)}</h4><p>${esc(x.d)}</p></div>`).join("")}</div></section>`:""}`;
+}
+function profDepts(P){const L=P.depts.filter(x=>x.t);return L.length?`<div class="pf-depts"><h3 class="pf-h3">${esc(P.deptTitle)}</h3><div class="pf-dgrid">${L.map(x=>`<div><b>${esc(x.t)}</b><span>${esc(x.d)}</span></div>`).join("")}</div></div>`:""}
+function profRecord(P){
+  const L=P.record.filter(x=>x.c);if(!L.length)return "";
+  return `<section class="pf-sec">${secLabel(P.recordKicker)}<h2 class="pf-h2">${esc(P.recordTitle)}</h2>
+    <div class="tw"><table class="pf-table"><thead><tr><th>Client / event</th><th>Scope</th><th>Date</th></tr></thead><tbody>${L.map(x=>`<tr><td><b>${esc(x.c)}</b></td><td>${esc(x.s)}</td><td class="nw">${esc(x.d)}</td></tr>`).join("")}</tbody></table></div>
+    ${P.recordNote?`<p class="hint">${esc(P.recordNote)}</p>`:""}</section>`;
+}
+function profCapability(P){
+  const F=lines(P.facilities),S=lines(P.safety),PR=lines(P.process),C=P.capacity.filter(x=>x.l);
+  if(!F.length&&!S.length&&!PR.length&&!C.length)return "";
+  return `<section class="pf-sec">${secLabel(P.capKicker)}<h2 class="pf-h2">${esc(P.capTitle)}</h2>
+    <div class="pf-cap"><div>${F.length?`<ul class="pf-list">${F.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
+      ${C.length?`<table class="pf-table small"><tbody>${C.map(x=>`<tr><td>${esc(x.l)}</td><td class="r"><b>${esc(x.v)}</b></td></tr>`).join("")}</tbody></table>`:""}</div>
+      ${P.capPhoto?`<figure class="ph">${kImg(P.capPhoto,1200,P.capTitle,'loading="lazy"')}</figure>`:""}</div>
+    ${PR.length?`<h3 class="pf-h3">${esc(P.processTitle)}</h3><ol class="pf-steps">${PR.map((x,i)=>`<li><b>${i+1}</b><span>${esc(x)}</span></li>`).join("")}</ol>`:""}
+    ${S.length?`<h3 class="pf-h3">${esc(P.safetyTitle)}</h3><ul class="pf-list two">${S.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}</section>`;
+}
+
+/* ============ FOR CORPORATE CLIENTS page — JSON in about.corporate, edited in "Edit corporate page" ============ */
+const CORP_DEFAULT={
+  kicker:"For corporate clients",title:"Dependable catering for companies and institutions",
+  intro:"Banks, utilities, builders and schools across Davao City trust Romualdo's for packed meals, snack boxes, meetings and company events — prepared in our own kitchen for 30 to 2,000+ guests, with the paperwork your purchasing team needs.",
+  heroPhoto:S_("packed2140"),heroAlt:"Romualdo's corporate packed meals",
+  pointsTitle:"How we serve corporate accounts",
+  points:"One account officer for quotations, orders, changes and billing — one number to call.\nPO-based ordering; a written quotation and Banquet Event Order (BEO) for every event.\nConsolidated monthly Statement of Account option for recurring orders.\nBIR-registered invoices / official receipts; 2% expanded withholding tax honored.\n4-week rotating menu cycle for standing meal programs.\nNo-pork, vegetarian, low-sodium and allergen-aware meals, labelled individually.\nScalable: 30 to 2,000+ pax per order, with staggered delivery for multiple sites or shifts.\nFood tasting for contracts of 200+ pax or standing programs.",
+  linesTitle:"Service portfolio",
+  lines:[{t:"Corporate packed meals",d:"Breakfast, lunch, dinner and crew meals in sealed, labelled packs.",p:"From ₱160 / pax",photo:S_("packed2116")},{t:"Snack boxes",d:"AM / PM snacks for meetings, trainings, sportsfests and outreach programs.",p:"From ₱120 / pax",photo:S_("sandwich1822")},{t:"Meetings & seminars",d:"Coffee breaks, half-day and whole-day packages, delivered or served on-site.",p:"From ₱180 / pax",photo:S_("canape1774")},{t:"Full-service buffet",d:"Town halls, anniversaries, Christmas parties, launches and galas — with staff, equipment and setup.",p:"From ₱450 / pax",photo:S_("buffetbeef2380")},{t:"Grazing & live stations",d:"Pica-pica tables, merienda spreads and live street-food stations for networking events.",p:"From ₱10,000 / station",photo:S_("grazing1870")},{t:"Party trays & desserts",d:"Ready-to-serve trays, whole cakes and dessert boxes for office celebrations.",p:"From ₱450 / tray",photo:S_("traylasagna2224")}],
+  priceNote:"Rates are indicative; final prices are confirmed in a written quotation based on menu, headcount, venue and delivery location.",
+  formTitle:"Download our Products & Services Catalogue",
+  formIntro:"Tell us a little about your company and the catalogue (PDF) downloads right away — packages, rates, commercial terms and accreditation details.",
+  fileLabel:"Products & Services Catalogue 2026–2027",fileUrl:"/assets/corporate/Romualdos-Products-and-Services-2026.pdf",
+  formFine:"We use these details only to follow up on your catering needs. Our account officer may contact you to help with a quotation.",
+  submitBtn:"Get the catalogue",thanks:"Thank you! Your download is ready."
+};
+function corpData(){
+  let x={};try{x=JSON.parse(state.about.corporate||"{}")||{}}catch(e){x={}}
+  const d=JSON.parse(JSON.stringify(CORP_DEFAULT));
+  for(const k of Object.keys(d)){if(!(k in x))continue;
+    if(k==="lines"){if(Array.isArray(x.lines))d.lines=x.lines.slice(0,9).map(o=>({t:String(o?.t||""),d:String(o?.d||""),p:String(o?.p||""),photo:kRef(o?.photo)}));continue}
+    if(k==="heroPhoto"){d.heroPhoto=kRef(x.heroPhoto);continue}
+    d[k]=String(x[k]??"")}
+  if(!/^(\/assets\/[\w\/.-]+\.pdf|https:\/\/(drive|docs)\.google\.com\/[^\s"<>]+)$/.test(d.fileUrl))d.fileUrl=CORP_DEFAULT.fileUrl;
+  return d;
+}
+const CORP_TYPES=["Bank / financial","Government / institution","School / university","Construction / engineering","Utilities / energy","Manufacturing / plant","BPO / IT","Healthcare","Retail / hospitality","NGO / foundation","Other"];
+state.cForm=state.cForm||{company:"",name:"",position:"",email:"",phone:"",industry:"",city:"",pax:"",wants:[],notes:""};
+function corpUnlocked(){try{return localStorage.getItem("rcs_corp_dl")==="1"}catch(e){return false}}
+function viewCorporate(){
+  const C=corpData(),P=profData(),f=state.cForm,ok=state.cDone||corpUnlocked();
+  const pts=lines(C.points),L=C.lines.filter(x=>x.t);
+  const inp=(k,label,type,req,extra)=>`<label><span>${label}${req?' <span class="req">*</span>':""}</span><input data-cf="${k}" type="${type||"text"}" value="${esc(f[k])}" ${req?"required":""} ${extra||""}></label>`;
+  return `<div class="corp">${state.canEdit?`<div style="text-align:right;margin:0 0 8px"><button class="btn small ghost" data-go="corpEdit">✎ Edit this page</button></div>`:""}
+  <section class="corp-hero"><div class="tx"><div class="sec-label light">${esc(C.kicker)}</div><h1>${esc(C.title)}</h1>${paras(C.intro)}
+    <div class="home-btns"><button class="btn gold" data-cscroll="corpForm">${esc(C.formTitle.replace(/^Download our /,"Download the "))}</button><button class="btn ghost light" data-go="contact">Talk to us</button></div></div>
+    ${C.heroPhoto?`<figure class="ph">${kImg(C.heroPhoto,1400,C.heroAlt)}</figure>`:""}</section>
+  ${profStats(P)}
+  ${pts.length?`<section class="pf-sec"><h2 class="pf-h2">${esc(C.pointsTitle)}</h2><ul class="pf-list two">${pts.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></section>`:""}
+  ${L.length?`<section class="pf-sec"><h2 class="pf-h2">${esc(C.linesTitle)}</h2><div class="pf-svcs">${L.map(x=>`<div class="pf-svc"><span class="ph">${x.photo?kImg(x.photo,700,x.t,'loading="lazy"'):""}</span><b>${esc(x.t)}</b><small>${esc(x.d)}</small>${x.p?`<span class="price">${esc(x.p)}</span>`:""}</div>`).join("")}</div>${C.priceNote?`<p class="hint">${esc(C.priceNote)}</p>`:""}</section>`:""}
+  ${state.about.clients.length?`<section class="clients"><div class="kicker" style="text-align:center">Trusted by</div><div class="client-list">${state.about.clients.map(c=>`<span>${esc(c)}</span>`).join("")}</div></section>`:""}
+  <section class="corp-form" id="corpForm"><div class="cf-head"><h2>${esc(C.formTitle)}</h2><p>${esc(C.formIntro)}</p></div>
+  ${ok?`<div class="cf-done"><div class="big">📄</div><b>${esc(C.thanks)}</b><a class="btn gold" href="${esc(C.fileUrl)}" target="_blank" rel="noopener" download>Download: ${esc(C.fileLabel)} (PDF)</a><span class="hint">Questions? Call or text ${esc((state.about.contactPhones||[])[0]||"")} or email ${esc(state.about.contactEmail)}.</span>${state.cDone?"":`<button class="btn small ghost" id="cfAgain">Send our details again</button>`}</div>`:`
+  <form id="cfForm" class="cf-grid" novalidate>
+    ${inp("company","Company / organization",0,1,'maxlength="120" autocomplete="organization"')}${inp("name","Contact person",0,1,'maxlength="80" autocomplete="name"')}
+    ${inp("position","Position / department",0,0,'maxlength="80"')}<label>Industry<select data-cf="industry"><option value="">Choose…</option>${CORP_TYPES.map(t=>`<option ${f.industry===t?"selected":""}>${t}</option>`).join("")}</select></label>
+    ${inp("email","Work email","email",1,'maxlength="120" autocomplete="email"')}${inp("phone","Mobile / phone","tel",1,'maxlength="30" autocomplete="tel"')}
+    ${inp("city","Office / delivery location",0,0,'maxlength="120" placeholder="e.g. Lanang, Davao City"')}${inp("pax","Usual headcount per order","number",0,'min="1" max="20000" inputmode="numeric"')}
+    <fieldset class="cf-wants"><legend>Interested in</legend>${L.map(x=>`<label class="chk"><input type="checkbox" data-cw="${esc(x.t)}" ${f.wants.includes(x.t)?"checked":""}> ${esc(x.t)}</label>`).join("")}</fieldset>
+    <label class="full">Anything else? (optional)<textarea data-cf="notes" rows="3" maxlength="1000" placeholder="e.g. weekly packed lunches for 120 staff, starting January">${esc(f.notes)}</textarea></label>
+    <input type="text" name="website" id="cfHp" tabindex="-1" autocomplete="off" class="hp" aria-hidden="true">
+    <div class="full cf-actions"><button class="btn gold" type="submit" id="cfSend">${esc(C.submitBtn)}</button><span class="formmsg" id="cfMsg">${esc(state.cMsg||"")}</span></div>
+    <p class="full hint" style="margin:0">${esc(C.formFine)}</p>
+  </form>`}</section></div>`;
+}
+function bindCorporate(v){
+  const f=state.cForm;
+  v.querySelectorAll("[data-cf]").forEach(el=>el.oninput=el.onchange=()=>{f[el.dataset.cf]=el.value});
+  v.querySelectorAll("[data-cw]").forEach(el=>el.onchange=()=>{const t=el.dataset.cw;f.wants=el.checked?[...new Set([...f.wants,t])]:f.wants.filter(x=>x!==t)});
+  v.querySelectorAll("[data-cscroll]").forEach(b=>b.onclick=()=>document.getElementById(b.dataset.cscroll)?.scrollIntoView({behavior:"smooth"}));
+  const ag=$("#cfAgain",v);if(ag)ag.onclick=()=>{try{localStorage.removeItem("rcs_corp_dl")}catch(e){}keepScroll(render)};
+  const fm=$("#cfForm",v);if(!fm)return;
+  fm.onsubmit=async e=>{e.preventDefault();const msg=$("#cfMsg"),btn=$("#cfSend");
+    const need=[["company","your company name"],["name","the contact person"],["email","a work email"],["phone","a mobile or phone number"]].find(([k])=>!String(f[k]||"").trim());
+    if(need){msg.textContent="Please enter "+need[1]+".";return}
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email.trim())){msg.textContent="Please check the email address.";return}
+    if(String(f.phone).replace(/\D/g,"").length<7){msg.textContent="Please check the phone number.";return}
+    btn.disabled=true;msg.textContent="Sending…";state.cMsg="";
+    const corp={company:f.company.trim(),position:f.position.trim(),industry:f.industry,city:f.city.trim(),wants:f.wants.slice(0,12)};
+    const inquiry={ref:state.cRef||(state.cRef=newRef()),customer:{name:f.name.trim(),phone:f.phone.trim(),email:f.email.trim()},event:{date:phDate(0),type:"Corporate catalogue request",pax:Number(f.pax)||0,venue:corp.city},plan:{kind:"corporate"},corp,notes:f.notes.trim(),items:[],estimate:{}};
+    let r;try{r=await api("submit",{inquiry,website:$("#cfHp")?.value||""})}catch(err){r={ok:false,error:"No internet connection. Please try again."}}
+    if(!r.ok){btn.disabled=false;msg.textContent=r.error||"Couldn't send. Please try again or call us.";return}
+    try{localStorage.setItem("rcs_corp_dl","1")}catch(e){}
+    state.cDone=true;state.cRef=null;keepScroll(render);
+    const a=document.querySelector(".cf-done a[download]");if(a)setTimeout(()=>a.click(),300);
+  };
+}
+
+/* ---------- Admin editors for the profile content and the corporate page (same pattern as the Packed Meals editor) ---------- */
+function startProfDraft(){state.pfDraft=profData();state.pfDirty=false;state.pfMsg=""}
+function startCorpDraft(){state.cpDraft=corpData();state.cpDirty=false;state.cpMsg=""}
+function edHelpers(prefix,D){
+  const inp=(path,label,val,max)=>`<label>${label}<input data-${prefix}="${path}" value="${esc(val)}" maxlength="${max||120}"></label>`;
+  const ta=(path,label,val,rows,max)=>`<label>${label}<textarea data-${prefix}="${path}" rows="${rows||3}" maxlength="${max||1200}">${esc(val)}</textarea></label>`;
+  const photo=(path,ref,label)=>`<div class="kslot"><div class="kslot-img">${ref?kImg(ref,500,label):`<span class="hint">No photo</span>`}</div><div class="kslot-b"><b>${label}</b><label class="btn small" style="cursor:pointer;margin:0;flex-direction:row;color:#fff">${ref?"Replace photo":"＋ Add photo"}<input type="file" accept="image/*" data-${prefix}up="${path}" style="display:none"></label>${ref?`<button class="btn small ghost" data-${prefix}clr="${path}">Remove photo</button>`:""}</div></div>`;
+  const sec=(t,body)=>`<details class="panel ed sec" open><summary><h3 style="display:inline">${t}</h3></summary><div style="margin-top:12px">${body}</div></details>`;
+  const rows=(key,arr,fields,max,addLabel)=>`${arr.map((o,i)=>`<div class="kopt-ed"><div class="kopt-h"><b>${esc(o[fields[0][0]]||"Item "+(i+1))}</b><span style="flex:1"></span><button class="btn small ghost" data-${prefix}mv="${key}|${i}|-1" ${i===0?"disabled":""}>↑</button><button class="btn small ghost" data-${prefix}mv="${key}|${i}|1" ${i===arr.length-1?"disabled":""}>↓</button><button class="btn small danger" data-${prefix}rm="${key}|${i}">✕</button></div>
+    ${fields.map(([f,l,m,kind])=>kind==="photo"?photo(`${key}.${i}.${f}`,o[f],l):kind==="ta"?ta(`${key}.${i}.${f}`,l,o[f],2,m):inp(`${key}.${i}.${f}`,l,o[f],m)).join("")}</div>`).join("")}${arr.length<max?`<button class="btn small" data-${prefix}add="${key}">＋ ${addLabel}</button>`:""}`;
+  return {inp,ta,photo,sec,rows};
+}
+function edBar(prefix,dirty,msg){return `<div class="panel" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;position:sticky;bottom:10px;z-index:5;border-color:${dirty?"var(--gold)":"var(--line)"}">
+    <button class="btn gold" id="${prefix}Save" ${dirty?"":"disabled"}>Save changes</button><button class="btn ghost" id="${prefix}Discard" ${dirty?"":"disabled"}>Discard changes</button><button class="btn ghost small" id="${prefix}Reset">Load the company-profile wording &amp; photos</button>
+    <span class="formmsg" id="${prefix}Msg" style="margin:0">${esc(msg||(dirty?"You have unsaved changes.":""))}</span></div>`}
+function viewProfEdit(){
+  if(!state.pfDraft)startProfDraft();
+  const D=state.pfDraft,{inp,ta,photo,sec,rows}=edHelpers("pf",D);
+  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>Edit company profile sections</h1><span class="who">Admin only · the profile sections on the Welcome and About Us pages · <a href="#about" data-go="about">view About Us</a> · other wording: <a href="#" data-go="aboutEdit">Edit pages</a></span></div>
+  <div class="formmsg" style="color:var(--blue);min-height:0;margin-bottom:8px">${esc(state.pfUpMsg||"")}</div>
+  ${sec("Highlights (numbers)",rows("stats",D.stats,[["n","Number",20],["l","Label",80]],4,"Add highlight"))}
+  ${sec("What we do — service cards (Welcome page)",`<div class="g2">${inp("svcKicker","Small heading",D.svcKicker,60)}${inp("svcTitle","Heading",D.svcTitle,60)}</div>${ta("svcIntro","Intro",D.svcIntro,2,400)}
+    <p class="hint">"Opens" is the page a card links to: packed, packages, grazing, kaarawan, trays, custom, corporate, about or contact (leave empty for no link).</p>
+    ${rows("svcs",D.svcs,[["t","Title",60],["d","Description",240,"ta"],["go","Opens",20],["photo","Photo",0,"photo"]],12,"Add service")}`)}
+  ${sec("Corporate band (Welcome page)",`${photo("corpBandPhoto",D.corpBandPhoto,"Photo")}${inp("corpBandTitle","Heading (leave empty to hide)",D.corpBandTitle,90)}${ta("corpBandText","Text",D.corpBandText,2,400)}${inp("corpBandBtn","Button",D.corpBandBtn,40)}`)}
+  ${sec("About Us — who we are",`${ta("quote","Quote",D.quote,2,200)}${inp("workTitle","How we work — heading",D.workTitle,60)}${rows("work",D.work,[["t","Title",60],["d","Text",200,"ta"]],6,"Add point")}
+    ${inp("approachTitle","Approach — heading",D.approachTitle,60)}${ta("approach","Approach text",D.approach,3,500)}`)}
+  ${sec("About Us — commitment &amp; values",`${inp("vmKicker","Small heading above vision &amp; mission",D.vmKicker,60)}${inp("commitTitle","Commitment heading",D.commitTitle,60)}${ta("commit","Commitment text",D.commit,3,600)}${inp("valuesTitle","Values heading",D.valuesTitle,60)}${rows("values",D.values,[["t","Value",40],["d","Text",200,"ta"]],9,"Add value")}`)}
+  ${sec("About Us — team organization",`${inp("deptTitle","Heading",D.deptTitle,80)}${rows("depts",D.depts,[["t","Department",60],["d","Who's in it",200]],6,"Add department")}`)}
+  ${sec("About Us — track record",`<div class="g2">${inp("recordKicker","Small heading",D.recordKicker,60)}${inp("recordTitle","Heading",D.recordTitle,60)}</div>${rows("record",D.record,[["c","Client / event",100],["s","Scope",240],["d","Date",40]],12,"Add engagement")}${inp("recordNote","Note under the table",D.recordNote,200)}`)}
+  ${sec("About Us — capability &amp; standards",`<div class="g2">${inp("capKicker","Small heading",D.capKicker,60)}${inp("capTitle","Heading",D.capTitle,80)}</div>${photo("capPhoto",D.capPhoto,"Photo")}${ta("facilities","Facilities &amp; systems (one per line)",D.facilities,6,1500)}
+    ${rows("capacity",D.capacity,[["l","Capacity",80],["v","Value",40]],6,"Add capacity line")}${inp("processTitle","Process heading",D.processTitle,80)}${ta("process","Process steps (one per line)",D.process,6,600)}${inp("safetyTitle","Food safety heading",D.safetyTitle,80)}${ta("safety","Food safety points (one per line)",D.safety,5,1200)}`)}
+  ${edBar("pf",state.pfDirty,state.pfMsg)}`;
+}
+function viewCorpEdit(){
+  if(!state.cpDraft)startCorpDraft();
+  const D=state.cpDraft,{inp,ta,photo,sec,rows}=edHelpers("cp",D);
+  return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>Edit "For Corporate Clients"</h1><span class="who">Admin only · <a href="#corporate" data-go="corporate">view the page</a></span></div>
+  <div class="formmsg" style="color:var(--blue);min-height:0;margin-bottom:8px">${esc(state.cpUpMsg||"")}</div>
+  ${sec("Top of the page",`${photo("heroPhoto",D.heroPhoto,"Big photo")}${inp("heroAlt","Photo description",D.heroAlt,140)}${inp("kicker","Small heading",D.kicker,60)}${inp("title","Title",D.title,120)}${ta("intro","Intro",D.intro,4,1000)}`)}
+  ${sec("How we serve corporate accounts",`${inp("pointsTitle","Heading",D.pointsTitle,80)}${ta("points","Points (one per line)",D.points,9,2500)}`)}
+  ${sec("Service portfolio",`${inp("linesTitle","Heading",D.linesTitle,60)}${rows("lines",D.lines,[["t","Service",60],["d","Description",240,"ta"],["p","Price line",40],["photo","Photo",0,"photo"]],9,"Add service")}${ta("priceNote","Price note",D.priceNote,2,400)}`)}
+  ${sec("Catalogue download form",`${inp("formTitle","Heading",D.formTitle,90)}${ta("formIntro","Intro",D.formIntro,2,400)}${inp("fileLabel","File name shown",D.fileLabel,90)}
+    ${inp("fileUrl","Catalogue link",D.fileUrl,300)}<p class="hint" style="margin-top:0">To use a new catalogue: upload the PDF to Google Drive, set sharing to "Anyone with the link", and paste its link here (it must start with https://drive.google.com/). The current one is on the website: ${esc(CORP_DEFAULT.fileUrl)}.</p>
+    <div class="g2">${inp("submitBtn","Button",D.submitBtn,40)}${inp("thanks","Thank-you line",D.thanks,120)}</div>${ta("formFine","Small print",D.formFine,2,400)}
+    <p class="hint">Every request is saved in <b>Inquiries</b> (type: Corporate catalogue request) and emailed to you.</p>`)}
+  ${edBar("cp",state.cpDirty,state.cpMsg)}`;
+}
+function bindJsonEdit(v,prefix,key,getD,start,blank,label){
+  const D=getD(),re=()=>{state[prefix+"Dirty"]=true;keepScroll(render)};
+  const set=(path,val)=>{const ks=path.split(".");let o=D;for(let i=0;i<ks.length-1;i++)o=o[ks[i]];o[ks[ks.length-1]]=val};
+  const mark=()=>{if(!state[prefix+"Dirty"]){state[prefix+"Dirty"]=true;const sv=$("#"+prefix+"Save"),x=$("#"+prefix+"Discard"),m=$("#"+prefix+"Msg");if(sv)sv.disabled=false;if(x)x.disabled=false;if(m)m.textContent="You have unsaved changes."}};
+  v.querySelectorAll(`[data-${prefix}]`).forEach(el=>el.oninput=()=>{set(el.dataset[prefix],el.value);mark()});
+  v.querySelectorAll(`[data-${prefix}up]`).forEach(el=>el.onchange=async()=>{const f=el.files[0];el.value="";if(!f)return;state[prefix+"UpMsg"]="Uploading photo…";keepScroll(render);
+    try{const r=await uploadOne(f,{slot:true});const ref=r.ok&&cleanRef(r.photo);if(ref){set(el.dataset[prefix+"up"],ref);state[prefix+"UpMsg"]="Photo uploaded. Click Save changes to publish.";state[prefix+"Dirty"]=true}else state[prefix+"UpMsg"]="Photo not uploaded: "+upErr(r)}catch(e){state[prefix+"UpMsg"]="That file isn't a photo the browser can read."}keepScroll(render)});
+  v.querySelectorAll(`[data-${prefix}clr]`).forEach(b=>b.onclick=()=>{set(b.dataset[prefix+"clr"],null);re()});
+  v.querySelectorAll(`[data-${prefix}mv]`).forEach(b=>b.onclick=()=>{const [k,i,d]=b.dataset[prefix+"mv"].split("|"),a=D[k],j=+i+ +d;[a[+i],a[j]]=[a[j],a[+i]];re()});
+  v.querySelectorAll(`[data-${prefix}rm]`).forEach(b=>b.onclick=()=>{const [k,i]=b.dataset[prefix+"rm"].split("|");if(!confirm("Remove this item?"))return;D[k].splice(+i,1);re()});
+  v.querySelectorAll(`[data-${prefix}add]`).forEach(b=>b.onclick=()=>{const k=b.dataset[prefix+"add"];D[k].push({...blank[k]});re()});
+  const sv=$("#"+prefix+"Save",v);if(sv)sv.onclick=async()=>{const json=JSON.stringify(D);state[prefix+"Msg"]="Saving…";keepScroll(render);
+    let r;try{r=await api("saveAbout",{about:{...state.about,[key]:json}})}catch(e){r={ok:false,error:"No internet connection"}}
+    if(!r.ok){state[prefix+"Msg"]=r.error||"Couldn't save.";keepScroll(render);return}
+    applyAbout(r.about||{...state.about,[key]:json},state.gallery);
+    if(!state.about[key]){state[prefix+"Msg"]="Saved, but the server didn't keep it (the Google script needs updating).";keepScroll(render);return}
+    if(state.aboutDraft)state.aboutDraft[key]=state.about[key];state[prefix+"UpMsg"]="";start();toast(label+" saved — live now");keepScroll(render)};
+  const dx=$("#"+prefix+"Discard",v);if(dx)dx.onclick=()=>{start();state[prefix+"UpMsg"]="";keepScroll(render)};
+  const rs=$("#"+prefix+"Reset",v);if(rs)rs.onclick=()=>{if(!confirm("Replace this page's wording and photos with the company-profile version? (Nothing is published until you click Save changes.)"))return;
+    const def=JSON.parse(JSON.stringify(key==="profile"?PROFILE_DEFAULT:CORP_DEFAULT));if(key==="profile")state.pfDraft=def;else state.cpDraft=def;state[prefix+"Dirty"]=true;keepScroll(render)};
+}
+
 /* ============ EVENTS ============ */
 function bind(){
   const v=$("#view");
@@ -2346,6 +2677,9 @@ function bind(){
   if(state.view==="grazEdit")bindGrazEdit(v);
   if(state.view==="home")bindFilm(v);
   if(state.view==="aboutEdit")bindAboutEdit(v);
+  if(state.view==="corporate")bindCorporate(v);
+  if(state.view==="profEdit")bindJsonEdit(v,"pf","profile",()=>state.pfDraft,startProfDraft,{stats:{n:"",l:""},svcs:{t:"New service",d:"",go:"",photo:null},work:{t:"",d:""},values:{t:"",d:""},depts:{t:"",d:""},record:{c:"",s:"",d:""},capacity:{l:"",v:""}},"Profile sections");
+  if(state.view==="corpEdit")bindJsonEdit(v,"cp","corporate",()=>state.cpDraft,startCorpDraft,{lines:{t:"New service",d:"",p:"",photo:null}},"Corporate page");
   if(state.view==="trayEdit")bindTrayEdit(v);
   if(state.view==="kaarEdit")bindKaarEdit(v);
   v.querySelectorAll("[data-go]").forEach(b=>b.onclick=e=>{e.preventDefault();if(b.dataset.go==="packages")state.pkg=null;if(b.dataset.go==="trayEdit"&&!state.trayDirty)startTrayDraft();if(b.dataset.go==="kaarEdit"&&!state.kDirty)startKaarDraft();if(b.dataset.go==="grazEdit"&&!state.gDirty)startGrazDraft();if(b.dataset.go==="photosEdit"&&!state.pDirty)startPhotosDraft();if(b.dataset.go==="packedEdit"&&!state.mDirty)startPackedDraft();if(b.dataset.go==="aboutEdit"&&!state.aboutDirty)startAboutDraft();go(b.dataset.go)});
@@ -2612,15 +2946,15 @@ function route(){
     if(v&&state.view!==v&&!(v==="packages"&&state.view==="choose")){state.view=v;render();window.scrollTo(0,0)}}
 }
 window.addEventListener("hashchange",route);
-window.addEventListener("beforeunload",e=>{if(state.menuDirty||state.aboutDirty){e.preventDefault();e.returnValue=""}});
+window.addEventListener("beforeunload",e=>{if(state.menuDirty||state.aboutDirty||state.pfDirty||state.cpDirty){e.preventDefault();e.returnValue=""}});
 /* ============ AUTO-SAVE: forms and editor drafts are kept on this device, so a refresh never loses typing ============ */
 const SITE_DRAFT_KEY="rcs_site_drafts_v1";
 const SITE_DRAFT_KEYS=["form","mForm","kForm","gForm","trayForm","trayCart","traySize","customTier","pax","pkg","pkgSel","chefPick","kOpt","gOpt","gPath",
-  "kDraft","kDirty","gDraft","gDirty","trayDraft","trayDirty","trayOrig","mDraft","mDirty","pDraft","pDirty","aboutDraft","aboutDirty"];
+  "kDraft","kDirty","gDraft","gDirty","trayDraft","trayDirty","trayOrig","mDraft","mDirty","pDraft","pDirty","aboutDraft","aboutDirty","cForm","pfDraft","pfDirty","cpDraft","cpDirty"];
 let siteDraftT=0;
 function siteDraftSave(){clearTimeout(siteDraftT);siteDraftT=setTimeout(siteDraftWrite,400)}
 function siteDraftWrite(){try{const o={};SITE_DRAFT_KEYS.forEach(k=>{if(state[k]!==undefined&&state[k]!==null)o[k]=state[k]});o.custom=[...(state.custom||[])];
-  ["kDraft","gDraft","trayDraft","trayOrig","mDraft","pDraft","aboutDraft"].forEach(k=>{const d=k.replace(/Draft|Orig/,"")+"Dirty",dk={trayOrig:"trayDirty",kDraft:"kDirty",gDraft:"gDirty",trayDraft:"trayDirty",mDraft:"mDirty",pDraft:"pDirty",aboutDraft:"aboutDirty"}[k];if(!state[dk])delete o[k]});
+  ["kDraft","gDraft","trayDraft","trayOrig","mDraft","pDraft","aboutDraft","pfDraft","cpDraft"].forEach(k=>{const d=k.replace(/Draft|Orig/,"")+"Dirty",dk={trayOrig:"trayDirty",kDraft:"kDirty",gDraft:"gDirty",trayDraft:"trayDirty",mDraft:"mDirty",pDraft:"pDirty",aboutDraft:"aboutDirty",pfDraft:"pfDirty",cpDraft:"cpDirty"}[k];if(!state[dk])delete o[k]});
   localStorage.setItem(SITE_DRAFT_KEY,JSON.stringify({at:Date.now(),d:o}))}catch(e){}}
 function siteDraftRestore(){try{const x=JSON.parse(localStorage.getItem(SITE_DRAFT_KEY)||"null");if(!x||!x.d||Date.now()-x.at>7*864e5)return;
   const d=x.d;SITE_DRAFT_KEYS.forEach(k=>{if(d[k]!==undefined)state[k]=d[k]});if(Array.isArray(d.custom))state.custom=new Set(d.custom);
