@@ -1472,7 +1472,7 @@ const ABOUT_DEFAULT={
   customTitle:"A customized menu, just for you",
   custom:"We understand that every event is unique, which is why we offer customizable menus to suit your preferences, dietary needs, and theme. Whether you desire a traditional feast or a contemporary fusion experience, our culinary experts will work closely with you to curate a menu that exceeds expectations.",
   customButton:"Build your own menu →",
-  clientsKicker:"05 · Clients & experience", clientsTitle:"Our corporate & institutional clients",
+  clientsKicker:"04 · Clients & experience", clientsTitle:"Our corporate & institutional clients",
   clients:["BDO Unibank","LANDBANK","Apo Agua","Ulticon Builders Inc.","BYD","Schools Division of Davao City","Pag-IBIG","BIR","LTO"],
   galleryTitle:"Our Food & Events",
   galleryIntro:"A taste of the feasts we've prepared and the celebrations we've been part of. Tap a photo to enlarge.",
@@ -2270,7 +2270,6 @@ function viewAbout(){
   ${profDepts(profData())}
   <section class="custom-band"><div><h2>${esc(a.customTitle)}</h2>${paras(a.custom)}</div>${a.customButton?`<button class="btn gold" data-go="custom">${esc(a.customButton)}</button>`:""}</section>
   ${a.clients.length?`<section class="clients">${a.clientsKicker?`<div class="kicker" style="text-align:center">${esc(a.clientsKicker)}</div>`:""}<h2 style="text-align:center">${esc(a.clientsTitle)}</h2><div class="client-list">${a.clients.map(c=>`<span>${esc(c)}</span>`).join("")}</div></section>`:""}
-  ${profRecord(profData())}
   ${profCapability(profData())}
   ${state.canEdit?`<div style="text-align:right;margin:8px 0"><button class="btn small ghost" data-go="profEdit">✎ Edit profile sections</button> <button class="btn small ghost" data-go="aboutEdit">✎ Edit pages</button></div>`:""}
   <section id="gallerySec">
@@ -2472,7 +2471,7 @@ const PROFILE_DEFAULT={
   recordKicker:"04 · Selected engagements",recordTitle:"Track record",
   record:[{c:"BDO Unibank — Sportsfest",s:"Customized AM snacks for 1,873 pax, produced and delivered in a single order",d:"Aug 2026"},{c:"BDO Unibank",s:"Ongoing supply of snacks and packed lunches",d:"2026 – present"},{c:"Schools Division of Davao City / Dangerous Drugs Board",s:"Catering for an institutional partnership program",d:"Dec 2025"},{c:"Corporate clients",s:"Meetings, conferences, corporate galas and themed buffets (Asian, Western / Tex-Mex)",d:"2020 – present"},{c:"Weddings & social events",s:"Garden and ballroom receptions, birthdays, christenings and family celebrations",d:"2020 – present"}],
   recordNote:"Client references and contact persons are available on request.",
-  capKicker:"06 · Capability & standards",capTitle:"Facilities, systems & quality",capPhoto:S_("buffetline2371"),
+  capKicker:"05 · Capability & standards",capTitle:"Facilities, systems & quality",capPhoto:S_("buffetline2371"),
   facilities:"Restaurant and production kitchen at 13 Juna Avenue, Juna Subdivision, Davao City, with dine-in space and a reception counter for orders and walk-in inquiries.\nFull catering equipment: chafing dishes, buffet setups, dinnerware, flatware, glassware and linens.\nInsulated food carriers for safe transport of hot and cold food.\nA Banquet Event Order (BEO) issued and signed off for every event.\nA shared events calendar, so no booking is double-scheduled.",
   capacity:[{l:"Packed meals / snacks per order",v:"30 – 2,000+ pax"},{l:"Buffet events",v:"30 pax and up"},{l:"Service area",v:"Davao City & nearby"}],
   processTitle:"From our kitchen to your event",process:"Preparation\nCooking\nPlating & packing\nQuality checks\nLoading\nSetup & service",
@@ -2654,7 +2653,6 @@ function viewProfEdit(){
   ${sec("About Us — commitment &amp; values",`${inp("vmKicker","Small heading above vision &amp; mission",D.vmKicker,60)}${inp("commitTitle","Commitment heading",D.commitTitle,60)}${ta("commit","Commitment text",D.commit,3,600)}${inp("valuesTitle","Values heading",D.valuesTitle,60)}${rows("values",D.values,[["t","Value",40],["d","Text",200,"ta"]],9,"Add value")}`)}
   ${sec("About Us — team over the years (photo slideshow)",`<p class="hint">Add photos from when you started up to today — oldest first. The label shows under each photo (e.g. "Our first event, 2020"). The heading under the photos is "Team photo caption" in <a href="#" data-go="aboutEdit">Edit pages</a>.</p>${rows("teamPhotos",D.teamPhotos,[["photo","Photo",0,"photo"],["label","Label",80]],30,"Add team photo")}`)}
   ${sec("About Us — team organization",`${inp("deptTitle","Heading",D.deptTitle,80)}${rows("depts",D.depts,[["t","Department",60],["d","Who's in it",200]],6,"Add department")}`)}
-  ${sec("About Us — track record",`<div class="g2">${inp("recordKicker","Small heading",D.recordKicker,60)}${inp("recordTitle","Heading",D.recordTitle,60)}</div>${rows("record",D.record,[["c","Client / event",100],["s","Scope",240],["d","Date",40]],12,"Add engagement")}${inp("recordNote","Note under the table",D.recordNote,200)}`)}
   ${sec("About Us — capability &amp; standards",`<div class="g2">${inp("capKicker","Small heading",D.capKicker,60)}${inp("capTitle","Heading",D.capTitle,80)}</div>${photo("capPhoto",D.capPhoto,"Photo")}${ta("facilities","Facilities &amp; systems (one per line)",D.facilities,6,1500)}
     ${rows("capacity",D.capacity,[["l","Capacity",80],["v","Value",40]],6,"Add capacity line")}${inp("processTitle","Process heading",D.processTitle,80)}${ta("process","Process steps (one per line)",D.process,6,600)}${inp("safetyTitle","Food safety heading",D.safetyTitle,80)}${ta("safety","Food safety points (one per line)",D.safety,5,1200)}`)}
   ${edBar("pf",state.pfDirty,state.pfMsg)}`;
