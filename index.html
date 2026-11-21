@@ -653,6 +653,10 @@ button.pf-svc:hover,button.pf-svc:focus-visible{transform:translateY(-2px);box-s
 .cf-done{display:flex;flex-direction:column;align-items:flex-start;gap:10px;background:var(--cream);border-radius:12px;padding:18px}.cf-done .big{font-size:34px}
 footer{background:var(--wine);color:#F3E7D3;border-top:4px solid var(--gold)}footer a{color:var(--custard)}footer b{color:#fff}footer .foot-social a{background:rgba(255,255,255,.12)}footer .foot-social a:hover{background:var(--gold)}
 @media (max-width:760px){.pf-corp,.corp-hero,.pf-two,.pf-cap,.cf-grid{grid-template-columns:1fr}.pf-list.two{grid-template-columns:1fr}.corp-hero .ph,.pf-corp .ph{min-height:200px}.corp-hero .tx{padding:24px 20px}}
+.chip.req{background:var(--custard);border:1.5px dashed var(--gold);color:var(--navy)}.chip.req[aria-pressed=true]{background:#FFF4D6;color:var(--navy)}.chip.req .x{opacity:.6;font-size:11px;margin-left:4px}
+.req-add{display:flex;gap:8px;margin-top:12px;align-items:center}.req-add input{flex:1;min-width:0;padding:9px 12px;border:1px dashed #CFC8AE;border-radius:999px;font:inherit;background:#FFFDF6}
+.req-add input:focus{outline:2px solid var(--gold);border-style:solid}.req-note{background:#FFF4D6;border-left:4px solid var(--gold);padding:10px 14px;border-radius:8px;color:var(--navy)!important;font-size:14.5px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 </style>
 </head>
 <body>
@@ -751,7 +755,7 @@ function applyMenu(saved){
   }
   MENU=m;PRICE_OVERRIDE=po;
   // drop selections for dishes that no longer exist
-  for(const k of [...state.custom]){const [t,c,d]=k.split("|");if(!MENU[t]?.[c]?.includes(d))state.custom.delete(k)}
+  for(const k of [...state.custom]){const [t,c,d]=k.split("|");if(t==="request"){if(!COURSES[c]||!d)state.custom.delete(k);continue}if(!MENU[t]?.[c]?.includes(d))state.custom.delete(k)}
   if(state.pkg){const p=PACKAGES.find(x=>x.id===state.pkg);for(const sl of p.slots)state.pkgSel[sl.id]=(state.pkgSel[sl.id]||[]).filter(k=>{const [c,d]=k.split("|");return MENU[p.list][c].includes(d)})}
 }
 const S = (id,label,cats,n)=>({id,label,cats,n});
@@ -793,7 +797,8 @@ function minPax(){return state.view==="custom"?customMinPax():Math.max(1, Number
 function customMinPax(){return Math.max(1, Math.floor(Number(state.rates.customMinPax))||30)}
 function customMinPerHead(){const v=Number(state.rates.customMinPerHead);return isFinite(v)&&v>=0?v:600}
 function paxVal(){return Math.max(minPax(), Math.floor(Number(state.pax)||0))}
-function dishRate(tier,cat,dish){const o=PRICE_OVERRIDE[tier+"|"+cat+"|"+dish];return o!=null?o:rate(tier,cat)}
+function dishRate(tier,cat,dish){if(tier==="request")return rate("standard",cat);const o=PRICE_OVERRIDE[tier+"|"+cat+"|"+dish];return o!=null?o:rate(tier,cat)}
+const REQ_MAX=5;const reqLabel="special request";
 function rate(tier,cat){const v=Number(state.rates?.[tier]?.[cat]);return isFinite(v)?v:DEFAULT_RATES[tier][cat]}
 function newRef(){const d=new Date();const p=n=>String(n).padStart(2,"0");const a="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let r="";for(let i=0;i<4;i++)r+=a[Math.floor(Math.random()*a.length)];return `RCS-${String(d.getFullYear()).slice(2)}${p(d.getMonth()+1)}${p(d.getDate())}-${r}`}
 function fmtDate(s){if(!s)return"";const d=new Date(s.length===10?s+"T00:00:00":s);return isNaN(d)?s:d.toLocaleDateString("en-PH",{year:"numeric",month:"short",day:"numeric"})}
@@ -1175,12 +1180,15 @@ function viewCustom(){
     const picked=[...state.custom].filter(k=>k.split("|")[1]===cat).length;
     return `<div class="panel">
       <h3>${esc(COURSES[cat])}<span class="count">${picked?picked+" selected · ":""}${peso(rate(t,cat))}/head each</span></h3>
-      <div class="chips">${MENU[t][cat].map(d=>{const k=`${t}|${cat}|${d}`;return `<button class="chip" data-ck="${esc(k)}" aria-pressed="${state.custom.has(k)}">${esc(d)}${PRICE_OVERRIDE[k]!=null?` <span class="p">${peso(PRICE_OVERRIDE[k])}</span>`:""}</button>`}).join("")}</div>
+      <div class="chips">${MENU[t][cat].map(d=>{const k=`${t}|${cat}|${d}`;return `<button class="chip" data-ck="${esc(k)}" aria-pressed="${state.custom.has(k)}">${esc(d)}${PRICE_OVERRIDE[k]!=null?` <span class="p">${peso(PRICE_OVERRIDE[k])}</span>`:""}</button>`}).join("")}
+        ${[...state.custom].filter(k=>k.startsWith("request|"+cat+"|")).map(k=>`<button class="chip req" data-ck="${esc(k)}" aria-pressed="true" title="Remove this request">✎ ${esc(k.split("|").slice(2).join("|"))} <span class="x">✕</span></button>`).join("")}</div>
+      <div class="req-add"><label class="sr" for="rq-${cat}">Request a ${esc(COURSES[cat].toLowerCase())} dish not on the list</label><input id="rq-${cat}" data-rq="${cat}" maxlength="80" placeholder="Don't see it? Type a ${esc(COURSES[cat].toLowerCase())} dish you'd like…" autocomplete="off"><button class="btn small ghost" data-rqadd="${cat}">＋ Request</button></div>
     </div>`}).join("");
   return `<section class="hero">
     <div>
       <h1>Build Your Own Menu</h1>
       <p>Pick as many dishes as you like from any course. Switch between our Standard and Premium lists — you can mix both. Rice and softdrinks are included in every custom menu.</p>
+      <p class="req-note">Craving something that isn't listed? Our chefs cook from a world of flavors — <b>type any dish under its course</b> and we'll include it in your quotation.</p>
     </div>
     ${paxBox()}
   </section>
@@ -1203,7 +1211,7 @@ function customSummary(){
     <h3>Your custom estimate</h3>
     <div class="line"><span>Guests</span><span>${paxVal()} pax</span></div>
     <div class="line"><span>Dishes selected</span><span>${e.items.length}</span></div>
-    <ol>${e.items.map(i=>`<li>${esc(i.dish)} <small>· ${esc(COURSES[i.cat])}${i.tier==="premium"?" · Premium":""} · ${peso(i.perHead)}</small> <button class="chip" style="padding:0 6px;font-size:11px;background:transparent;color:#fff;border-color:rgba(255,255,255,.3)" data-ck="${esc(i.tier+"|"+i.cat+"|"+i.dish)}" aria-label="Remove ${esc(i.dish)}">✕</button></li>`).join("")||"<li style='list-style:none;margin-left:-18px;opacity:.7'>Tap dishes to add them</li>"}</ol>
+    <ol>${e.items.map(i=>`<li>${esc(i.dish)} <small>· ${esc(COURSES[i.cat])}${i.tier==="premium"?" · Premium":""}${i.tier==="request"?" · <b style=\"color:var(--custard)\">special request</b> · est.":""} · ${peso(i.perHead)}</small> <button class="chip" style="padding:0 6px;font-size:11px;background:transparent;color:#fff;border-color:rgba(255,255,255,.3)" data-ck="${esc(i.tier+"|"+i.cat+"|"+i.dish)}" aria-label="Remove ${esc(i.dish)}">✕</button></li>`).join("")||"<li style='list-style:none;margin-left:-18px;opacity:.7'>Tap dishes to add them</li>"}</ol>
     <div class="total">
       <div class="line"><span>Rice & softdrinks</span><span>${e.items.length?peso(e.base):"—"}/head</span></div>
       <div class="line"><span>Your dishes</span><span>${peso(e.dishes)}/head</span></div>
@@ -1213,6 +1221,7 @@ function customSummary(){
     </div>
     ${hint?`<p style="font-size:12.5px;margin:8px 0 0;color:var(--custard)">${esc(hint)}</p>`:""}
     ${e.floor>0?`<p style="font-size:12.5px;margin:8px 0 0;color:${e.lifted?"var(--custard)":"inherit"};opacity:${e.lifted?1:.8}">Custom menus start at ${customMinPax()} guests and ${peso(e.floor)}/head (minimum ${peso(e.minTotal)}).${e.lifted?" Your dishes come to less, so the minimum applies. Add more dishes at no extra cost up to "+peso(e.floor)+"/head.":""}</p>`:""}
+    ${e.items.some(i=>i.tier==="request")?`<p style="font-size:12.5px;margin:8px 0 0;color:var(--custard)">Special requests are estimated at the Standard rate for their course; our chef confirms the final price in your quotation.</p>`:""}
     <div class="disclaim">This is an <b>estimate only</b>, not a final quotation. Custom menus are priced per dish and confirmed by our team after review.</div>
   </div>`;
 }
@@ -1326,7 +1335,7 @@ function detailHtml(q){
     </ul>
     ${state.canEdit?`<button class="btn small danger" data-del="${esc(q._id)}">${state.confirmDel===q._id?"Click again to delete":"Delete inquiry"}</button>`:""}</div></div>`;
   }
-  const items=(q.items||[]).map(i=>`<li>${esc(COURSES[i.cat]||i.cat)}: <b>${esc(i.dish)}</b>${i.tier?` <span class="hint">(${i.tier==="premium"?"Premium":"Standard"}${i.perHead?` · ${peso(i.perHead)}/head`:""})</span>`:""}</li>`).join("");
+  const items=(q.items||[]).map(i=>`<li>${esc(COURSES[i.cat]||i.cat)}: <b>${esc(i.dish)}</b>${i.tier?` <span class="hint">(${i.tier==="request"?"<b style='color:var(--wine)'>Special request — off-menu</b>":i.tier==="premium"?"Premium":"Standard"}${i.perHead?` · ${peso(i.perHead)}/head`:""})</span>`:""}</li>`).join("");
   return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
     <div><b>Menu</b>${q.plan?.chefPick?"<p>Chef to recommend the menu.</p>":`<ul>${items||"<li>No dishes listed</li>"}</ul>`}</div>
     <div><b>Details</b><ul>
@@ -2737,6 +2746,14 @@ function bind(){
   const cp=$("#chefPick",v); if(cp) cp.onchange=()=>{state.chefPick=cp.checked;keepScroll(render)};
   v.querySelectorAll("[data-tier]").forEach(b=>b.onclick=()=>{state.customTier=b.dataset.tier;keepScroll(render)});
   v.querySelectorAll("[data-ck]").forEach(b=>b.onclick=()=>{const k=b.dataset.ck;state.custom.has(k)?state.custom.delete(k):state.custom.add(k);keepScroll(render)});
+  const addReq=cat=>{const el=v.querySelector(`[data-rq="${cat}"]`);const d=String(el?.value||"").replace(/[|<>]/g," ").replace(/\s+/g," ").trim().slice(0,80);if(!d)return el?.focus();
+    const mine=[...state.custom].filter(k=>k.startsWith("request|"+cat+"|"));if(mine.length>=REQ_MAX){toast(`Up to ${REQ_MAX} requests per course — tell us more in the notes.`);return}
+    const onList=["standard","premium"].map(t=>(MENU[t][cat]||[]).find(x=>x.toLowerCase()===d.toLowerCase())&&t).find(Boolean);
+    if(onList){const x=MENU[onList][cat].find(x=>x.toLowerCase()===d.toLowerCase());state.custom.add(`${onList}|${cat}|${x}`);toast(`"${x}" is on our ${onList} list — added.`)}else{state.custom.add(`request|${cat}|${d}`);toast(`Added "${d}" as a special request`)}
+    state.rqFocus=cat;keepScroll(render)};
+  v.querySelectorAll("[data-rqadd]").forEach(b=>b.onclick=()=>addReq(b.dataset.rqadd));
+  v.querySelectorAll("[data-rq]").forEach(i=>i.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();addReq(i.dataset.rq)}});
+  if(state.rqFocus){const el=v.querySelector(`[data-rq="${state.rqFocus}"]`);state.rqFocus=null;el?.focus()}
   const f=$("#inqForm",v);
   if(f){
     f.querySelectorAll("input,select,textarea").forEach(el=>{if(el.name&&el.name!=="ack")el.addEventListener("input",()=>{state.form[el.name]=el.value})});
@@ -2801,7 +2818,7 @@ function messageFor(q){
   lines.push(`Guests: ${q.event.pax} pax`);
   lines.push(`Plan: ${q.plan.kind==="package"?(q.plan.pricePerHead>0?`${q.plan.packageName} Package (${peso(q.plan.pricePerHead)}/head)`:`${q.plan.packageName} (quote requested)`):"Custom menu"}`);
   if(q.plan.chefPick)lines.push("Menu: Chef to recommend");
-  else{lines.push("Menu:");q.items.forEach(i=>lines.push(`- ${COURSES[i.cat]||i.cat}: ${i.dish}`))}
+  else{lines.push("Menu:");q.items.forEach(i=>lines.push(`- ${COURSES[i.cat]||i.cat}: ${i.dish}${i.tier==="request"?" (special request)":""}`))}
   if(q.estimate.total>0)lines.push(`Estimated total: ${peso(q.estimate.total)} (${peso(q.estimate.perHead)}/head) — estimate only`);
   if(q.notes)lines.push(`Notes: ${q.notes}`);
   const compact={...q};delete compact.status;
@@ -2955,7 +2972,7 @@ function buildWorkbook(list){
       if(q.plan?.kind==="custom"&&q.plan.basePerHead)rows.push(["Rice & softdrinks","Included","—",Number(q.plan.basePerHead)]);
       if(q.plan?.chefPick)rows.push(["—","Chef to recommend","",""]);
       if(q.plan?.kind==="tray"){rows.push(["Pick-up / delivery",q.plan.fulfil||"",q.plan.payment?"Payment: "+q.plan.payment:"",""]);(q.items||[]).forEach(i=>rows.push([i.cat,i.dish,`${Number(i.qty)||1} tray(s)`,(Number(i.qty)||1)*(Number(i.perHead)||0)]));}
-      else (q.items||[]).forEach(i=>rows.push([COURSES[i.cat]||i.cat,i.dish,i.tier==="premium"?"Premium":"Standard",q.plan?.kind==="custom"?Number(i.perHead)||0:"Included"]));
+      else (q.items||[]).forEach(i=>rows.push([COURSES[i.cat]||i.cat,i.dish,i.tier==="request"?"Special request (off-menu)":i.tier==="premium"?"Premium":"Standard",q.plan?.kind==="custom"?Number(i.perHead)||0:"Included"]));
       rows.push([],["* Estimate only — final price to be confirmed in a formal quotation."],[]);
     });
     const ws=XLSX.utils.aoa_to_sheet(rows);fmtCells(ws);ws["!cols"]=[{wch:26},{wch:46},{wch:14},{wch:14}];

@@ -224,7 +224,7 @@ function sendInquiryAlert(q) {
   if (p.kind === 'tray') return sendTrayAlert(q);
   if (p.kind === 'corporate') return sendCorpAlert(q);
   const plan = p.kind === 'package' ? (p.pricePerHead > 0 ? p.packageName + ' Package (' + pesoTxt(p.pricePerHead) + '/head)' : p.packageName + ' (quote requested)') : 'Custom menu';
-  const items = p.chefPick ? ['Chef to recommend the menu'] : (q.items || []).map(function (i) { return (COURSE_NAMES[i.cat] || i.cat) + ': ' + i.dish; });
+  const items = p.chefPick ? ['Chef to recommend the menu'] : (q.items || []).map(function (i) { return (COURSE_NAMES[i.cat] || i.cat) + ': ' + i.dish + (i.tier === 'request' ? '  ★ SPECIAL REQUEST (off-menu — confirm price)' : ''); });
   const subject = 'New inquiry: ' + c.name + ' · ' + (ev.type || 'Event') + ' · ' + niceDate(ev.date) + ' · ' + ev.pax + ' pax';
   const rows = [['Reference', q.ref], ['Customer', c.name], ['Mobile', c.phone], ['Email', c.email || '—'], ['Event', (ev.type || 'Event') + ' on ' + niceDate(ev.date) + (ev.time ? ' at ' + niceTime(ev.time) : '')],
     ['Venue', ev.venue || '—'], ['Guests', ev.pax + ' pax'], ['Plan', plan], ['Estimated total', es.total > 0 ? pesoTxt(es.total) + ' (' + pesoTxt(es.perHead) + '/head) — estimate only' : 'To be quoted'], ['Notes', q.notes || '—']];
