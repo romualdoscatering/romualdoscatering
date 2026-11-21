@@ -2478,7 +2478,7 @@ const PROFILE_DEFAULT={
   capacity:[{l:"Packed meals / snacks per order",v:"30 – 2,000+ pax"},{l:"Buffet events",v:"30 pax and up"},{l:"Service area",v:"Davao City · out-of-town on request"}],
   processTitle:"From our kitchen to your event",process:"Preparation\nCooking\nPlating & packing\nQuality checks\nLoading\nSetup & service",
   safetyTitle:"Food safety & quality",
-  safety:"Food handlers with valid health certificates, in hairnets, gloves and clean uniforms.\nFresh ingredients bought daily; first-in, first-out stock rotation.\nSealed, labelled packs with production time and allergen / no-pork markings.\nPost-event feedback within 24 hours, answered by our account officer the same day.",
+  safety:"",
   corpBandTitle:"Catering for companies and institutions",
   corpBandText:"Packed meals, snack boxes, meetings and company events — with POs, BEOs, BIR invoices and one account officer. Download our Products & Services Catalogue.",
   corpBandBtn:"For corporate clients →",corpBandPhoto:S_("packed2140")
@@ -2657,7 +2657,7 @@ function viewProfEdit(){
   <div id="pf-team">${sec("About Us — team over the years (photo slideshow)",`<p class="hint">Add photos from when you started up to today — oldest first, use ↑ ↓ to reorder. The caption shows under each photo (e.g. "Our first event, 2020"). The heading under the photos is in <a href="#" data-go="aboutEdit">Edit pages</a> (4. Team). Click <b>Save changes</b> at the bottom when done.</p>${rows("teamPhotos",D.teamPhotos,[["photo","Photo",0,"photo"],["label","Caption",80]],30,"Add team photo")}`)}</div>
   ${sec("About Us — team organization",`${inp("deptTitle","Heading",D.deptTitle,80)}${rows("depts",D.depts,[["t","Department",60],["d","Who's in it",200]],6,"Add department")}`)}
   ${sec("About Us — capability &amp; standards",`<div class="g2">${inp("capKicker","Small heading",D.capKicker,60)}${inp("capTitle","Heading",D.capTitle,80)}</div>${photo("capPhoto",D.capPhoto,"Photo")}${ta("facilities","Facilities &amp; systems (one per line)",D.facilities,6,1500)}
-    ${rows("capacity",D.capacity,[["l","Capacity",80],["v","Value",40]],6,"Add capacity line")}${inp("processTitle","Process heading",D.processTitle,80)}${ta("process","Process steps (one per line)",D.process,6,600)}${inp("safetyTitle","Food safety heading",D.safetyTitle,80)}${ta("safety","Food safety points (one per line)",D.safety,5,1200)}`)}
+    ${rows("capacity",D.capacity,[["l","Capacity",80],["v","Value",40]],6,"Add capacity line")}${inp("processTitle","Process heading",D.processTitle,80)}${ta("process","Process steps (one per line)",D.process,6,600)}${inp("safetyTitle","Food safety heading",D.safetyTitle,80)}${ta("safety","Food safety points (one per line; leave empty to hide)",D.safety,5,1200)}`)}
   ${edBar("pf",state.pfDirty,state.pfMsg)}`;
 }
 function viewCorpEdit(){
