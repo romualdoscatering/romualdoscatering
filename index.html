@@ -657,6 +657,8 @@ footer{background:var(--wine);color:#F3E7D3;border-top:4px solid var(--gold)}foo
 .req-add{display:flex;gap:8px;margin-top:12px;align-items:center}.req-add input{flex:1;min-width:0;padding:9px 12px;border:1px dashed #CFC8AE;border-radius:999px;font:inherit;background:#FFFDF6}
 .req-add input:focus{outline:2px solid var(--gold);border-style:solid}.req-note{background:#FFF4D6;border-left:4px solid var(--gold);padding:10px 14px;border-radius:8px;color:var(--navy)!important;font-size:14.5px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.summary .line small{display:block;font-size:11.5px;opacity:.75;font-weight:400}.summary .line.svc span:last-child{text-align:right}
+.svc-note{font-size:12.5px;margin:8px 0 0;opacity:.85}
 </style>
 </head>
 <body>
@@ -771,7 +773,7 @@ const PACKAGES = [
 ];
 /* Default per-head rates for custom menus. Staff can override these in "Custom rates". */
 const DEFAULT_RATES = {
-  base:120, minPax:50, customMinPax:30, customMinPerHead:600,
+  base:120, minPax:50, customMinPax:30, customMinPerHead:600, waiterFee:600, guestsPerWaiter:25,
   standard:{soup:50,appetizer:50,chicken:80,pork:80,beef:95,fish:85,veg:45,pasta:55,dessert:45},
   premium:{soup:65,appetizer:70,chicken:110,pork:115,beef:135,fish:125,veg:60,pasta:75,dessert:60}
 };
@@ -795,6 +797,8 @@ function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&l
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove("show"),2600)}
 function minPax(){return state.view==="custom"?customMinPax():Math.max(1, Number(state.rates.minPax)||50)}
 function customMinPax(){return Math.max(1, Math.floor(Number(state.rates.customMinPax))||30)}
+function waiterFee(){const v=Number(state.rates.waiterFee);return isFinite(v)&&v>=0?v:600}
+function guestsPerWaiter(){return Math.max(1,Math.floor(Number(state.rates.guestsPerWaiter))||25)}
 function customMinPerHead(){const v=Number(state.rates.customMinPerHead);return isFinite(v)&&v>=0?v:600}
 function paxVal(){return Math.max(minPax(), Math.floor(Number(state.pax)||0))}
 function dishRate(tier,cat,dish){if(tier==="request")return rate("standard",cat);const o=PRICE_OVERRIDE[tier+"|"+cat+"|"+dish];return o!=null?o:rate(tier,cat)}
@@ -818,8 +822,10 @@ function customEstimate(){
   const items=customItems();const dishes=items.reduce((s,i)=>s+i.perHead,0);
   const base=Number(state.rates.base)||0;const raw=items.length?base+dishes:0;
   const floor=customMinPerHead(),pax=paxVal(),perHead=items.length?Math.max(raw,floor):0;
-  const minTotal=floor*customMinPax(),total=items.length?Math.max(perHead*pax,minTotal):0;
-  return {items,base,dishes,raw,perHead,total,floor,minTotal,lifted:items.length>0&&raw<floor};
+  const minTotal=floor*customMinPax(),food=items.length?Math.max(perHead*pax,minTotal):0;
+  const waiters=items.length&&waiterFee()>0?Math.ceil(pax/guestsPerWaiter()):0,service=waiters*waiterFee(),total=food+service;
+  const finalPerHead=items.length&&pax?Math.round(total/pax):0;
+  return {items,base,dishes,raw,perHead,food,waiters,service,total,finalPerHead,floor,minTotal,lifted:items.length>0&&raw<floor};
 }
 function closestPackageHint(perHead){
   const cheaper=PACKAGES.filter(p=>p.price<=perHead).pop();
@@ -1216,8 +1222,11 @@ function customSummary(){
       <div class="line"><span>Rice & softdrinks</span><span>${e.items.length?peso(e.base):"—"}/head</span></div>
       <div class="line"><span>Your dishes</span><span>${peso(e.dishes)}/head</span></div>
       ${e.lifted?`<div class="line"><span>Dishes subtotal</span><span>${peso(e.raw)}/head</span></div><div class="line" style="color:var(--custard)"><span>Minimum per head</span><span>${peso(e.floor)}</span></div>`:""}
-      <div class="line"><span><b>Estimated per head</b></span><span><b>${peso(e.perHead)}</b></span></div>
+      ${e.service?`<div class="line"><span>Food per head</span><span>${peso(e.perHead)}</span></div>
+      <div class="line svc"><span>Service team<small>${e.waiters} waiter${e.waiters>1?"s":""} · 1 per ${guestsPerWaiter()} guests</small></span><span>${peso(e.service)}<small>≈ ${peso(Math.round(e.service/paxVal()))}/head</small></span></div>
+      <div class="line"><span><b>Estimated per head</b><small>food &amp; service, all in</small></span><span><b>${peso(e.finalPerHead)}</b></span></div>`:`<div class="line"><span><b>Estimated per head</b></span><span><b>${peso(e.perHead)}</b></span></div>`}
       <div class="est-label" style="margin-top:8px">Estimated total</div><div class="big">${peso(e.total)}</div>
+      ${e.service?`<p class="svc-note">Our uniformed waiters set up, serve your guests and clear — so you can simply enjoy your event.</p>`:""}
     </div>
     ${hint?`<p style="font-size:12.5px;margin:8px 0 0;color:var(--custard)">${esc(hint)}</p>`:""}
     ${e.floor>0?`<p style="font-size:12.5px;margin:8px 0 0;color:${e.lifted?"var(--custard)":"inherit"};opacity:${e.lifted?1:.8}">Custom menus start at ${customMinPax()} guests and ${peso(e.floor)}/head (minimum ${peso(e.minTotal)}).${e.lifted?" Your dishes come to less, so the minimum applies. Add more dishes at no extra cost up to "+peso(e.floor)+"/head.":""}</p>`:""}
@@ -1364,6 +1373,8 @@ function viewRates(){
       <tr><td><b>Minimum guests</b> (packages)</td><td class="num" colspan="2"><input type="number" min="1" data-rate="minPax" value="${esc(r.minPax)}"></td></tr>
       <tr><td><b>Minimum guests</b> (build your own menu)</td><td class="num" colspan="2"><input type="number" min="1" data-rate="customMinPax" value="${esc(r.customMinPax??DEFAULT_RATES.customMinPax)}"></td></tr>
       <tr><td><b>Minimum per head</b> (build your own menu)</td><td class="num" colspan="2"><input type="number" min="0" data-rate="customMinPerHead" value="${esc(r.customMinPerHead??DEFAULT_RATES.customMinPerHead)}"></td></tr>
+      <tr><td><b>Service fee per waiter</b> (build your own menu; 0 = don't add)</td><td class="num" colspan="2"><input type="number" min="0" data-rate="waiterFee" value="${esc(r.waiterFee??DEFAULT_RATES.waiterFee)}"></td></tr>
+      <tr><td><b>Guests per waiter</b></td><td class="num" colspan="2"><input type="number" min="1" data-rate="guestsPerWaiter" value="${esc(r.guestsPerWaiter??DEFAULT_RATES.guestsPerWaiter)}"></td></tr>
       ${rows}
     </tbody></table>
     <div style="display:flex;gap:10px;margin-top:14px;flex-wrap:wrap"><button class="btn gold" id="saveRates">Save rates</button><button class="btn ghost" id="resetRates">Reset to defaults</button><span class="formmsg" id="ratesMsg"></span></div>
@@ -2793,7 +2804,7 @@ function buildInquiry(){
     return {...base,plan:{kind:"package",packageId:p.id,packageName:p.name[0]+p.name.slice(1).toLowerCase(),pricePerHead:p.price,chefPick:state.chefPick},items,estimate:pkgEstimate(p)};
   }
   const e=customEstimate();
-  return {...base,plan:{kind:"custom",basePerHead:e.base,chefPick:false},items:e.items.map(i=>({cat:i.cat,dish:i.dish,tier:i.tier,perHead:i.perHead})),estimate:{perHead:e.perHead,total:e.total}};
+  return {...base,plan:{kind:"custom",basePerHead:e.base,chefPick:false,waiters:e.waiters,serviceFee:e.service,foodPerHead:e.perHead},items:e.items.map(i=>({cat:i.cat,dish:i.dish,tier:i.tier,perHead:i.perHead})),estimate:{perHead:e.finalPerHead||e.perHead,total:e.total}};
 }
 function validate(f){
   const msg=$("#formMsg");msg.textContent="";
@@ -2819,7 +2830,8 @@ function messageFor(q){
   lines.push(`Plan: ${q.plan.kind==="package"?(q.plan.pricePerHead>0?`${q.plan.packageName} Package (${peso(q.plan.pricePerHead)}/head)`:`${q.plan.packageName} (quote requested)`):"Custom menu"}`);
   if(q.plan.chefPick)lines.push("Menu: Chef to recommend");
   else{lines.push("Menu:");q.items.forEach(i=>lines.push(`- ${COURSES[i.cat]||i.cat}: ${i.dish}${i.tier==="request"?" (special request)":""}`))}
-  if(q.estimate.total>0)lines.push(`Estimated total: ${peso(q.estimate.total)} (${peso(q.estimate.perHead)}/head) — estimate only`);
+  if(q.plan?.serviceFee>0)lines.push(`Service team: ${q.plan.waiters} waiter(s) — ${peso(q.plan.serviceFee)}`);
+  if(q.estimate.total>0)lines.push(`Estimated total: ${peso(q.estimate.total)} (${peso(q.estimate.perHead)}/head, food & service) — estimate only`);
   if(q.notes)lines.push(`Notes: ${q.notes}`);
   const compact={...q};delete compact.status;
   lines.push("","[Please keep this reference line] RCS1:"+b64e(JSON.stringify(compact)));
@@ -2932,10 +2944,10 @@ async function importMessage(){
   else msg.textContent=r.error||"Couldn't save. Please try again.";
 }
 async function saveRates(){
-  const r={base:0,minPax:50,customMinPax:30,customMinPerHead:600,standard:{},premium:{}};
+  const r={base:0,minPax:50,customMinPax:30,customMinPerHead:600,waiterFee:600,guestsPerWaiter:25,standard:{},premium:{}};
   document.querySelectorAll("[data-rate]").forEach(el=>{
     const v=Math.max(0,Number(el.value)||0);const k=el.dataset.rate;
-    if(k==="base")r.base=v;else if(k==="minPax")r.minPax=Math.max(1,Math.floor(v)||50);else if(k==="customMinPax")r.customMinPax=Math.max(1,Math.floor(v)||30);else if(k==="customMinPerHead")r.customMinPerHead=v;else{const [t,c]=k.split("|");r[t][c]=v}
+    if(k==="base")r.base=v;else if(k==="minPax")r.minPax=Math.max(1,Math.floor(v)||50);else if(k==="customMinPax")r.customMinPax=Math.max(1,Math.floor(v)||30);else if(k==="customMinPerHead")r.customMinPerHead=v;else if(k==="waiterFee")r.waiterFee=v;else if(k==="guestsPerWaiter")r.guestsPerWaiter=Math.max(1,Math.floor(v)||25);else{const [t,c]=k.split("|");r[t][c]=v}
   });
   $("#ratesMsg").textContent="Saving…";
   const res=await api("saveRates",{rates:r});
@@ -2991,7 +3003,7 @@ function downloadExcel(){
 }
 
 /* ============ START ============ */
-function applyRates(r){if(!r)return;state.rates={base:Number(r.base)||0,minPax:Number(r.minPax)||50,customMinPax:Math.max(1,Math.floor(Number(r.customMinPax))||DEFAULT_RATES.customMinPax),customMinPerHead:(r.customMinPerHead!=null&&r.customMinPerHead!==""&&isFinite(Number(r.customMinPerHead)))?Math.max(0,Number(r.customMinPerHead)):DEFAULT_RATES.customMinPerHead,standard:{...DEFAULT_RATES.standard,...(r.standard||{})},premium:{...DEFAULT_RATES.premium,...(r.premium||{})}}}
+function applyRates(r){if(!r)return;state.rates={base:Number(r.base)||0,minPax:Number(r.minPax)||50,customMinPax:Math.max(1,Math.floor(Number(r.customMinPax))||DEFAULT_RATES.customMinPax),customMinPerHead:(r.customMinPerHead!=null&&r.customMinPerHead!==""&&isFinite(Number(r.customMinPerHead)))?Math.max(0,Number(r.customMinPerHead)):DEFAULT_RATES.customMinPerHead,waiterFee:(r.waiterFee!=null&&r.waiterFee!==""&&isFinite(Number(r.waiterFee)))?Math.max(0,Number(r.waiterFee)):DEFAULT_RATES.waiterFee,guestsPerWaiter:Math.max(1,Math.floor(Number(r.guestsPerWaiter))||DEFAULT_RATES.guestsPerWaiter),standard:{...DEFAULT_RATES.standard,...(r.standard||{})},premium:{...DEFAULT_RATES.premium,...(r.premium||{})}}}
 function route(){
   if(location.hash==="#staff"){go(state.isStaff?"admin":"login");if(state.isStaff&&!state.inqLoaded)loadInquiries()}
   else{const h=location.hash.slice(1);const v=Object.keys(PAGE_HASH).find(k=>PAGE_HASH[k]===h);

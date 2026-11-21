@@ -127,7 +127,8 @@ function cleanInquiry(q, source) {
       kind: p.kind === 'package' ? 'package' : p.kind === 'tray' ? 'tray' : p.kind === 'corporate' ? 'corporate' : 'custom',
       fulfil: p.fulfil === 'Delivery' ? 'Delivery' : 'Pick-up', payment: ['Bank transfer', 'Bank deposit', 'GCash'].indexOf(p.payment) >= 0 ? p.payment : '',
       packageId: str(p.packageId, 20), packageName: str(p.packageName, 40),
-      pricePerHead: num(p.pricePerHead), basePerHead: num(p.basePerHead), chefPick: !!p.chefPick
+      pricePerHead: num(p.pricePerHead), basePerHead: num(p.basePerHead), chefPick: !!p.chefPick,
+      waiters: Math.max(0, Math.min(500, Math.floor(num(p.waiters)))), serviceFee: num(p.serviceFee), foodPerHead: num(p.foodPerHead)
     },
     items: (Array.isArray(q.items) ? q.items : []).slice(0, 80).map(function (i) {
       const o = { cat: str(i.cat, 20), dish: str(i.dish, 120), tier: str(i.tier, 10), perHead: num(i.perHead) };
@@ -227,7 +228,7 @@ function sendInquiryAlert(q) {
   const items = p.chefPick ? ['Chef to recommend the menu'] : (q.items || []).map(function (i) { return (COURSE_NAMES[i.cat] || i.cat) + ': ' + i.dish + (i.tier === 'request' ? '  ★ SPECIAL REQUEST (off-menu — confirm price)' : ''); });
   const subject = 'New inquiry: ' + c.name + ' · ' + (ev.type || 'Event') + ' · ' + niceDate(ev.date) + ' · ' + ev.pax + ' pax';
   const rows = [['Reference', q.ref], ['Customer', c.name], ['Mobile', c.phone], ['Email', c.email || '—'], ['Event', (ev.type || 'Event') + ' on ' + niceDate(ev.date) + (ev.time ? ' at ' + niceTime(ev.time) : '')],
-    ['Venue', ev.venue || '—'], ['Guests', ev.pax + ' pax'], ['Plan', plan], ['Estimated total', es.total > 0 ? pesoTxt(es.total) + ' (' + pesoTxt(es.perHead) + '/head) — estimate only' : 'To be quoted'], ['Notes', q.notes || '—']];
+    ['Venue', ev.venue || '—'], ['Guests', ev.pax + ' pax'], ['Plan', plan]].concat(p.serviceFee > 0 ? [['Service team', p.waiters + ' waiter(s) · ' + pesoTxt(p.serviceFee) + ' (food ' + pesoTxt(p.foodPerHead) + '/head)']] : []).concat([['Estimated total', es.total > 0 ? pesoTxt(es.total) + ' (' + pesoTxt(es.perHead) + '/head' + (p.serviceFee > 0 ? ', food & service' : '') + ') — estimate only' : 'To be quoted'], ['Notes', q.notes || '—']]);
   const html = '<div style="font-family:Arial,sans-serif;color:#1A2C54;max-width:560px">' +
     '<div style="background:#1A2C54;color:#fff;padding:14px 18px;border-radius:10px 10px 0 0"><b style="font-size:17px">New catering inquiry</b><div style="font-size:12px;color:#E5DEB2">from romualdos.ph · ' + h(q.ref) + '</div></div>' +
     '<table style="width:100%;border-collapse:collapse;font-size:14px;border:1px solid #E4DFC8;border-top:0">' +
@@ -297,7 +298,7 @@ function deleteInquiry(ref) {
 function saveRates(r) {
   r = r || {};
   const courses = ['soup', 'appetizer', 'chicken', 'pork', 'beef', 'fish', 'veg', 'pasta', 'dessert'];
-  const clean = { base: num(r.base), minPax: Math.max(1, Math.floor(num(r.minPax)) || 50), customMinPax: Math.max(1, Math.floor(num(r.customMinPax)) || 30), customMinPerHead: (r.customMinPerHead === undefined || r.customMinPerHead === null || r.customMinPerHead === '') ? 600 : num(r.customMinPerHead), standard: {}, premium: {} };
+  const clean = { base: num(r.base), minPax: Math.max(1, Math.floor(num(r.minPax)) || 50), customMinPax: Math.max(1, Math.floor(num(r.customMinPax)) || 30), customMinPerHead: (r.customMinPerHead === undefined || r.customMinPerHead === null || r.customMinPerHead === '') ? 600 : num(r.customMinPerHead), waiterFee: (r.waiterFee === undefined || r.waiterFee === null || r.waiterFee === '') ? 600 : num(r.waiterFee), guestsPerWaiter: Math.max(1, Math.floor(num(r.guestsPerWaiter)) || 25), standard: {}, premium: {} };
   courses.forEach(function (c) {
     clean.standard[c] = num(r.standard && r.standard[c]);
     clean.premium[c] = num(r.premium && r.premium[c]);
