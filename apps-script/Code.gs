@@ -598,3 +598,42 @@ function testSetup() {
   const staff = loadStaff();
   console.log('Staff file OK — ' + staff.length + ' account(s): ' + staff.map(function (s) { return s.username + ' (' + s.role + (s.active ? '' : ', inactive') + ')'; }).join(', '));
 }
+
+/** Admin utility (run from the Apps Script editor): copies photos from a Drive folder the account can view
+ *  into "Website Photos" as web-sized JPEGs (about 1800 px), shares them by link and registers them,
+ *  so they can be used and later replaced from the website's photo editors.
+ *  Edit SHOOT_PICKS (Drive file id → short name), run importShootPhotos, then read the log for the new ids. */
+const SHOOT_PICKS = {
+  '1DaJSSLP-Fg2ZnGMg9uj8IU2-ZpPZHSXY': 'grazing-1870', '189lgMzjFLYcICIQBozOjMR3bDmiCCCw0': 'grazing-2026', '1mSE1p6_ZT6EBHqh5xNwBHrDs8yGQEUX9': 'grazing-1912',
+  '1azgdjGXPmIFBM_YwtaB3JzLIHUFKjIxS': 'logo-2449', '1AvZHnTjbOKZX3bS_y_lHYTiRyzKTWgzm': 'team-2398', '16tYEq1wrOkDD3mregG_PBQQrJpZY1p3J': 'sandwich-1759',
+  '1cI63eAexhFTRIHq7F_OWRy5O1CKfF8YO': 'sandwich-1822', '1_YCZYgQO9Um0G1ssDTfJKa2M0efof_c2': 'quesadilla-1825', '12hJ-mNNIkf_XcaOu6fsismJK1Svj78u6': 'snacks-1834',
+  '1XvaNEoplTwDsz6TCSfpSHVbfTeJ41cvK': 'rolls-1963', '1XmjmtVAZ1AzJ5LW-HguQ2VZLhqZ4mLAV': 'canape-1774', '1Wc3kxeOma-_j1y7bX8u60KOoEx2lR8KF': 'fried-1816',
+  '176YzgZzsoxwWrSM1plakYb4z4O-fEZg2': 'packed-2131', '1oa5XWJ7xfnKVGeBBV-yipcV71yokc4gI': 'packed-2140', '1wNu991t1qv8OlF4HIFISydhEDwvWSOjq': 'packed-2116',
+  '18CDvS2Bj53enu28R-UscHVByIzKXTOsR': 'tray-fish-2185', '1dNglaLFQe5cuv8IrinQhEqKRZtXmKW0p': 'tray-bake-2209', '1rNxnlpgm_XngIas_gQWjvtsC6-ZeTLIY': 'tray-beef-2245',
+  '1qzqct2dCQuUSB6gmQKYx41r06PK6XYS1': 'tray-pasta-2299', '1LCXALKP0DK5oSsorWHyRFcX1uCAhsAcs': 'tray-lasagna-2224', '1Ajsx3nvjU24d2BuRaYDkYNjSh86SrPWZ': 'buffet-2341',
+  '1kTW9LWNOqdjQL-DHp_78SPFMwzkhvkgV': 'buffet-line-2371', '1nsQuGJhNN9WbNUqC9J8X1kGWstfelt90': 'buffet-beef-2380'
+};
+function importShootPhotos() {
+  const token = ScriptApp.getOAuthToken(), out = {};
+  Object.keys(SHOOT_PICKS).forEach(function (src) {
+    const name = 'shoot-' + SHOOT_PICKS[src] + '.jpg';
+    try {
+      const meta = JSON.parse(UrlFetchApp.fetch('https://www.googleapis.com/drive/v3/files/' + src + '?fields=thumbnailLink&supportsAllDrives=true', { headers: { Authorization: 'Bearer ' + token } }).getContentText());
+      const url = String(meta.thumbnailLink || '').replace(/=s\d+$/, '') + '=s1800';
+      const r = UrlFetchApp.fetch(url, { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true });
+      const blob = r.getBlob();
+      if (r.getResponseCode() !== 200 || !/image\//.test(blob.getContentType())) throw new Error('HTTP ' + r.getResponseCode() + ' ' + blob.getContentType());
+      withLock(function () {
+        const db = readDb(), folder = photosFolder(db);
+        const ex = folder.getFilesByName(name);
+        const file = ex.hasNext() ? ex.next() : folder.createFile(blob.setName(name));
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        if (!Array.isArray(db.photoIds)) db.photoIds = [];
+        if (db.photoIds.indexOf(file.getId()) < 0) db.photoIds.push(file.getId());
+        writeDb(db);
+        out[SHOOT_PICKS[src]] = file.getId() + ' ' + blob.getBytes().length;
+      });
+    } catch (e) { out[SHOOT_PICKS[src]] = 'ERROR ' + e.message; }
+  });
+  console.log('SHOOT_IMPORT ' + JSON.stringify(out));
+}
