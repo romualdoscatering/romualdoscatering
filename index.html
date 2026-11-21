@@ -2265,7 +2265,7 @@ function viewAbout(){
     <div class="team-text">${a.teamKicker?`<div class="kicker">${esc(a.teamKicker)}</div>`:""}<h2>${esc(a.teamTitle)}</h2>${paras(a.team)}
       ${chefs.length?`<div class="chefs">${chefs.map(c=>`<figure>${c.photo?imgTag(c.photo,700,'loading="lazy"',c.name):""}<figcaption><b>${esc(c.name)}</b>${c.subtitle?`<span>${esc(c.subtitle)}</span>`:""}</figcaption></figure>`).join("")}</div>`:""}
     </div>
-    ${teamFigure(a)}
+    <div>${teamFigure(a)}${state.canEdit?`<button class="btn small ghost" data-teamphotos="1" style="margin-top:8px">✎ Add / change team photos &amp; captions</button>`:""}</div>
   </section>
   ${profDepts(profData())}
   <section class="custom-band"><div><h2>${esc(a.customTitle)}</h2>${paras(a.custom)}</div>${a.customButton?`<button class="btn gold" data-go="custom">${esc(a.customButton)}</button>`:""}</section>
@@ -2336,7 +2336,8 @@ function viewAboutEdit(){
   ${sec("3. What we cater",`${inp("servicesTitle","Heading",60)}${ta("services","Services (one per line; leave empty to hide the section)",6,1500)}`)}
   ${sec("4. Team",`${inp("teamKicker","Small heading",60)}${inp("teamTitle","Heading",80)}${ta("team","Team text",5,1500)}
     <div class="chef-grid">${chefs}</div><button class="btn small" id="addChef" style="margin:10px 0 16px">＋ Add a chef</button>
-    ${slot("teamPhoto","Team photo",a.teamPhoto)}${inp("teamCaption","Team photo caption",120)}`)}
+    <div class="kslot" style="align-items:center"><div class="kslot-b"><b>Team photos (slideshow) — ${profData().teamPhotos.filter(x=>x.photo).length} photo(s)</b><span class="hint" style="margin:0">Add, replace, reorder and caption the "team over the years" photos.</span><button class="btn small" data-teamphotos="1">＋ Add / change team photos &amp; captions →</button></div></div>
+    ${inp("teamCaption","Heading under the team photos",120)}`)}
   ${sec("5. Customized menu",`${inp("customTitle","Heading",80)}${ta("custom","Text",4,1200)}${inp("customButton","Button text (leave empty to hide)",40)}`)}
   ${sec("6. Corporate clients",`${inp("clientsKicker","Small heading",60)}${inp("clientsTitle","Heading",80)}${ta("clients","Clients (one per line; leave empty to hide the section)",6,1000)}`)}
   ${sec("7. Photo gallery",`${inp("galleryTitle","Heading",80)}${inp("galleryIntro","Intro line",200)}
@@ -2503,6 +2504,7 @@ function teamFigure(a){
   return `<figure class="team-photo team-show">${multi?`<div class="ts-stage">`:""}${kImg(x.photo,1400,x.label||a.teamCaption||"Our team",'loading="lazy"')}${multi?`<button class="ts-nav prev" data-tsi="${(i-1+list.length)%list.length}" aria-label="Previous photo">‹</button><button class="ts-nav next" data-tsi="${(i+1)%list.length}" aria-label="Next photo">›</button></div>`:""}
     <figcaption><b>${esc(a.teamCaption||"")}</b>${x.label?`<span>${esc(x.label)}</span>`:""}${multi?`<span class="ts-dots">${list.map((_,j)=>`<button class="${j===i?"on":""}" data-tsi="${j}" aria-label="Photo ${j+1}"></button>`).join("")}</span>`:""}</figcaption></figure>`;
 }
+document.addEventListener("click",e=>{const t=e.target.closest("[data-teamphotos]");if(!t||!state.canEdit)return;e.preventDefault();state.pfFocus="pf-team";go("profEdit")});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-tsi]");if(!b)return;state.teamIdx=+b.dataset.tsi;const f=b.closest(".team-show");if(f)f.outerHTML=teamFigure(state.about)});
 function profStats(P){const st=P.stats.filter(x=>x.n);return st.length?`<div class="pf-stats">${st.map(x=>`<div><b>${esc(x.n)}</b><span>${esc(x.l)}</span></div>`).join("")}</div>`:""}
 function profServices(P,home){
@@ -2629,7 +2631,7 @@ function edHelpers(prefix,D){
   const ta=(path,label,val,rows,max)=>`<label>${label}<textarea data-${prefix}="${path}" rows="${rows||3}" maxlength="${max||1200}">${esc(val)}</textarea></label>`;
   const photo=(path,ref,label)=>`<div class="kslot"><div class="kslot-img">${ref?kImg(ref,500,label):`<span class="hint">No photo</span>`}</div><div class="kslot-b"><b>${label}</b><label class="btn small" style="cursor:pointer;margin:0;flex-direction:row;color:#fff">${ref?"Replace photo":"＋ Add photo"}<input type="file" accept="image/*" data-${prefix}up="${path}" style="display:none"></label>${ref?`<button class="btn small ghost" data-${prefix}clr="${path}">Remove photo</button>`:""}</div></div>`;
   const sec=(t,body)=>`<details class="panel ed sec" open><summary><h3 style="display:inline">${t}</h3></summary><div style="margin-top:12px">${body}</div></details>`;
-  const rows=(key,arr,fields,max,addLabel)=>`${arr.map((o,i)=>`<div class="kopt-ed"><div class="kopt-h"><b>${esc(o[fields[0][0]]||"Item "+(i+1))}</b><span style="flex:1"></span><button class="btn small ghost" data-${prefix}mv="${key}|${i}|-1" ${i===0?"disabled":""}>↑</button><button class="btn small ghost" data-${prefix}mv="${key}|${i}|1" ${i===arr.length-1?"disabled":""}>↓</button><button class="btn small danger" data-${prefix}rm="${key}|${i}">✕</button></div>
+  const rows=(key,arr,fields,max,addLabel)=>`${arr.map((o,i)=>`<div class="kopt-ed"><div class="kopt-h"><b>${esc((()=>{const f=fields.find(x=>x[3]!=="photo");return (f&&o[f[0]])||"Item "+(i+1)})())}</b><span style="flex:1"></span><button class="btn small ghost" data-${prefix}mv="${key}|${i}|-1" ${i===0?"disabled":""}>↑</button><button class="btn small ghost" data-${prefix}mv="${key}|${i}|1" ${i===arr.length-1?"disabled":""}>↓</button><button class="btn small danger" data-${prefix}rm="${key}|${i}">✕</button></div>
     ${fields.map(([f,l,m,kind])=>kind==="photo"?photo(`${key}.${i}.${f}`,o[f],l):kind==="ta"?ta(`${key}.${i}.${f}`,l,o[f],2,m):inp(`${key}.${i}.${f}`,l,o[f],m)).join("")}</div>`).join("")}${arr.length<max?`<button class="btn small" data-${prefix}add="${key}">＋ ${addLabel}</button>`:""}`;
   return {inp,ta,photo,sec,rows};
 }
@@ -2651,7 +2653,7 @@ function viewProfEdit(){
   ${sec("About Us — who we are",`${ta("quote","Quote",D.quote,2,200)}${inp("workTitle","How we work — heading",D.workTitle,60)}${rows("work",D.work,[["t","Title",60],["d","Text",200,"ta"]],6,"Add point")}
     ${inp("approachTitle","Approach — heading",D.approachTitle,60)}${ta("approach","Approach text",D.approach,3,500)}`)}
   ${sec("About Us — commitment &amp; values",`${inp("vmKicker","Small heading above vision &amp; mission",D.vmKicker,60)}${inp("commitTitle","Commitment heading",D.commitTitle,60)}${ta("commit","Commitment text",D.commit,3,600)}${inp("valuesTitle","Values heading",D.valuesTitle,60)}${rows("values",D.values,[["t","Value",40],["d","Text",200,"ta"]],9,"Add value")}`)}
-  ${sec("About Us — team over the years (photo slideshow)",`<p class="hint">Add photos from when you started up to today — oldest first. The label shows under each photo (e.g. "Our first event, 2020"). The heading under the photos is "Team photo caption" in <a href="#" data-go="aboutEdit">Edit pages</a>.</p>${rows("teamPhotos",D.teamPhotos,[["photo","Photo",0,"photo"],["label","Label",80]],30,"Add team photo")}`)}
+  <div id="pf-team">${sec("About Us — team over the years (photo slideshow)",`<p class="hint">Add photos from when you started up to today — oldest first, use ↑ ↓ to reorder. The caption shows under each photo (e.g. "Our first event, 2020"). The heading under the photos is in <a href="#" data-go="aboutEdit">Edit pages</a> (4. Team). Click <b>Save changes</b> at the bottom when done.</p>${rows("teamPhotos",D.teamPhotos,[["photo","Photo",0,"photo"],["label","Caption",80]],30,"Add team photo")}`)}</div>
   ${sec("About Us — team organization",`${inp("deptTitle","Heading",D.deptTitle,80)}${rows("depts",D.depts,[["t","Department",60],["d","Who's in it",200]],6,"Add department")}`)}
   ${sec("About Us — capability &amp; standards",`<div class="g2">${inp("capKicker","Small heading",D.capKicker,60)}${inp("capTitle","Heading",D.capTitle,80)}</div>${photo("capPhoto",D.capPhoto,"Photo")}${ta("facilities","Facilities &amp; systems (one per line)",D.facilities,6,1500)}
     ${rows("capacity",D.capacity,[["l","Capacity",80],["v","Value",40]],6,"Add capacity line")}${inp("processTitle","Process heading",D.processTitle,80)}${ta("process","Process steps (one per line)",D.process,6,600)}${inp("safetyTitle","Food safety heading",D.safetyTitle,80)}${ta("safety","Food safety points (one per line)",D.safety,5,1200)}`)}
@@ -2709,6 +2711,7 @@ function bind(){
   if(state.view==="home")bindFilm(v);
   if(state.view==="aboutEdit")bindAboutEdit(v);
   if(state.view==="corporate")bindCorporate(v);
+  if(state.view==="profEdit"&&state.pfFocus){const id=state.pfFocus;state.pfFocus=null;setTimeout(()=>document.getElementById(id)?.scrollIntoView({behavior:"smooth",block:"start"}),60)}
   if(state.view==="profEdit")bindJsonEdit(v,"pf","profile",()=>state.pfDraft,startProfDraft,{teamPhotos:{photo:null,label:""},steps:{t:"",d:"",btn:"",go:""},stats:{n:"",l:""},svcs:{t:"New service",d:"",go:"",photo:null},work:{t:"",d:""},values:{t:"",d:""},depts:{t:"",d:""},record:{c:"",s:"",d:""},capacity:{l:"",v:""}},"Profile sections");
   if(state.view==="corpEdit")bindJsonEdit(v,"cp","corporate",()=>state.cpDraft,startCorpDraft,{lines:{t:"New service",d:"",p:"",photo:null}},"Corporate page");
   if(state.view==="trayEdit")bindTrayEdit(v);
