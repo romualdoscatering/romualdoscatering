@@ -501,6 +501,11 @@ body.nav-open .nav-burger span:nth-child(1){transform:translateY(7px) rotate(45d
 .chefs figcaption span{font-size:12.5px;color:var(--muted)}
 .team-photo img{width:100%;display:block}
 .team-photo figcaption{padding:10px 12px;font-size:13px;color:var(--muted)}
+.team-show figcaption{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}.team-show figcaption b{color:var(--navy);font-size:14px}
+.ts-stage{position:relative}.ts-stage img{aspect-ratio:3/2;object-fit:cover}
+.ts-nav{position:absolute;top:50%;transform:translateY(-50%);width:38px;height:38px;border-radius:50%;border:0;background:rgba(26,44,84,.75);color:#fff;font-size:24px;line-height:1;cursor:pointer;display:grid;place-items:center}
+.ts-nav:hover{background:var(--gold)}.ts-nav.prev{left:10px}.ts-nav.next{right:10px}
+.ts-dots{margin-left:auto;display:flex;gap:6px}.ts-dots button{width:9px;height:9px;border-radius:50%;border:0;padding:0;background:#CFC8AE;cursor:pointer}.ts-dots button.on{background:var(--gold)}
 .custom-band{background:var(--paper);border:1px solid var(--line);border-left:6px solid var(--wine);border-radius:14px;padding:24px 26px;display:flex;gap:20px;align-items:center;flex-wrap:wrap;margin-bottom:34px}
 .custom-band div{flex:1;min-width:260px}.custom-band p{margin:0;color:var(--muted)}
 .clients{margin-bottom:34px}
@@ -1463,7 +1468,7 @@ const ABOUT_DEFAULT={
   teamKicker:"03 · Our team", teamTitle:"Leadership & our chefs",
   team:"Chef John Philip D. Domingo, proprietor and head chef, is a graduate of Culinary & Restaurant Management at École Hôtelière de Lausanne, Switzerland. He leads the business, client relationships and menu development.\n\nChef Jasper Patrick Domingo, head chef, is a graduate of Professional Culinary and Pastry Arts. He leads kitchen production and pastry, and curates menus tailored to each client and occasion.\n\nTogether, our chefs plan each menu around the client's occasion and guests, large or small.",
   chefs:[{name:"Chef John Philip D. Domingo",subtitle:"Proprietor · Head Chef",photo:P("about/chef-jp.jpg")},{name:"Chef Jasper Patrick Domingo",subtitle:"Head Chef",photo:P("about/chef-jasper.jpg")}],
-  teamPhoto:S_("team2398")||P("about/team.jpg"), teamCaption:"Our kitchen team",
+  teamPhoto:S_("team2398")||P("about/team.jpg"), teamCaption:"Our team over the years",
   customTitle:"A customized menu, just for you",
   custom:"We understand that every event is unique, which is why we offer customizable menus to suit your preferences, dietary needs, and theme. Whether you desire a traditional feast or a contemporary fusion experience, our culinary experts will work closely with you to curate a menu that exceeds expectations.",
   customButton:"Build your own menu →",
@@ -2260,7 +2265,7 @@ function viewAbout(){
     <div class="team-text">${a.teamKicker?`<div class="kicker">${esc(a.teamKicker)}</div>`:""}<h2>${esc(a.teamTitle)}</h2>${paras(a.team)}
       ${chefs.length?`<div class="chefs">${chefs.map(c=>`<figure>${c.photo?imgTag(c.photo,700,'loading="lazy"',c.name):""}<figcaption><b>${esc(c.name)}</b>${c.subtitle?`<span>${esc(c.subtitle)}</span>`:""}</figcaption></figure>`).join("")}</div>`:""}
     </div>
-    ${a.teamPhoto?`<figure class="team-photo">${imgTag(a.teamPhoto,1400,'loading="lazy"',a.teamCaption||"Our team")}${a.teamCaption?`<figcaption>${esc(a.teamCaption)}</figcaption>`:""}</figure>`:""}
+    ${teamFigure(a)}
   </section>
   ${profDepts(profData())}
   <section class="custom-band"><div><h2>${esc(a.customTitle)}</h2>${paras(a.custom)}</div>${a.customButton?`<button class="btn gold" data-go="custom">${esc(a.customButton)}</button>`:""}</section>
@@ -2453,6 +2458,7 @@ const PROFILE_DEFAULT={
     {t:"Receive a written quotation",d:"We review your details and send a written quotation with the final menu and price.",btn:"Send an inquiry",go:"contact"},
     {t:"Confirm your booking",d:"Reserve your date with a down payment. We confirm every detail in a Banquet Event Order, then cook, deliver and serve.",btn:"Book now",go:"contact"}],
   stepsCorp:"Ordering for a company or institution?",
+  teamPhotos:[{photo:P("about/team.jpg"),label:"The Romualdo's team"},{photo:S_("team2398"),label:"Our kitchen team, 2026"}],
   quote:"We show up for celebrations — and for the everyday meals that keep people connected.",
   workTitle:"How we work",
   work:[{t:"Chef-planned menus",d:"Our two head chefs plan and check every menu."},{t:"Organized paperwork",d:"Purchase orders, Banquet Event Orders, BIR invoices and statements of account."},{t:"Consistent at any size",d:"The same recipes and quality checks for 30 or 2,000 guests."},{t:"One team",d:"Menu, kitchen, delivery, service and billing handled in-house, so you have one point of contact."}],
@@ -2476,7 +2482,7 @@ const PROFILE_DEFAULT={
   corpBandText:"Packed meals, snack boxes, meetings and company events — with POs, BEOs, BIR invoices and one account officer. Download our Products & Services Catalogue.",
   corpBandBtn:"For corporate clients →",corpBandPhoto:S_("packed2140")
 };
-const PROF_LISTS={steps:6,stats:4,svcs:12,work:6,values:9,depts:6,record:12,capacity:6};
+const PROF_LISTS={teamPhotos:30,steps:6,stats:4,svcs:12,work:6,values:9,depts:6,record:12,capacity:6};
 function profData(){
   let x={};try{x=JSON.parse(state.about.profile||"{}")||{}}catch(e){x={}}
   const d=JSON.parse(JSON.stringify(PROFILE_DEFAULT));
@@ -2490,6 +2496,15 @@ function profData(){
 }
 const lines=t=>String(t||"").split("\n").map(x=>x.trim()).filter(Boolean);
 const secLabel=t=>t?`<div class="sec-label">${esc(t)}</div>`:"";
+/* Team photo: a slideshow of "our team over the years" (Edit profile → Team over the years); falls back to the single team photo. */
+function teamFigure(a){
+  const L=profData().teamPhotos.filter(x=>x.photo);
+  const list=L.length?L:(a.teamPhoto?[{photo:a.teamPhoto,label:""}]:[]);if(!list.length)return "";
+  const i=Math.min(state.teamIdx||0,list.length-1),x=list[i],multi=list.length>1;
+  return `<figure class="team-photo team-show">${multi?`<div class="ts-stage">`:""}${kImg(x.photo,1400,x.label||a.teamCaption||"Our team",'loading="lazy"')}${multi?`<button class="ts-nav prev" data-tsi="${(i-1+list.length)%list.length}" aria-label="Previous photo">‹</button><button class="ts-nav next" data-tsi="${(i+1)%list.length}" aria-label="Next photo">›</button></div>`:""}
+    <figcaption><b>${esc(a.teamCaption||"")}</b>${x.label?`<span>${esc(x.label)}</span>`:""}${multi?`<span class="ts-dots">${list.map((_,j)=>`<button class="${j===i?"on":""}" data-tsi="${j}" aria-label="Photo ${j+1}"></button>`).join("")}</span>`:""}</figcaption></figure>`;
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-tsi]");if(!b)return;state.teamIdx=+b.dataset.tsi;const f=b.closest(".team-show");if(f)f.outerHTML=teamFigure(state.about)});
 function profStats(P){const st=P.stats.filter(x=>x.n);return st.length?`<div class="pf-stats">${st.map(x=>`<div><b>${esc(x.n)}</b><span>${esc(x.l)}</span></div>`).join("")}</div>`:""}
 function profServices(P,home){
   const L=P.svcs.filter(x=>x.t);if(!L.length)return "";
@@ -2637,6 +2652,7 @@ function viewProfEdit(){
   ${sec("About Us — who we are",`${ta("quote","Quote",D.quote,2,200)}${inp("workTitle","How we work — heading",D.workTitle,60)}${rows("work",D.work,[["t","Title",60],["d","Text",200,"ta"]],6,"Add point")}
     ${inp("approachTitle","Approach — heading",D.approachTitle,60)}${ta("approach","Approach text",D.approach,3,500)}`)}
   ${sec("About Us — commitment &amp; values",`${inp("vmKicker","Small heading above vision &amp; mission",D.vmKicker,60)}${inp("commitTitle","Commitment heading",D.commitTitle,60)}${ta("commit","Commitment text",D.commit,3,600)}${inp("valuesTitle","Values heading",D.valuesTitle,60)}${rows("values",D.values,[["t","Value",40],["d","Text",200,"ta"]],9,"Add value")}`)}
+  ${sec("About Us — team over the years (photo slideshow)",`<p class="hint">Add photos from when you started up to today — oldest first. The label shows under each photo (e.g. "Our first event, 2020"). The heading under the photos is "Team photo caption" in <a href="#" data-go="aboutEdit">Edit pages</a>.</p>${rows("teamPhotos",D.teamPhotos,[["photo","Photo",0,"photo"],["label","Label",80]],30,"Add team photo")}`)}
   ${sec("About Us — team organization",`${inp("deptTitle","Heading",D.deptTitle,80)}${rows("depts",D.depts,[["t","Department",60],["d","Who's in it",200]],6,"Add department")}`)}
   ${sec("About Us — track record",`<div class="g2">${inp("recordKicker","Small heading",D.recordKicker,60)}${inp("recordTitle","Heading",D.recordTitle,60)}</div>${rows("record",D.record,[["c","Client / event",100],["s","Scope",240],["d","Date",40]],12,"Add engagement")}${inp("recordNote","Note under the table",D.recordNote,200)}`)}
   ${sec("About Us — capability &amp; standards",`<div class="g2">${inp("capKicker","Small heading",D.capKicker,60)}${inp("capTitle","Heading",D.capTitle,80)}</div>${photo("capPhoto",D.capPhoto,"Photo")}${ta("facilities","Facilities &amp; systems (one per line)",D.facilities,6,1500)}
@@ -2695,7 +2711,7 @@ function bind(){
   if(state.view==="home")bindFilm(v);
   if(state.view==="aboutEdit")bindAboutEdit(v);
   if(state.view==="corporate")bindCorporate(v);
-  if(state.view==="profEdit")bindJsonEdit(v,"pf","profile",()=>state.pfDraft,startProfDraft,{steps:{t:"",d:"",btn:"",go:""},stats:{n:"",l:""},svcs:{t:"New service",d:"",go:"",photo:null},work:{t:"",d:""},values:{t:"",d:""},depts:{t:"",d:""},record:{c:"",s:"",d:""},capacity:{l:"",v:""}},"Profile sections");
+  if(state.view==="profEdit")bindJsonEdit(v,"pf","profile",()=>state.pfDraft,startProfDraft,{teamPhotos:{photo:null,label:""},steps:{t:"",d:"",btn:"",go:""},stats:{n:"",l:""},svcs:{t:"New service",d:"",go:"",photo:null},work:{t:"",d:""},values:{t:"",d:""},depts:{t:"",d:""},record:{c:"",s:"",d:""},capacity:{l:"",v:""}},"Profile sections");
   if(state.view==="corpEdit")bindJsonEdit(v,"cp","corporate",()=>state.cpDraft,startCorpDraft,{lines:{t:"New service",d:"",p:"",photo:null}},"Corporate page");
   if(state.view==="trayEdit")bindTrayEdit(v);
   if(state.view==="kaarEdit")bindKaarEdit(v);
