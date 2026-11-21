@@ -179,7 +179,15 @@ td.num{text-align:right;white-space:nowrap}
 .home-highlights{list-style:none;margin:0 0 30px;padding:14px 18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 18px;background:var(--navy);color:#fff;border-radius:14px}
 .home-highlights li{display:flex;gap:8px;align-items:flex-start;font-weight:600;font-size:14px}
 .home-highlights li:before{content:"✦";color:var(--gold)}
-.home-steps h2{text-align:center;margin-bottom:16px}
+.home-steps h2{text-align:center;margin-bottom:6px}
+.steps-intro{text-align:center;color:var(--muted);margin:0 auto 18px;max-width:620px}
+ol.steps-grid{list-style:none;padding:0;margin:0;counter-reset:none}
+.home-steps .step-card{cursor:default;display:flex;flex-direction:column;gap:6px}
+.home-steps .step-card .go{all:unset;cursor:pointer;margin-top:auto;padding-top:8px;font-weight:700;color:var(--wine)}
+.home-steps .step-card .go:hover,.home-steps .step-card .go:focus-visible{text-decoration:underline}
+.steps-corp{text-align:center;margin:16px 0 0;color:var(--navy);font-weight:600}
+.linkbtn{all:unset;cursor:pointer;color:var(--wine);font-weight:700;text-decoration:underline}
+.home-steps .step-card:hover{transform:none;box-shadow:none}
 .steps-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:30px}
 .step-card{text-align:left;background:var(--paper);border:1px solid var(--line);border-top:5px solid var(--gold);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:6px;color:var(--navy);font-size:14px;transition:transform .15s,box-shadow .15s}
 .step-card:hover{transform:translateY(-3px);box-shadow:0 12px 24px -16px rgba(26,44,84,.5)}
@@ -1473,7 +1481,7 @@ const ABOUT_DEFAULT={
   homePhoto:S_("grazing1870")||P("gallery/buffet-setup.jpg"), homePhotoAlt:"Romualdo's grazing table set for an evening event",
   homeBtn1:"See our packages", homeBtn2:"Get to know us",
   homeHighlights:["Serving Davao City since 2020","30 to 2,000+ guests per order","Corporate · Weddings · Birthdays · Institutional programs","Chef-planned menus, built around you"],
-  homeStepsTitle:"Plan your event in four easy steps",
+  homeStepsTitle:"How to book with Romualdo's",
   homePhotosTitle:"A taste of our work",
   contactTitle:"How to contact us",
   contactText:"Tell us your event date, number of guests and venue, and we'll prepare a written quotation. Message us on Facebook or Instagram, call or text us, or send an inquiry through this website.",
@@ -1505,7 +1513,7 @@ const ABOUT_DEFAULT={
 };
 const ABOUT_LISTS=["services","mission","clients","homeHighlights","contactPhones"];
 /* Keys replaced by the Nov 2026 company-profile wording the first time it loads (until an admin saves the pages again). */
-const ABOUT_REV_KEYS=["kicker","headline","story","heroPhoto","heroAlt","vision","missionTitle","mission","servicesTitle","services","teamKicker","teamTitle","team","chefs","teamPhoto","teamCaption","clientsKicker","clientsTitle","clients","ctaTitle","ctaText","homeKicker","homeTitle","homeText","homePhoto","homePhotoAlt","homeHighlights"];
+const ABOUT_REV_KEYS=["kicker","headline","story","heroPhoto","heroAlt","vision","missionTitle","mission","servicesTitle","services","teamKicker","teamTitle","team","chefs","teamPhoto","teamCaption","clientsKicker","clientsTitle","clients","ctaTitle","ctaText","homeKicker","homeTitle","homeText","homePhoto","homePhotoAlt","homeHighlights","homeStepsTitle"];
 const SHOOT_GALLERY=()=>[["grazing2026","events","Grazing table for an evening event"],["packed2131","food","Corporate packed meals"],["traybake2209","food","Baked party tray"],["rolls1963","food","Pica-pica rolls"],["buffetline2371","events","Buffet line, ready for guests"],["sandwich1759","food","Tea sandwiches"],["trayfish2185","food","Fish fillet in sauce, party tray"],["snacks1834","food","Merienda bites"],["traybeef2245","food","Beef with mushrooms"],["quesadilla1825","food","Grilled quesadilla wedges"],["packed2116","food","Packed lunch boxes"],["traypasta2299","food","Creamy pasta tray"]].map(([k,c,cap])=>S_(k)&&{...S_(k),category:c,caption:cap}).filter(Boolean);
 const TRAY_CDN="https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261112_";
 const TRAY_IMG={chicken:"085510_ccb96433-9fec-4c14-9c9d-9d7c973645bc",pork:"085314_70d2c337-f7e0-4b04-b1b4-db665034fd0d",beef:"085908_71cbd089-68e8-4889-a1ef-7d8f48d8091d",seafood:"085641_d8c40549-4fa0-4ba2-b814-8bd91f2c9259",vegetables:"085907_4b5311d5-696c-4d1f-949d-399d913b8bc1",pasta:"085312_60fae33c-6365-4146-a0c4-e7c9619c2adb",salads:"085640_9fec2c5f-831a-4ad3-a00d-796c393c5e4e",rice:"090232_1e1f0948-bcfc-4db1-a501-c49cb2d0b530",desserts:"090233_3f8ad353-abbd-4545-a0f3-e497213ceda7"};
@@ -1618,7 +1626,8 @@ function viewHome(){
   ${a.homeHighlights.length?`<ul class="home-highlights">${a.homeHighlights.map(x=>`<li>${esc(x)}</li>`).join("")}</ul>`:""}
   ${profStats(profData())}${profServices(profData(),true)}${profCorpBand(profData())}
   <section class="home-steps"><h2>${esc(a.homeStepsTitle)}</h2>
-    <div class="steps-grid">${STEPS.map(([v,n,t,d])=>`<button class="step-card" data-go="${v}"><span class="n">${n}</span><b>${t}</b><span>${d}</span><span class="go">Open →</span></button>`).join("")}</div>
+    ${(()=>{const P=profData(),L=P.steps.filter(x=>x.t);return `${P.stepsIntro?`<p class="steps-intro">${esc(P.stepsIntro)}</p>`:""}<ol class="steps-grid">${L.map((x,i)=>`<li class="step-card"><span class="n">${i+1}</span><b>${esc(x.t)}</b><span>${esc(x.d)}</span>${x.btn&&x.go?`<button class="go" data-go="${esc(x.go)}">${esc(x.btn)} →</button>`:""}</li>`).join("")}</ol>
+    ${P.stepsCorp?`<p class="steps-corp">${esc(P.stepsCorp)} <button class="linkbtn" data-go="corporate">See For Corporate Clients →</button></p>`:""}`})()}
   </section>
   ${pics.length?`<section class="home-pics"><div class="gallery-head"><h2 style="margin:0">${esc(a.homePhotosTitle)}</h2><button class="btn ghost small" data-go="about">See all photos →</button></div>
     <div class="gallery four">${pics.map(p=>`<figure data-photo="${esc(photoKey(p))}" tabindex="0">${imgTag(p,700,'loading="lazy"',p.caption||catLabel(p.category))}${p.caption?`<figcaption>${esc(p.caption)}</figcaption>`:""}</figure>`).join("")}</div></section>`:""}
@@ -2438,6 +2447,12 @@ const PROFILE_DEFAULT={
     {t:"Handaan packages",d:"Ready-to-book Filipino celebration packages, including our Maligayang Kaarawan birthday package, with setup, décor and service.",go:"kaarawan",photo:S_("fried1816")},
     {t:"Party trays & desserts",d:"Ready-to-serve trays across chicken, pork, beef, seafood, vegetables, pasta, salads, rice and desserts.",go:"trays",photo:S_("traybake2209")},
     {t:"Restaurant",d:"Our dine-in restaurant in Juna Subdivision, with Sunday buffets and themed menus.",go:"contact",photo:S_("logo2449")}],
+  stepsIntro:"From first inquiry to the day of your event — one team, one point of contact.",
+  steps:[{t:"Choose your service",d:"Pick a ready-made package, or tell us what you need — buffet, packed meals, trays or grazing.",btn:"See our packages",go:"packages"},
+    {t:"Get an estimate",d:"Build your own menu for an instant estimate, or send your date, venue and guest count.",btn:"Build your menu",go:"custom"},
+    {t:"Receive a written quotation",d:"We review your details and send a written quotation with the final menu and price.",btn:"Send an inquiry",go:"contact"},
+    {t:"Confirm your booking",d:"Reserve your date with a down payment. We confirm every detail in a Banquet Event Order, then cook, deliver and serve.",btn:"Book now",go:"contact"}],
+  stepsCorp:"Ordering for a company or institution?",
   quote:"We show up for celebrations — and for the everyday meals that keep people connected.",
   workTitle:"How we work",
   work:[{t:"Chef-planned menus",d:"Our two head chefs plan and check every menu."},{t:"Organized paperwork",d:"Purchase orders, Banquet Event Orders, BIR invoices and statements of account."},{t:"Consistent at any size",d:"The same recipes and quality checks for 30 or 2,000 guests."},{t:"One team",d:"Menu, kitchen, delivery, service and billing handled in-house, so you have one point of contact."}],
@@ -2461,7 +2476,7 @@ const PROFILE_DEFAULT={
   corpBandText:"Packed meals, snack boxes, meetings and company events — with POs, BEOs, BIR invoices and one account officer. Download our Products & Services Catalogue.",
   corpBandBtn:"For corporate clients →",corpBandPhoto:S_("packed2140")
 };
-const PROF_LISTS={stats:4,svcs:12,work:6,values:9,depts:6,record:12,capacity:6};
+const PROF_LISTS={steps:6,stats:4,svcs:12,work:6,values:9,depts:6,record:12,capacity:6};
 function profData(){
   let x={};try{x=JSON.parse(state.about.profile||"{}")||{}}catch(e){x={}}
   const d=JSON.parse(JSON.stringify(PROFILE_DEFAULT));
@@ -2613,6 +2628,8 @@ function viewProfEdit(){
   return `<div style="display:flex;align-items:baseline;gap:14px;flex-wrap:wrap"><h1>Edit company profile sections</h1><span class="who">Admin only · the profile sections on the Welcome and About Us pages · <a href="#about" data-go="about">view About Us</a> · other wording: <a href="#" data-go="aboutEdit">Edit pages</a></span></div>
   <div class="formmsg" style="color:var(--blue);min-height:0;margin-bottom:8px">${esc(state.pfUpMsg||"")}</div>
   ${sec("Highlights (numbers)",rows("stats",D.stats,[["n","Number",20],["l","Label",80]],4,"Add highlight"))}
+  ${sec("How to book — steps (Welcome page)",`<p class="hint">The heading is in <a href="#" data-go="aboutEdit">Edit pages</a> (Steps heading). "Opens" can be: packages, custom, packed, trays, grazing, kaarawan, corporate, about or contact.</p>${ta("stepsIntro","Intro line",D.stepsIntro,2,300)}
+    ${rows("steps",D.steps,[["t","Step",60],["d","What happens",260,"ta"],["btn","Button text",30],["go","Opens",20]],6,"Add step")}${inp("stepsCorp","Corporate line under the steps (leave empty to hide)",D.stepsCorp,120)}`)}
   ${sec("What we do — service cards (Welcome page)",`<div class="g2">${inp("svcKicker","Small heading",D.svcKicker,60)}${inp("svcTitle","Heading",D.svcTitle,60)}</div>${ta("svcIntro","Intro",D.svcIntro,2,400)}
     <p class="hint">"Opens" is the page a card links to: packed, packages, grazing, kaarawan, trays, custom, corporate, about or contact (leave empty for no link).</p>
     ${rows("svcs",D.svcs,[["t","Title",60],["d","Description",240,"ta"],["go","Opens",20],["photo","Photo",0,"photo"]],12,"Add service")}`)}
@@ -2678,7 +2695,7 @@ function bind(){
   if(state.view==="home")bindFilm(v);
   if(state.view==="aboutEdit")bindAboutEdit(v);
   if(state.view==="corporate")bindCorporate(v);
-  if(state.view==="profEdit")bindJsonEdit(v,"pf","profile",()=>state.pfDraft,startProfDraft,{stats:{n:"",l:""},svcs:{t:"New service",d:"",go:"",photo:null},work:{t:"",d:""},values:{t:"",d:""},depts:{t:"",d:""},record:{c:"",s:"",d:""},capacity:{l:"",v:""}},"Profile sections");
+  if(state.view==="profEdit")bindJsonEdit(v,"pf","profile",()=>state.pfDraft,startProfDraft,{steps:{t:"",d:"",btn:"",go:""},stats:{n:"",l:""},svcs:{t:"New service",d:"",go:"",photo:null},work:{t:"",d:""},values:{t:"",d:""},depts:{t:"",d:""},record:{c:"",s:"",d:""},capacity:{l:"",v:""}},"Profile sections");
   if(state.view==="corpEdit")bindJsonEdit(v,"cp","corporate",()=>state.cpDraft,startCorpDraft,{lines:{t:"New service",d:"",p:"",photo:null}},"Corporate page");
   if(state.view==="trayEdit")bindTrayEdit(v);
   if(state.view==="kaarEdit")bindKaarEdit(v);
