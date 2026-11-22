@@ -718,7 +718,7 @@ ACT.prodToReq = () => {
    Stored on the event record as `sheet`, so the same event also carries costing in "Catering events".
    Billing is intentionally excluded: it is handled by finance between the admin and the client. */
 const SHEET_COURSES = ['Soup', 'Salad / appetizer', 'Main dish', 'Main dish', 'Main dish', 'Main dish', 'Pasta / noodles', 'Vegetables', 'Rice', 'Dessert', 'Drinks'];
-const EV_TYPES = ['Anniversary', 'Birthday', 'Christening', 'Christmas Party', 'Corporate', 'Debut', 'Funeral / Wake', 'Graduation', 'Retirement Party', 'Reunion', 'Wedding', 'Other'];  // A–Z, Other last
+const EV_TYPES = ['Anniversary', 'Birthday', 'Christening / Baptism', 'Christmas Party', 'Corporate Event', 'Debut', 'Funeral / Wake', 'Graduation', 'Retirement Party', 'Reunion', 'Seminar', 'Training', 'Wedding', 'Other'];  // A–Z, Other last — same list as the website's booking form
 const SHEET_STATUS = [['draft', 'Draft'], ['approval', 'For client approval'], ['approved', 'Approved by client'], ['cancelled', 'Cancelled']];
 const SHEET_KINDS = [['catering', 'Catering / buffet event'], ['trays', 'Food trays'], ['packs', 'Food packs']];
 const sheetKindLabel = k => ({trays: 'Food trays', packs: 'Food packs'})[k] || 'Catering';
@@ -763,7 +763,7 @@ V.sheets = () => {
    <h4 class="sub">1. Client</h4>
    <div class="grid">${lab('Client name(s)', inp('client', cat ? 'e.g. Juan Manalang & Ysabel Zubiri' : 'e.g. Maria Santos', 'text', 'autocapitalize="words"'))}${lab('Contact person', inp('contact', '', 'text', 'autocapitalize="words"'))}${lab('Mobile no.', inp('mobile', '09XX XXX XXXX', 'tel'))}${lab('Email', inp('email', '', 'email'))}${lab('How they found us', inp('source', 'Facebook, website, referral…'))}${lab('Reference no.', inp('ref', d.id ? sheetRef(d) : 'Filled in automatically'))}</div>
    ${cat ? `<h4 class="sub">2. Event</h4>
-   <div class="grid">${lab('Event type', sel('sheet.type', opt('', '— choose —') + EV_TYPES.map(t => opt(t, t)).join(''), false))}${lab('Event date', inp('date', '', 'date'))}${lab('Number of guests', inp('pax', '150', 'number', 'inputmode="numeric" min="0"'))}
+   <div class="grid">${lab('Event type', sel('sheet.type', opt('', '— choose —') + (D.sheet?.type && !EV_TYPES.includes(D.sheet.type) ? opt(D.sheet.type, D.sheet.type) : '') + EV_TYPES.map(t => opt(t, t)).join(''), false))}${lab('Event date', inp('date', '', 'date'))}${lab('Number of guests', inp('pax', '150', 'number', 'inputmode="numeric" min="0"'))}
     ${lab('Call time (team at venue)', inp('call', '', 'time'))}${lab('Serving time', inp('serve', '', 'time'))}${lab('Pull-out time', inp('pull', '', 'time'))}
     ${lab('Venue / address', inp('venue', '', 'text', 'autocapitalize="words"'))}${lab('Venue coordinator & contact', inp('coord'))}${lab('Package', inp('pkg', 'Classic / Signature / Premium / Grand / Custom'))}</div>
    <h4 class="sub">3. Menu</h4>
