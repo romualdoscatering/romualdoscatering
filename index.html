@@ -1605,11 +1605,11 @@ const FILM={
 };
 function viewFilm(){
   return `<section class="home-film" aria-labelledby="filmTitle">
-    <div class="kicker">Watch · 12 seconds</div>
+    <div class="kicker">Watch · 12 seconds · AI-generated film</div>
     <h2 id="filmTitle">Every celebration begins at the table</h2>
-    <p class="film-sub">From a child's birthday to your wedding day — a little look at the gatherings we're honored to cater.</p>
+    <p class="film-sub">A short film, made with AI, that imagines the family gatherings we love to cook for. The people and scenes are illustrations, not footage of our events — for real photos of our food and setups, see <a href="#about" data-go="about">About Us</a>.</p>
     <div class="film-frame" id="filmFrame">
-      <video id="filmVideo" muted loop playsinline preload="metadata" poster="${FILM.poster}" aria-label="Romualdo's Catering welcome video: a family setting the table, a child's birthday and a wedding reception, ending with the Romualdo's logo.">
+      <video id="filmVideo" muted loop playsinline preload="metadata" poster="${FILM.poster}" aria-label="AI-generated illustrative film for Romualdo's Catering: a family setting the table, a child's birthday and a wedding reception, ending with the Romualdo's logo.">
         <source src="${FILM.src}" type="video/mp4">
       </video>
       <button class="film-play" id="filmPlay" type="button"><span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.5z"/></svg></span>Watch with sound</button>
