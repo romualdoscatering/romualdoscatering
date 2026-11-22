@@ -718,7 +718,7 @@ ACT.prodToReq = () => {
    Stored on the event record as `sheet`, so the same event also carries costing in "Catering events".
    Billing is intentionally excluded: it is handled by finance between the admin and the client. */
 const SHEET_COURSES = ['Soup', 'Salad / appetizer', 'Main dish', 'Main dish', 'Main dish', 'Main dish', 'Pasta / noodles', 'Vegetables', 'Rice', 'Dessert', 'Drinks'];
-const EV_TYPES = ['Wedding', 'Birthday', 'Debut', 'Christening', 'Corporate', 'Anniversary', 'Graduation', 'Reunion', 'Funeral / Wake', 'Other'];
+const EV_TYPES = ['Anniversary', 'Birthday', 'Christening', 'Christmas Party', 'Corporate', 'Debut', 'Funeral / Wake', 'Graduation', 'Retirement Party', 'Reunion', 'Wedding', 'Other'];  // A–Z, Other last
 const SHEET_STATUS = [['draft', 'Draft'], ['approval', 'For client approval'], ['approved', 'Approved by client'], ['cancelled', 'Cancelled']];
 const SHEET_KINDS = [['catering', 'Catering / buffet event'], ['trays', 'Food trays'], ['packs', 'Food packs']];
 const sheetKindLabel = k => ({trays: 'Food trays', packs: 'Food packs'})[k] || 'Catering';
