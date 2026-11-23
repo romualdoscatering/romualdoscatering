@@ -48,7 +48,17 @@ async function loadMaster() {
 const itemName = id => S.itemsById[id]?.name || '(item)';
 const itemUnit = id => S.itemsById[id]?.stock_unit || '';
 const itemDatalist = () => `<datalist id="dl-items">${S.items.map(i => `<option value="${esc(i.name)}">${esc(i.category)} · ${esc(i.stock_unit)}</option>`).join('')}</datalist>`;
-const dishDatalist = () => `<datalist id="dl-dishes">${S.dishes.filter(d => d.active).map(d => `<option value="${esc(d.name)}">`).join('')}</datalist>`;
+const dishOptions = (course, cat) => S.dishes.filter(d => d.active && (!course || d.course === course) && (!cat || d.category === cat))
+  .map(d => `<option value="${esc(d.name)}"${course === 'Main' && !cat ? ` label="${esc(d.category)}"` : ''}>`).join('');
+const mainCats = () => [...new Set(S.dishes.filter(d => d.active && d.course === 'Main').map(d => d.category))].sort();
+// The dish suggestions follow the course (and, for Main, the meat) picked on the add-dish line
+document.addEventListener('change', e => {
+  const f = e.target.closest('form[data-form="addMenu"]'); if (!f || !['course', 'cat'].includes(e.target.name)) return;
+  const course = f.course.value, catSel = f.querySelector('[name="cat"]');
+  if (catSel) { catSel.hidden = course !== 'Main'; if (course !== 'Main') catSel.value = ''; }
+  const dl = document.getElementById('dl-dishes'); if (dl) dl.innerHTML = dishOptions(course, catSel?.value || '');
+  f.dish.value = ''; f.dish.focus();
+});
 function itemIdFromName(name) { const n = (name || '').trim().toLowerCase(); return S.items.find(i => i.name.toLowerCase() === n)?.id || null; }
 
 /* ================= router ================= */
@@ -204,12 +214,13 @@ routes['c/event'] = async id => {
   <section class="card"><h2>Menu</h2>
    ${byCourse.length ? byCourse.map(([c, l]) => `<div class="course"><h3>${esc(c)}</h3>${l.map(m => `<div class="mline"><span>${esc(lineName(m))} ${lineChip(m)}${m.note ? `<span class="mut small"> · ${esc(m.note)}</span>` : ''}</span><span class="sp"></span>${m.qty ? `<b>${fq(m.qty)} ${ev.kind === 'packs' ? 'packs' : 'trays'}</b>` : ''}${canMenu ? `<button class="x" title="Remove" data-act="rmMenu" data-id="${m.id}">✕</button>` : ''}</div>`).join('')}</div>`).join('') : '<p class="mut">No dishes yet.</p>'}
    ${canMenu ? `<form data-form="addMenu" data-id="${ev.id}" class="addline">
-     <select name="course">${COURSES.map(c => opt(c, c, c === 'Main')).join('')}</select>
+     <select name="course">${COURSES.map(c => opt(c, c, c === (S.lastCourse || 'Main'))).join('')}</select>
      ${ev.kind === 'packs' && S.packs.length ? `<select name="pack_id">${opt('', 'Dish (type below)')}${S.packs.map(p => opt(p.id, p.name)).join('')}</select>` : ''}
-     <input name="dish" list="dl-dishes" placeholder="Type a dish — e.g. Chicken Teriyaki" autocomplete="off">
+     <select name="cat" aria-label="Main dish type"${(S.lastCourse || 'Main') !== 'Main' ? ' hidden' : ''}>${opt('', 'All mains')}${mainCats().map(c => opt(c, c, c === S.lastCat)).join('')}</select>
+     <input name="dish" list="dl-dishes" placeholder="Type or pick a dish" autocomplete="off">
      ${ev.kind !== 'buffet' ? `<input name="qty" type="number" step="any" min="0" placeholder="${ev.kind === 'packs' ? 'packs' : 'trays'}" class="qty">` : ''}
-     <button class="pri">Add</button></form>${dishDatalist()}
-     <p class="small mut">Names are matched to the standard dish list ("beef steak" → Bistek Tagalog). Several dishes typed together are split. Anything unknown is kept as an off-menu dish for the chef.${ev.kind === 'buffet' ? ' Buffet quantities come from the guest count.' : ''}</p>` : ''}
+     <button class="pri">Add</button></form><datalist id="dl-dishes">${dishOptions(S.lastCourse || 'Main', (S.lastCourse || 'Main') === 'Main' ? S.lastCat || '' : '')}</datalist>
+     <p class="small mut">The list shows only dishes for the course you pick (for Main, pick the meat to shorten it further). You can still type any dish. Names are matched to the standard dish list ("beef steak" → Bistek Tagalog). Several dishes typed together are split. Anything unknown is kept as an off-menu dish for the chef.${ev.kind === 'buffet' ? ' Buffet quantities come from the guest count.' : ''}</p>` : ''}
   </section>
 
   ${(menu.some(m => m.custom_name && !m.dish_id && !m.pack_id) || extras.length) ? `<section class="card"><h2>Off-menu ingredients</h2>
@@ -252,6 +263,7 @@ FORMS.editEvent = async (f, el) => {
 FORMS.addMenu = async (f, el) => {
   const id = el.dataset.id, qty = f.qty ? num(f.qty) : null;
   if (f.pack_id) { await db.insert('event_menu', { event_id: id, course: f.course, pack_id: f.pack_id, qty }); return refresh(); }
+  S.lastCourse = f.course; S.lastCat = f.cat || '';
   if (!f.dish?.trim()) return toast('Type a dish name.', true);
   const n = await db.rpc('add_menu_text', { p_event: id, p_course: f.course, p_text: f.dish, p_qty: qty });
   toast(n > 1 ? `Added as ${n} dishes` : 'Added'); refresh();
