@@ -88,3 +88,8 @@ input.qty{width:96px;text-align:right;padding:6px 8px}
 .toast.show{opacity:1}.toast.bad{background:var(--bad)}
 code{background:#0000000d;padding:1px 4px;border-radius:4px;font-size:13px}
 @media (max-width:640px){main{padding:12px 10px 80px}.card{padding:12px}h1{font-size:22px}.who span{display:none}.li-date{min-width:52px}}
+
+.dgroup{margin-top:18px}.dgroup h3{display:flex;align-items:center;gap:8px}.dgroup .cnt{font-size:11px;background:#e9e4d8;color:var(--ink);border-radius:9px;padding:1px 7px;letter-spacing:0}
+.dgroup .li{padding:9px 14px}
+.jump{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0;position:sticky;top:0;z-index:5;background:var(--bg,#f4f2ec);padding:8px 0}.jump button{font-size:12px;padding:5px 10px;border-radius:14px;background:#fff;border:1px solid var(--line);color:var(--ink)}
+.dgroup{scroll-margin-top:60px}

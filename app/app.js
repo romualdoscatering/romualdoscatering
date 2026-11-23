@@ -457,6 +457,15 @@ ACT.postCount = async el => {
 };
 
 /* ================= RECIPES ================= */
+// Dishes grouped the way a menu reads: by course, Main split by meat, A–Z inside each group
+const MAIN_ORDER = ['Chicken', 'Pork', 'Beef', 'Seafood', 'Vegetables'];
+function dishGroups(list) {
+  const key = d => d.course === 'Main' ? `Main · ${d.category}` : d.course;
+  const rank = d => { const c = COURSES.indexOf(d.course); const m = d.course === 'Main' ? (MAIN_ORDER.indexOf(d.category) + 1 || 9) : 0; return (c < 0 ? 99 : c) * 10 + m; };
+  const g = new Map();
+  [...list].sort((a, b) => rank(a) - rank(b) || (a.course === 'Main' ? a.category.localeCompare(b.category) : 0) || a.name.localeCompare(b.name)).forEach(d => { const k = key(d); g.has(k) || g.set(k, []); g.get(k).push(d); });
+  return [...g];
+}
 routes['c/recipes'] = async arg => {
   const tab = arg || 'standard';
   const recipes = Object.fromEntries((await db.select('recipes', { cols: 'dish_id,status,batch_serves' })).map(r => [r.dish_id, r]));
@@ -464,8 +473,9 @@ routes['c/recipes'] = async arg => {
   const list = S.dishes.filter(d => tab === 'all' || (tab === 'standard' ? d.standard : tab === 'none' ? !recipes[d.id] && d.standard : recipes[d.id]?.status === tab));
   return `<h1>Dishes & recipes</h1><p class="lede">A dish's recipe lists what to buy for one batch: one large tray (12 guests), or one guest for rice, drinks and fruit. Only <b>verified</b> recipes are used for purchase requests.</p>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/recipes/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
-   <input class="search" placeholder="Search dishes…" data-filter=".list .li">
-   <div class="list">${list.map(d => `<a class="li" href="#/c/recipe/${d.id}"><div class="li-main"><b>${esc(d.name)}</b><span class="mut small">${esc(d.category)} · chosen ${d.times_booked}×${d.tray_price ? ' · tray ' + peso(d.tray_price) : ''}</span></div>${recipes[d.id] ? chip(recipes[d.id].status === 'verified' ? 'Verified' : 'Draft', recipes[d.id].status === 'verified' ? 'ok' : 'warn') : chip('No recipe', 'mut')}</a>`).join('') || '<div class="empty">None.</div>'}</div>`;
+   <input class="search" placeholder="Search dishes…" data-filter=".dgroup .li">
+   ${(g => g.length > 2 ? `<div class="jump">${g.map(([head], i) => `<button type="button" data-jump="g${i}">${esc(head.replace('Main · ', ''))}</button>`).join('')}</div>` : '')(dishGroups(list))}
+   ${dishGroups(list).map(([head, ds], i) => `<section class="dgroup" data-group id="g${i}"><h3>${esc(head)} <span class="cnt">${ds.length}</span></h3><div class="list">${ds.map(d => `<a class="li" href="#/c/recipe/${d.id}"><div class="li-main"><b>${esc(d.name)}</b><span class="mut small">chosen ${d.times_booked}×${d.tray_price ? ' · tray ' + peso(d.tray_price) : ''}</span></div>${recipes[d.id] ? chip(recipes[d.id].status === 'verified' ? 'Verified' : 'Draft', recipes[d.id].status === 'verified' ? 'ok' : 'warn') : chip('No recipe', 'mut')}</a>`).join('')}</div></section>`).join('') || '<div class="empty">None.</div>'}`;
 };
 routes['c/recipe'] = async id => {
   const d = S.dishById[id]; if (!d) return '<div class="card">Dish not found.</div>';
@@ -560,9 +570,11 @@ document.addEventListener('click', async e => {
   e.preventDefault(); if (el.disabled) return; el.disabled = true;
   try { await ACT[el.dataset.act](el); } catch (err) { console.error(err); toast(err.message, true); } finally { el.disabled = false; }
 });
+document.addEventListener('click', e => { const j = e.target.closest('[data-jump]'); if (j) document.getElementById(j.dataset.jump)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 document.addEventListener('input', e => {
   const t = e.target.dataset?.filter; if (!t) return; const q = e.target.value.toLowerCase();
   document.querySelectorAll(t).forEach(r => r.hidden = q && !r.textContent.toLowerCase().includes(q));
+  document.querySelectorAll('[data-group]').forEach(g => g.hidden = ![...g.querySelectorAll('.li')].some(r => !r.hidden));
 });
 
 /* ================= start ================= */
