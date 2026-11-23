@@ -699,7 +699,7 @@ footer{background:var(--wine);color:#F3E7D3;border-top:4px solid var(--gold)}foo
     </ul>
     <p>Minimum of 50 guests. Prices are estimates; your final price is confirmed in a written quotation.</p>
     <h2>Food trays</h2>
-    <p>Large party trays good for 10–12 guests: beef, pork, chicken, seafood, vegetables, pasta, salads, rice and desserts.</p>
+    <p>Large party trays good for 12 guests: beef, pork, chicken, seafood, vegetables, pasta, salads, rice and desserts.</p>
     <h2>What we cater</h2>
     <p>Weddings, corporate events, birthdays, debuts, christenings, family reunions, anniversaries and memorials, with customized menus for every theme and dietary need.</p>
     <h2>Contact</h2>
@@ -989,7 +989,7 @@ function offerList(){
     {v:"packages",s:"Buffet catering for weddings, debuts and big events",t:"Catering Packages",d:"Full buffet catering for weddings, debuts, christenings and company events.",p:isFinite(pk)?`from ${peso(pk)}/head`:"",img:hp},
     {v:"kaarawan",s:"Ready-made Pinoy birthday handaan",t:K.title.replace(/\s*package\s*$/i,"")+" Package",d:"Ready-made Pinoy birthday handaan, menu all set. Book in a minute.",p:kp.length?`${peso(Math.min(...kp))} for ${K.options.find(kReady)?.pax||50} guests`:"",img:kRef(K.options.find(o=>o.show)?.photo)?.url||kRef(K.heroPhoto)?.url||""},
     {v:"grazing",s:"Grazing tables and a live street-food station",t:G.title,d:"Elegant grazing tables and a live street-food station for parties and launches.",p:gp.length?`from ${peso(Math.min(...gp))}`:"",img:kRef(G.paths[0]?.photo)?.url||kRef(G.heroPhoto)?.url||""},
-    {v:"trays",s:"Party trays for 10–12 guests",t:"Food Trays",d:"Large party trays good for 10–12 guests. Order online 2–3 days ahead.",p:tp.length?`from ${peso(Math.min(...tp))}/tray`:"",img:trayImg("chicken")},
+    {v:"trays",s:"Party trays for 12 guests",t:"Food Trays",d:"Large party trays good for 12 guests. Order online 2–3 days ahead.",p:tp.length?`from ${peso(Math.min(...tp))}/tray`:"",img:trayImg("chicken")},
     {v:"packed",s:"Snacks and meals for 30 to 2,000+ guests",t:packedData().title,d:"Snacks and full meals, packed and delivered for crews, offices and corporate events. Ask us for a quote.",p:"30 to 2,000+ guests · ask for a quote",img:kRef(packedData().heroPhoto)?.url||""},
     {v:"custom",s:"Pick your own dishes, instant estimate",t:"Build Your Own Menu",d:"Pick your own dishes and get an instant estimate.",p:"",img:trayImg("pasta")}];
 }
@@ -1518,7 +1518,7 @@ const ABOUT_DEFAULT={
   contactMap:"yes",
   trayKicker:"Romualdo's Food Trays",
   trayTitle:"Party trays, ready to share",
-  trayPax:"Large tray · good for 10–12 guests",
+  trayPax:"Large tray · good for 12 guests",
   trayIntro:"Freshly cooked trays for birthdays, office lunches and family gatherings. Pick your favorites, and we'll have them hot and ready.",
   trayOrder:"Message us on Facebook or call us with the dishes you want, how many trays, and the date and time of pick-up or delivery.",
   trayNote:"Prices are per large tray. Prices may change without prior notice; your order confirmation shows the final price.",
@@ -1538,7 +1538,7 @@ const ABOUT_DEFAULT={
 };
 const ABOUT_LISTS=["services","mission","clients","homeHighlights","contactPhones"];
 /* Keys replaced by the Nov 2026 company-profile wording the first time it loads (until an admin saves the pages again). */
-const ABOUT_REV_KEYS=["kicker","headline","story","heroPhoto","heroAlt","vision","missionTitle","mission","servicesTitle","services","teamKicker","teamTitle","team","chefs","teamPhoto","teamCaption","clientsKicker","clientsTitle","clients","ctaTitle","ctaText","homeKicker","homeTitle","homeText","homePhoto","homePhotoAlt","homeHighlights","homeStepsTitle"];
+const ABOUT_REV_KEYS=["kicker","headline","story","heroPhoto","heroAlt","vision","missionTitle","mission","servicesTitle","services","teamKicker","teamTitle","team","chefs","teamPhoto","teamCaption","clientsKicker","clientsTitle","clients","ctaTitle","ctaText","homeKicker","homeTitle","homeText","homePhoto","homePhotoAlt","homeHighlights","homeStepsTitle","trayPax"];
 const GALLERY_DROP=["gallery/filipino-feast.jpg"];
 const SHOOT_GALLERY=()=>[["grazing2026","events","Grazing table for an evening event"],["packed2131","food","Corporate packed meals"],["traybake2209","food","Baked party tray"],["rolls1963","food","Pica-pica rolls"],["buffetline2371","events","Buffet line, ready for guests"],["sandwich1759","food","Tea sandwiches"],["trayfish2185","food","Fish fillet in sauce, party tray"],["snacks1834","food","Merienda bites"],["traybeef2245","food","Beef with mushrooms"],["canape1774","food","Canapés, plated for guests"],["packed2116","food","Packed lunch boxes"],["traypasta2299","food","Creamy pasta tray"],["buffet2341","events","Hot buffet, served from the chafing dish"]].map(([k,c,cap])=>S_(k)&&{...S_(k),category:c,caption:cap}).filter(Boolean);
 const TRAY_CDN="https://d8j0ntlcm91z4.cloudfront.net/user_3LsEl5LJsrdoT1xogYBDG78eIGk/hf_20261112_";
