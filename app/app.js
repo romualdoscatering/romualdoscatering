@@ -149,7 +149,8 @@ routes['c/event-new'] = async () => {
      <label>Contract price ₱<input name="contract_price" type="number" step="any" min="0"></label>
      <label>Client name<input name="client_name"></label>
      <label>Client mobile<input name="client_phone" inputmode="tel"></label>
-    </div><div class="row end"><a class="btn ghost" href="#/c/events">Cancel</a><button class="pri">Create event</button></div></form>`;
+    </div><p class="small mut">Next step: after you tap Create event, the event page opens and you add the menu (dishes) there.</p>
+    <div class="row end"><a class="btn ghost" href="#/c/events">Cancel</a><button class="pri">Create event</button></div></form>`;
 };
 const FORMS = {};
 FORMS.newEvent = async f => {
