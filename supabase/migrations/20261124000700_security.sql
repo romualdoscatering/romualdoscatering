@@ -111,10 +111,21 @@ do $$ declare t text; begin
   end loop;
 end $$;
 
+-- ---------- table access ----------
+-- The project does NOT grant API access to new tables automatically. Logged-in users get table
+-- privileges here, and row-level security (above) then decides which rows they see and change.
+-- Visitors (anon) get no table access at all: the website can only call submit_booking().
+revoke all on all tables in schema public from anon;
+revoke all on all sequences in schema public from anon;
+grant select, insert, update, delete on all tables in schema public to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
+revoke all on doc_counters from authenticated;
+revoke insert, update, delete on audit_log from authenticated;
+grant select on stock_on_hand, event_pick_list, event_costing, restaurant_food_cost to authenticated;
+
 -- ---------- function access ----------
 revoke execute on all functions in schema public from public, anon;
 grant execute on all functions in schema public to authenticated;
 grant execute on function submit_booking(jsonb) to anon;
 -- role checks simply answer "no" for visitors, so they see empty results instead of errors
 grant execute on function is_admin(), is_active_user(), member_of(workspace), has_role(workspace, app_role[]), has_role_any(app_role[]) to anon;
-revoke all on doc_counters, audit_log from anon;

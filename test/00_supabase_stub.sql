@@ -9,5 +9,4 @@ create or replace function auth.uid() returns uuid language sql stable as $$ sel
 grant usage on schema auth to anon, authenticated;
 grant execute on function auth.uid() to anon, authenticated;
 grant usage on schema public to anon, authenticated;
-alter default privileges in schema public grant all on tables to anon, authenticated;
-alter default privileges in schema public grant all on sequences to anon, authenticated;
+-- like the project setting "Grant API access to new tables automatically" = OFF: no default grants
