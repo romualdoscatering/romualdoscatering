@@ -1,3 +1,4 @@
+[hidden]{display:none!important}
 :root{--navy:#1c2a44;--navy2:#2a3b5c;--gold:#c9a24a;--bg:#f5f3ee;--card:#fff;--ink:#1d1f24;--mut:#6b6a66;--line:#e4e0d7;--ok:#1d7a3a;--okbg:#e6f4ea;--bad:#b42318;--badbg:#fdecea;--warn:#8a5300;--warnbg:#fff3d9;--info:#2d4f8f;--infobg:#e8eefb;color-scheme:light}
 *{box-sizing:border-box}
 body{margin:0;font:15px/1.45 Inter,system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink)}
