@@ -106,3 +106,5 @@ tr.grp td{background:#f1ede3;font-size:12px;font-weight:700;text-transform:upper
 .addbox{margin-top:14px;background:#faf8f3;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
 .addbox .addline{margin-top:8px}.addbox p{margin:8px 0 0}
 @media (max-width:640px){.mcourse{grid-template-columns:1fr;gap:2px}.mc-label{padding-top:0}}
+table.kv td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}table.kv td:first-child{width:130px;font-size:13px}
+label.inline{display:flex;align-items:center;gap:8px;font-size:13px}label.inline select{width:auto}

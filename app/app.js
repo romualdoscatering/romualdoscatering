@@ -125,7 +125,7 @@ function afterRender() {
 /* ================= shell ================= */
 function renderShell(key) {
   const inCat = key.startsWith('c/');
-  const nav = inCat ? [['c/events', 'Events'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes']] : [];
+  const nav = inCat ? [['c/events', 'Events'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes']] : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/">Romualdo's<small>${inCat ? 'Catering' : 'Staff'}</small></a>
     <div class="who"><span>${esc(who())}</span>${isAdmin() ? '<a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
     ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">Switch workspace</a></nav>` : ''}`;
@@ -248,6 +248,7 @@ routes['c/event'] = async id => {
      <label>Contract price ₱<input name="contract_price" type="number" step="any" min="0" value="${esc(ev.contract_price ?? '')}"></label>
     </div><div class="row end">${can('catering', 'manager', 'finance') && ev.status === 'done' ? `<button type="button" class="ghost" data-act="closeEvent" data-id="${ev.id}">Close event (releases leftover stock)</button>` : ''}<button class="pri">Save</button></div></form></details>` : ''}
 
+  ${ev.booking_id || ev.sheet?.website_ref ? `<div class="alert info"><b>From a website inquiry</b>${ev.sheet?.website_ref ? ' (' + esc(ev.sheet.website_ref) + ')' : ''} · <a href="#/c/inquiry/${ev.booking_id}">see what the client sent</a>${ev.sheet?.date_missing ? '<br><b>The client gave no date</b> — a date two weeks ahead was used; set the real one under Edit details.' : ''}${ev.sheet?.notes ? `<br>Client notes: ${esc(ev.sheet.notes)}` : ''}${num(ev.sheet?.estimate?.total) ? `<br>Estimate shown to the client: ${peso(ev.sheet.estimate.total)}` : ''}</div>` : ''}
   <section class="card"><div class="row"><h2>Menu</h2><span class="sp"></span><span class="small mut">${menu.length} ${menu.length === 1 ? 'dish' : 'dishes'}${ev.kind === 'buffet' && ev.pax ? ` · buffet for ${ev.pax} guests` : ''}</span></div>
    ${byCourse.length ? `<div class="menu-grid">${byCourse.map(([c, l]) => `<div class="mcourse"><div class="mc-label">${esc(c)}</div><div class="mc-items">${sortMenu(l).map(m => { const d = S.dishById[m.dish_id];
      return `<div class="mline"><span class="mname">${esc(lineName(m))}</span>${c === 'Main' && d ? `<span class="mtag">${esc(d.category)}</span>` : ''} ${lineChip(m)}${m.note ? `<span class="mut small"> · ${esc(m.note)}</span>` : ''}<span class="sp"></span>${m.qty ? `<b>${fq(m.qty)} ${ev.kind === 'packs' ? 'packs' : 'trays'}</b>` : ''}${canMenu ? `<button class="x" title="Remove" data-act="rmMenu" data-id="${m.id}">✕</button>` : ''}</div>`; }).join('')}</div></div>`).join('')}</div>` : '<p class="mut">No dishes yet.</p>'}
@@ -625,6 +626,60 @@ ACT.saveIng = async el => {
 };
 ACT.rmIng = async el => { await db.remove('recipe_lines', { dish_id: el.dataset.dish, item_id: el.dataset.item }); refresh(); };
 ACT.verify = async el => { const f = formData(el.closest('form')); await FORMS.saveRecipe(f, el.closest('form')); await db.rpc('verify_recipe', { p_dish: el.dataset.id }); toast('Recipe verified — it will now be used for purchase requests'); refresh(); };
+
+
+/* ================= INQUIRIES (from the website) ================= */
+const BK_STATUS = { new: 'New', contacted: 'Contacted', quoted: 'Quoted', won: 'Won', lost: 'Lost', spam: 'Spam' };
+const BK_TONE = { new: 'info', contacted: 'warn', quoted: 'warn', won: 'ok', lost: 'mut', spam: 'mut' };
+const BK_KIND = { package: 'Package', custom: 'Custom menu', tray: 'Food trays', corporate: 'Corporate lead' };
+const COURSE_OF = { soup: 'Soup', appetizer: 'Appetizer', chicken: 'Chicken', pork: 'Pork', beef: 'Beef', fish: 'Fish / seafood', veg: 'Vegetables', pasta: 'Pasta / noodles', dessert: 'Dessert', drinks: 'Drinks', rice: 'Rice' };
+routes['c/inquiries'] = async arg => {
+  const tab = arg || 'open';
+  const rows = await db.select('bookings', { cols: 'id,ref,website_ref,kind,status,received_at,client_name,phone,event_date,pax,event_type,event_id', order: [['received_at', false]], limit: 300 });
+  const groups = { open: ['new', 'contacted', 'quoted'], won: ['won'], closed: ['lost', 'spam'], all: null };
+  const list = rows.filter(r => !groups[tab] || groups[tab].includes(r.status));
+  const nNew = rows.filter(r => r.status === 'new').length;
+  const tabs = [['open', `Open${nNew ? ` (${nNew} new)` : ''}`], ['won', 'Won'], ['closed', 'Lost / spam'], ['all', 'All']];
+  return `<h1>Inquiries</h1><p class="lede">Bookings and quote requests sent from romualdos.ph. Turn one into an event to plan the menu and purchasing.</p>
+   <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/inquiries/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
+   ${list.length ? `<div class="list">${list.map(b => `<a class="li" href="#/c/inquiry/${b.id}"><div class="li-date"><b>${b.event_date ? esc(fmtD(b.event_date).split(',')[0]) : '—'}</b><span>${b.event_date ? esc(fmtD(b.event_date).split(',').slice(1).join(',')) : 'no date'}</span></div>
+      <div class="li-main"><b>${esc(b.client_name || 'No name')}${b.event_type ? ' · ' + esc(b.event_type) : ''}</b><span class="mut small">${esc(BK_KIND[b.kind] || 'Inquiry')}${b.pax ? ' · ' + b.pax + ' guests' : ''} · received ${esc(fmtT(b.received_at))}${b.event_id ? ' · event made' : ''}</span></div>
+      ${chip(BK_STATUS[b.status], BK_TONE[b.status])}</a>`).join('')}</div>` : '<div class="empty">Nothing here.</div>'}`;
+};
+routes['c/inquiry'] = async id => {
+  const [b] = await db.select('bookings', { eq: { id } }); if (!b) return '<div class="card">Inquiry not found.</div>';
+  const p = b.payload || {}, c = p.customer || {}, ev = p.event || {}, pl = p.plan || {}, es = p.estimate || {}, k = p.corp || {};
+  const canAct = can('catering', 'coordinator', 'manager');
+  const items = (p.items || []).filter(i => i.dish);
+  const row = (l, v) => v ? `<tr><td class="mut">${l}</td><td>${v}</td></tr>` : '';
+  const plan = pl.kind === 'package' ? `${esc(pl.packageName || 'Package')}${num(pl.pricePerHead) ? ` · ${peso(pl.pricePerHead)} per head` : ''}` : esc(BK_KIND[pl.kind] || pl.kind || '');
+  return `<div class="row"><a href="#/c/inquiries" class="back">‹ Inquiries</a></div>
+  <div class="row"><h1>${esc(b.client_name || 'Inquiry')}</h1>${chip(BK_STATUS[b.status], BK_TONE[b.status])}</div>
+  <p class="lede">${esc(b.ref)}${b.website_ref ? ' · website ref ' + esc(b.website_ref) : ''} · received ${esc(fmtT(b.received_at))}</p>
+  <section class="card"><h2>Customer and event</h2><table class="kv"><tbody>
+   ${row('Mobile', c.phone ? `<a href="tel:${esc(String(c.phone).replace(/\s+/g, ''))}">${esc(c.phone)}</a>` : '')}${row('Email', c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}
+   ${row('Company', esc([k.company, k.position].filter(Boolean).join(' · ')))}
+   ${row('Event', esc([ev.type, ev.date ? fmtD(ev.date) : '', ev.time ? fmtClock(ev.time) : ''].filter(Boolean).join(' · ')))}${row('Venue', esc(ev.venue || ''))}${row('Guests', ev.pax ? esc(ev.pax) : '')}
+   ${row('Plan', plan)}${row('Fulfilment', esc([pl.fulfil, pl.payment].filter(Boolean).join(' · ')))}
+   ${row('Estimate', num(es.total) ? `${peso(es.total)}${num(es.perHead) ? ` (${peso(es.perHead)} per head)` : ''} <span class="mut small">— estimate shown to the customer</span>` : '')}
+   ${row('Notes', p.notes ? esc(p.notes).replace(/\n/g, '<br>') : '')}
+  </tbody></table></section>
+  ${items.length || pl.chefPick ? `<section class="card"><h2>Menu picked</h2>${pl.chefPick ? '<p>Chef to recommend the menu.</p>' : ''}
+   ${items.map(i => `<div class="mline"><span class="mut small" style="min-width:120px">${esc(COURSE_OF[i.cat] || i.cat || '')}</span><span>${esc(i.dish)}</span>${i.tier === 'request' ? chip('special request', 'warn') : ''}<span class="sp"></span>${i.qty ? `<b>${esc(i.qty)}${pl.kind === 'tray' ? ' tray' + (num(i.qty) > 1 ? 's' : '') : ''}</b>` : ''}</div>`).join('')}</section>` : ''}
+  ${canAct ? `<section class="card"><div class="row"><h2>Next step</h2></div>
+   <div class="row">${b.event_id ? `<a class="btn pri" href="#/c/event/${b.event_id}">Open the event</a>` : `<button class="pri" data-act="bkEvent" data-id="${b.id}">Create event from this inquiry</button>`}
+    <span class="sp"></span><label class="inline">Status <select data-bkstatus="${b.id}">${Object.entries(BK_STATUS).map(([v, l]) => opt(v, l, v === b.status)).join('')}</select></label></div>
+   <p class="small mut">${b.event_id ? 'The event was made from this inquiry. Set the status to Won once the client confirms.' : 'Makes an event (status: Inquiry) with the customer, date, guests and the dishes they picked. Unknown dishes are kept as off-menu for the chef.'}</p></section>` : ''}`;
+};
+ACT.bkEvent = async el => {
+  el.disabled = true; el.textContent = 'Making the event…';
+  try { const e = await db.rpc('create_event_from_booking', { p_booking: el.dataset.id }); toast('Event made — check the date, guests and menu'); go('#/c/event/' + e); }
+  catch (err) { el.disabled = false; el.textContent = 'Create event from this inquiry'; toast(err.message, true); }
+};
+document.addEventListener('change', async e => {
+  const id = e.target.dataset?.bkstatus; if (!id) return;
+  try { await db.update('bookings', { status: e.target.value, handled_by: S.user.id }, { id }); toast('Status saved'); refresh(); } catch (err) { toast(err.message, true); }
+});
 
 /* ================= PEOPLE (owner) ================= */
 routes.people = async arg => {

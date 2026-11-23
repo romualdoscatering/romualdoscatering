@@ -2855,6 +2855,10 @@ async function submitInquiry(f){
 
 /* ============ BACKEND (Google Apps Script) ============ */
 const API_URL=(window.ROMUALDOS_CONFIG&&window.ROMUALDOS_CONFIG.API_URL)||"";
+/* Copy each new inquiry into the staff app (Supabase) so it shows under Catering → Inquiries.
+   Fire-and-forget: the customer's confirmation never waits for it or fails because of it. */
+function toApp(inq){try{const C=window.ROMUALDOS_CONFIG||{};if(!C.SUPABASE_URL||!C.SUPABASE_KEY)return;
+  fetch(C.SUPABASE_URL+"/rest/v1/rpc/submit_booking",{method:"POST",keepalive:true,headers:{"Content-Type":"application/json",apikey:C.SUPABASE_KEY,Authorization:"Bearer "+C.SUPABASE_KEY},body:JSON.stringify({p:inq})}).catch(()=>{})}catch{}}
 async function api(action,payload={}){
   if(!API_URL||API_URL.includes("PASTE_"))return {ok:false,network:true,error:"The inquiry system isn't connected yet."};
   /* Google's server sometimes never answers a request. Each try has a time limit, and sends are retried once
@@ -2866,6 +2870,7 @@ async function api(action,payload={}){
     try{
       const res=await fetch(API_URL,{method:"POST",body,signal:ctl?ctl.signal:undefined});
       const data=await res.json();clearTimeout(tm);clearTimeout(slow);
+      if(send&&data&&data.ok&&!data.dup&&!payload.website)toApp({...(payload.inquiry||{}),ref:data.ref});
       if(data&&data.auth&&state.token&&action!=="login"){endSession(data.error)}
       return data||{ok:false,error:"Empty response"};
     }catch(e){clearTimeout(tm);clearTimeout(slow)}
