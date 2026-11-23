@@ -491,7 +491,14 @@ routes['c/recipe'] = async id => {
    <div class="row"><h2>Ingredients for ${num(r.batch_serves) === 1 ? 'one guest' : `one batch (${fq(r.batch_serves)} guests)`}</h2></div>
    ${r.method ? `<p class="small mut">${esc(r.method)}</p>` : ''}
    <div class="tw"><table><thead><tr><th>Ingredient</th><th class="n">Qty</th><th class="n">Cost</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>
-   ${lines.map(l => `<tr><td>${esc(itemName(l.item_id))}</td><td class="n">${edit ? `<input name="q_${l.item_id}" type="number" step="any" min="0" value="${num(l.qty)}" class="qty">` : fq(l.qty)} ${esc(itemUnit(l.item_id))}</td><td class="n">${num(S.itemsById[l.item_id]?.last_cost) ? peso(num(l.qty) * num(S.itemsById[l.item_id].last_cost)) : '<span class="mut small">no price</span>'}</td>${edit ? `<td><button type="button" class="x" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>`).join('')}
+   ${lines.map(l => { const it = S.itemsById[l.item_id] || {}; return `<tr><td>${esc(itemName(l.item_id))}${num(it.last_cost) ? `<div class="small mut">${peso(it.last_cost)} per ${esc(it.stock_unit)}</div>` : ''}</td><td class="n">${edit ? `<input name="q_${l.item_id}" type="number" step="any" min="0" value="${num(l.qty)}" class="qty">` : fq(l.qty)} ${esc(itemUnit(l.item_id))}</td><td class="n">${num(it.last_cost) ? peso(num(l.qty) * num(it.last_cost)) : '<span class="mut small">no price</span>'}</td>${edit ? `<td class="nowrap"><button type="button" class="x" title="Edit" data-act="editIng" data-item="${l.item_id}">✎</button><button type="button" class="x" title="Remove" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>
+   ${edit ? `<tr class="ing-edit" id="ie_${l.item_id}" hidden><td colspan="4"><div class="grid">
+     <label>Replace with another ingredient (this recipe only)<input name="e_swap_${l.item_id}" list="dl-items" placeholder="leave empty to keep ${esc(it.name || '')}" autocomplete="off"></label>
+     <label>Ingredient name<input name="e_name_${l.item_id}" value="${esc(it.name || '')}"></label>
+     <label>Unit used in recipes<input name="e_unit_${l.item_id}" list="dl-units" value="${esc(it.stock_unit || '')}"></label>
+     <label>Price per unit ₱<input name="e_cost_${l.item_id}" type="number" step="any" min="0" value="${num(it.last_cost) || ''}"></label></div>
+     <p class="small mut">Name, unit and price belong to the ingredient, so they change in every recipe that uses it. Price is updated again automatically when goods are received.</p>
+     <div class="row end"><button type="button" class="ghost" data-act="editIng" data-item="${l.item_id}">Cancel</button><button type="button" class="pri" data-act="saveIng" data-dish="${id}" data-item="${l.item_id}">Save ingredient</button></div></td></tr>` : ''}`; }).join('')}
    </tbody><tfoot><tr><td colspan="4">Ingredient cost per batch ${peso(cost)}${d.tray_price && num(r.batch_serves) === 12 ? ` · ${Math.round(cost / num(d.tray_price) * 100)}% of the tray price` : ''}</td></tr></tfoot></table></div>
    ${edit ? `<div class="addline mt"><input name="new_item" list="dl-items" placeholder="Add ingredient" autocomplete="off"><input name="new_qty" type="number" step="any" min="0" placeholder="qty" class="qty"><button type="button" data-act="addIng" data-id="${id}">Add</button></div>${itemDatalist()}
    <div class="row end"><button class="ghost">Save quantities</button>${r.status !== 'verified' ? `<button type="button" class="pri" data-act="verify" data-id="${id}">Mark verified</button>` : ''}</div>
@@ -519,6 +526,26 @@ ACT.addIng = async el => {
   const f = formData(el.closest('form')); const item = itemIdFromName(f.new_item);
   if (!item) return toast('Pick an ingredient from the list, or add it as a new item below.', true); if (!(num(f.new_qty) > 0)) return toast('Enter a quantity.', true);
   await db.upsert('recipe_lines', { dish_id: el.dataset.id, item_id: item, qty: num(f.new_qty) }, 'dish_id,item_id'); refresh();
+};
+ACT.editIng = async el => { const r = document.getElementById('ie_' + el.dataset.item); if (r) r.hidden = !r.hidden; };
+ACT.saveIng = async el => {
+  const f = formData(el.closest('form')), id = el.dataset.item, dish = el.dataset.dish, it = S.itemsById[id];
+  const swap = (f['e_swap_' + id] || '').trim(), name = (f['e_name_' + id] || '').trim(), unit = (f['e_unit_' + id] || '').trim(), cost = f['e_cost_' + id];
+  if (swap) {
+    const to = itemIdFromName(swap); if (!to) return toast('Pick the replacement from the list, or add it as a new item below.', true);
+    if (to === id) return toast('That is the same ingredient.', true);
+    const qty = num(f['q_' + id]) || num((await db.select('recipe_lines', { eq: { dish_id: dish, item_id: id } }))[0]?.qty);
+    await db.upsert('recipe_lines', { dish_id: dish, item_id: to, qty }, 'dish_id,item_id');
+    await db.remove('recipe_lines', { dish_id: dish, item_id: id });
+    toast(`Replaced with ${itemName(to)}`); return refresh();
+  }
+  if (!name || !unit) return toast('Name and unit cannot be empty.', true);
+  const other = itemIdFromName(name); if (other && other !== id) return toast('Another ingredient already has that name. Use "Replace with" instead.', true);
+  const patch = { name, stock_unit: unit };
+  if (it && it.purchase_unit === it.stock_unit && num(it.units_per_purchase) === 1) patch.purchase_unit = unit;
+  if (cost !== '' && cost != null) { if (num(cost) < 0) return toast('Price cannot be negative.', true); patch.last_cost = num(cost); }
+  await db.update('items', patch, { id });
+  await loadMaster(); toast('Ingredient saved'); refresh();
 };
 ACT.rmIng = async el => { await db.remove('recipe_lines', { dish_id: el.dataset.dish, item_id: el.dataset.item }); refresh(); };
 ACT.verify = async el => { const f = formData(el.closest('form')); await FORMS.saveRecipe(f, el.closest('form')); await db.rpc('verify_recipe', { p_dish: el.dataset.id }); toast('Recipe verified — it will now be used for purchase requests'); refresh(); };
