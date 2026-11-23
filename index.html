@@ -1576,6 +1576,7 @@ function applyAbout(a,g){
       else if(k==="chefs"){if(Array.isArray(a.chefs))n.chefs=a.chefs.filter(c=>c&&typeof c==="object").map(c=>({name:String(c.name||""),subtitle:String(c.subtitle||""),photo:cleanRef(c.photo)}))}
       else if(typeof a[k]==="string")n[k]=a[k];
     }
+    for(const k of Object.keys(n))if(/^tray/.test(k)&&typeof n[k]==="string")n[k]=n[k].replace(/10\s*(?:–|-|to)\s*12 (guests|pax)/g,"12 $1");  // trays are now good for 12 guests
     n.rev=ABOUT_REV;
     state.about=n;
     if(fresh&&Array.isArray(g)){g=g.filter(x=>!GALLERY_DROP.some(d=>String(x&&x.src||"").endsWith(d)));const have=new Set(g.map(x=>x&&(x.id||x.src)));g=SHOOT_GALLERY().filter(x=>!have.has(x.id)).concat(g)}
