@@ -498,6 +498,17 @@ routes['c/recipes'] = async arg => {
    ${(g => g.length > 2 ? `<div class="jump">${g.map(([head], i) => `<button type="button" data-jump="g${i}">${esc(head.replace('Main · ', ''))}</button>`).join('')}</div>` : '')(dishGroups(list))}
    ${dishGroups(list).map(([head, ds], i) => `<section class="dgroup" data-group id="g${i}"><h3>${esc(head)} <span class="cnt">${ds.length}</span></h3><div class="list">${ds.map(d => `<a class="li" href="#/c/recipe/${d.id}"><div class="li-main"><b>${esc(d.name)}</b><span class="mut small">chosen ${d.times_booked}×${d.tray_price ? ' · tray ' + peso(d.tray_price) : ''}${costTag(d)}</span></div>${recipes[d.id] ? chip(recipes[d.id].status === 'verified' ? 'Verified' : 'Draft', recipes[d.id].status === 'verified' ? 'ok' : 'warn') : chip('No recipe', 'mut')}</a>`).join('')}</div></section>`).join('') || '<div class="empty">None.</div>'}`;
 };
+// Recipe order, the way recipes are written: main item (protein, or the pasta/noodles/rice the dish is built on),
+// then supporting ingredients, then sauces, seasonings and oil — salt and pepper last
+const RECIPE_HEADS = ['Main', 'Supporting ingredients', 'Sauces, seasonings & others'];
+const SUPPORT_PANTRY = /tomato sauce|coconut milk|liver spread|pineapple|peanut butter|mayonnaise|gulaman|anchov|peanuts|condensed|evaporated/i;
+function recipeRank(itemId) {
+  const it = S.itemsById[itemId] || {}, c = it.category || '', n = it.name || '';
+  if (['Poultry', 'Beef', 'Pork', 'Seafood', 'Processed meat', 'Beverages'].includes(c) || c === 'Rice & grains' || /pasta|spaghetti|penne|lasagna|noodles|bihon|sotanghon/i.test(n)) return 0;
+  if (['Condiments & spices', 'Oil & fats'].includes(c) || (c === 'Pantry' && !SUPPORT_PANTRY.test(n))) return 2;
+  return 1;
+}
+const isToTaste = itemId => /^(salt|black pepper|whole peppercorns)/i.test(S.itemsById[itemId]?.name || '') ? 1 : 0;
 // Recipe cost line: total, per guest, share of tray price (with a warning colour when the margin is thin)
 function recipeTotalText(cost, tray, serves) {
   const pct = tray ? Math.round(cost / tray * 100) : null;
@@ -521,7 +532,13 @@ routes['c/recipe'] = async id => {
   const [[r], lines] = await Promise.all([db.select('recipes', { eq: { dish_id: id } }), db.select('recipe_lines', { eq: { dish_id: id } })]);
   const edit = canAny('chef', 'manager');
   const cost = lines.reduce((s, l) => s + num(l.qty) * num(S.itemsById[l.item_id]?.last_cost), 0);
-  lines.sort((a, b) => num(b.qty) - num(a.qty) || itemName(a.item_id).localeCompare(itemName(b.item_id)));  // biggest quantity first
+  // No meat, pasta or rice (desserts, soups, salads)? The ingredient named in the dish is the main one — Buko Pandan → buko
+  const words = d.name.toLowerCase().split(/[^a-z]+/).filter(w => w.length > 3);
+  const named = itemId => { const n = (S.itemsById[itemId]?.name || '').toLowerCase(); return words.some(w => n.includes(w)); };
+  const noMain = !lines.some(l => recipeRank(l.item_id) === 0);
+  const rank0 = recipeRank; const recipeRankD = itemId => noMain && named(itemId) ? 0 : rank0(itemId);
+  lines.sort((a, b) => recipeRankD(a.item_id) - recipeRankD(b.item_id) || (isToTaste(a.item_id) - isToTaste(b.item_id)) || num(b.qty) - num(a.qty) || itemName(a.item_id).localeCompare(itemName(b.item_id)));
+  let lastG = -1; const head = itemId => { const g = recipeRankD(itemId); if (g === lastG) return ''; lastG = g; return `<tr class="grp"><td colspan="4">${g === 1 && !lines.some(l => recipeRankD(l.item_id) === 0) ? 'Ingredients' : RECIPE_HEADS[g]}</td></tr>`; };
   return `<div class="row"><a href="#/c/recipes" class="back">‹ Dishes</a></div>
   <div class="row"><h1>${esc(d.name)}</h1>${r ? chip(r.status === 'verified' ? 'Verified' : 'Draft', r.status === 'verified' ? 'ok' : 'warn') : chip('No recipe', 'mut')}</div>
   <p class="lede">${esc(d.category)} · ${esc(d.course)} · chosen ${d.times_booked}× ${d.tray_price ? '· tray price ' + peso(d.tray_price) : ''}</p>
@@ -530,7 +547,7 @@ routes['c/recipe'] = async id => {
    <div class="row"><h2>Ingredients for ${num(r.batch_serves) === 1 ? 'one guest' : `one batch (${fq(r.batch_serves)} guests)`}</h2></div>
    ${r.method ? `<p class="small mut">${esc(r.method)}</p>` : ''}
    <div class="tw"><table><thead><tr><th>Ingredient</th><th class="n">Qty</th><th class="n">Cost</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>
-   ${lines.map(l => { const it = S.itemsById[l.item_id] || {}; return `<tr><td>${esc(itemName(l.item_id))}${num(it.last_cost) ? `<div class="small mut">${peso(it.last_cost)} per ${esc(it.stock_unit)}</div>` : ''}</td><td class="n">${edit ? `<input name="q_${l.item_id}" type="number" step="any" min="0" value="${num(l.qty)}" class="qty">` : fq(l.qty)} ${esc(itemUnit(l.item_id))}</td><td class="n" data-linecost="${l.item_id}" data-price="${num(it.last_cost)}">${num(it.last_cost) ? peso(num(l.qty) * num(it.last_cost)) : '<span class="mut small">no price</span>'}</td>${edit ? `<td class="nowrap"><button type="button" class="x" title="Edit" data-act="editIng" data-item="${l.item_id}">✎</button><button type="button" class="x" title="Remove" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>
+   ${lines.map(l => { const it = S.itemsById[l.item_id] || {}; return `${head(l.item_id)}<tr><td>${esc(itemName(l.item_id))}${num(it.last_cost) ? `<div class="small mut">${peso(it.last_cost)} per ${esc(it.stock_unit)}</div>` : ''}</td><td class="n">${edit ? `<input name="q_${l.item_id}" type="number" step="any" min="0" value="${num(l.qty)}" class="qty">` : fq(l.qty)} ${esc(itemUnit(l.item_id))}</td><td class="n" data-linecost="${l.item_id}" data-price="${num(it.last_cost)}">${num(it.last_cost) ? peso(num(l.qty) * num(it.last_cost)) : '<span class="mut small">no price</span>'}</td>${edit ? `<td class="nowrap"><button type="button" class="x" title="Edit" data-act="editIng" data-item="${l.item_id}">✎</button><button type="button" class="x" title="Remove" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>
    ${edit ? `<tr class="ing-edit" id="ie_${l.item_id}" hidden><td colspan="4"><div class="grid">
      <label>Replace with another ingredient (this recipe only)<input name="e_swap_${l.item_id}" list="dl-items" placeholder="leave empty to keep ${esc(it.name || '')}" autocomplete="off"></label>
      <label>Ingredient name<input name="e_name_${l.item_id}" value="${esc(it.name || '')}"></label>
