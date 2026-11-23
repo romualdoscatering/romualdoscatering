@@ -468,15 +468,37 @@ function dishGroups(list) {
 }
 routes['c/recipes'] = async arg => {
   const tab = arg || 'standard';
-  const recipes = Object.fromEntries((await db.select('recipes', { cols: 'dish_id,status,batch_serves' })).map(r => [r.dish_id, r]));
+  const [rs, rl] = await Promise.all([db.select('recipes', { cols: 'dish_id,status,batch_serves' }), db.select('recipe_lines', { cols: 'dish_id,item_id,qty' })]);
+  const recipes = Object.fromEntries(rs.map(r => [r.dish_id, r]));
+  const costOf = {}; rl.forEach(l => costOf[l.dish_id] = (costOf[l.dish_id] || 0) + num(l.qty) * num(S.itemsById[l.item_id]?.last_cost));
+  const costTag = d => { const r = recipes[d.id]; if (!r || !costOf[d.id]) return ''; const c = costOf[d.id], pct = d.tray_price && num(r.batch_serves) === 12 ? Math.round(c / num(d.tray_price) * 100) : null;
+    return ` · cost ${peso(c)}${pct !== null ? ` · <span class="${pct > 45 ? 'bad-t' : pct > 35 ? 'warn-t' : 'ok-t'}">${pct}%</span>` : ''}`; };
   const tabs = [['standard', 'Standard list'], ['draft', 'Draft recipes'], ['verified', 'Verified'], ['none', 'No recipe'], ['all', 'All dishes']];
   const list = S.dishes.filter(d => tab === 'all' || (tab === 'standard' ? d.standard : tab === 'none' ? !recipes[d.id] && d.standard : recipes[d.id]?.status === tab));
   return `<h1>Dishes & recipes</h1><p class="lede">A dish's recipe lists what to buy for one batch: one large tray (12 guests), or one guest for rice, drinks and fruit. Only <b>verified</b> recipes are used for purchase requests.</p>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/recipes/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
    <input class="search" placeholder="Search dishes…" data-filter=".dgroup .li">
    ${(g => g.length > 2 ? `<div class="jump">${g.map(([head], i) => `<button type="button" data-jump="g${i}">${esc(head.replace('Main · ', ''))}</button>`).join('')}</div>` : '')(dishGroups(list))}
-   ${dishGroups(list).map(([head, ds], i) => `<section class="dgroup" data-group id="g${i}"><h3>${esc(head)} <span class="cnt">${ds.length}</span></h3><div class="list">${ds.map(d => `<a class="li" href="#/c/recipe/${d.id}"><div class="li-main"><b>${esc(d.name)}</b><span class="mut small">chosen ${d.times_booked}×${d.tray_price ? ' · tray ' + peso(d.tray_price) : ''}</span></div>${recipes[d.id] ? chip(recipes[d.id].status === 'verified' ? 'Verified' : 'Draft', recipes[d.id].status === 'verified' ? 'ok' : 'warn') : chip('No recipe', 'mut')}</a>`).join('')}</div></section>`).join('') || '<div class="empty">None.</div>'}`;
+   ${dishGroups(list).map(([head, ds], i) => `<section class="dgroup" data-group id="g${i}"><h3>${esc(head)} <span class="cnt">${ds.length}</span></h3><div class="list">${ds.map(d => `<a class="li" href="#/c/recipe/${d.id}"><div class="li-main"><b>${esc(d.name)}</b><span class="mut small">chosen ${d.times_booked}×${d.tray_price ? ' · tray ' + peso(d.tray_price) : ''}${costTag(d)}</span></div>${recipes[d.id] ? chip(recipes[d.id].status === 'verified' ? 'Verified' : 'Draft', recipes[d.id].status === 'verified' ? 'ok' : 'warn') : chip('No recipe', 'mut')}</a>`).join('')}</div></section>`).join('') || '<div class="empty">None.</div>'}`;
 };
+// Recipe cost line: total, per guest, share of tray price (with a warning colour when the margin is thin)
+function recipeTotalText(cost, tray, serves) {
+  const pct = tray ? Math.round(cost / tray * 100) : null;
+  return `Ingredient cost per batch <b>${peso(cost)}</b> · ${peso(cost / (serves || 1))} per guest${pct !== null ? ` · <span class="${pct > 45 ? 'bad-t' : pct > 35 ? 'warn-t' : 'ok-t'}">${pct}% of the tray price</span>` : ''}`;
+}
+// Live recompute while quantities are typed; each change is saved on its own
+document.addEventListener('input', e => {
+  const m = /^q_(.+)$/.exec(e.target.name || ''); if (!m || !e.target.closest('form[data-form="saveRecipe"]')) return;
+  const cell = document.querySelector(`[data-linecost="${m[1]}"]`); if (!cell) return;
+  const price = num(cell.dataset.price); if (price) cell.textContent = peso(num(e.target.value) * price);
+  let total = 0; document.querySelectorAll('[data-linecost]').forEach(c => { const q = document.querySelector(`[name="q_${c.dataset.linecost}"]`); total += num(q?.value) * num(c.dataset.price); });
+  const t = $('#recipeTotal'); if (t) t.innerHTML = recipeTotalText(total, num(t.dataset.tray), num(t.dataset.serves));
+});
+document.addEventListener('change', async e => {
+  const m = /^q_(.+)$/.exec(e.target.name || ''); const form = e.target.closest('form[data-form="saveRecipe"]'); if (!m || !form) return;
+  if (!(num(e.target.value) > 0)) return toast('Quantity must be more than 0 (use ✕ to remove an ingredient).', true);
+  try { await db.update('recipe_lines', { qty: num(e.target.value) }, { dish_id: form.dataset.id, item_id: m[1] }); toast('Saved'); } catch (err) { toast(err.message, true); }
+});
 routes['c/recipe'] = async id => {
   const d = S.dishById[id]; if (!d) return '<div class="card">Dish not found.</div>';
   const [[r], lines] = await Promise.all([db.select('recipes', { eq: { dish_id: id } }), db.select('recipe_lines', { eq: { dish_id: id } })]);
@@ -491,7 +513,7 @@ routes['c/recipe'] = async id => {
    <div class="row"><h2>Ingredients for ${num(r.batch_serves) === 1 ? 'one guest' : `one batch (${fq(r.batch_serves)} guests)`}</h2></div>
    ${r.method ? `<p class="small mut">${esc(r.method)}</p>` : ''}
    <div class="tw"><table><thead><tr><th>Ingredient</th><th class="n">Qty</th><th class="n">Cost</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>
-   ${lines.map(l => { const it = S.itemsById[l.item_id] || {}; return `<tr><td>${esc(itemName(l.item_id))}${num(it.last_cost) ? `<div class="small mut">${peso(it.last_cost)} per ${esc(it.stock_unit)}</div>` : ''}</td><td class="n">${edit ? `<input name="q_${l.item_id}" type="number" step="any" min="0" value="${num(l.qty)}" class="qty">` : fq(l.qty)} ${esc(itemUnit(l.item_id))}</td><td class="n">${num(it.last_cost) ? peso(num(l.qty) * num(it.last_cost)) : '<span class="mut small">no price</span>'}</td>${edit ? `<td class="nowrap"><button type="button" class="x" title="Edit" data-act="editIng" data-item="${l.item_id}">✎</button><button type="button" class="x" title="Remove" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>
+   ${lines.map(l => { const it = S.itemsById[l.item_id] || {}; return `<tr><td>${esc(itemName(l.item_id))}${num(it.last_cost) ? `<div class="small mut">${peso(it.last_cost)} per ${esc(it.stock_unit)}</div>` : ''}</td><td class="n">${edit ? `<input name="q_${l.item_id}" type="number" step="any" min="0" value="${num(l.qty)}" class="qty">` : fq(l.qty)} ${esc(itemUnit(l.item_id))}</td><td class="n" data-linecost="${l.item_id}" data-price="${num(it.last_cost)}">${num(it.last_cost) ? peso(num(l.qty) * num(it.last_cost)) : '<span class="mut small">no price</span>'}</td>${edit ? `<td class="nowrap"><button type="button" class="x" title="Edit" data-act="editIng" data-item="${l.item_id}">✎</button><button type="button" class="x" title="Remove" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>
    ${edit ? `<tr class="ing-edit" id="ie_${l.item_id}" hidden><td colspan="4"><div class="grid">
      <label>Replace with another ingredient (this recipe only)<input name="e_swap_${l.item_id}" list="dl-items" placeholder="leave empty to keep ${esc(it.name || '')}" autocomplete="off"></label>
      <label>Ingredient name<input name="e_name_${l.item_id}" value="${esc(it.name || '')}"></label>
@@ -499,7 +521,7 @@ routes['c/recipe'] = async id => {
      <label>Price per unit ₱<input name="e_cost_${l.item_id}" type="number" step="any" min="0" value="${num(it.last_cost) || ''}"></label></div>
      <p class="small mut">Name, unit and price belong to the ingredient, so they change in every recipe that uses it. Price is updated again automatically when goods are received.</p>
      <div class="row end"><button type="button" class="ghost" data-act="editIng" data-item="${l.item_id}">Cancel</button><button type="button" class="pri" data-act="saveIng" data-dish="${id}" data-item="${l.item_id}">Save ingredient</button></div></td></tr>` : ''}`; }).join('')}
-   </tbody><tfoot><tr><td colspan="4">Ingredient cost per batch ${peso(cost)}${d.tray_price && num(r.batch_serves) === 12 ? ` · ${Math.round(cost / num(d.tray_price) * 100)}% of the tray price` : ''}</td></tr></tfoot></table></div>
+   </tbody><tfoot><tr><td colspan="4" id="recipeTotal" data-tray="${d.tray_price && num(r.batch_serves) === 12 ? num(d.tray_price) : 0}" data-serves="${num(r.batch_serves)}">${recipeTotalText(cost, d.tray_price && num(r.batch_serves) === 12 ? num(d.tray_price) : 0, num(r.batch_serves))}</td></tr></tfoot></table></div>
    ${edit ? `<div class="addline mt"><input name="new_item" list="dl-items" placeholder="Add ingredient" autocomplete="off"><input name="new_qty" type="number" step="any" min="0" placeholder="qty" class="qty"><button type="button" data-act="addIng" data-id="${id}">Add</button></div>${itemDatalist()}
    <div class="row end"><button class="ghost">Save quantities</button>${r.status !== 'verified' ? `<button type="button" class="pri" data-act="verify" data-id="${id}">Mark verified</button>` : ''}</div>
    <p class="small mut">${r.status === 'verified' ? 'A manager\'s change puts this recipe back to draft until a chef verifies it again.' : 'Check each quantity against how the kitchen really cooks this dish, then mark it verified so it can be used for purchase requests.'}</p>` : ''}
