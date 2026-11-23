@@ -108,3 +108,12 @@ tr.grp td{background:#f1ede3;font-size:12px;font-weight:700;text-transform:upper
 @media (max-width:640px){.mcourse{grid-template-columns:1fr;gap:2px}.mc-label{padding-top:0}}
 table.kv td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}table.kv td:first-child{width:130px;font-size:13px}
 label.inline{display:flex;align-items:center;gap:8px;font-size:13px}label.inline select{width:auto}
+.kcard h3{margin-top:0}
+.khead,.krow{display:grid;grid-template-columns:minmax(0,1fr) 48px repeat(3,74px) 52px;gap:8px;align-items:center}
+.khead{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;padding:0 14px 4px}.khead span{text-align:right}.khead span:first-child{text-align:left}
+.krow{padding:7px 14px;margin-top:6px}.krow .qty{width:100%}.kbeg,.kend{text-align:right}.kname{cursor:pointer}
+.row.wrap{flex-wrap:wrap;gap:10px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:640px){.khead,.krow{grid-template-columns:minmax(0,1fr) 28px repeat(3,52px) 34px;gap:4px}.krow{padding:7px 8px}.two{grid-template-columns:1fr}}
+@media print{#top,.seg,.search,button,.btn{display:none!important}.card{border:0}}
+.kname{overflow-wrap:anywhere;font-size:14px}

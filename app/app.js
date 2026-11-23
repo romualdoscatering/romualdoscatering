@@ -36,7 +36,7 @@ const who = () => S.me?.full_name || S.me?.username || '';
 async function loadMaster() {
   const [items, dishes, aliases, packs] = await Promise.all([
     db.select('items', { cols: 'id,name,category,stock_unit,purchase_unit,units_per_purchase,last_cost,waste_pct,active', eq: { active: true }, order: [['category'], ['name']] }),
-    db.select('dishes', { cols: 'id,name,category,course,tray_price,tray_serves,standard,times_booked,active', order: [['times_booked', false], ['name']] }),
+    db.select('dishes', { cols: 'id,name,category,course,tray_price,tray_serves,standard,times_booked,active,sold_as', order: [['times_booked', false], ['name']] }),
     db.select('dish_aliases', { cols: 'alias,dish_id' }),
     db.select('pack_sets', { cols: 'id,name,price,active', eq: { active: true }, order: [['name']] }),
   ]);
@@ -48,9 +48,10 @@ async function loadMaster() {
 const itemName = id => S.itemsById[id]?.name || '(item)';
 const itemUnit = id => S.itemsById[id]?.stock_unit || '';
 const itemDatalist = () => `<datalist id="dl-items">${S.items.map(i => `<option value="${esc(i.name)}">${esc(i.category)} · ${esc(i.stock_unit)}</option>`).join('')}</datalist>`;
-const dishOptions = (course, cat) => S.dishes.filter(d => d.active && (!course || d.course === course) && (!cat || d.category === cat))
+const cateringDish = d => !(d.sold_as && d.sold_as.length === 1 && d.sold_as[0] === 'restaurant');
+const dishOptions = (course, cat) => S.dishes.filter(d => d.active && cateringDish(d) && (!course || d.course === course) && (!cat || d.category === cat))
   .map(d => `<option value="${esc(d.name)}"${course === 'Main' && !cat ? ` label="${esc(d.category)}"` : ''}>`).join('');
-const mainCats = () => [...new Set(S.dishes.filter(d => d.active && d.course === 'Main').map(d => d.category))].sort();
+const mainCats = () => [...new Set(S.dishes.filter(d => d.active && cateringDish(d) && d.course === 'Main').map(d => d.category))].sort();
 // The dish suggestions follow the course (and, for Main, the meat) picked on the add-dish line
 document.addEventListener('change', e => {
   const f = e.target.closest('form[data-form="addMenu"]'); if (!f || !['course', 'cat'].includes(e.target.name)) return;
@@ -101,12 +102,17 @@ const sortMenu = l => [...l].sort((a, b) => { const da = S.dishById[a.dish_id], 
 /* ================= router ================= */
 const routes = {};
 let current = '';
+// Which workspace the page belongs to: #/r/… = restaurant, #/c/… = catering (shared pages read this)
+const WS = () => current.startsWith('r/') ? 'restaurant' : 'catering';
+const P = () => current.startsWith('r/') ? 'r' : 'c';
+const STORE = () => WS() === 'restaurant' ? 'restaurant store' : 'catering store';
 async function route() {
   const hash = location.hash.replace(/^#\/?/, '');
   if (!S.user) return renderLogin();
   const [page, ...rest] = hash.split('/');
-  const key = page === 'c' ? 'c/' + (rest[0] || 'events') : (page || 'home');
-  const arg = page === 'c' ? rest.slice(1).join('/') : rest.join('/');
+  const pre = page === 'c' || page === 'r';
+  const key = pre ? page + '/' + (rest[0] || (page === 'c' ? 'events' : 'kitchen')) : (page || 'home');
+  const arg = pre ? rest.slice(1).join('/') : rest.join('/');
   const r = routes[key] || routes.home;
   current = key;
   renderShell(key);
@@ -124,14 +130,16 @@ function afterRender() {
 
 /* ================= shell ================= */
 function renderShell(key) {
-  const inCat = key.startsWith('c/');
-  const nav = inCat ? [['c/events', 'Events'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes']] : [];
-  $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/">Romualdo's<small>${inCat ? 'Catering' : 'Staff'}</small></a>
+  const inCat = key.startsWith('c/'), inRes = key.startsWith('r/');
+  const nav = inCat ? [['c/events', 'Events'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes']]
+    : inRes ? [['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']] : [];
+  $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/">Romualdo's<small>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</small></a>
     <div class="who"><span>${esc(who())}</span>${isAdmin() ? '<a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
     ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">Switch workspace</a></nav>` : ''}`;
 }
 function navOf(key) {
-  return { 'c/event': 'c/events', 'c/event-new': 'c/events', 'c/pr': 'c/requests', 'c/po': 'c/orders', 'c/count': 'c/stock', 'c/recipe': 'c/recipes' }[key] || key;
+  return { 'c/event': 'c/events', 'c/event-new': 'c/events', 'c/pr': 'c/requests', 'c/po': 'c/orders', 'c/count': 'c/stock', 'c/recipe': 'c/recipes', 'c/inquiry': 'c/inquiries',
+    'r/pr': 'r/requests', 'r/po': 'r/orders', 'r/count': 'r/stock' }[key] || key;
 }
 
 /* ================= login ================= */
@@ -161,7 +169,7 @@ async function afterLogin() {
 routes.home = async () => {
   const cards = [];
   if (member('catering')) cards.push(`<a class="ws-card cat" href="#/c/events"><b>Catering</b><span>Events, menus, purchase requests, receiving, stock, recipes</span></a>`);
-  if (member('restaurant')) cards.push(`<a class="ws-card res" href="/ops/"><b>Restaurant</b><span>Coming next. For now, keep using the current app (opens /ops)</span></a>`);
+  if (member('restaurant')) cards.push(`<a class="ws-card res" href="#/r/kitchen"><b>Restaurant</b><span>Kitchen stocks, restock, purchase requests, receiving, store and par levels</span></a>`);
   if (!cards.length) cards.push(`<div class="card"><p>You don't have a workspace yet. Ask the owner to give you a role.</p></div>`);
   return `<h1>Good day, ${esc(S.me.full_name.split(' ')[0])}</h1><p class="lede">Choose where you're working.</p><div class="ws-grid">${cards.join('')}</div>
     ${isAdmin() ? `<p class="small mut" style="margin-top:24px">Owner: <a href="#/people">add people and give them roles</a>.</p>` : ''}`;
@@ -335,17 +343,17 @@ ACT.closeEvent = async el => { if (!confirm('Close this event? Leftover stock se
 
 /* ================= REQUESTS ================= */
 routes['c/requests'] = async arg => {
-  const tab = arg || (can('catering', 'manager') ? 'approve' : 'open');
+  const tab = arg || (can(WS(), 'manager') ? 'approve' : 'open');
   const tabs = [['approve', 'To approve'], ['open', 'In progress'], ['draft', 'Drafts'], ['all', 'All']];
   const st = { approve: ['submitted'], open: ['submitted', 'approved', 'ordered'], draft: ['draft'] }[tab];
-  const rows = await db.select('pr_overview', { eq: { ws: 'catering' }, ...(st ? { in: { status: st } } : {}), order: [['created_at', false]], limit: 200 });
+  const rows = await db.select('pr_overview', { eq: { ws: WS() }, ...(st ? { in: { status: st } } : {}), order: [['created_at', false]], limit: 200 });
   return `<div class="row"><h1>Purchase requests</h1><span class="sp"></span><button class="pri" data-act="newPR">＋ New request</button></div>
-   <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/requests/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
-   ${rows.length ? `<div class="list">${rows.map(p => `<a class="li" href="#/c/pr/${p.id}"><div class="li-main"><b>${esc(p.pr_no)}${p.priority === 'urgent' ? ' ' + chip('urgent', 'bad') : ''}</b>
+   <div class="seg">${tabs.map(([k, l]) => `<a href="#/${P()}/requests/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
+   ${rows.length ? `<div class="list">${rows.map(p => `<a class="li" href="#/${P()}/pr/${p.id}"><div class="li-main"><b>${esc(p.pr_no)}${p.priority === 'urgent' ? ' ' + chip('urgent', 'bad') : ''}</b>
      <span class="mut small">${p.event_title ? esc(p.event_ref + ' · ' + p.event_title) + ' · ' : ''}${esc(p.purpose || '')}</span>
      <span class="mut small">${p.line_count} items · est. ${peso(p.est_total)} · ${esc(p.requested_by_name || '')}${p.needed_by ? ' · needed ' + esc(fmtD(p.needed_by)) : ''}</span></div>${chip(PR_STATUS[p.status], statusTone(p.status))}</a>`).join('')}</div>` : '<div class="empty">No requests here.</div>'}`;
 };
-ACT.newPR = async () => { const r = (await db.insert('purchase_requests', { ws: 'catering', purpose: 'Catering store restock', requested_by: S.user.id }))[0]; go('#/c/pr/' + r.id); };
+ACT.newPR = async () => { const r = (await db.insert('purchase_requests', { ws: WS(), purpose: WS() === 'restaurant' ? 'Restaurant restock' : 'Catering store restock', requested_by: S.user.id }))[0]; go(`#/${P()}/pr/${r.id}`); };
 
 routes['c/pr'] = async id => {
   const [p] = await db.select('pr_overview', { eq: { id } }); if (!p) return '<div class="card">Request not found.</div>';
@@ -359,7 +367,7 @@ routes['c/pr'] = async id => {
   const remaining = l => Math.max(num(l.approved_qty) - (ordered[l.id] || 0), 0);
   const advances = buyer ? await db.select('cash_advances', { eq: { ws: p.ws, status: 'open' }, order: [['released_at', false]] }) : [];
   const total = lines.reduce((s, l) => s + num(l.approved_qty ?? l.qty) * num(l.est_unit_cost), 0);
-  return `<div class="row"><a href="#/c/requests" class="back">‹ Requests</a></div>
+  return `<div class="row"><a href="#/${P()}/requests" class="back">‹ Requests</a></div>
   <div class="row"><h1>${esc(p.pr_no)}</h1>${chip(PR_STATUS[p.status], statusTone(p.status))}</div>
   <p class="lede">${p.event_id ? `<a href="#/c/event/${p.event_id}">${esc(p.event_ref + ' · ' + p.event_title)}</a> · ` : ''}${esc(p.purpose || '')}<br><span class="small mut">Requested by ${esc(p.requested_by_name || '')} · ${esc(fmtT(p.created_at))}${p.needed_by ? ' · needed by ' + esc(fmtD(p.needed_by)) : ''}${p.approved_by_name ? ` · ${p.status === 'rejected' ? 'rejected' : 'approved'} by ${esc(p.approved_by_name)} ${esc(fmtT(p.approved_at))}` : ''}</span></p>
   ${p.decision_note ? `<div class="alert ${p.status === 'rejected' ? 'bad' : 'info'}">${esc(p.decision_note)}</div>` : ''}
@@ -385,7 +393,7 @@ routes['c/pr'] = async id => {
     <div class="grid"><label>Supplier / stall<input name="supplier" required placeholder="e.g. Agdao market — stall 12"></label>
     <label>Cash advance used<select name="advance">${opt('', 'None / paid directly')}${advances.map(a => opt(a.id, `${peso(a.amount)} · ${fmtT(a.released_at)}`)).join('')}</select></label></div>
     <div class="row end"><button class="pri">Create order</button></div></form>` : ''}
-  ${orders.length ? `<section class="card"><h2>Orders</h2><div class="list">${orders.map(o => `<a class="li" href="#/c/po/${o.id}"><div class="li-main"><b>${esc(o.po_no)}</b><span class="mut small">${esc(o.supplier || '')} · ${o.line_count} items · by ${esc(o.buyer_name || '')}</span></div>${chip(PO_STATUS[o.status], statusTone(o.status))}</a>`).join('')}</div></section>` : ''}`;
+  ${orders.length ? `<section class="card"><h2>Orders</h2><div class="list">${orders.map(o => `<a class="li" href="#/${P()}/po/${o.id}"><div class="li-main"><b>${esc(o.po_no)}</b><span class="mut small">${esc(o.supplier || '')} · ${o.line_count} items · by ${esc(o.buyer_name || '')}</span></div>${chip(PO_STATUS[o.status], statusTone(o.status))}</a>`).join('')}</div></section>` : ''}`;
 };
 async function saveDraftLines(f, id) {
   const lines = Object.entries(f).filter(([k]) => k.startsWith('q_'));
@@ -419,20 +427,20 @@ ACT.addLine = async el => {
 routes['c/orders'] = async arg => {
   const tab = arg || 'open', tabs = [['open', 'To receive'], ['received', 'Received'], ['all', 'All']];
   const st = { open: ['open', 'partly_received'], received: ['received', 'closed'] }[tab];
-  const rows = await db.select('po_overview', { eq: { ws: 'catering' }, ...(st ? { in: { status: st } } : {}), order: [['ordered_at', false]], limit: 200 });
-  return `<h1>Orders & receiving</h1><div class="seg">${tabs.map(([k, l]) => `<a href="#/c/orders/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
-   ${rows.length ? `<div class="list">${rows.map(o => `<a class="li" href="#/c/po/${o.id}"><div class="li-main"><b>${esc(o.po_no)}</b><span class="mut small">${esc(o.supplier || '')} · ${esc(o.pr_no || '')}${o.event_title ? ' · ' + esc(o.event_title) : ''}</span><span class="mut small">${o.line_count} items · bought by ${esc(o.buyer_name || '')} · ${esc(fmtT(o.ordered_at))}${num(o.received_value) ? ' · received ' + peso(o.received_value) : ''}</span></div>${chip(PO_STATUS[o.status], statusTone(o.status))}</a>`).join('')}</div>` : '<div class="empty">Nothing here.</div>'}`;
+  const rows = await db.select('po_overview', { eq: { ws: WS() }, ...(st ? { in: { status: st } } : {}), order: [['ordered_at', false]], limit: 200 });
+  return `<h1>Orders & receiving</h1><div class="seg">${tabs.map(([k, l]) => `<a href="#/${P()}/orders/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
+   ${rows.length ? `<div class="list">${rows.map(o => `<a class="li" href="#/${P()}/po/${o.id}"><div class="li-main"><b>${esc(o.po_no)}</b><span class="mut small">${esc(o.supplier || '')} · ${esc(o.pr_no || '')}${o.event_title ? ' · ' + esc(o.event_title) : ''}</span><span class="mut small">${o.line_count} items · bought by ${esc(o.buyer_name || '')} · ${esc(fmtT(o.ordered_at))}${num(o.received_value) ? ' · received ' + peso(o.received_value) : ''}</span></div>${chip(PO_STATUS[o.status], statusTone(o.status))}</a>`).join('')}</div>` : '<div class="empty">Nothing here.</div>'}`;
 };
 routes['c/po'] = async id => {
   const [o] = await db.select('po_overview', { eq: { id } }); if (!o) return '<div class="card">Order not found.</div>';
   const [lines, receipts] = await Promise.all([db.select('po_line_progress', { eq: { po_id: id } }), db.select('receipts', { eq: { po_id: id }, order: [['received_at', false]] })]);
   const canRecv = ['open', 'partly_received'].includes(o.status) && can(o.ws, 'storekeeper', 'manager', 'chef');
   const people = receipts.length ? Object.fromEntries((await db.select('profiles', { cols: 'id,full_name', in: { id: [...new Set(receipts.map(r => r.received_by))] } })).map(p => [p.id, p.full_name])) : {};
-  return `<div class="row"><a href="#/c/orders" class="back">‹ Orders</a></div>
+  return `<div class="row"><a href="#/${P()}/orders" class="back">‹ Orders</a></div>
   <div class="row"><h1>${esc(o.po_no)}</h1>${chip(PO_STATUS[o.status], statusTone(o.status))}</div>
-  <p class="lede">${esc(o.supplier || '')} · from <a href="#/c/pr/${o.pr_id}">${esc(o.pr_no)}</a>${o.event_id ? ` · <a href="#/c/event/${o.event_id}">${esc(o.event_title)}</a>` : ''} · bought by ${esc(o.buyer_name || '')}</p>
+  <p class="lede">${esc(o.supplier || '')} · from <a href="#/${P()}/pr/${o.pr_id}">${esc(o.pr_no)}</a>${o.event_id ? ` · <a href="#/c/event/${o.event_id}">${esc(o.event_title)}</a>` : ''} · bought by ${esc(o.buyer_name || '')}</p>
   <form class="card" data-form="${canRecv ? 'receive' : 'none'}" data-id="${id}"><h2>${canRecv ? 'Receive' : 'Items'}</h2>
-   ${canRecv ? `<p class="small mut">Weigh or count what actually arrived. Only what you enter goes into the catering store.${o.buyer === S.user.id ? ' <b class="warn-t">You are the buyer on this order — it will be flagged if you receive it yourself.</b>' : ''}</p>` : ''}
+   ${canRecv ? `<p class="small mut">Weigh or count what actually arrived. Only what you enter goes into the ${STORE()}.${o.buyer === S.user.id ? ' <b class="warn-t">You are the buyer on this order — it will be flagged if you receive it yourself.</b>' : ''}</p>` : ''}
    <div class="tw"><table><thead><tr><th>Item</th><th class="n">Ordered</th><th class="n">Received so far</th>${canRecv ? '<th class="n">Received now</th><th class="n">Actual unit price ₱</th>' : '<th class="n">Unit price</th>'}</tr></thead><tbody>
    ${shopRows(lines, l => l.item_id, l => l.ordered, 5, l => { const left = Math.max(num(l.ordered) - num(l.received), 0); return `<tr><td>${esc(l.name)}</td><td class="n">${fq(l.ordered)} ${esc(l.stock_unit)}${packSplit(l.item_id, l.ordered) ? `<div class="small mut">${esc(packSplit(l.item_id, l.ordered))}</div>` : ''}</td><td class="n ${num(l.received) < num(l.ordered) && o.status !== 'open' ? 'warn-t' : ''}">${fq(l.received)}</td>
      ${canRecv ? `<td class="n"><input name="q_${l.id}" type="number" step="any" min="0" value="${left}" class="qty"></td><td class="n"><input name="c_${l.id}" type="number" step="any" min="0" value="${num(l.unit_cost) || ''}" class="qty" placeholder="price"></td>` : `<td class="n">${peso(l.unit_cost)}</td>`}</tr>`; })}
@@ -446,34 +454,35 @@ FORMS.receive = async (f, el) => {
   const lines = Object.keys(f).filter(k => k.startsWith('q_')).map(k => ({ po_line_id: k.slice(2), qty: num(f[k]), unit_cost: f['c_' + k.slice(2)] === '' ? undefined : num(f['c_' + k.slice(2)]) }));
   if (lines.some(l => l.qty > 0 && !(l.unit_cost > 0))) return toast('Enter the actual unit price for each item received.', true);
   const r = await db.rpc('receive_po', { p_po: el.dataset.id, p_lines: lines, p_or_no: f.or_no || null, p_note: f.note || null });
-  toast(num(r.short_value) > 0 ? `Received — short by ${peso(r.short_value)}` : 'Received into the catering store', num(r.short_value) > 0);
+  toast(num(r.short_value) > 0 ? `Received — short by ${peso(r.short_value)}` : 'Received into the ' + STORE(), num(r.short_value) > 0);
   await loadMaster(); refresh();
 };
 
 /* ================= STOCK & COUNTS ================= */
-routes['c/stock'] = async () => {
-  const [stock, counts] = await Promise.all([db.select('stock_on_hand', { eq: { ws: 'catering' }, order: [['category'], ['name']] }), db.select('stock_counts', { eq: { ws: 'catering' }, order: [['counted_at', false]], limit: 15 })]);
+routes['c/stock'] = async arg => {
+  if (arg === 'par') return parView();
+  const [stock, counts] = await Promise.all([db.select('stock_on_hand', { eq: { ws: WS() }, order: [['category'], ['name']] }), db.select('stock_counts', { eq: { ws: WS() }, order: [['counted_at', false]], limit: 15 })]);
   const val = stock.reduce((s, x) => s + Math.max(num(x.value), 0), 0);
-  return `<div class="row"><h1>Catering store</h1><span class="sp"></span>${can('catering', 'storekeeper', 'manager', 'chef') ? '<button class="pri" data-act="startCount">Start a count</button>' : ''}</div>
+  return `<div class="row"><h1>${WS() === 'restaurant' ? 'Restaurant store' : 'Catering store'}</h1><span class="sp"></span><a class="btn ghost" href="#/${P()}/stock/par">Par levels &amp; restock</a>${can(WS(), 'storekeeper', 'manager', 'chef') ? '<button class="pri" data-act="startCount">Start a count</button>' : ''}</div>
    <div class="kpis"><div class="kpi"><span>Items in stock</span><b>${stock.filter(s => num(s.on_hand) > 0).length}</b></div><div class="kpi"><span>Stock value (last prices)</span><b>${peso(val)}</b></div></div>
    <input class="search" placeholder="Search…" data-filter="#stockTable tbody tr">
    ${stock.length ? `<div class="card tw"><table id="stockTable"><thead><tr><th>Item</th><th class="n">On hand</th><th class="n">Value</th></tr></thead><tbody>
-     ${stock.map(s => `<tr><td>${esc(s.name)}<div class="small mut">${esc(s.category)}</div></td><td class="n ${num(s.on_hand) < 0 ? 'bad-t' : ''}">${fq(s.on_hand)} ${esc(s.stock_unit)}</td><td class="n">${peso(s.value)}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">The catering store is empty. Receive an order or do an opening count.</div>'}
-   ${counts.length ? `<h2>Counts</h2><div class="list">${counts.map(c => `<a class="li" href="#/c/count/${c.id}"><div class="li-main"><b>${esc(fmtT(c.counted_at))}</b><span class="mut small">${c.status === 'posted' ? `missing ${peso(Math.abs(num(c.loss_value)))} · excess ${peso(c.gain_value)}` : 'not posted yet'}</span></div>${chip(c.status === 'posted' ? 'Posted' : 'Open', c.status === 'posted' ? (num(c.loss_value) < -1 ? 'bad' : 'ok') : 'warn')}</a>`).join('')}</div>` : ''}`;
+     ${stock.map(s => `<tr><td>${esc(s.name)}<div class="small mut">${esc(s.category)}</div></td><td class="n ${num(s.on_hand) < 0 ? 'bad-t' : ''}">${fq(s.on_hand)} ${esc(s.stock_unit)}</td><td class="n">${peso(s.value)}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty">The ${STORE()} is empty. Receive an order or do an opening count.</div>`}
+   ${counts.length ? `<h2>Counts</h2><div class="list">${counts.map(c => `<a class="li" href="#/${P()}/count/${c.id}"><div class="li-main"><b>${esc(fmtT(c.counted_at))}</b><span class="mut small">${c.status === 'posted' ? `missing ${peso(Math.abs(num(c.loss_value)))} · excess ${peso(c.gain_value)}` : 'not posted yet'}</span></div>${chip(c.status === 'posted' ? 'Posted' : 'Open', c.status === 'posted' ? (num(c.loss_value) < -1 ? 'bad' : 'ok') : 'warn')}</a>`).join('')}</div>` : ''}`;
 };
-ACT.startCount = async () => { const c = (await db.insert('stock_counts', { ws: 'catering', counted_by: S.user.id }))[0]; go('#/c/count/' + c.id); };
+ACT.startCount = async () => { const c = (await db.insert('stock_counts', { ws: WS(), counted_by: S.user.id }))[0]; go(`#/${P()}/count/${c.id}`); };
 routes['c/count'] = async id => {
   const [c] = await db.select('stock_counts', { eq: { id } }); if (!c) return '<div class="card">Count not found.</div>';
   const lines = await db.select('stock_count_lines', { eq: { count_id: id } }); const got = Object.fromEntries(lines.map(l => [l.item_id, l]));
   if (c.status === 'posted') {
     const diff = lines.map(l => ({ ...l, d: num(l.counted) - num(l.expected) })).filter(l => Math.abs(l.d) > 0.0005).sort((a, b) => a.d * num(S.itemsById[a.item_id]?.last_cost) - b.d * num(S.itemsById[b.item_id]?.last_cost));
-    return `<div class="row"><a href="#/c/stock" class="back">‹ Stock</a></div><h1>Count · ${esc(fmtT(c.counted_at))}</h1>
+    return `<div class="row"><a href="#/${P()}/stock" class="back">‹ Stock</a></div><h1>Count · ${esc(fmtT(c.counted_at))}</h1>
      <div class="kpis"><div class="kpi bad"><span>Missing</span><b>${peso(Math.abs(num(c.loss_value)))}</b></div><div class="kpi"><span>Excess</span><b>${peso(c.gain_value)}</b></div><div class="kpi"><span>Items counted</span><b>${lines.length}</b></div></div>
      ${diff.length ? `<div class="card tw"><table><thead><tr><th>Item</th><th class="n">Expected</th><th class="n">Counted</th><th class="n">Difference</th></tr></thead><tbody>${diff.map(l => `<tr><td>${esc(itemName(l.item_id))}</td><td class="n">${fq(l.expected)}</td><td class="n">${fq(l.counted)}</td><td class="n ${l.d < 0 ? 'bad-t' : 'ok-t'}">${l.d > 0 ? '+' : ''}${fq(l.d)} ${esc(itemUnit(l.item_id))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="alert ok">Everything matched.</div>'}
      <p class="small mut">Missing stock left the store without an issue or waste record. Recount big differences and ask who had access.</p>`;
   }
   const cats = [...new Set(S.items.map(i => i.category))];
-  return `<div class="row"><a href="#/c/stock" class="back">‹ Stock</a></div><h1>Count the catering store</h1>
+  return `<div class="row"><a href="#/${P()}/stock" class="back">‹ Stock</a></div><h1>Count the ${STORE()}</h1>
    <p class="lede">Count what is physically on the shelves, chiller and freezer. Expected quantities are hidden so nobody copies them. Leave items you didn't count blank.</p>
    <form class="card" data-form="saveCount" data-id="${id}"><label>Witness<input name="witness" value="${esc(c.witness || '')}" placeholder="Second person present"></label>
    <input class="search mt" placeholder="Find item…" data-filter=".count-row">
@@ -680,6 +689,157 @@ document.addEventListener('change', async e => {
   const id = e.target.dataset?.bkstatus; if (!id) return;
   try { await db.update('bookings', { status: e.target.value, handled_by: S.user.id }, { id }); toast('Status saved'); refresh(); } catch (err) { toast(err.message, true); }
 });
+
+
+/* ================= PAR LEVELS (both stores) ================= */
+// Par = the least the store should hold. "Make restock request" lists everything below par, topped up to par.
+async function parView() {
+  const [par, stock] = await Promise.all([db.select('item_par', { eq: { ws: WS() } }), db.select('stock_on_hand', { eq: { ws: WS() } })]);
+  const parOf = Object.fromEntries(par.map(x => [x.item_id, num(x.par_qty)])), oh = Object.fromEntries(stock.map(x => [x.item_id, num(x.on_hand)]));
+  const edit = can(WS(), 'manager', 'chef'), mayReq = can(WS(), 'storekeeper', 'manager', 'chef');
+  const items = S.items.filter(i => i.active !== false);
+  const low = items.filter(i => parOf[i.id] > 0 && (oh[i.id] || 0) < parOf[i.id]);
+  return `<div class="row"><a href="#/${P()}/stock" class="back">‹ Store</a></div>
+   <div class="row"><h1>Par levels</h1><span class="sp"></span>${mayReq ? `<button class="pri" data-act="parPR"${low.length ? '' : ' disabled'}>Make restock request${low.length ? ` (${low.length})` : ''}</button>` : ''}</div>
+   <p class="lede">Set the least the ${STORE()} should hold of each item. When stock falls below par, one tap makes a purchase request that tops everything back up — in market order. Leave par blank for items you only buy when needed.</p>
+   ${low.length ? `<div class="alert warn"><b>${low.length} item${low.length > 1 ? 's are' : ' is'} below par:</b> ${low.slice(0, 12).map(i => esc(i.name)).join(', ')}${low.length > 12 ? '…' : ''}</div>` : ''}
+   <input class="search" placeholder="Find item…" data-filter="#parTable tbody tr:not(.grp)">
+   <div class="card tw"><table id="parTable"><thead><tr><th>Item</th><th class="n">On hand</th><th class="n">Par</th></tr></thead><tbody>
+   ${shopRows(items, i => i.id, i => parOf[i.id] || 0, 3, i => { const o = oh[i.id] || 0, pq = parOf[i.id];
+     return `<tr><td>${esc(i.name)}</td><td class="n ${pq > 0 && o < pq ? 'warn-t' : ''}">${fq(o)} ${esc(i.stock_unit)}</td><td class="n">${edit ? `<input class="qty" type="number" min="0" step="any" data-par="${i.id}" value="${pq || ''}" placeholder="—">` : pq ? fq(pq) : '—'} <span class="unit">${esc(i.stock_unit)}</span></td></tr>`; })}
+   </tbody></table></div>
+   <p class="small mut">Changes save by themselves. Only a manager or chef can change par levels.</p>`;
+}
+document.addEventListener('change', async e => {
+  const id = e.target.dataset?.par; if (!id) return;
+  const v = e.target.value === '' ? 0 : num(e.target.value);
+  try { if (v > 0) await db.upsert('item_par', { item_id: id, ws: WS(), par_qty: v }, 'item_id,ws'); else await db.remove('item_par', { item_id: id, ws: WS() }); toast('Par saved'); }
+  catch (err) { toast(err.message, true); }
+});
+ACT.parPR = async el => {
+  el.disabled = true;
+  try { const r = await db.rpc('generate_par_pr', { p_ws: WS() }); if (!r.pr) { toast('Nothing is below par.'); return refresh(); } toast(`${r.pr}: ${r.lines} items to buy`); go(`#/${P()}/pr/${r.pr_id}`); }
+  catch (err) { el.disabled = false; toast(err.message, true); }
+};
+
+/* ================= RESTAURANT · KITCHEN STOCKS ================= */
+// Daily count of cooked portions per menu dish: Beginning (yesterday's ending) + Cooked − Pull-out − Sold = Ending.
+// Each box saves by itself, under the logged-in person's name. Below the low level → on the restock list.
+const KFIELDS = [['produced', 'Cooked'], ['pulled_out', 'Pull-out'], ['sold', 'Sold']];
+const KPROT_ORDER = ['Chicken', 'Pork', 'Beef', 'Fish & Seafood', 'Veggies and Produce', 'Noodles & Pasta', 'Rice', 'Others'];
+const kEnd = r => num(r.beginning) + num(r.produced) - num(r.pulled_out) - num(r.sold);
+const kGroups = (rows, by) => { const g = new Map(); const order = by === 'protein' ? KPROT_ORDER : [...new Set(rows.map(r => r.section))];
+  rows.forEach(r => { const k = by === 'protein' ? r.protein : r.section; g.has(k) || g.set(k, []); g.get(k).push(r); });
+  return [...g].sort((a, b) => (order.indexOf(a[0]) + 1 || 99) - (order.indexOf(b[0]) + 1 || 99)); };
+routes['r/kitchen'] = async arg => {
+  const [tab, dArg] = (arg || 'day').split('/');
+  const tabs = [['day', 'Daily count'], ['restock', 'Restock list'], ['week', 'Weekly report'], ...(can('restaurant', 'manager', 'chef') ? [['dishes', 'Dishes & par']] : [])];
+  const seg = `<div class="seg">${tabs.map(([k, l]) => `<a href="#/r/kitchen/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>`;
+  const body = tab === 'restock' ? await kRestock(dArg) : tab === 'week' ? await kWeek(dArg) : tab === 'dishes' ? await kDishes() : await kDay(dArg);
+  return `<h1>Kitchen stocks</h1>${seg}${body}`;
+};
+async function kDay(d) {
+  d = d || S.kDate || today(); S.kDate = d;
+  const [rows, [day]] = await Promise.all([db.rpc('kitchen_sheet', { p_date: d }), db.select('kitchen_days', { eq: { count_date: d } })]);
+  S.kRows = Object.fromEntries(rows.map(r => [r.dish_id, r]));
+  const by = S.kGroup || 'section', mayEdit = member('restaurant');
+  const low = rows.filter(r => kEnd(r) < num(r.min_level));
+  const saver = day?.saved_by ? (await db.select('profiles', { cols: 'full_name', eq: { id: day.saved_by } }))[0]?.full_name : '';
+  return `<div class="card"><div class="row wrap"><label class="inline">Date <input type="date" value="${d}" data-kdate max="${today()}"></label>
+     <label class="inline">Group by <select data-kgroup>${opt('section', 'Menu section', by === 'section')}${opt('protein', 'Main ingredient', by === 'protein')}</select></label><span class="sp"></span>
+     <span class="small mut">${day ? `Started ${saver ? 'by ' + esc(saver) : ''} ${day.note ? '· ' + esc(day.note) : ''}` : 'Not started yet — beginning stock is yesterday\'s ending.'}</span></div></div>
+   ${low.length ? `<div class="alert warn"><b>${low.length} dish${low.length > 1 ? 'es are' : ' is'} low</b> (ending below the low level). <a href="#/r/kitchen/restock/${d}">Open the restock list →</a></div>` : ''}
+   <input class="search" placeholder="Find a dish…" data-filter=".krow">
+   ${kGroups(rows, by).map(([g, list]) => `<section class="card kcard" data-group><h3>${esc(g)}</h3>
+     <div class="khead"><span></span><span>Beg</span>${KFIELDS.map(([, l]) => `<span>${l}</span>`).join('')}<span>End</span></div>
+     ${list.map(r => { const e = kEnd(r), lowR = e < num(r.min_level);
+       return `<div class="krow li" data-kid="${r.dish_id}"><span class="kname">${esc(r.name)}${r.note ? `<small class="mut"> · ${esc(r.note)}</small>` : ''}</span>
+         <span class="kbeg">${fq(r.beginning)}</span>
+         ${KFIELDS.map(([k]) => `<input type="number" inputmode="numeric" min="0" step="any" class="qty" data-kf="${k}" value="${num(r[k]) || ''}" placeholder="0"${mayEdit ? '' : ' disabled'}>`).join('')}
+         <b class="kend ${e < 0 ? 'bad-t' : lowR ? 'warn-t' : ''}" data-kend>${fq(e)}</b></div>`; }).join('')}</section>`).join('')}
+   <p class="small mut">Each box saves by itself. Beginning comes from the last saved day. Write pull-outs (spoiled, staff meal, tasting) with a note — tap the dish name to add one.</p>`;
+}
+document.addEventListener('input', e => {
+  const k = e.target.dataset?.kf; if (!k) return; const row = e.target.closest('[data-kid]'), r = S.kRows?.[row.dataset.kid]; if (!r) return;
+  r[k] = e.target.value; const el = row.querySelector('[data-kend]'), v = kEnd(r); el.textContent = fq(v);
+  el.className = 'kend ' + (v < 0 ? 'bad-t' : v < num(r.min_level) ? 'warn-t' : '');
+});
+document.addEventListener('change', async e => {
+  if (e.target.dataset?.kdate !== undefined && e.target.matches('[data-kdate]')) { S.kDate = e.target.value; return go('#/r/kitchen/day/' + e.target.value); }
+  if (e.target.matches('[data-kgroup]')) { S.kGroup = e.target.value; return refresh(); }
+  const k = e.target.dataset?.kf; if (!k) return;
+  const id = e.target.closest('[data-kid]').dataset.kid, r = S.kRows[id];
+  try { await kSave(r); toast('Saved'); } catch (err) { toast(err.message, true); }
+});
+async function kSave(r) {
+  if (!S.kDayMade?.[S.kDate]) { await db.insert('kitchen_days', { count_date: S.kDate, saved_by: S.user.id }).catch(() => {}); (S.kDayMade ||= {})[S.kDate] = 1; }
+  await db.upsert('dish_day_counts', { count_date: S.kDate, dish_id: r.dish_id, beginning: num(r.beginning), produced: num(r.produced), pulled_out: num(r.pulled_out), sold: num(r.sold), note: r.note || null, counted_by: S.user.id, updated_at: new Date().toISOString() }, 'count_date,dish_id');
+  r.saved = true;
+}
+document.addEventListener('click', async e => {
+  const n = e.target.closest('.kname'); if (!n || !member('restaurant')) return;
+  const row = n.closest('[data-kid]'), r = S.kRows?.[row.dataset.kid]; if (!r) return;
+  const note = prompt(`Note for ${r.name} (e.g. 2 burnt, staff meal):`, r.note || ''); if (note === null) return;
+  r.note = note.trim(); try { await kSave(r); toast('Note saved'); refresh(); } catch (err) { toast(err.message, true); }
+});
+async function kRestock(d) {
+  d = d || S.kDate || today();
+  const rows = await db.rpc('kitchen_sheet', { p_date: d });
+  const need = rows.map(r => ({ ...r, end: kEnd(r) })).filter(r => r.end < num(r.min_level)).map(r => ({ ...r, need: Math.max(num(r.par) - r.end, 0) }));
+  return `<div class="card"><div class="row wrap"><label class="inline">Date <input type="date" value="${d}" onchange="location.hash='#/r/kitchen/restock/'+this.value" max="${today()}"></label><span class="sp"></span><button class="ghost" onclick="window.print()">Print</button></div></div>
+   ${need.length ? `<div class="card tw"><h2>To cook — ${esc(fmtD(d))}</h2><p class="small mut">Dishes that ended below their low level. Cook back up to par.</p>
+     <table><thead><tr><th>Dish</th><th class="n">Ending</th><th class="n">Par</th><th class="n">Cook</th></tr></thead><tbody>
+     ${kGroups(need, 'protein').map(([g, l]) => `<tr class="grp"><td colspan="4">${esc(g)}</td></tr>${l.sort((a, b) => b.need - a.need).map(r => `<tr><td>${esc(r.name)}</td><td class="n ${r.end <= 0 ? 'bad-t' : ''}">${fq(r.end)}</td><td class="n">${fq(r.par)}</td><td class="n"><b>${fq(r.need)}</b></td></tr>`).join('')}`).join('')}
+     </tbody></table></div>` : '<div class="empty">Nothing is low. 👍</div>'}`;
+}
+// date-only arithmetic in UTC so the phone's time zone can't shift the day
+const addDays = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
+const weekStart = d => addDays(d, -((new Date(d + 'T00:00:00Z').getUTCDay() + 6) % 7));   // Monday
+async function kWeek(w) {
+  const from = weekStart(w || today()), to = addDays(from, 6);
+  const rows = await db.select('dish_day_counts', { gte: { count_date: from }, lte: { count_date: to }, order: [['count_date']] });
+  const menu = Object.fromEntries((await db.select('restaurant_menu', { cols: 'dish_id,section,protein' })).map(m => [m.dish_id, m]));
+  const by = {}; rows.forEach(r => { const x = by[r.dish_id] ||= { id: r.dish_id, start: num(r.beginning), in: 0, out: 0, sold: 0, end: 0, notes: [] };
+    x.in += num(r.produced); x.out += num(r.pulled_out); x.sold += num(r.sold); x.end = num(r.ending); if (r.note) x.notes.push(fmtD(r.count_date).split(',')[0] + ': ' + r.note); });
+  const list = Object.values(by).map(x => ({ ...x, name: S.dishById[x.id]?.name || '?', section: menu[x.id]?.section || '' })).sort((a, b) => b.sold - a.sold || a.name.localeCompare(b.name));
+  const days = new Set(rows.map(r => r.count_date)).size, T = k => list.reduce((s, x) => s + x[k], 0);
+  const top = list.filter(x => x.sold > 0).slice(0, 5), pulled = list.filter(x => x.out > 0).sort((a, b) => b.out - a.out).slice(0, 5), idle = list.filter(x => !x.sold && (x.start || x.in));
+  return `<div class="card"><div class="row wrap"><a class="btn ghost" href="#/r/kitchen/week/${addDays(from, -7)}">‹ Previous</a><b>${esc(fmtD(from))} – ${esc(fmtD(to))}</b>${from < weekStart(today()) ? `<a class="btn ghost" href="#/r/kitchen/week/${addDays(from, 7)}">Next ›</a>` : ''}<span class="sp"></span><span class="small mut">${days} of 7 days counted</span><button class="ghost" onclick="window.print()">Print</button></div></div>
+   ${list.length ? `<div class="kpis"><div class="kpi"><span>Portions sold</span><b>${fq(T('sold'))}</b></div><div class="kpi"><span>Cooked</span><b>${fq(T('in'))}</b></div><div class="kpi ${T('out') ? 'bad' : ''}"><span>Pulled out</span><b>${fq(T('out'))}</b></div></div>
+   <div class="two"><div class="card"><h3>Best sellers</h3>${top.map((x, i) => `<div class="mline"><span>${i + 1}. ${esc(x.name)}</span><span class="sp"></span><b>${fq(x.sold)}</b></div>`).join('') || '<span class="mut small">No sales recorded.</span>'}</div>
+     <div class="card"><h3>Pulled out — check waste</h3>${pulled.map(x => `<div class="mline"><span>${esc(x.name)}</span><span class="sp"></span><b class="warn-t">${fq(x.out)}</b></div>`).join('') || '<span class="mut small">None.</span>'}</div></div>
+   ${idle.length ? `<p class="small mut">In stock but not sold this week: ${idle.map(x => esc(x.name)).join(', ')}</p>` : ''}
+   <div class="card tw"><table><thead><tr><th>Dish</th><th class="n">Beg</th><th class="n">Cooked</th><th class="n">Pull-out</th><th class="n">Sold</th><th class="n">End</th></tr></thead><tbody>
+   ${list.map(x => `<tr><td>${esc(x.name)}<div class="small mut">${esc(x.section)}${x.notes.length ? ' · ' + esc(x.notes.join(' · ')) : ''}</div></td><td class="n">${fq(x.start)}</td><td class="n">${x.in ? fq(x.in) : ''}</td><td class="n ${x.out ? 'warn-t' : ''}">${x.out ? fq(x.out) : ''}</td><td class="n"><b>${fq(x.sold)}</b></td><td class="n">${fq(x.end)}</td></tr>`).join('')}
+   </tbody></table></div>` : '<div class="empty">No counts this week.</div>'}`;
+}
+async function kDishes() {
+  const rows = await db.select('restaurant_menu', { order: [['sort']] });
+  const sections = [...new Set(rows.map(r => r.section))];
+  return `<p class="lede">The dishes counted every day. <b>Par</b> = cook back up to this many portions; <b>Low</b> = below this, the dish goes on the restock list. Changes save by themselves.</p>
+   <div class="card tw"><table><thead><tr><th>Dish</th><th>Menu section</th><th>Main ingredient</th><th class="n">Par</th><th class="n">Low</th><th class="n">Counted</th></tr></thead><tbody>
+   ${rows.map(r => `<tr data-rm="${r.dish_id}"><td>${esc(S.dishById[r.dish_id]?.name || '?')}</td>
+     <td><input list="dl-sec" data-rmf="section" value="${esc(r.section)}"></td><td><select data-rmf="protein">${KPROT_ORDER.map(p => opt(p, p, p === r.protein)).join('')}</select></td>
+     <td class="n"><input class="qty" type="number" min="0" step="1" data-rmf="par" value="${num(r.par)}"></td><td class="n"><input class="qty" type="number" min="0" step="1" data-rmf="min_level" value="${num(r.min_level)}"></td>
+     <td class="n"><input type="checkbox" data-rmf="active" ${r.active ? 'checked' : ''}></td></tr>`).join('')}
+   </tbody></table><datalist id="dl-sec">${sections.map(x => `<option value="${esc(x)}">`).join('')}</datalist></div>
+   <form class="card addline" data-form="addKDish"><input name="name" placeholder="Add a dish to the daily count" list="dl-dishes-all" required><input name="section" list="dl-sec" placeholder="Menu section" required><button class="pri">Add</button></form>
+   <datalist id="dl-dishes-all">${S.dishes.map(d => `<option value="${esc(d.name)}">`).join('')}</datalist>`;
+}
+document.addEventListener('change', async e => {
+  const f = e.target.dataset?.rmf; if (!f) return; const id = e.target.closest('[data-rm]').dataset.rm;
+  const v = f === 'active' ? e.target.checked : ['par', 'min_level'].includes(f) ? num(e.target.value) : e.target.value.trim();
+  try { await db.update('restaurant_menu', { [f]: v }, { dish_id: id }); toast('Saved'); } catch (err) { toast(err.message, true); }
+});
+FORMS.addKDish = async f => {
+  let id = S.dishes.find(d => d.name.toLowerCase() === f.name.trim().toLowerCase())?.id;
+  if (!id) id = (await db.insert('dishes', { name: f.name.trim(), category: 'Others', course: 'Main', sold_as: ['restaurant'] }))[0].id;
+  const max = (await db.select('restaurant_menu', { cols: 'sort', order: [['sort', false]], limit: 1 }))[0]?.sort || 0;
+  await db.upsert('restaurant_menu', { dish_id: id, section: f.section.trim(), sort: max + 10, active: true }, 'dish_id');
+  await loadMaster(); toast('Added to the daily count'); refresh();
+};
+// Restaurant reuses the purchasing, receiving and store pages; they read the workspace from the address (#/r/…)
+['requests', 'pr', 'orders', 'po', 'stock', 'count'].forEach(k => routes['r/' + k] = (...a) => routes['c/' + k](...a));
 
 /* ================= PEOPLE (owner) ================= */
 routes.people = async arg => {
