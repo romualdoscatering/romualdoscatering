@@ -95,3 +95,4 @@ code{background:#0000000d;padding:1px 4px;border-radius:4px;font-size:13px}
 .jump{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0;position:sticky;top:0;z-index:5;background:var(--bg,#f4f2ec);padding:8px 0}.jump button{font-size:12px;padding:5px 10px;border-radius:14px;background:#fff;border:1px solid var(--line);color:var(--ink)}
 .dgroup{scroll-margin-top:60px}
 .nowrap{white-space:nowrap}.ing-edit td{background:#faf7ef}.ing-edit .grid{margin-bottom:6px}
+tr.grp td{background:#f1ede3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--navy);padding:7px 10px}

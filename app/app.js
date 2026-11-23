@@ -61,6 +61,24 @@ document.addEventListener('change', e => {
 });
 function itemIdFromName(name) { const n = (name || '').trim().toLowerCase(); return S.items.find(i => i.name.toLowerCase() === n)?.id || null; }
 
+// Shopping order: proteins first (chicken, beef, pork, fish & seafood — biggest quantity first),
+// then the wet market (vegetables, fruit, eggs, rice), then grocery, then everything else — A–Z after proteins
+const SHOP = [['Chicken', ['Poultry']], ['Beef', ['Beef']], ['Pork', ['Pork']], ['Fish & seafood', ['Seafood']],
+  ['Vegetables & wet market (Bankerohan)', ['Vegetables', 'Fruits', 'Rice & grains']],
+  ['Grocery', ['Dairy & eggs', 'Pantry', 'Dry goods', 'Oil & fats', 'Condiments & spices', 'Beverages', 'Processed meat', 'Frozen']]];
+function shopRank(itemId) {
+  const it = S.itemsById[itemId] || {};
+  if (/^eggs?\b/i.test(it.name || '')) return 4;                       // eggs are bought at the market
+  const i = SHOP.findIndex(([, cats]) => cats.includes(it.category)); return i < 0 ? SHOP.length : i;
+}
+const SHOP_HEADS = [...SHOP.map(([h]) => h), 'Miscellaneous'];
+// rows: any objects; idOf(row) → item id; qtyOf(row) → quantity; cols: table width; render(row) → <tr>
+function shopRows(rows, idOf, qtyOf, cols, render) {
+  const sorted = [...rows].sort((a, b) => { const ra = shopRank(idOf(a)), rb = shopRank(idOf(b));
+    return ra - rb || (ra < 4 ? num(qtyOf(b)) - num(qtyOf(a)) : 0) || itemName(idOf(a)).localeCompare(itemName(idOf(b))); });
+  let last = -1;
+  return sorted.map(r => { const g = shopRank(idOf(r)); const head = g !== last ? `<tr class="grp"><td colspan="${cols}">${g < 4 ? 'Protein · ' : ''}${esc(SHOP_HEADS[g])}</td></tr>` : ''; last = g; return head + render(r); }).join('');
+}
 /* ================= router ================= */
 const routes = {};
 let current = '';
@@ -233,7 +251,7 @@ routes['c/event'] = async id => {
    ${warnings.length ? `<div class="alert warn"><b>Not included yet:</b><ul>${warnings.map(w => `<li>${esc(w.dish)} — ${esc(w.problem)}</li>`).join('')}</ul></div>` : ''}
    ${needs.length ? `<details ${toBuy.length ? 'open' : ''}><summary>What this event needs (${needs.length} ingredients, ${toBuy.length} to buy · est. ${peso(needs.reduce((s, n) => s + num(n.est_cost), 0))})</summary>
      <div class="tw"><table><thead><tr><th>Ingredient</th><th class="n">Needed</th><th class="n">In store</th><th class="n">To buy</th><th class="n">Est. cost</th></tr></thead><tbody>
-     ${needs.map(n => `<tr><td>${esc(n.item)}<div class="small mut">${esc(n.from_dishes || '')}</div></td><td class="n">${fq(n.needed)} ${esc(n.unit)}</td><td class="n mut">${fq(n.free_stock)}</td><td class="n"><b>${num(n.to_buy) > 0 ? fq(n.to_buy) : '—'}</b></td><td class="n">${num(n.est_cost) ? peso(n.est_cost) : '<span class="mut small">no price yet</span>'}</td></tr>`).join('')}
+     ${shopRows(needs, n => n.item_id, n => n.needed, 5, n => `<tr><td>${esc(n.item)}<div class="small mut">${esc(n.from_dishes || '')}</div></td><td class="n">${fq(n.needed)} ${esc(n.unit)}</td><td class="n mut">${fq(n.free_stock)}</td><td class="n"><b>${num(n.to_buy) > 0 ? fq(n.to_buy) : '—'}</b></td><td class="n">${num(n.est_cost) ? peso(n.est_cost) : '<span class="mut small">no price yet</span>'}</td></tr>`)}
      </tbody></table></div></details>` : '<p class="mut">Add dishes with verified recipes to see what to buy.</p>'}
    ${prs.length ? `<h3 class="mt">Requests for this event</h3><div class="list">${prs.map(p => `<a class="li" href="#/c/pr/${p.id}"><div class="li-main"><b>${esc(p.pr_no)}</b><span class="mut small">${p.line_count} items · ${peso(p.est_total)} · ${esc(fmtT(p.created_at))}</span></div>${chip(PR_STATUS[p.status], statusTone(p.status))}</a>`).join('')}</div>` : ''}
   </section>
@@ -241,7 +259,7 @@ routes['c/event'] = async id => {
   ${(pick.length || ['confirmed', 'in_prep', 'done'].includes(ev.status)) && can('catering', 'storekeeper', 'manager', 'chef') ? `<section class="card"><h2>Prep day</h2>
    ${pick.length ? `<form data-form="issue" data-id="${ev.id}"><p class="small mut">Stock set aside for this event in the catering store. Issue it to the cook in charge.</p>
      <div class="tw"><table><thead><tr><th>Item</th><th class="n">Set aside</th><th class="n">Issue now</th></tr></thead><tbody>
-     ${pick.map(p => `<tr><td>${esc(p.name)}</td><td class="n">${fq(p.reserved)} ${esc(p.stock_unit)}</td><td class="n"><input name="q_${p.item_id}" type="number" step="any" min="0" value="${num(p.reserved)}" class="qty"></td></tr>`).join('')}
+     ${shopRows(pick, p => p.item_id, p => p.reserved, 3, p => `<tr><td>${esc(p.name)}</td><td class="n">${fq(p.reserved)} ${esc(p.stock_unit)}</td><td class="n"><input name="q_${p.item_id}" type="number" step="any" min="0" value="${num(p.reserved)}" class="qty"></td></tr>`)}
      </tbody></table></div><div class="row end"><input name="received_by" placeholder="Received by (cook in charge)" required><button class="pri">Issue to event</button></div></form>` : '<p class="mut">Nothing set aside for this event right now.</p>'}
    <details class="mt"><summary>Return leftovers to the store</summary><form data-form="returnLeft" data-id="${ev.id}" class="addline"><input name="item" list="dl-items" placeholder="Item" autocomplete="off"><input name="qty" type="number" step="any" min="0" placeholder="qty" class="qty"><input name="by" placeholder="Returned by" required><button>Return</button></form>${itemDatalist()}</details>
   </section>` : ''}
@@ -311,7 +329,6 @@ ACT.newPR = async () => { const r = (await db.insert('purchase_requests', { ws: 
 routes['c/pr'] = async id => {
   const [p] = await db.select('pr_overview', { eq: { id } }); if (!p) return '<div class="card">Request not found.</div>';
   const [lines, orders] = await Promise.all([db.select('pr_lines', { eq: { pr_id: id } }), db.select('po_overview', { eq: { pr_id: id }, order: [['ordered_at']] })]);
-  lines.sort((a, b) => (S.itemsById[a.item_id]?.category || '').localeCompare(S.itemsById[b.item_id]?.category || '') || itemName(a.item_id).localeCompare(itemName(b.item_id)));
   const mine = p.requested_by === S.user.id;
   const editable = p.status === 'draft' && (mine || can(p.ws, 'manager'));
   const approver = p.status === 'submitted' && can(p.ws, 'manager') && (!mine || isAdmin());
@@ -327,12 +344,12 @@ routes['c/pr'] = async id => {
   ${p.decision_note ? `<div class="alert ${p.status === 'rejected' ? 'bad' : 'info'}">${esc(p.decision_note)}</div>` : ''}
   <form class="card" data-form="${approver ? 'approvePR' : editable ? 'saveDraft' : 'none'}" data-id="${id}">
    <div class="tw"><table><thead><tr><th>Item</th><th class="n">Requested</th>${p.status !== 'draft' ? '<th class="n">Approved</th>' : ''}${buyer ? '<th class="n">Still to order</th>' : ''}<th class="n">Est. price</th><th class="n">In store then</th>${editable ? '<th></th>' : ''}</tr></thead><tbody>
-   ${lines.map(l => `<tr><td>${esc(itemName(l.item_id))}${l.note ? `<div class="small mut">${esc(l.note)}</div>` : ''}</td>
+   ${shopRows(lines, l => l.item_id, l => l.approved_qty ?? l.qty, 7, l => `<tr><td>${esc(itemName(l.item_id))}${l.note ? `<div class="small mut">${esc(l.note)}</div>` : ''}</td>
      <td class="n">${editable ? `<input name="q_${l.id}" type="number" step="any" min="0" value="${num(l.qty)}" class="qty">` : fq(l.qty)} ${esc(itemUnit(l.item_id))}</td>
      ${p.status !== 'draft' ? `<td class="n">${approver ? `<input name="a_${l.id}" type="number" step="any" min="0" max="${num(l.qty)}" value="${num(l.qty)}" class="qty">` : l.approved_qty != null ? fq(l.approved_qty) : '—'}</td>` : ''}
      ${buyer ? `<td class="n">${remaining(l) > 0 ? `<label class="tick"><input type="checkbox" name="o_${l.id}" checked form="orderForm"> ${fq(remaining(l))}</label>` : '<span class="mut">ordered</span>'}</td>` : ''}
      <td class="n">${num(l.est_unit_cost) ? peso(l.est_unit_cost) : '<span class="mut small">—</span>'}</td><td class="n mut">${l.on_hand_then != null ? fq(l.on_hand_then) : ''}</td>
-     ${editable ? `<td><button type="button" class="x" data-act="rmLine" data-id="${l.id}">✕</button></td>` : ''}</tr>`).join('')}
+     ${editable ? `<td><button type="button" class="x" data-act="rmLine" data-id="${l.id}">✕</button></td>` : ''}</tr>`)}
    </tbody><tfoot><tr><td colspan="9">Estimated total ${peso(total)} <span class="small mut">(items without a price yet count as ₱0)</span></td></tr></tfoot></table></div>
    ${editable ? `<div class="addline mt"><input name="new_item" list="dl-items" placeholder="Add item" autocomplete="off"><input name="new_qty" type="number" step="any" min="0" placeholder="qty" class="qty"><button type="button" data-act="addLine" data-id="${id}">Add</button></div>${itemDatalist()}
      <div class="grid mt"><label>Purpose<input name="purpose" value="${esc(p.purpose || '')}"></label><label>Needed by<input name="needed_by" type="date" value="${esc(p.needed_by || '')}"></label>
@@ -396,8 +413,8 @@ routes['c/po'] = async id => {
   <form class="card" data-form="${canRecv ? 'receive' : 'none'}" data-id="${id}"><h2>${canRecv ? 'Receive' : 'Items'}</h2>
    ${canRecv ? `<p class="small mut">Weigh or count what actually arrived. Only what you enter goes into the catering store.${o.buyer === S.user.id ? ' <b class="warn-t">You are the buyer on this order — it will be flagged if you receive it yourself.</b>' : ''}</p>` : ''}
    <div class="tw"><table><thead><tr><th>Item</th><th class="n">Ordered</th><th class="n">Received so far</th>${canRecv ? '<th class="n">Received now</th><th class="n">Actual unit price ₱</th>' : '<th class="n">Unit price</th>'}</tr></thead><tbody>
-   ${lines.map(l => { const left = Math.max(num(l.ordered) - num(l.received), 0); return `<tr><td>${esc(l.name)}</td><td class="n">${fq(l.ordered)} ${esc(l.stock_unit)}</td><td class="n ${num(l.received) < num(l.ordered) && o.status !== 'open' ? 'warn-t' : ''}">${fq(l.received)}</td>
-     ${canRecv ? `<td class="n"><input name="q_${l.id}" type="number" step="any" min="0" value="${left}" class="qty"></td><td class="n"><input name="c_${l.id}" type="number" step="any" min="0" value="${num(l.unit_cost) || ''}" class="qty" placeholder="price"></td>` : `<td class="n">${peso(l.unit_cost)}</td>`}</tr>`; }).join('')}
+   ${shopRows(lines, l => l.item_id, l => l.ordered, 5, l => { const left = Math.max(num(l.ordered) - num(l.received), 0); return `<tr><td>${esc(l.name)}</td><td class="n">${fq(l.ordered)} ${esc(l.stock_unit)}</td><td class="n ${num(l.received) < num(l.ordered) && o.status !== 'open' ? 'warn-t' : ''}">${fq(l.received)}</td>
+     ${canRecv ? `<td class="n"><input name="q_${l.id}" type="number" step="any" min="0" value="${left}" class="qty"></td><td class="n"><input name="c_${l.id}" type="number" step="any" min="0" value="${num(l.unit_cost) || ''}" class="qty" placeholder="price"></td>` : `<td class="n">${peso(l.unit_cost)}</td>`}</tr>`; })}
    </tbody></table></div>
    ${canRecv ? `<div class="grid mt"><label>Official receipt / invoice no.<input name="or_no"></label><label>Note<input name="note" placeholder="e.g. 0.5 kg short, wilted pechay"></label></div><div class="row end"><button class="pri">Receive into store</button></div>` : ''}
   </form>
