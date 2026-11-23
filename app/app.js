@@ -79,6 +79,20 @@ function shopRows(rows, idOf, qtyOf, cols, render) {
   let last = -1;
   return sorted.map(r => { const g = shopRank(idOf(r)); const head = g !== last ? `<tr class="grp"><td colspan="${cols}">${g < 4 ? 'Protein · ' : ''}${esc(SHOP_HEADS[g])}</td></tr>` : ''; last = g; return head + render(r); }).join('');
 }
+// Countable items are bought whole; items sold by the tray/pack/sack also show how that splits:
+// 77 eggs → "2 trays + 17 pc", 0.06 kg pepper → "2 packs"
+const COUNTABLE = ['pc', 'pack', 'can', 'bundle', 'bottle', 'tray', 'box', 'case', 'sack'];
+const buyRound = (itemId, q) => COUNTABLE.includes(S.itemsById[itemId]?.stock_unit) ? Math.ceil(num(q) - 1e-9) : num(q);
+const plural = (n, u) => `${fq(n)} ${u}${n > 1 && !/s$/.test(u) && !['kg', 'g', 'L', 'ml'].includes(u) ? 's' : ''}`;
+function packSplit(itemId, q) {
+  const it = S.itemsById[itemId]; q = buyRound(itemId, q); if (!it || !(q > 0)) return '';
+  const upp = num(it.units_per_purchase); if (it.purchase_unit === it.stock_unit || !(upp > 0) || upp === 1) return '';
+  if (upp < 1) return plural(Math.ceil(q / upp - 1e-9), it.purchase_unit);
+  const whole = Math.floor(q / upp + 1e-9), rest = Math.round((q - whole * upp) * 1000) / 1000;
+  if (!whole) return '';
+  return plural(whole, it.purchase_unit) + (rest > 0 ? ` + ${fq(rest)} ${it.stock_unit}` : '');
+}
+const buyCell = (itemId, q) => { const r = buyRound(itemId, q), sp = packSplit(itemId, q); return `${fq(r)}${sp ? `<div class="small mut">${esc(sp)}</div>` : ''}`; };
 /* ================= router ================= */
 const routes = {};
 let current = '';
@@ -251,7 +265,7 @@ routes['c/event'] = async id => {
    ${warnings.length ? `<div class="alert warn"><b>Not included yet:</b><ul>${warnings.map(w => `<li>${esc(w.dish)} — ${esc(w.problem)}</li>`).join('')}</ul></div>` : ''}
    ${needs.length ? `<details ${toBuy.length ? 'open' : ''}><summary>What this event needs (${needs.length} ingredients, ${toBuy.length} to buy · est. ${peso(needs.reduce((s, n) => s + num(n.est_cost), 0))})</summary>
      <div class="tw"><table><thead><tr><th>Ingredient</th><th class="n">Needed</th><th class="n">In store</th><th class="n">To buy</th><th class="n">Est. cost</th></tr></thead><tbody>
-     ${shopRows(needs, n => n.item_id, n => n.needed, 5, n => `<tr><td>${esc(n.item)}<div class="small mut">${esc(n.from_dishes || '')}</div></td><td class="n">${fq(n.needed)} ${esc(n.unit)}</td><td class="n mut">${fq(n.free_stock)}</td><td class="n"><b>${num(n.to_buy) > 0 ? fq(n.to_buy) : '—'}</b></td><td class="n">${num(n.est_cost) ? peso(n.est_cost) : '<span class="mut small">no price yet</span>'}</td></tr>`)}
+     ${shopRows(needs, n => n.item_id, n => n.needed, 5, n => `<tr><td>${esc(n.item)}<div class="small mut">${esc(n.from_dishes || '')}</div></td><td class="n">${fq(n.needed)} ${esc(n.unit)}</td><td class="n mut">${fq(n.free_stock)}</td><td class="n"><b>${num(n.to_buy) > 0 ? buyCell(n.item_id, n.to_buy) : '—'}</b></td><td class="n">${num(n.est_cost) ? peso(n.est_cost) : '<span class="mut small">no price yet</span>'}</td></tr>`)}
      </tbody></table></div></details>` : '<p class="mut">Add dishes with verified recipes to see what to buy.</p>'}
    ${prs.length ? `<h3 class="mt">Requests for this event</h3><div class="list">${prs.map(p => `<a class="li" href="#/c/pr/${p.id}"><div class="li-main"><b>${esc(p.pr_no)}</b><span class="mut small">${p.line_count} items · ${peso(p.est_total)} · ${esc(fmtT(p.created_at))}</span></div>${chip(PR_STATUS[p.status], statusTone(p.status))}</a>`).join('')}</div>` : ''}
   </section>
@@ -345,8 +359,8 @@ routes['c/pr'] = async id => {
   <form class="card" data-form="${approver ? 'approvePR' : editable ? 'saveDraft' : 'none'}" data-id="${id}">
    <div class="tw"><table><thead><tr><th>Item</th><th class="n">Requested</th>${p.status !== 'draft' ? '<th class="n">Approved</th>' : ''}${buyer ? '<th class="n">Still to order</th>' : ''}<th class="n">Est. price</th><th class="n">In store then</th>${editable ? '<th></th>' : ''}</tr></thead><tbody>
    ${shopRows(lines, l => l.item_id, l => l.approved_qty ?? l.qty, 7, l => `<tr><td>${esc(itemName(l.item_id))}${l.note ? `<div class="small mut">${esc(l.note)}</div>` : ''}</td>
-     <td class="n">${editable ? `<input name="q_${l.id}" type="number" step="any" min="0" value="${num(l.qty)}" class="qty">` : fq(l.qty)} ${esc(itemUnit(l.item_id))}</td>
-     ${p.status !== 'draft' ? `<td class="n">${approver ? `<input name="a_${l.id}" type="number" step="any" min="0" max="${num(l.qty)}" value="${num(l.qty)}" class="qty">` : l.approved_qty != null ? fq(l.approved_qty) : '—'}</td>` : ''}
+     <td class="n">${editable ? `<input name="q_${l.id}" type="number" step="any" min="0" value="${num(l.qty)}" class="qty">` : fq(l.qty)} ${esc(itemUnit(l.item_id))}${packSplit(l.item_id, l.qty) ? `<div class="small mut">${esc(packSplit(l.item_id, l.qty))}</div>` : ''}</td>
+     ${p.status !== 'draft' ? `<td class="n">${approver ? `<input name="a_${l.id}" type="number" step="any" min="0" max="${num(l.qty)}" value="${num(l.qty)}" class="qty">` : l.approved_qty != null ? buyCell(l.item_id, l.approved_qty) : '—'}</td>` : ''}
      ${buyer ? `<td class="n">${remaining(l) > 0 ? `<label class="tick"><input type="checkbox" name="o_${l.id}" checked form="orderForm"> ${fq(remaining(l))}</label>` : '<span class="mut">ordered</span>'}</td>` : ''}
      <td class="n">${num(l.est_unit_cost) ? peso(l.est_unit_cost) : '<span class="mut small">—</span>'}</td><td class="n mut">${l.on_hand_then != null ? fq(l.on_hand_then) : ''}</td>
      ${editable ? `<td><button type="button" class="x" data-act="rmLine" data-id="${l.id}">✕</button></td>` : ''}</tr>`)}
@@ -413,7 +427,7 @@ routes['c/po'] = async id => {
   <form class="card" data-form="${canRecv ? 'receive' : 'none'}" data-id="${id}"><h2>${canRecv ? 'Receive' : 'Items'}</h2>
    ${canRecv ? `<p class="small mut">Weigh or count what actually arrived. Only what you enter goes into the catering store.${o.buyer === S.user.id ? ' <b class="warn-t">You are the buyer on this order — it will be flagged if you receive it yourself.</b>' : ''}</p>` : ''}
    <div class="tw"><table><thead><tr><th>Item</th><th class="n">Ordered</th><th class="n">Received so far</th>${canRecv ? '<th class="n">Received now</th><th class="n">Actual unit price ₱</th>' : '<th class="n">Unit price</th>'}</tr></thead><tbody>
-   ${shopRows(lines, l => l.item_id, l => l.ordered, 5, l => { const left = Math.max(num(l.ordered) - num(l.received), 0); return `<tr><td>${esc(l.name)}</td><td class="n">${fq(l.ordered)} ${esc(l.stock_unit)}</td><td class="n ${num(l.received) < num(l.ordered) && o.status !== 'open' ? 'warn-t' : ''}">${fq(l.received)}</td>
+   ${shopRows(lines, l => l.item_id, l => l.ordered, 5, l => { const left = Math.max(num(l.ordered) - num(l.received), 0); return `<tr><td>${esc(l.name)}</td><td class="n">${fq(l.ordered)} ${esc(l.stock_unit)}${packSplit(l.item_id, l.ordered) ? `<div class="small mut">${esc(packSplit(l.item_id, l.ordered))}</div>` : ''}</td><td class="n ${num(l.received) < num(l.ordered) && o.status !== 'open' ? 'warn-t' : ''}">${fq(l.received)}</td>
      ${canRecv ? `<td class="n"><input name="q_${l.id}" type="number" step="any" min="0" value="${left}" class="qty"></td><td class="n"><input name="c_${l.id}" type="number" step="any" min="0" value="${num(l.unit_cost) || ''}" class="qty" placeholder="price"></td>` : `<td class="n">${peso(l.unit_cost)}</td>`}</tr>`; })}
    </tbody></table></div>
    ${canRecv ? `<div class="grid mt"><label>Official receipt / invoice no.<input name="or_no"></label><label>Note<input name="note" placeholder="e.g. 0.5 kg short, wilted pechay"></label></div><div class="row end"><button class="pri">Receive into store</button></div>` : ''}
