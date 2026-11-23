@@ -96,3 +96,13 @@ code{background:#0000000d;padding:1px 4px;border-radius:4px;font-size:13px}
 .dgroup{scroll-margin-top:60px}
 .nowrap{white-space:nowrap}.ing-edit td{background:#faf7ef}.ing-edit .grid{margin-bottom:6px}
 tr.grp td{background:#f1ede3;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--navy);padding:7px 10px}
+.menu-grid{margin-top:6px}
+.mcourse{display:grid;grid-template-columns:150px 1fr;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.mcourse:first-child{border-top:0}
+.mc-label{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--gold);padding-top:9px}
+.mc-items .mline{border-bottom:0;padding:5px 0}
+.mname{font-weight:500}
+.mtag{font-size:11.5px;color:var(--mut);background:#f1ede3;border-radius:9px;padding:1px 8px}
+.addbox{margin-top:14px;background:#faf8f3;border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.addbox .addline{margin-top:8px}.addbox p{margin:8px 0 0}
+@media (max-width:640px){.mcourse{grid-template-columns:1fr;gap:2px}.mc-label{padding-top:0}}

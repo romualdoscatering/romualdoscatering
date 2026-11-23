@@ -93,6 +93,11 @@ function packSplit(itemId, q) {
   return plural(whole, it.purchase_unit) + (rest > 0 ? ` + ${fq(rest)} ${it.stock_unit}` : '');
 }
 const buyCell = (itemId, q) => { const r = buyRound(itemId, q), sp = packSplit(itemId, q); return `${fq(r)}${sp ? `<div class="small mut">${esc(sp)}</div>` : ''}`; };
+// Mains listed chicken → beef → pork → seafood → others, then A–Z
+const MEAT_ORDER = ['Chicken', 'Beef', 'Pork', 'Seafood'];
+const sortMenu = l => [...l].sort((a, b) => { const da = S.dishById[a.dish_id], db_ = S.dishById[b.dish_id];
+  const ra = MEAT_ORDER.indexOf(da?.category), rb = MEAT_ORDER.indexOf(db_?.category);
+  return (ra < 0 ? 9 : ra) - (rb < 0 ? 9 : rb) || String(da?.name || a.custom_name || '').localeCompare(String(db_?.name || b.custom_name || '')); });
 /* ================= router ================= */
 const routes = {};
 let current = '';
@@ -243,16 +248,17 @@ routes['c/event'] = async id => {
      <label>Contract price ₱<input name="contract_price" type="number" step="any" min="0" value="${esc(ev.contract_price ?? '')}"></label>
     </div><div class="row end">${can('catering', 'manager', 'finance') && ev.status === 'done' ? `<button type="button" class="ghost" data-act="closeEvent" data-id="${ev.id}">Close event (releases leftover stock)</button>` : ''}<button class="pri">Save</button></div></form></details>` : ''}
 
-  <section class="card"><h2>Menu</h2>
-   ${byCourse.length ? byCourse.map(([c, l]) => `<div class="course"><h3>${esc(c)}</h3>${l.map(m => `<div class="mline"><span>${esc(lineName(m))} ${lineChip(m)}${m.note ? `<span class="mut small"> · ${esc(m.note)}</span>` : ''}</span><span class="sp"></span>${m.qty ? `<b>${fq(m.qty)} ${ev.kind === 'packs' ? 'packs' : 'trays'}</b>` : ''}${canMenu ? `<button class="x" title="Remove" data-act="rmMenu" data-id="${m.id}">✕</button>` : ''}</div>`).join('')}</div>`).join('') : '<p class="mut">No dishes yet.</p>'}
-   ${canMenu ? `<form data-form="addMenu" data-id="${ev.id}" class="addline">
-     <select name="course">${COURSES.map(c => opt(c, c, c === (S.lastCourse || 'Main'))).join('')}</select>
+  <section class="card"><div class="row"><h2>Menu</h2><span class="sp"></span><span class="small mut">${menu.length} ${menu.length === 1 ? 'dish' : 'dishes'}${ev.kind === 'buffet' && ev.pax ? ` · buffet for ${ev.pax} guests` : ''}</span></div>
+   ${byCourse.length ? `<div class="menu-grid">${byCourse.map(([c, l]) => `<div class="mcourse"><div class="mc-label">${esc(c)}</div><div class="mc-items">${sortMenu(l).map(m => { const d = S.dishById[m.dish_id];
+     return `<div class="mline"><span class="mname">${esc(lineName(m))}</span>${c === 'Main' && d ? `<span class="mtag">${esc(d.category)}</span>` : ''} ${lineChip(m)}${m.note ? `<span class="mut small"> · ${esc(m.note)}</span>` : ''}<span class="sp"></span>${m.qty ? `<b>${fq(m.qty)} ${ev.kind === 'packs' ? 'packs' : 'trays'}</b>` : ''}${canMenu ? `<button class="x" title="Remove" data-act="rmMenu" data-id="${m.id}">✕</button>` : ''}</div>`; }).join('')}</div></div>`).join('')}</div>` : '<p class="mut">No dishes yet.</p>'}
+   ${canMenu ? `<div class="addbox"><div class="small"><b>Add a dish</b></div><form data-form="addMenu" data-id="${ev.id}" class="addline">
+     <select name="course" aria-label="Course">${COURSES.map(c => opt(c, c, c === (S.lastCourse || 'Main'))).join('')}</select>
      ${ev.kind === 'packs' && S.packs.length ? `<select name="pack_id">${opt('', 'Dish (type below)')}${S.packs.map(p => opt(p.id, p.name)).join('')}</select>` : ''}
      <select name="cat" aria-label="Main dish type"${(S.lastCourse || 'Main') !== 'Main' ? ' hidden' : ''}>${opt('', 'All mains')}${mainCats().map(c => opt(c, c, c === S.lastCat)).join('')}</select>
      <input name="dish" list="dl-dishes" placeholder="Type or pick a dish" autocomplete="off">
      ${ev.kind !== 'buffet' ? `<input name="qty" type="number" step="any" min="0" placeholder="${ev.kind === 'packs' ? 'packs' : 'trays'}" class="qty">` : ''}
      <button class="pri">Add</button></form><datalist id="dl-dishes">${dishOptions(S.lastCourse || 'Main', (S.lastCourse || 'Main') === 'Main' ? S.lastCat || '' : '')}</datalist>
-     <p class="small mut">The list shows only dishes for the course you pick (for Main, pick the meat to shorten it further). You can still type any dish. Names are matched to the standard dish list ("beef steak" → Bistek Tagalog). Several dishes typed together are split. Anything unknown is kept as an off-menu dish for the chef.${ev.kind === 'buffet' ? ' Buffet quantities come from the guest count.' : ''}</p>` : ''}
+     <p class="small mut">Pick the course first to shorten the list. Unknown dishes are kept as off-menu for the chef.${ev.kind === 'buffet' ? ' Buffet quantities come from the guest count.' : ''}</p></div>` : ''}
   </section>
 
   ${(menu.some(m => m.custom_name && !m.dish_id && !m.pack_id) || extras.length) ? `<section class="card"><h2>Off-menu ingredients</h2>
