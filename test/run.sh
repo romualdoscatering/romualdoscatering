@@ -71,7 +71,7 @@ EV3=$(as coord "insert into events(kind,title,event_date,status,pax) values ('pa
 as coord "insert into event_menu(event_id,course,pack_id,qty) values ('$EV3','Main','$PK',25)" >/dev/null
 as coord "select item||' '||needed||' '||unit from event_requirements('$EV3') where item in ('Chicken thigh fillet','Rice','Ground pork')" | sed 's/^/  packs: /'
 echo "== workspace separation and direct-edit protection"
-echo "  restaurant staff sees catering events: $(as staff1 "select count(*) from events") · catering requests: $(as staff1 "select count(*) from purchase_requests") · catering stock rows: $(as staff1 "select count(*) from stock_moves")"
+echo "  restaurant staff sees catering events: $(as staff1 "select count(*) from events") · catering requests: $(as staff1 "select count(*) from purchase_requests where ws = 'catering'") · catering stock rows: $(as staff1 "select count(*) from stock_moves")"
 expect_fail staff1 "insert into stock_moves(ws,item_id,kind,qty) select 'restaurant', id, 'receipt', 5 from items limit 1"
 expect_fail coord "insert into stock_moves(ws,item_id,kind,qty) select 'catering', id, 'count_adjust', 50 from items limit 1"
 expect_fail staff1 "select generate_event_pr('$EV')"
@@ -82,7 +82,7 @@ as mgr "insert into item_par select id,'restaurant',5,8 from items where name in
 as mgr "select generate_par_pr('restaurant')" | cut -c1-80
 expect_fail staff1 "select post_stock_out('restaurant','waste',(select json_agg(json_build_object('item_id',id,'qty',1))::jsonb from items where name='Cabbage'))"
 echo "== website booking as an anonymous visitor"
-echo "  submitted: $(anon "select submit_booking('{\"customer\":{\"name\":\"Test\"},\"event\":{\"pax\":\"80\",\"date\":\"2026-12-30\"}}')")"
+echo "  submitted: $(anon "select submit_booking('{\"customer\":{\"name\":\"Test\",\"phone\":\"0917\"},\"event\":{\"pax\":\"80\",\"date\":\"2026-12-30\"}}')")"
 out=$(anon "select count(*) from bookings"); echo "$out" | grep -q "permission denied" && echo "  ✓ blocked: visitor cannot read bookings or any table" || echo "  ✗ visitor read bookings: $out"
 echo "== audit trail entries: $(su_ "select count(*) from audit_log") · who approved $(su_ "select pr_no from purchase_requests where id='$PRID'"): $(su_ "select p.full_name from purchase_requests r join profiles p on p.id=r.approved_by where r.id='$PRID'")"
 echo "== recipe control: a manager's edit sends a verified recipe back to draft; coordinators can't edit; nobody fakes verification"
