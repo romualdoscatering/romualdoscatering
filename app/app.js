@@ -482,7 +482,7 @@ routes['c/recipe'] = async id => {
   const [[r], lines] = await Promise.all([db.select('recipes', { eq: { dish_id: id } }), db.select('recipe_lines', { eq: { dish_id: id } })]);
   const edit = canAny('chef', 'manager');
   const cost = lines.reduce((s, l) => s + num(l.qty) * num(S.itemsById[l.item_id]?.last_cost), 0);
-  lines.sort((a, b) => itemName(a.item_id).localeCompare(itemName(b.item_id)));
+  lines.sort((a, b) => num(b.qty) - num(a.qty) || itemName(a.item_id).localeCompare(itemName(b.item_id)));  // biggest quantity first
   return `<div class="row"><a href="#/c/recipes" class="back">‹ Dishes</a></div>
   <div class="row"><h1>${esc(d.name)}</h1>${r ? chip(r.status === 'verified' ? 'Verified' : 'Draft', r.status === 'verified' ? 'ok' : 'warn') : chip('No recipe', 'mut')}</div>
   <p class="lede">${esc(d.category)} · ${esc(d.course)} · chosen ${d.times_booked}× ${d.tray_price ? '· tray price ' + peso(d.tray_price) : ''}</p>
