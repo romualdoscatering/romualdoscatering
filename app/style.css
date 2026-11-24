@@ -195,3 +195,4 @@ body.pos-mode main{max-width:none;padding:0;margin:0}
 .p-dpanel{position:absolute;left:0;top:0;bottom:0;width:min(320px,85vw);background:#fff;padding:16px;display:flex;flex-direction:column;gap:8px;overflow:auto}.p-dpanel a:not(.otab):not(.btn){padding:8px 2px;color:var(--ink)}
 .p-dpanel .otab{min-width:0}
 @media (max-width:900px){.pos2{grid-template-columns:1fr;height:auto}.p-grid{max-height:55vh}.p-right{border-left:0}}
+.p-tile.add{border:2px dashed #5cc96b;color:#5cc96b;background:transparent}.p-tile.add b{font-size:30px;font-weight:400}.p-tile.add small{color:#5cc96b}

@@ -908,7 +908,8 @@ function posHtml() {
     <div class="p-bar"><button type="button" class="ic" data-posdrawer title="Orders and menu">☰</button><button type="button" class="ic ${POS.search ? 'on' : ''}" data-possearch title="Search">⌕</button>
      ${POS.search ? `<input class="p-search" placeholder="Find a dish…" value="${esc(POS.q)}" data-posq>` : `<div class="p-tabs">${secs.map(x => `<button type="button" class="${POS.sec === x ? 'on' : ''}" data-possec="${esc(x)}">${esc(x)}</button>`).join('')}</div>`}</div>
     <div class="p-grid">${items.map(m => { const left = posLeft(m), inO = o.lines.filter(l => l.dish_id === m.dish_id).reduce((a, l) => a + num(l.qty), 0);
-      return `<button type="button" class="p-tile ${left !== null && left <= 0 ? 'out' : ''}" style="--c:${PROT_C[m.protein] || PROT_C.Others}" data-posadd="${m.dish_id}">${inO ? `<i>${fq(inO)}</i>` : ''}<b>${esc(m.name)}</b><small>${peso(m.price).replace('.00', '')}${left !== null ? ` · ${left <= 0 ? 'out' : fq(left) + ' left'}` : ''}</small></button>`; }).join('') || '<div class="p-empty">No dishes here.</div>'}</div>
+      return `<button type="button" class="p-tile ${left !== null && left <= 0 ? 'out' : ''}" style="--c:${PROT_C[m.protein] || PROT_C.Others}" data-posadd="${m.dish_id}">${inO ? `<i>${fq(inO)}</i>` : ''}<b>${esc(m.name)}</b><small>${peso(m.price).replace('.00', '')}${left !== null ? ` · ${left <= 0 ? 'out' : fq(left) + ' left'}` : ''}</small></button>`; }).join('') || (posEditor() ? '' : '<div class="p-empty">No dishes here.</div>')}
+     ${posEditor() ? '<button type="button" class="p-tile add" data-act="posNewItem"><b>＋</b><small>Add item</small></button>' : ''}</div>
     ${unpriced ? `<p class="p-note">${unpriced} item${unpriced > 1 ? 's' : ''} hidden — no price yet${can('restaurant', 'manager', 'chef') ? ' · <a href="#/r/kitchen/dishes">set prices</a>' : ''}</p>` : ''}
    </div>
    <div class="p-right">
@@ -927,7 +928,7 @@ function posHtml() {
    ${POS.drawer ? `<div class="p-drawer" data-posdrawer-bg><div class="p-dpanel"><h2>Open orders</h2>
      ${POS.open.map(x => `<a class="otab ${x.id === o.id ? 'on' : ''}" href="#/r/pos/${x.id}"><b>${x.table_no ? 'Table ' + esc(x.table_no) : '#' + x.order_no + ' · ' + KIND_L[x.kind]}</b><small>${peso(x.total)}</small></a>`).join('') || '<p class="mut small">No open orders.</p>'}
      <a class="btn pri" href="#/r/pos/new">＋ New order</a><hr>
-     <a href="#/r/sales">Sales today</a><a href="#/r/kitchen">Kitchen stocks</a>${POS.shift && posCash() ? '<a href="#/r/sales">Close the cash drawer</a>' : ''}<a href="#/">Exit POS</a></div></div>` : ''}
+     ${posEditor() ? '<a href="javascript:void 0" data-act="posNewItem">＋ Add an item to the POS</a>' : ''}<a href="#/r/sales">Sales today</a><a href="#/r/kitchen">Kitchen stocks</a>${POS.shift && posCash() ? '<a href="#/r/sales">Close the cash drawer</a>' : ''}<a href="#/">Exit POS</a></div></div>` : ''}
   </div>`;
 }
 function posPaint() { $('#main').innerHTML = posHtml(); }
@@ -973,6 +974,48 @@ document.addEventListener('input', e => {
   if (e.target.matches('[data-poscashin]')) { POS.cash = num(e.target.value); const v = e.target.value; posPaint(); const i = $('[data-poscashin]'); i.focus(); i.value = v; }
 });
 document.addEventListener('change', e => { const f = e.target.dataset?.posf; if (f && POS.order) { POS.order[f] = e.target.value.trim(); posQueueSave(); } });
+
+// ---- add an item (or change a price) straight from the POS — managers and chefs ----
+const posEditor = () => can('restaurant', 'manager', 'chef');
+const PROT_CAT = { Chicken: 'Chicken', Pork: 'Pork', Beef: 'Beef', 'Fish & Seafood': 'Seafood', 'Veggies and Produce': 'Vegetables', Rice: 'Rice', 'Noodles & Pasta': 'Pasta & noodles', Others: 'Others' };
+ACT.posNewItem = async (el, e) => {
+  if (!posEditor()) return toast('Only a manager or chef can add items.', true);
+  POS.drawer = false; posPaint();
+  const secs = [...new Set(POS.menu.map(m => m.section))], sec0 = POS.sec !== 'All' ? POS.sec : '';
+  const box = document.createElement('div'); box.className = 'modal';
+  box.innerHTML = `<form class="card" id="newItemForm"><div class="row"><h2>Add an item</h2><span class="sp"></span><button type="button" class="x" data-close>✕</button></div>
+    <div class="grid"><label>Name<input name="name" list="dl-allitems" required autocomplete="off" placeholder="e.g. Extra Rice"></label><label>Price ₱<input name="price" type="number" min="0" step="any" inputmode="decimal" required></label>
+     <label>Menu section<select name="section">${secs.map(x => opt(x, x, x === sec0)).join('')}${opt('__new', '＋ New section…')}</select></label><label class="newsec" hidden>New section name<input name="newsec" placeholder="e.g. Add-ons"></label>
+     <label>Main ingredient<select name="protein">${KPROT_ORDER.map(x => opt(x, x, x === 'Others')).join('')}</select></label>
+     <label class="tick"><input type="checkbox" name="counted"> Count it in the daily Kitchen stocks (cooked dishes; leave off for drinks, rice, add-ons)</label></div>
+    <p class="small mut" id="niHint"></p>
+    <div class="row end"><button type="button" class="ghost" data-close>Cancel</button><button class="pri big">Save</button></div></form>
+    <datalist id="dl-allitems">${S.dishes.map(d => `<option value="${esc(d.name)}">`).join('')}</datalist>`;
+  document.body.appendChild(box);
+  const f = box.querySelector('form'); f.name.focus();
+  const hint = () => { const n = f.name.value.trim().toLowerCase(), m = POS.menu.find(x => x.name.toLowerCase() === n);
+    $('#niHint').innerHTML = m ? `<b>${esc(m.name)}</b> is already on the POS at ${peso(m.price ?? 0)} (${esc(m.section)}). Saving changes its price and section.` : ''; };
+  f.name.addEventListener('input', hint);
+  f.section.addEventListener('change', () => { box.querySelector('.newsec').hidden = f.section.value !== '__new'; if (f.section.value === '__new') f.newsec.focus(); });
+  box.addEventListener('click', ev => { if (ev.target.dataset.close !== undefined) box.remove(); });
+  f.addEventListener('submit', async ev => {
+    ev.preventDefault(); const name = f.name.value.trim().replace(/\s+/g, ' '), price = num(f.price.value);
+    const section = f.section.value === '__new' ? f.newsec.value.trim() : f.section.value;
+    if (!name || !(price >= 0) || f.price.value === '') return toast('Type the name and the price.', true);
+    if (!section) return toast('Choose or type the menu section.', true);
+    try {
+      let id = S.dishes.find(d => d.name.toLowerCase() === name.toLowerCase())?.id;
+      if (!id) id = (await db.insert('dishes', { name, category: PROT_CAT[f.protein.value] || 'Others', course: 'Main', sold_as: ['restaurant'] }))[0].id;
+      const existing = POS.menu.find(m => m.dish_id === id);
+      const inSec = POS.menu.filter(m => m.section === section).map(m => m.sort);
+      const sort = existing ? existing.sort : inSec.length ? Math.max(...inSec) + 1 : Math.max(0, ...POS.menu.map(m => m.sort)) + 1000;   // end of its section, or a new section last
+      await db.upsert('restaurant_menu', { dish_id: id, section, protein: f.protein.value, price, on_pos: true, active: !!f.counted.checked, sort }, 'dish_id');
+      box.remove(); await loadMaster(); POS.sec = section;
+      toast(existing ? `${name}: price updated to ${peso(price)}` : `${name} added — tap it to ring it up`);
+      const keep = POS.order; await route(); if (keep?.id) POS.order = keep;
+    } catch (err) { toast(err.message, true); }
+  });
+};
 async function posPayNow(pay) {
   try {
     const o = await posSave();
