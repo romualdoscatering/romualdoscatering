@@ -473,6 +473,7 @@ routes['c/stock'] = async arg => {
 };
 ACT.startCount = async () => { const c = (await db.insert('stock_counts', { ws: WS(), counted_by: S.user.id }))[0]; go(`#/${P()}/count/${c.id}`); };
 routes['c/count'] = async id => {
+  if (!id) { location.hash = '#/' + P() + '/stock'; return ''; }
   const [c] = await db.select('stock_counts', { eq: { id } }); if (!c) return '<div class="card">Count not found.</div>';
   const lines = await db.select('stock_count_lines', { eq: { count_id: id } }); const got = Object.fromEntries(lines.map(l => [l.item_id, l]));
   if (c.status === 'posted') {
