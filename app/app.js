@@ -241,7 +241,7 @@ routes['c/event'] = async id => {
   const toBuy = needs.filter(n => num(n.to_buy) > 0);
   const margin = cost && ev.contract_price ? num(ev.contract_price) - num(cost.total_cost) : null;
   return `<div class="row"><a href="#/c/events" class="back">‹ Events</a></div>
-  <div class="row"><h1>${esc(ev.title)}</h1>${chip(EVENT_STATUS[ev.status], statusTone(ev.status))}</div>
+  <div class="row"><h1>${esc(ev.title)}</h1>${chip(EVENT_STATUS[ev.status], statusTone(ev.status))}<span class="sp"></span><button class="pri" data-act="evPdf" data-id="${ev.id}" title="One-page event sheet for the kitchen and the client">📄 Event sheet PDF</button></div>
   <p class="lede">${esc(ev.ref)} · ${KIND[ev.kind]} · ${esc(fmtD(ev.event_date))}${ev.serve_time ? ' · ' + fmtClock(ev.serve_time) : ''}${ev.pax ? ' · <b>' + ev.pax + ' guests</b>' : ''}${ev.venue ? ' · ' + esc(ev.venue) : ''}${client ? ' · ' + esc(client.name) + (client.phone ? ' (' + esc(client.phone) + ')' : '') : ''}</p>
 
   ${canEdit ? `<details class="card"><summary>Edit details & status</summary><form data-form="editEvent" data-id="${ev.id}" class="mt">
@@ -257,6 +257,7 @@ routes['c/event'] = async id => {
      <label>Contract price ₱<input name="contract_price" type="number" step="any" min="0" value="${esc(ev.contract_price ?? '')}"></label>
     </div><div class="row end">${can('catering', 'manager', 'finance') && ev.status === 'done' ? `<button type="button" class="ghost" data-act="closeEvent" data-id="${ev.id}">Close event (releases leftover stock)</button>` : ''}<button class="pri">Save</button></div></form></details>` : ''}
 
+  ${canEdit ? sheetForm(ev, client) : ''}
   ${ev.booking_id || ev.sheet?.website_ref ? `<div class="alert info"><b>From a website inquiry</b>${ev.sheet?.website_ref ? ' (' + esc(ev.sheet.website_ref) + ')' : ''} · <a href="#/c/inquiry/${ev.booking_id}">see what the client sent</a>${ev.sheet?.date_missing ? '<br><b>The client gave no date</b> — a date two weeks ahead was used; set the real one under Edit details.' : ''}${ev.sheet?.notes ? `<br>Client notes: ${esc(ev.sheet.notes)}` : ''}${num(ev.sheet?.estimate?.total) ? `<br>Estimate shown to the client: ${peso(ev.sheet.estimate.total)}` : ''}</div>` : ''}
   <section class="card"><div class="row"><h2>Menu</h2><span class="sp"></span><span class="small mut">${menu.length} ${menu.length === 1 ? 'dish' : 'dishes'}${ev.kind === 'buffet' && ev.pax ? ` · buffet for ${ev.pax} guests` : ''}</span></div>
    ${byCourse.length ? `<div class="menu-grid">${byCourse.map(([c, l]) => `<div class="mcourse"><div class="mc-label">${esc(c)}</div><div class="mc-items">${sortMenu(l).map(m => { const d = S.dishById[m.dish_id];
@@ -308,6 +309,109 @@ FORMS.editEvent = async (f, el) => {
     pax: f.pax ? parseInt(f.pax) : null, venue: f.venue || null, contract_price: f.contract_price ? num(f.contract_price) : null }, { id: el.dataset.id });
   toast('Saved'); refresh();
 };
+/* ================= EVENT SHEET (1-page PDF for the kitchen and the client — same layout as /ops) ================= */
+const SHEET_ST = { inquiry: 'Inquiry', draft: 'Draft', for_client_approval: 'For client approval', confirmed: 'Approved by client', in_prep: 'Approved by client', done: 'Approved by client', closed: 'Approved by client', cancelled: 'Cancelled' };
+const DRINK_RE = /\b(water|juice|soda|soft ?drinks?|coke|sprite|royal|pepsi|7.?up|mountain dew|iced tea|tea|coffee|lemonade|drinks?|beverages?|c2|zesto|milk ?tea|shakes?|calamansi)\b/i;
+const fmtLong = s => s ? new Date(s.slice(0, 10) + 'T00:00').toLocaleDateString('en-PH', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) : '';
+function sheetForm(ev, client) {
+  const s = ev.sheet || {}, cat = ev.kind === 'buffet', v = k => esc(s[k] ?? '');
+  const inp = (k, l, ph = '', t = 'text') => `<label>${l}<input name="${k}" type="${t}" value="${v(k)}" placeholder="${esc(ph)}"></label>`;
+  const ta = (k, l, ph = '') => `<label>${l}<textarea name="${k}" rows="2" placeholder="${esc(ph)}">${v(k)}</textarea></label>`;
+  return `<details class="card"><summary>Event sheet details <span class="small mut">— printed on the PDF</span></summary><form data-form="evSheet" data-id="${ev.id}" class="mt">
+   <h3>Client</h3><div class="grid">${inp('contact', 'Contact person')}<label>Mobile<input name="mobile" value="${esc(s.mobile ?? client?.phone ?? '')}" inputmode="tel" placeholder="09XX XXX XXXX"></label><label>Email<input name="email" type="email" value="${esc(s.email ?? client?.email ?? '')}"></label>${inp('source', 'How they found us', 'Facebook, website, referral…')}</div>
+   ${cat ? `<h3>Event</h3><div class="grid">${inp('call', 'Call time (team at venue)', '', 'time')}${inp('pull', 'Pull-out time', '', 'time')}${inp('coord', 'Venue coordinator & contact')}${inp('pkg', 'Package', 'Classic / Signature / Premium / Custom')}</div>
+   <h3>Setup &amp; service</h3><div class="grid">${inp('motif', 'Motif / theme')}${inp('setup', 'Table setup', 'Buffet, plated; no. of tables')}${inp('staff', 'Service staff', 'e.g. 1 head waiter, 8 servers')}</div>${ta('equip', 'Equipment', 'Chafing dishes, tables, linens, tent…')}`
+   : `<h3>Pick-up or delivery</h3><div class="grid"><label>Pick-up or delivery<select name="fulfil">${['Pick-up', 'Delivery'].map(x => opt(x, x, (s.fulfil || 'Pick-up') === x)).join('')}</select></label></div><p class="small mut">The date, time, address (Venue) and guests are under Edit details. Quantities come from the menu.</p>`}
+   <h3>Notes</h3><div class="grid">${ta('allergy', 'Allergies / dietary needs')}${ta('special', 'Special requests')}</div>
+   <h3>Approval</h3><div class="grid">${inp('approvedOn', 'Approved by the client on', '', 'date')}<label>Prepared by<input name="preparedBy" value="${esc(s.preparedBy || S.me.full_name)}"></label></div>
+   <p class="small mut">The status on the PDF follows the event status (set it under Edit details).</p>
+   <div class="row end"><button type="button" class="ghost" data-act="evPdf" data-id="${ev.id}">📄 PDF</button><button class="pri">Save</button></div></form></details>`;
+}
+FORMS.evSheet = async (f, el) => {
+  const [ev] = await db.select('events', { cols: 'sheet', eq: { id: el.dataset.id } });
+  const keys = ['contact', 'mobile', 'email', 'source', 'call', 'pull', 'coord', 'pkg', 'motif', 'setup', 'staff', 'equip', 'fulfil', 'allergy', 'special', 'approvedOn', 'preparedBy'];
+  const sheet = { ...(ev?.sheet || {}) }; keys.forEach(k => { if (k in f) { const x = String(f[k] ?? '').trim(); if (x) sheet[k] = x; else delete sheet[k]; } });
+  await db.update('events', { sheet }, { id: el.dataset.id }); toast('Event sheet saved'); refresh();
+};
+function sheetHtml(ev, menuRows, client) {
+  const d = ev.sheet || {}, k = ev.kind, cat = k === 'buffet', st = SHEET_ST[ev.status] || 'Draft', logo = S.logoData || new URL('../assets/logo.png', location.href).href;
+  const who = client?.name || ev.title, mobile = d.mobile || client?.phone, email = d.email || client?.email, fulfil = d.fulfil || 'Pick-up', del = fulfil === 'Delivery';
+  const name = m => m.dish_id ? S.dishById[m.dish_id]?.name : m.pack_id ? (S.packs.find(p => p.id === m.pack_id)?.name || 'Packed meal set') : m.custom_name;
+  const row = (l, v) => v ? `<tr><th>${esc(l)}</th><td>${esc(v)}</td></tr>` : '';
+  const courses = COURSES.map(c => [c, sortMenu(menuRows.filter(m => m.course === c))]).concat([['Other', menuRows.filter(m => !COURSES.includes(m.course))]]).filter(([, l]) => l.length);
+  const lines = menuRows.map(m => ({ ...m, n: name(m), t: m.course === 'Drinks' || DRINK_RE.test(name(m) || '') ? 'drink' : k === 'packs' && !m.pack_id && /\btrays?\b/i.test(name(m) || '') ? 'addon' : 'main', q: num(m.qty) || 1 }));
+  const grp = t => lines.filter(l => l.t === t), sum = t => grp(t).reduce((a, l) => a + l.q, 0);
+  const unit = k === 'packs' ? 'pack' : 'tray', orderTxt = [sum('main') ? plural(sum('main'), unit) : '', sum('addon') ? plural(sum('addon'), 'add-on') : ''].filter(Boolean).join(' + ');
+  const docTitle = cat ? 'Event Details' : k === 'packs' ? 'Food Pack Order' : 'Food Tray Order';
+  const hero = cat ? [['Date', fmtLong(ev.event_date)], ['Guests', ev.pax ? ev.pax + ' pax' : 'To be confirmed'], ['Occasion', ev.event_type || 'To be confirmed']]
+    : [[del ? 'Delivery date' : 'Pick-up date', fmtLong(ev.event_date)], [del ? 'Delivery time' : 'Ready by', ev.serve_time ? fmtClock(ev.serve_time) : 'To be confirmed'], ['Order', (orderTxt || docTitle) + ' · ' + fulfil]];
+  const times = cat ? [['Call time', d.call], ['Serving', ev.serve_time], ['Pull-out', d.pull]].filter(x => x[1]) : [];
+  const setup = cat ? [['Motif / theme', d.motif], ['Table setup', d.setup], ['Service staff', d.staff], ['Equipment', d.equip]] : [];
+  const notes = [['Allergies & dietary', d.allergy], ['Special requests', d.special]];
+  const issued = new Date().toLocaleDateString('en-PH', { month: 'long', day: 'numeric', year: 'numeric' });
+  const menuHtml = !menuRows.length ? '' : cat
+    ? `<div class="menu"><h2>The Menu</h2>${courses.map(([c, l]) => `<div class="c">${esc(c === 'Main' ? (l.length > 1 ? 'Main dishes' : 'Main dish') : c)}</div>${l.map(m => `<div class="d">${esc(name(m))}</div>${m.note ? `<div class="n">${esc(m.note)}</div>` : ''}`).join('')}`).join('')}</div>`
+    : `<div class="menu" style="text-align:left"><h2>The Order</h2><table class="items"><thead><tr><th>Item</th><th class="q">Qty</th></tr></thead><tbody>${[['main', k === 'packs' ? 'Meal packs' : 'Trays'], ['drink', 'Drinks'], ['addon', 'Add-ons']].filter(([t]) => grp(t).length).map(([t, h]) => `<tr><td colspan="2" class="gh">${h} · ${fq(sum(t))}</td></tr>` + grp(t).map(l => `<tr><td><div class="d">${esc(l.n)}</div>${l.note ? `<div class="n">${esc(l.note)}</div>` : ''}</td><td class="q">${fq(l.q)}</td></tr>`).join('')).join('')}</tbody></table></div>`;
+  const title = `${cat ? 'Event Sheet' : docTitle} - ${who} - ${fmtLong(ev.event_date).replace(/^\w+, /, '')}`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${esc(title)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,500&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+@page{size:A4;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0}
+:root{--ink:#14213F;--txt:#1F2433;--lab:#4A5265;--acc:#8A5A00;--rule:#9C9479;--wine:#631B1C}
+body{font-family:Montserrat,Arial,sans-serif;color:var(--txt);font-size:9.6pt;line-height:1.42;-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#ECE8DA}
+h1,h2,.who,.hero b,.times b,.menu .d,.items .d{font-family:'Playfair Display',Georgia,serif}
+.page{width:210mm;min-height:297mm;margin:0 auto;padding:11mm 13mm 9mm;background:#fff;display:flex;flex-direction:column}
+.bar{display:flex;gap:10px;justify-content:center;padding:12px;background:#F7F4EA;border-bottom:1px solid #E4DFC8}
+.bar button{font:600 13px Montserrat;border:0;border-radius:8px;padding:10px 18px;cursor:pointer;background:#1A2C54;color:#fff}.bar button.alt{background:#fff;color:#1A2C54;border:1px solid #CFC9B0}.bar span{align-self:center;font-size:12px;color:#5B6478}
+header{display:flex;align-items:center;gap:6mm;padding-bottom:3.5mm;border-bottom:1pt solid var(--rule)}header img{height:17mm}
+.hd{flex:1;min-width:0}.tag{font-size:7pt;font-weight:600;letter-spacing:.24em;text-transform:uppercase;color:var(--acc);white-space:nowrap}
+h1{font-weight:400;font-style:italic;font-size:22pt;line-height:1.1;margin:.8mm 0 .6mm;color:var(--ink)}.who{font-size:12.5pt;color:var(--ink)}
+.meta{text-align:right;font-size:8pt;color:var(--lab);line-height:1.75;white-space:nowrap}
+.status{display:inline-block;border:.8pt solid var(--wine);color:var(--wine);border-radius:20px;padding:0 2.5mm;font-size:7pt;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
+.hero{border-top:1.6pt solid var(--ink);border-bottom:1.6pt solid var(--ink);padding:3mm 4mm;display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:4mm;text-align:center;margin:4mm 0;color:var(--ink)}
+.hero div+div{border-left:.6pt solid var(--rule)}.hero span{display:block;font-size:6.8pt;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--acc)}.hero b{font-weight:400;font-size:13pt;color:var(--ink)}
+.cols{display:grid;grid-template-columns:1.12fr 1fr;gap:7mm;align-items:start}
+h2{font-weight:600;font-size:11.5pt;margin:0 0 1.5mm;letter-spacing:.02em;border-bottom:.8pt solid var(--rule);padding-bottom:1mm;color:var(--ink)}
+h2 small{font-family:Montserrat,Arial,sans-serif;font-weight:600;font-size:6.5pt;letter-spacing:.24em;text-transform:uppercase;color:var(--acc);margin-left:2mm}
+section{margin:0 0 3.5mm}table.kv{width:100%;border-collapse:collapse}
+.kv th{width:31mm;text-align:left;vertical-align:top;font-weight:600;font-size:7pt;letter-spacing:.1em;text-transform:uppercase;color:var(--lab);padding:1mm 2mm 1mm 0}
+.kv td{font-weight:500;padding:.8mm 0;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--txt)}
+.times{display:flex;gap:3mm}.times div{flex:1;border:.8pt solid var(--rule);border-radius:2mm;text-align:center;padding:1.3mm 0}
+.times span{display:block;font-size:6.6pt;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--lab)}.times b{font-size:12pt;font-weight:400;color:var(--ink)}
+.menu{text-align:center;border:1pt solid var(--rule);border-radius:2.5mm;padding:4mm 5mm 3.5mm;background:#FBF9F2}
+.menu h2{border:0;text-align:center;font-size:14pt;font-style:italic;font-weight:400;margin-bottom:1mm}
+.menu .c{font-size:6.6pt;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--acc);margin-top:2mm}
+.menu .d{font-style:italic;font-size:11.5pt;line-height:1.22;color:var(--ink)}.menu .n{font-size:7.6pt;color:var(--wine);font-style:italic;font-weight:500}
+.items{width:100%;border-collapse:collapse;text-align:left}.items th{font-size:6.6pt;letter-spacing:.18em;text-transform:uppercase;color:var(--lab);font-weight:600;border-bottom:.8pt solid var(--rule);padding:1mm}
+.items td{padding:1.4mm 1mm;border-bottom:.6pt solid #CFC8B0;vertical-align:top}.items .d{font-size:11pt}.items .q{text-align:center;width:16mm;font-weight:700;color:var(--ink)}
+.items td.gh{font-size:6.6pt;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:#8A5A00;padding-top:2.5mm;border:0}
+.foot{margin-top:auto;padding-top:4mm}.ack{font-size:8pt;color:var(--lab);text-align:center;margin:0 0 7mm}
+.sign{display:grid;grid-template-columns:1fr 1fr;gap:14mm}.sign div{border-top:.8pt solid var(--ink);padding-top:1.2mm;font-size:7.4pt;color:var(--lab)}.sign b{display:block;color:var(--ink);font-weight:600;font-size:8.6pt}
+footer{margin-top:4mm;text-align:center;font-size:7.2pt;color:var(--lab);letter-spacing:.03em;border-top:.8pt solid var(--rule);padding-top:2mm}
+@media screen{.page{margin:16px auto;box-shadow:0 2px 14px rgba(0,0,0,.12)}}@media print{body{background:#fff}.bar{display:none}}
+</style></head><body>
+<div class="bar"><button onclick="window.print()">Save as PDF / Print</button><button class="alt" onclick="window.close()">Close</button><span>Choose <b>Save as PDF</b> as the destination.</span></div>
+<div class="page" id="pg">
+<header><img src="${logo}" alt="Romualdo's"><div class="hd"><div class="tag">Catering Services · Davao City</div><h1>${esc(docTitle)}</h1><div class="who">${esc(who)}</div></div>
+<div class="meta">Ref. ${esc(ev.ref)}<br><span class="status">${esc(st)}</span><br>Issued ${esc(issued)}</div></header>
+<div class="hero">${hero.map(([l, v]) => `<div><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join('')}</div>
+<div class="cols"><div>
+<section><h2>Client${cat ? ' &amp; venue' : ''}<small>Details</small></h2><table class="kv">
+${row('Client', who)}${row('Contact person', d.contact)}${row('Mobile', mobile)}${row('Email', email)}${cat ? row('Event', ev.title !== who ? ev.title : '') + row('Venue', ev.venue) + row('Coordinator', d.coord) + row('Package', d.pkg) : row(del ? 'Deliver to' : 'Pick-up at', del ? ev.venue : (ev.venue || "Romualdo's, 13 Juna Ave., Juna Subd.")) + row('Good for', ev.pax ? ev.pax + ' pax' : '')}
+</table></section>
+${times.length ? `<section><h2>Timeline<small>Schedule</small></h2><div class="times">${times.map(([l, t]) => `<div><span>${l}</span><b>${esc(fmtClock(t))}</b></div>`).join('')}</div></section>` : ''}
+${setup.some(x => x[1]) ? `<section><h2>Setup &amp; service<small>On site</small></h2><table class="kv">${setup.map(([l, v]) => row(l, v)).join('')}</table></section>` : ''}
+${notes.some(x => x[1]) ? `<section><h2>Notes<small>Please note</small></h2><table class="kv">${notes.map(([l, v]) => row(l, v)).join('')}</table></section>` : ''}
+</div><div>${menuHtml}</div></div>
+<div class="foot"><p class="ack">By signing below, the client confirms the ${cat ? 'event details and menu' : 'order details'} above.${d.approvedOn ? ` Approved on ${esc(fmtLong(d.approvedOn).replace(/^\w+, /, ''))}.` : ''}</p>
+<div class="sign"><div><b>${esc(who)}</b>Client signature over printed name · Date</div><div><b>${esc(d.preparedBy || S.me.full_name || "Romualdo's Catering Services")}</b>Prepared by · Romualdo's Catering Services</div></div>
+<footer>Romualdo's Catering Services · 13 Juna Avenue, Juna Subdivision, Davao City · 0945 542 5300 · romualdoscatering@gmail.com · romualdos.ph</footer></div>
+</div><script>
+function fit(){var p=document.getElementById('pg'),H=p.offsetWidth*297/210;p.style.zoom=1;p.style.minHeight='0';var h=p.scrollHeight,z=h>H?Math.max(.55,(H-2)/h):1;p.style.zoom=z;p.style.minHeight=((H-2)/z)+'px';}
+window.addEventListener('load',function(){(document.fonts?document.fonts.ready:Promise.resolve()).then(function(){fit();setTimeout(function(){window.print()},400)})});
+<\/script></body></html>`;
+}
+
 FORMS.addMenu = async (f, el) => {
   const id = el.dataset.id, qty = f.qty ? num(f.qty) : null;
   if (f.pack_id) { await db.insert('event_menu', { event_id: id, course: f.course, pack_id: f.pack_id, qty }); return refresh(); }
@@ -333,6 +437,17 @@ FORMS.returnLeft = async (f, el) => {
   toast('Leftovers returned to the catering store'); refresh();
 };
 const ACT = {};
+ACT.evPdf = async el => {
+  const w = window.open('', '_blank');   // open now, while it still counts as a tap, so the browser doesn't block it
+  if (!w) return toast('The browser blocked the PDF window. Allow pop-ups for romualdos.ph and try again.', true);
+  w.document.write('<!DOCTYPE html><title>Preparing PDF…</title><body style="font:15px Montserrat,Arial,sans-serif;color:#1A2C54;display:grid;place-items:center;height:90vh;margin:0">Preparing the event sheet…</body>');
+  try {
+    const id = el.dataset.id, [ev] = await db.select('events', { eq: { id } });
+    const [menu, client] = await Promise.all([db.select('event_menu', { eq: { event_id: id }, order: [['sort'], ['course']] }), ev.client_id ? db.select('clients', { eq: { id: ev.client_id } }).then(r => r[0]) : null]);
+    if (!S.logoData) S.logoData = await fetch(new URL('../assets/logo.png', location.href)).then(r => r.blob()).then(b => new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); })).catch(() => '');
+    w.document.open(); w.document.write(sheetHtml(ev, menu, client)); w.document.close();
+  } catch (e) { w.close(); throw e; }
+};
 ACT.rmMenu = async el => { await db.remove('event_menu', { id: el.dataset.id }); refresh(); };
 ACT.rmExtra = async el => { await db.remove('event_extra_needs', { event_id: el.dataset.ev, item_id: el.dataset.item }); refresh(); };
 ACT.genPR = async el => {
