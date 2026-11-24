@@ -885,6 +885,11 @@ function posLeft(m) {   // portions left after what is already on this order (nu
   const onOrder = POS.order.lines.filter(l => l.dish_id === m.dish_id).reduce((a, l) => a + num(l.qty), 0);
   return POS.left[m.dish_id] - onOrder;
 }
+function posSum(o) {
+  const T = posTotals(o), change = POS.cash - T.total;
+  return `<div class="p-sum"><div><div class="big"><span>Subtotal</span><b>${peso(T.sub)}</b></div>${T.sc ? `<div><span>Service ${fq(POS.settings?.sc_rate ?? 10)}%</span><span>${peso(T.sc)}</span></div>` : ''}<div><span>Disc. amount</span><span>${T.disc ? '−' + peso(T.disc) : '₱0'}</span></div></div>
+     <div><div class="big"><span>Total</span><b>${peso(T.total)}</b></div><div><span>Cash received</span><span>${peso(POS.cash)}</span></div><div><span>${POS.cash && change < 0 ? 'Still due' : 'Change'}</span><span class="${POS.cash && change < 0 ? 'bad-t' : POS.cash ? 'ok-t' : ''}">${POS.cash ? peso(Math.abs(change)) : '₱0'}</span></div></div></div>`;
+}
 function posHtml() {
   const o = POS.order, T = posTotals(o), first = (S.me.full_name || '').split(' ')[0];
   const priced = POS.menu.filter(m => m.price != null), unpriced = POS.menu.length - priced.length;
@@ -893,7 +898,8 @@ function posHtml() {
   const nItems = o.lines.reduce((a, l) => a + num(l.qty), 0), change = POS.cash - T.total;
   const tabBody = {
     change: `<div class="notes">${[20, 50, 100, 200, 500, 1000].map((v, i) => `<button type="button" class="note n${i}" data-posnote-cash="${v}">₱${v.toLocaleString()}</button>`).join('')}
-       <button type="button" class="note exact" data-posnote-cash="exact">Exact</button><input class="note-in" type="number" inputmode="decimal" min="0" step="any" placeholder="Enter amount" data-poscashin value="${POS.cash || ''}"><button type="button" class="note clr" data-posnote-cash="0" title="Clear">🗑</button></div>`,
+       <button type="button" class="note exact" data-posnote-cash="exact">Exact</button><button type="button" class="note clr" data-posnote-cash="0" title="Clear the cash">Clear</button>
+       <label class="note-in"><span>₱</span><input type="text" inputmode="decimal" autocomplete="off" placeholder="Type the cash received" data-poscashin value="${POS.cash ? String(+POS.cash.toFixed(2)) : ''}"></label></div>`,
     discount: `<div class="ptab-grid"><label>Guests<span class="step"><button type="button" data-posstep="pax|-1">−</button><b>${o.pax}</b><button type="button" data-posstep="pax|1">＋</button></span></label>
        <label>Senior / PWD<span class="step"><button type="button" data-posstep="seniors|-1">−</button><b>${o.seniors}</b><button type="button" data-posstep="seniors|1">＋</button></span></label>
        <p class="small mut">${fq(POS.settings?.senior_pct ?? 20)}% off each Senior/PWD's share of the bill. Check their ID.</p></div>`,
@@ -920,8 +926,7 @@ function posHtml() {
       : `<div class="p-tap"><div class="p-circle">▦</div><b>Tap an item</b><span>to add to order ${o.order_no ? '#' + o.order_no : '#' + ((POS.open.reduce((a, x) => Math.max(a, x.order_no), 0)) + 1)}</span></div>`}</div>
     <div class="p-tabs2">${[['change', 'Change'], ['discount', 'Discount'], ['service', 'Service'], ['print', 'More']].map(([k, l]) => `<button type="button" class="${POS.tab === k ? 'on' : ''}" data-postab="${k}">${l}${k === 'discount' && o.seniors ? ' •' : ''}</button>`).join('')}</div>
     <div class="p-tabbody">${tabBody}</div>
-    <div class="p-sum"><div><div class="big"><span>Subtotal</span><b>${peso(T.sub)}</b></div>${T.sc ? `<div><span>Service ${fq(POS.settings?.sc_rate ?? 10)}%</span><span>${peso(T.sc)}</span></div>` : ''}<div><span>Disc. amount</span><span>${T.disc ? '−' + peso(T.disc) : '₱0'}</span></div></div>
-     <div><div class="big"><span>Total</span><b>${peso(T.total)}</b></div><div><span>Cash received</span><span>${peso(POS.cash)}</span></div><div><span>Change</span><span class="${POS.cash && change < 0 ? 'bad-t' : ''}">${POS.cash ? (change < 0 ? 'short ' + peso(-change) : peso(change)) : '₱0'}</span></div></div></div>
+    ${posSum(o)}
     <div class="p-act"><button type="button" class="sq" data-postab="service" title="Order type">${KIND_I[o.kind]}</button><button type="button" class="sq" data-act="posSend" title="Send to kitchen"${o.lines.some(l => !l.sent_at) ? '' : ' disabled'}>🍳</button>
      <button type="button" class="charge" data-act="posCharge"${o.lines.length && posCash() ? '' : ' disabled'}>Charge</button><button type="button" class="gcash" data-act="posGcash"${o.lines.length && posCash() ? '' : ' disabled'}>GCash</button></div>
    </div>
@@ -971,7 +976,9 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('input', e => {
   if (e.target.matches('[data-posq]')) { POS.q = e.target.value; const pos = e.target.selectionStart; posPaint(); const i = $('[data-posq]'); i.focus(); i.setSelectionRange(pos, pos); }
-  if (e.target.matches('[data-poscashin]')) { POS.cash = num(e.target.value); const v = e.target.value; posPaint(); const i = $('[data-poscashin]'); i.focus(); i.value = v; }
+  if (e.target.matches('[data-poscashin]')) {
+    const i = e.target; let v = i.value.replace(/[^0-9.]/g, '').replace(/^0+(?=\d)/, ''); const d = v.indexOf('.'); if (d >= 0) v = v.slice(0, d + 1) + v.slice(d + 1).replace(/\./g, '').slice(0, 2);
+    if (v !== i.value) i.value = v; POS.cash = num(v); const sum = $('.p-sum'); if (sum) sum.outerHTML = posSum(POS.order); }
 });
 document.addEventListener('change', e => { const f = e.target.dataset?.posf; if (f && POS.order) { POS.order[f] = e.target.value.trim(); posQueueSave(); } });
 
