@@ -115,6 +115,7 @@ async function route() {
   const arg = pre ? rest.slice(1).join('/') : rest.join('/');
   const r = routes[key] || routes.home;
   current = key;
+  document.body.classList.toggle('pos-mode', key === 'r/pos');
   renderShell(key);
   $('#main').innerHTML = '<div class="loading">Loading…</div>';
   try { $('#main').innerHTML = await r(arg); afterRender(); }
@@ -132,7 +133,7 @@ function afterRender() {
 function renderShell(key) {
   const inCat = key.startsWith('c/'), inRes = key.startsWith('r/');
   const nav = inCat ? [['c/events', 'Events'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes']]
-    : inRes ? [['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']] : [];
+    : inRes ? [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']] : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/">Romualdo's<small>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</small></a>
     <div class="who"><span>${esc(who())}</span>${isAdmin() ? '<a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
     ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">Switch workspace</a></nav>` : ''}`;
@@ -169,7 +170,7 @@ async function afterLogin() {
 routes.home = async () => {
   const cards = [];
   if (member('catering')) cards.push(`<a class="ws-card cat" href="#/c/events"><b>Catering</b><span>Events, menus, purchase requests, receiving, stock, recipes</span></a>`);
-  if (member('restaurant')) cards.push(`<a class="ws-card res" href="#/r/kitchen"><b>Restaurant</b><span>Kitchen stocks, restock, purchase requests, receiving, store and par levels</span></a>`);
+  if (member('restaurant')) cards.push(`<a class="ws-card res" href="#/r/${can('restaurant', 'cashier', 'staff') && !can('restaurant', 'manager', 'chef') ? 'pos' : 'kitchen'}"><b>Restaurant</b><span>POS, daily sales, kitchen stocks, restock, purchase requests, receiving, store and par levels</span></a>`);
   if (!cards.length) cards.push(`<div class="card"><p>You don't have a workspace yet. Ask the owner to give you a role.</p></div>`);
   return `<h1>Good day, ${esc(S.me.full_name.split(' ')[0])}</h1><p class="lede">Choose where you're working.</p><div class="ws-grid">${cards.join('')}</div>
     ${isAdmin() ? `<p class="small mut" style="margin-top:24px">Owner: <a href="#/people">add people and give them roles</a>.</p>` : ''}`;
@@ -733,14 +734,15 @@ const kGroups = (rows, by) => { const g = new Map(); const order = by === 'prote
   return [...g].sort((a, b) => (order.indexOf(a[0]) + 1 || 99) - (order.indexOf(b[0]) + 1 || 99)); };
 routes['r/kitchen'] = async arg => {
   const [tab, dArg] = (arg || 'day').split('/');
-  const tabs = [['day', 'Daily count'], ['restock', 'Restock list'], ['week', 'Weekly report'], ...(can('restaurant', 'manager', 'chef') ? [['dishes', 'Dishes & par']] : [])];
+  const tabs = [['day', 'Daily count'], ['restock', 'Restock list'], ['week', 'Weekly report'], ...(can('restaurant', 'manager', 'chef') ? [['dishes', 'Menu, prices & par']] : [])];
   const seg = `<div class="seg">${tabs.map(([k, l]) => `<a href="#/r/kitchen/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>`;
   const body = tab === 'restock' ? await kRestock(dArg) : tab === 'week' ? await kWeek(dArg) : tab === 'dishes' ? await kDishes() : await kDay(dArg);
   return `<h1>Kitchen stocks</h1>${seg}${body}`;
 };
 async function kDay(d) {
   d = d || S.kDate || today(); S.kDate = d;
-  const [rows, [day]] = await Promise.all([db.rpc('kitchen_sheet', { p_date: d }), db.select('kitchen_days', { eq: { count_date: d } })]);
+  const [rows, [day], posDay] = await Promise.all([db.rpc('kitchen_sheet', { p_date: d }), db.select('kitchen_days', { eq: { count_date: d } }), db.select('pos_daily', { eq: { biz_date: d } }).catch(() => [])]);
+  const fromPos = num(posDay[0]?.orders) > 0 && !can('restaurant', 'manager');
   S.kRows = Object.fromEntries(rows.map(r => [r.dish_id, r]));
   const by = S.kGroup || 'section', mayEdit = member('restaurant');
   const low = rows.filter(r => kEnd(r) < num(r.min_level));
@@ -755,9 +757,9 @@ async function kDay(d) {
      ${list.map(r => { const e = kEnd(r), lowR = e < num(r.min_level);
        return `<div class="krow li" data-kid="${r.dish_id}"><span class="kname">${esc(r.name)}${r.note ? `<small class="mut"> · ${esc(r.note)}</small>` : ''}</span>
          <span class="kbeg">${fq(r.beginning)}</span>
-         ${KFIELDS.map(([k]) => `<input type="number" inputmode="numeric" min="0" step="any" class="qty" data-kf="${k}" value="${num(r[k]) || ''}" placeholder="0"${mayEdit ? '' : ' disabled'}>`).join('')}
+         ${KFIELDS.map(([k]) => `<input type="number" inputmode="numeric" min="0" step="any" class="qty" data-kf="${k}" value="${num(r[k]) || ''}" placeholder="0"${mayEdit && !(k === 'sold' && fromPos) ? '' : ' disabled'}>`).join('')}
          <b class="kend ${e < 0 ? 'bad-t' : lowR ? 'warn-t' : ''}" data-kend>${fq(e)}</b></div>`; }).join('')}</section>`).join('')}
-   <p class="small mut">Each box saves by itself. Beginning comes from the last saved day. Write pull-outs (spoiled, staff meal, tasting) with a note — tap the dish name to add one.</p>`;
+   <p class="small mut">${fromPos ? '<b>Sold comes from the POS today</b> — every paid order adds its dishes here. ' : ''}Each box saves by itself. Beginning comes from the last saved day. Write pull-outs (spoiled, staff meal, tasting) with a note — tap the dish name to add one.</p>`;
 }
 document.addEventListener('input', e => {
   const k = e.target.dataset?.kf; if (!k) return; const row = e.target.closest('[data-kid]'), r = S.kRows?.[row.dataset.kid]; if (!r) return;
@@ -769,18 +771,22 @@ document.addEventListener('change', async e => {
   if (e.target.matches('[data-kgroup]')) { S.kGroup = e.target.value; return refresh(); }
   const k = e.target.dataset?.kf; if (!k) return;
   const id = e.target.closest('[data-kid]').dataset.kid, r = S.kRows[id];
-  try { await kSave(r); toast('Saved'); } catch (err) { toast(err.message, true); }
+  try { await kSave(r, k); toast('Saved'); } catch (err) { toast(err.message, true); }
 });
-async function kSave(r) {
+// Save only the box that changed, so a sale rung on the POS meanwhile is never overwritten by an older screen
+async function kSave(r, field) {
   if (!S.kDayMade?.[S.kDate]) { await db.insert('kitchen_days', { count_date: S.kDate, saved_by: S.user.id }).catch(() => {}); (S.kDayMade ||= {})[S.kDate] = 1; }
-  await db.upsert('dish_day_counts', { count_date: S.kDate, dish_id: r.dish_id, beginning: num(r.beginning), produced: num(r.produced), pulled_out: num(r.pulled_out), sold: num(r.sold), note: r.note || null, counted_by: S.user.id, updated_at: new Date().toISOString() }, 'count_date,dish_id');
+  const patch = field === 'note' ? { note: r.note || null } : { [field]: num(r[field]) };
+  if (r.saved) await db.update('dish_day_counts', { ...patch, counted_by: S.user.id, updated_at: new Date().toISOString() }, { count_date: S.kDate, dish_id: r.dish_id });
+  else { await db.insert('dish_day_counts', { count_date: S.kDate, dish_id: r.dish_id, beginning: num(r.beginning), ...patch, counted_by: S.user.id }).catch(async () =>
+    db.update('dish_day_counts', { ...patch, counted_by: S.user.id, updated_at: new Date().toISOString() }, { count_date: S.kDate, dish_id: r.dish_id })); }
   r.saved = true;
 }
 document.addEventListener('click', async e => {
   const n = e.target.closest('.kname'); if (!n || !member('restaurant')) return;
   const row = n.closest('[data-kid]'), r = S.kRows?.[row.dataset.kid]; if (!r) return;
   const note = prompt(`Note for ${r.name} (e.g. 2 burnt, staff meal):`, r.note || ''); if (note === null) return;
-  r.note = note.trim(); try { await kSave(r); toast('Note saved'); refresh(); } catch (err) { toast(err.message, true); }
+  r.note = note.trim(); try { await kSave(r, 'note'); toast('Note saved'); refresh(); } catch (err) { toast(err.message, true); }
 });
 async function kRestock(d) {
   d = d || S.kDate || today();
@@ -816,28 +822,217 @@ async function kWeek(w) {
 async function kDishes() {
   const rows = await db.select('restaurant_menu', { order: [['sort']] });
   const sections = [...new Set(rows.map(r => r.section))];
-  return `<p class="lede">The dishes counted every day. <b>Par</b> = cook back up to this many portions; <b>Low</b> = below this, the dish goes on the restock list. Changes save by themselves.</p>
-   <div class="card tw"><table><thead><tr><th>Dish</th><th>Menu section</th><th>Main ingredient</th><th class="n">Par</th><th class="n">Low</th><th class="n">Counted</th></tr></thead><tbody>
+  const noPrice = rows.filter(r => r.on_pos && r.price == null).length;
+  return `<p class="lede">Everything sold at the restaurant. <b>Price</b> is what the POS charges. <b>Counted</b> = included in the daily Kitchen stocks count (cooked dishes); drinks, rice and add-ons are usually on the POS but not counted. <b>Par</b> = cook back up to this many portions; <b>Low</b> = below this it goes on the restock list. Changes save by themselves.</p>
+   ${noPrice ? `<div class="alert warn"><b>${noPrice} item${noPrice > 1 ? 's have' : ' has'} no price yet</b> — they can't be rung up on the POS until a price is set.</div>` : ''}
+   <input class="search" placeholder="Find…" data-filter="#rmTable tbody tr">
+   <div class="card tw"><table id="rmTable"><thead><tr><th>Item</th><th>Menu section</th><th>Main ingredient</th><th class="n">Price ₱</th><th class="n">On POS</th><th class="n">Counted</th><th class="n">Par</th><th class="n">Low</th></tr></thead><tbody>
    ${rows.map(r => `<tr data-rm="${r.dish_id}"><td>${esc(S.dishById[r.dish_id]?.name || '?')}</td>
      <td><input list="dl-sec" data-rmf="section" value="${esc(r.section)}"></td><td><select data-rmf="protein">${KPROT_ORDER.map(p => opt(p, p, p === r.protein)).join('')}</select></td>
-     <td class="n"><input class="qty" type="number" min="0" step="1" data-rmf="par" value="${num(r.par)}"></td><td class="n"><input class="qty" type="number" min="0" step="1" data-rmf="min_level" value="${num(r.min_level)}"></td>
-     <td class="n"><input type="checkbox" data-rmf="active" ${r.active ? 'checked' : ''}></td></tr>`).join('')}
+     <td class="n"><input class="qty ${r.on_pos && r.price == null ? 'need' : ''}" type="number" min="0" step="any" data-rmf="price" value="${r.price ?? ''}" placeholder="—"></td>
+     <td class="n"><input type="checkbox" data-rmf="on_pos" ${r.on_pos ? 'checked' : ''}></td><td class="n"><input type="checkbox" data-rmf="active" ${r.active ? 'checked' : ''}></td>
+     <td class="n"><input class="qty" type="number" min="0" step="1" data-rmf="par" value="${num(r.par)}"></td><td class="n"><input class="qty" type="number" min="0" step="1" data-rmf="min_level" value="${num(r.min_level)}"></td></tr>`).join('')}
    </tbody></table><datalist id="dl-sec">${sections.map(x => `<option value="${esc(x)}">`).join('')}</datalist></div>
-   <form class="card addline" data-form="addKDish"><input name="name" placeholder="Add a dish to the daily count" list="dl-dishes-all" required><input name="section" list="dl-sec" placeholder="Menu section" required><button class="pri">Add</button></form>
+   <form class="card addline" data-form="addKDish"><input name="name" placeholder="Add an item (dish, drink, rice, add-on)" list="dl-dishes-all" required><input name="section" list="dl-sec" placeholder="Menu section" required><input name="price" type="number" min="0" step="any" placeholder="Price ₱" class="qty"><label class="tick"><input type="checkbox" name="counted" checked> Counted daily</label><button class="pri">Add</button></form>
    <datalist id="dl-dishes-all">${S.dishes.map(d => `<option value="${esc(d.name)}">`).join('')}</datalist>`;
 }
 document.addEventListener('change', async e => {
   const f = e.target.dataset?.rmf; if (!f) return; const id = e.target.closest('[data-rm]').dataset.rm;
-  const v = f === 'active' ? e.target.checked : ['par', 'min_level'].includes(f) ? num(e.target.value) : e.target.value.trim();
+  const v = ['active', 'on_pos'].includes(f) ? e.target.checked : f === 'price' ? (e.target.value === '' ? null : num(e.target.value)) : ['par', 'min_level'].includes(f) ? num(e.target.value) : e.target.value.trim();
   try { await db.update('restaurant_menu', { [f]: v }, { dish_id: id }); toast('Saved'); } catch (err) { toast(err.message, true); }
 });
 FORMS.addKDish = async f => {
   let id = S.dishes.find(d => d.name.toLowerCase() === f.name.trim().toLowerCase())?.id;
   if (!id) id = (await db.insert('dishes', { name: f.name.trim(), category: 'Others', course: 'Main', sold_as: ['restaurant'] }))[0].id;
   const max = (await db.select('restaurant_menu', { cols: 'sort', order: [['sort', false]], limit: 1 }))[0]?.sort || 0;
-  await db.upsert('restaurant_menu', { dish_id: id, section: f.section.trim(), sort: max + 10, active: true }, 'dish_id');
+  await db.upsert('restaurant_menu', { dish_id: id, section: f.section.trim(), sort: max + 10, active: !!f.counted, on_pos: true, price: f.price === '' || f.price == null ? null : num(f.price) }, 'dish_id');
   await loadMaster(); toast('Added to the daily count'); refresh();
 };
+
+/* ================= RESTAURANT · POS (order taking) ================= */
+// Tablet order taking. Prices, service charge and Senior/PWD discounts are worked out by the database;
+// this screen only sends dish, quantity and notes. Paying an order adds its dishes to the kitchen's Sold.
+// The BIR invoice still comes from the registered POS — the slip printed here says so.
+const POS = { order: null, menu: [], sec: 'All', q: '', t: null, busy: false, settings: null, shift: null };
+const KIND_L = { dine_in: 'Dine-in', take_out: 'Take-out', delivery: 'Delivery' };
+const posCan = () => can('restaurant', 'cashier', 'manager', 'staff');
+const posCash = () => can('restaurant', 'cashier', 'manager');
+function posBlank() { return { id: null, kind: 'dine_in', table_no: '', pax: 1, seniors: 0, customer: '', note: '', lines: [], subtotal: 0, sc_amount: 0, discount: 0, total: 0, order_no: null }; }
+function posTotals(o) {   // preview while typing; the database recalculates on every save
+  const st = POS.settings || { sc_rate: 10, senior_pct: 20 }, sub = o.lines.reduce((a, l) => a + num(l.qty) * num(l.price), 0);
+  const sc = o.kind === 'dine_in' ? Math.round(sub * num(st.sc_rate)) / 100 : 0;
+  const disc = o.seniors > 0 ? Math.round(sub * Math.min(o.seniors, o.pax) / Math.max(o.pax, 1) * num(st.senior_pct)) / 100 : 0;
+  return { sub, sc, disc, total: sub + sc - disc };
+}
+routes['r/pos'] = async arg => {
+  if (!posCan()) return '<div class="card">The POS is for cashiers, servers and managers. Ask the owner to add the Cashier or Staff job in Restaurant.</div>';
+  const [menu, [st], [shift], open] = await Promise.all([
+    db.select('restaurant_menu', { eq: { on_pos: true }, order: [['sort']] }), db.select('pos_settings'),
+    db.select('pos_shifts', { order: [['opened_at', false]], limit: 1 }), db.select('pos_orders', { eq: { status: 'open' }, order: [['opened_at']] })]);
+  POS.menu = menu.map(m => ({ ...m, name: S.dishById[m.dish_id]?.name || '?' })); POS.settings = st; POS.shift = shift && !shift.closed_at ? shift : null; POS.open = open;
+  if (arg && arg !== 'new') { const [o] = await db.select('pos_orders', { eq: { id: arg } }); if (o && o.status === 'open') POS.order = { ...o, lines: await db.select('pos_lines', { eq: { order_id: arg }, order: [['created_at']] }) }; else POS.order = posBlank(); }
+  else if (arg === 'new' || !POS.order || (POS.order.id && !open.some(o => o.id === POS.order.id))) POS.order = posBlank();
+  document.body.classList.add('pos-mode');
+  return posHtml();
+};
+function posHtml() {
+  const o = POS.order, T = posTotals(o), secs = ['All', ...new Set(POS.menu.map(m => m.section))];
+  const priced = POS.menu.filter(m => m.price != null), unpriced = POS.menu.length - priced.length;
+  const items = priced.filter(m => (POS.sec === 'All' || m.section === POS.sec) && (!POS.q || m.name.toLowerCase().includes(POS.q.toLowerCase())));
+  return `<div class="pos">
+   <div class="pos-left">
+    <div class="pos-top">${POS.shift ? `<span class="chip ok">Drawer open · ${peso(POS.shift.opening_cash)} start</span>` : posCash() ? '<button class="pri" data-act="posShift">Open cash drawer</button>' : '<span class="chip warn">Cash drawer not open — the cashier opens it</span>'}
+     <span class="sp"></span><a class="btn ghost" href="#/r/sales">Sales today</a></div>
+    <div class="pos-open">${POS.open.map(x => `<a class="otab ${x.id === o.id ? 'on' : ''}" href="#/r/pos/${x.id}"><b>${x.table_no ? 'T' + esc(x.table_no) : '#' + x.order_no}</b><small>${KIND_L[x.kind]} · ${peso(x.total)}</small></a>`).join('')}<a class="otab new ${!o.id ? 'on' : ''}" href="#/r/pos/new"><b>＋</b><small>New order</small></a></div>
+    <div class="pos-secs">${secs.map(x => `<button type="button" class="${POS.sec === x ? 'on' : ''}" data-possec="${esc(x)}">${esc(x)}</button>`).join('')}</div>
+    <input class="search" placeholder="Find a dish…" value="${esc(POS.q)}" data-posq>
+    <div class="pos-grid">${items.map(m => { const inOrder = o.lines.filter(l => l.dish_id === m.dish_id).reduce((a, l) => a + num(l.qty), 0);
+      return `<button type="button" class="tile ${m.price == null ? 'noprice' : ''}" data-posadd="${m.dish_id}"${m.price == null ? ' disabled' : ''}>${inOrder ? `<i>${fq(inOrder)}</i>` : ''}<b>${esc(m.name)}</b><span>${m.price == null ? 'no price' : peso(m.price)}</span></button>`; }).join('') || '<div class="empty">No dishes. Set prices under Kitchen stocks → Menu, prices &amp; par.</div>'}</div>
+    ${unpriced ? `<p class="small mut">${unpriced} menu item${unpriced > 1 ? 's are' : ' is'} hidden because ${unpriced > 1 ? 'they have' : 'it has'} no price yet${can('restaurant', 'manager', 'chef') ? ' — <a href="#/r/kitchen/dishes">set prices</a>' : ''}.</p>` : ''}
+   </div>
+   <div class="pos-right card">
+    <div class="row"><h2>${o.id ? `Order #${o.order_no}` : 'New order'}</h2><span class="sp"></span>${o.id ? `<button class="x" title="Void order" data-act="posVoid">Void</button>` : ''}</div>
+    <div class="seg pos-kind">${Object.entries(KIND_L).map(([k, l]) => `<button type="button" class="${o.kind === k ? 'on' : ''}" data-poskind="${k}">${l}</button>`).join('')}</div>
+    <div class="pos-meta">${o.kind === 'dine_in' ? `<label>Table<input data-posf="table_no" value="${esc(o.table_no || '')}" inputmode="numeric"></label>` : `<label>Name<input data-posf="customer" value="${esc(o.customer || '')}"></label>`}
+     <label>Guests<span class="step"><button type="button" data-posstep="pax|-1">−</button><b>${o.pax}</b><button type="button" data-posstep="pax|1">＋</button></span></label>
+     <label>Senior/PWD<span class="step"><button type="button" data-posstep="seniors|-1">−</button><b>${o.seniors}</b><button type="button" data-posstep="seniors|1">＋</button></span></label></div>
+    <div class="pos-lines">${o.lines.length ? o.lines.map((l, i) => `<div class="pline ${l.sent_at ? 'sent' : ''}"><div class="pl-name" data-posnote="${i}"><b>${esc(l.name)}</b>${l.note ? `<small>${esc(l.note)}</small>` : ''}${l.sent_at ? '<small class="mut">sent to kitchen</small>' : ''}</div>
+       <span class="step"><button type="button" data-posqty="${i}|-1">−</button><b>${fq(l.qty)}</b><button type="button" data-posqty="${i}|1">＋</button></span><span class="pl-amt">${peso(num(l.qty) * num(l.price))}</span></div>`).join('') : '<p class="mut small">Tap dishes to add them. Tap a dish name in the order to add a note (no onions, extra rice…).</p>'}</div>
+    <div class="pos-tot"><div><span>Subtotal</span><b>${peso(T.sub)}</b></div>${T.sc ? `<div><span>Service charge ${fq(POS.settings?.sc_rate ?? 10)}%</span><b>${peso(T.sc)}</b></div>` : ''}${T.disc ? `<div><span>Senior/PWD ${fq(POS.settings?.senior_pct ?? 20)}% (${o.seniors} of ${o.pax})</span><b>−${peso(T.disc)}</b></div>` : ''}<div class="grand"><span>Total</span><b>${peso(T.total)}</b></div></div>
+    <div class="pos-btns"><button type="button" class="ghost big" data-act="posSend"${o.lines.some(l => !l.sent_at) ? '' : ' disabled'}>Send to kitchen</button>
+     <button type="button" class="pri big" data-act="posBill"${o.lines.length && posCash() ? '' : ' disabled'}>Bill out ${o.lines.length ? peso(T.total) : ''}</button></div>
+    ${!posCash() ? '<p class="small mut">Only the cashier bills out.</p>' : ''}
+   </div></div>`;
+}
+function posPaint() { const y = scrollY; $('#main').innerHTML = posHtml(); window.scrollTo(0, y); }
+function posQueueSave() { clearTimeout(POS.t); POS.t = setTimeout(() => posSave().catch(err => toast(err.message, true)), 700); }
+async function posSave() {
+  clearTimeout(POS.t); const o = POS.order; if (!o.id && !o.lines.length) return o;
+  while (POS.busy) await new Promise(r => setTimeout(r, 120));
+  POS.busy = true;
+  try {
+    const r = await db.rpc('pos_save', { p: { id: o.id, kind: o.kind, table_no: o.table_no, pax: o.pax, seniors: o.seniors, customer: o.customer, note: o.note,
+      lines: o.lines.map(l => ({ id: l.id || null, dish_id: l.dish_id, qty: num(l.qty), note: l.note || '' })) } });
+    const lines = await db.select('pos_lines', { eq: { order_id: r.id }, order: [['created_at']] });
+    const wasNew = !o.id; POS.order = { ...r, lines };
+    if (wasNew) { history.replaceState(null, '', '#/r/pos/' + r.id); POS.open = await db.select('pos_orders', { eq: { status: 'open' }, order: [['opened_at']] }); }
+    else POS.open = POS.open.map(x => x.id === r.id ? r : x);
+    posPaint(); return POS.order;
+  } finally { POS.busy = false; }
+}
+document.addEventListener('click', async e => {
+  if (!current.startsWith('r/pos')) return;
+  const b = e.target.closest('button,[data-posnote]'); if (!b) return; const o = POS.order;
+  if (b.dataset.possec) { POS.sec = b.dataset.possec; return posPaint(); }
+  if (b.dataset.posadd) { const m = POS.menu.find(x => x.dish_id === b.dataset.posadd); const l = o.lines.find(x => x.dish_id === m.dish_id && !x.sent_at && !x.note);
+    if (l) l.qty = num(l.qty) + 1; else o.lines.push({ dish_id: m.dish_id, name: m.name, price: m.price, qty: 1 }); posPaint(); return posQueueSave(); }
+  if (b.dataset.posqty) { const [i, d] = b.dataset.posqty.split('|').map(Number), l = o.lines[i]; const nq = num(l.qty) + d;
+    if (l.sent_at && d < 0 && !can('restaurant', 'manager')) return toast('This dish is already with the kitchen — ask a manager to reduce it.', true);
+    if (nq <= 0) o.lines.splice(i, 1); else l.qty = nq; posPaint(); return posQueueSave(); }
+  if (b.dataset.posstep) { const [f, d] = b.dataset.posstep.split('|'); o[f] = Math.max(num(o[f]) + Number(d), f === 'pax' ? 1 : 0); if (f === 'pax' && o.seniors > o.pax) o.seniors = o.pax; posPaint(); return posQueueSave(); }
+  if (b.dataset.poskind) { o.kind = b.dataset.poskind; posPaint(); return posQueueSave(); }
+  if (b.dataset.posnote !== undefined) { const l = o.lines[b.dataset.posnote]; const n = prompt(`Note for ${l.name}:`, l.note || ''); if (n === null) return; l.note = n.trim(); posPaint(); return posQueueSave(); }
+});
+document.addEventListener('input', e => { if (e.target.matches('[data-posq]')) { POS.q = e.target.value; const pos = e.target.selectionStart; posPaint(); const i = $('[data-posq]'); i.focus(); i.setSelectionRange(pos, pos); } });
+document.addEventListener('change', e => { const f = e.target.dataset?.posf; if (f && POS.order) { POS.order[f] = e.target.value.trim(); posQueueSave(); } });
+ACT.posSend = async () => {
+  const o = await posSave(); const lines = await db.rpc('pos_send', { p_order: o.id });
+  if (lines.length) posPrint(`<h2>KITCHEN · ${o.table_no ? 'Table ' + esc(o.table_no) : KIND_L[o.kind]}</h2><p>Order #${o.order_no} · ${new Date().toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })} · ${esc(who())}</p><hr>
+    ${lines.map(l => `<div class="tk"><b>${fq(l.qty)} × ${esc(l.name)}</b>${l.note ? `<div>→ ${esc(l.note)}</div>` : ''}</div>`).join('')}`);
+  toast(`Sent ${lines.length} item${lines.length === 1 ? '' : 's'} to the kitchen`); POS.order.lines.forEach(l => l.sent_at = l.sent_at || new Date().toISOString()); posPaint();
+};
+ACT.posBill = async () => {
+  const o = await posSave(), t = num(o.total);
+  const quick = [...new Set([t, Math.ceil(t / 100) * 100, Math.ceil(t / 500) * 500, Math.ceil(t / 1000) * 1000])].filter(x => x >= t).slice(0, 4);
+  const box = document.createElement('div'); box.className = 'modal';
+  box.innerHTML = `<form class="card" id="payForm"><div class="row"><h2>Bill out · Order #${o.order_no}</h2><span class="sp"></span><button type="button" class="x" data-close>✕</button></div>
+    <div class="pay-total">${peso(t)}</div><p class="small mut" style="text-align:center">Subtotal ${peso(o.subtotal)}${num(o.sc_amount) ? ' · SC ' + peso(o.sc_amount) : ''}${num(o.discount) ? ' · Senior/PWD −' + peso(o.discount) : ''}</p>
+    <div class="quick">${quick.map(v => `<button type="button" data-cash="${v}">${v === t ? 'Exact' : peso(v)}</button>`).join('')}</div>
+    <div class="grid"><label>Cash ₱<input name="cash" type="number" step="any" min="0" inputmode="decimal"></label><label>GCash ₱<input name="gcash" type="number" step="any" min="0" inputmode="decimal"></label>
+     <label>Card ₱<input name="card" type="number" step="any" min="0" inputmode="decimal"></label><label>Charge ₱<input name="charge" type="number" step="any" min="0" inputmode="decimal"></label>
+     <label>Reference / charged to<input name="ref" placeholder="GCash ref, card approval, or who pays later"></label><label>Invoice no. (registered POS)<input name="invoice" placeholder="optional"></label></div>
+    <div class="pay-change" id="payChange"></div>
+    <div class="row end"><button type="button" class="ghost" data-close>Back</button><button class="pri big">Paid</button></div></form>`;
+  document.body.appendChild(box);
+  const f = box.querySelector('form'), upd = () => { const v = k => num(f[k].value), paid = v('cash') + v('gcash') + v('card') + v('charge'), d = paid - t;
+    $('#payChange').innerHTML = paid ? (d >= 0 ? `Change <b>${peso(d)}</b>` : `<span class="bad-t">Short ${peso(-d)}</span>`) : ''; };
+  box.addEventListener('click', ev => { if (ev.target.dataset.close !== undefined) box.remove(); if (ev.target.dataset.cash) { f.cash.value = ev.target.dataset.cash; upd(); } });
+  f.addEventListener('input', upd); f.cash.focus();
+  f.addEventListener('submit', async ev => { ev.preventDefault(); const v = k => f[k].value === '' ? 0 : num(f[k].value);
+    try { const r = await db.rpc('pos_pay', { p_order: o.id, p_cash: v('cash'), p_card: v('card'), p_gcash: v('gcash'), p_charge: v('charge'), p_ref: f.ref.value, p_invoice: f.invoice.value });
+      box.remove(); toast(num(r.change_due) ? `Paid · change ${peso(r.change_due)}` : 'Paid');
+      if (confirm('Print the order slip for the customer?')) posSlip(r, POS.order.lines);
+      POS.order = posBlank(); go('#/r/pos/new');
+    } catch (err) { toast(err.message, true); } });
+};
+ACT.posVoid = async () => {
+  const reason = prompt('Why is this order being voided? (Paid or already-cooking orders need a manager.)'); if (!reason) return;
+  try { await db.rpc('pos_void', { p_order: POS.order.id, p_reason: reason }); toast('Order voided'); POS.order = posBlank(); go('#/r/pos/new'); } catch (err) { toast(err.message, true); }
+};
+ACT.posShift = async () => {
+  const v = prompt('Opening cash in the drawer (₱):', '0'); if (v === null) return;
+  try { await db.rpc('pos_open_shift', { p_cash: num(v) }); toast('Cash drawer open'); refresh(); } catch (err) { toast(err.message, true); }
+};
+function posSlip(o, lines) {
+  posPrint(`<h2>Romualdo's</h2><p>Order #${o.order_no} · ${o.table_no ? 'Table ' + esc(o.table_no) + ' · ' : ''}${KIND_L[o.kind]} · ${new Date(o.paid_at || Date.now()).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}</p><hr>
+   ${lines.map(l => `<div class="tl"><span>${fq(l.qty)} × ${esc(l.name)}</span><span>${peso(num(l.qty) * num(l.price))}</span></div>`).join('')}<hr>
+   <div class="tl"><span>Subtotal</span><span>${peso(o.subtotal)}</span></div>${num(o.sc_amount) ? `<div class="tl"><span>Service charge</span><span>${peso(o.sc_amount)}</span></div>` : ''}${num(o.discount) ? `<div class="tl"><span>Senior/PWD discount</span><span>−${peso(o.discount)}</span></div>` : ''}
+   <div class="tl big"><span>TOTAL</span><span>${peso(o.total)}</span></div>${num(o.change_due) ? `<div class="tl"><span>Change</span><span>${peso(o.change_due)}</span></div>` : ''}<hr><p class="foot">${esc(POS.settings?.slip_footer || '')}</p>`);
+}
+// 80 mm receipt printing through the tablet's print dialog (works with Bluetooth/Wi-Fi printers set up on the device)
+function posPrint(html) {
+  const f = document.createElement('iframe'); f.style.cssText = 'position:fixed;width:0;height:0;border:0;right:0;bottom:0'; document.body.appendChild(f);
+  f.contentDocument.write(`<!doctype html><html><head><style>@page{size:80mm auto;margin:3mm}body{font:13px/1.35 monospace;width:72mm;margin:0}h2{font-size:16px;margin:0 0 4px;text-align:center}p{margin:2px 0;text-align:center}hr{border:0;border-top:1px dashed #000;margin:6px 0}.tk{font-size:15px;margin:4px 0}.tl{display:flex;justify-content:space-between}.big{font-weight:700;font-size:15px}.foot{font-size:11px}</style></head><body>${html}</body></html>`);
+  f.contentDocument.close(); setTimeout(() => { try { f.contentWindow.focus(); f.contentWindow.print(); } catch (e) {} setTimeout(() => f.remove(), 2000); }, 250);
+}
+
+/* ================= RESTAURANT · SALES (daily report) ================= */
+routes['r/sales'] = async arg => {
+  const d = arg || today();
+  const [[day], orders, shifts, [reg]] = await Promise.all([db.select('pos_daily', { eq: { biz_date: d } }), db.select('pos_orders', { eq: { biz_date: d }, order: [['order_no']] }),
+    db.select('pos_shifts', { order: [['opened_at', false]], limit: 10 }), db.select('daily_sales', { eq: { sale_date: d } })]);
+  const paid = orders.filter(o => o.status === 'paid'), voids = orders.filter(o => o.status === 'void'), open = orders.filter(o => o.status === 'open');
+  const lines = paid.length ? await db.select('pos_lines', { in: { order_id: paid.map(o => o.id) } }) : [];
+  const items = {}; lines.forEach(l => { const x = items[l.name] ||= { name: l.name, qty: 0, amt: 0 }; x.qty += num(l.qty); x.amt += num(l.qty) * num(l.price); });
+  const top = Object.values(items).sort((a, b) => b.amt - a.amt);
+  const people = {}; (await db.select('profiles', { cols: 'id,full_name' }).catch(() => [])).forEach(p => people[p.id] = p.full_name);
+  const z = day || { orders: 0, guests: 0, gross: 0, service_charge: 0, discounts: 0, net: 0, cash: 0, card: 0, gcash: 0, charge: 0 };
+  const dayShifts = shifts.filter(s => (s.opened_at || '').slice(0, 10) <= d && (!s.closed_at || s.closed_at.slice(0, 10) >= addDays(d, -1)));
+  const openShift = shifts.find(s => !s.closed_at);
+  const diff = (a, b) => { const x = num(a) - num(b); return Math.abs(x) < 0.5 ? '<span class="ok-t">matches</span>' : `<span class="bad-t">${x > 0 ? '+' : ''}${peso(x)}</span>`; };
+  return `<div class="row wrap"><h1>Sales</h1><span class="sp"></span><label class="inline">Date <input type="date" value="${d}" max="${today()}" onchange="location.hash='#/r/sales/'+this.value"></label><button class="ghost" onclick="window.print()">Print</button></div>
+   ${open.length ? `<div class="alert warn"><b>${open.length} order${open.length > 1 ? 's are' : ' is'} still open:</b> ${open.map(o => `<a href="#/r/pos/${o.id}">#${o.order_no}${o.table_no ? ' (T' + esc(o.table_no) + ')' : ''}</a>`).join(', ')}</div>` : ''}
+   <div class="kpis"><div class="kpi"><span>Net sales</span><b>${peso(z.net)}</b></div><div class="kpi"><span>Service charge (staff)</span><b>${peso(z.service_charge)}</b></div><div class="kpi"><span>Orders · guests</span><b>${z.orders} · ${z.guests}</b></div><div class="kpi"><span>Average per guest</span><b>${z.guests ? peso(num(z.net) / z.guests) : '—'}</b></div></div>
+   <div class="two"><section class="card"><h2>Summary</h2><table class="kv"><tbody>
+     <tr><td>Gross sales (before SC)</td><td class="n">${peso(z.gross)}</td></tr><tr><td class="mut">· take-out / delivery (no SC)</td><td class="n">${peso(z.gross_no_sc || 0)}</td></tr>
+     <tr><td>Service charge</td><td class="n">${peso(z.service_charge)}</td></tr><tr><td>Senior/PWD discounts</td><td class="n">−${peso(z.discounts)}</td></tr><tr><td><b>Net sales</b></td><td class="n"><b>${peso(z.net)}</b></td></tr>
+     <tr><td>Cash</td><td class="n">${peso(z.cash)}</td></tr><tr><td>GCash</td><td class="n">${peso(z.gcash)}</td></tr><tr><td>Card</td><td class="n">${peso(z.card)}</td></tr><tr><td>Charge (to collect)</td><td class="n">${peso(z.charge)}</td></tr>
+     <tr><td>Voids</td><td class="n ${voids.length ? 'warn-t' : ''}">${voids.length}</td></tr></tbody></table></section>
+    <section class="card"><h2>Cash drawer</h2>${dayShifts.length ? dayShifts.map(s => `<div class="mline"><span>${esc(fmtT(s.opened_at))}${s.closed_at ? ' – ' + esc(new Date(s.closed_at).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })) : ' · <b>open</b>'}<br><small class="mut">by ${esc(people[s.opened_by] || '')}${s.closed_by ? ' · closed by ' + esc(people[s.closed_by] || '') : ''}</small></span><span class="sp"></span>
+       ${s.closed_at ? `<span class="n">expected ${peso(s.expected_cash)}<br>counted ${peso(s.counted_cash)} · ${num(s.over_short) === 0 ? '<span class="ok-t">exact</span>' : `<b class="${num(s.over_short) < 0 ? 'bad-t' : 'warn-t'}">${num(s.over_short) < 0 ? 'short' : 'over'} ${peso(Math.abs(num(s.over_short)))}</b>`}</span>` : `start ${peso(s.opening_cash)}`}</div>`).join('') : '<p class="mut">No drawer opened.</p>'}
+     ${openShift && can('restaurant', 'cashier', 'manager') ? '<div class="row end"><button class="pri" data-act="posCloseShift">Close the drawer (count cash)</button></div>' : ''}</section></div>
+   ${top.length ? `<section class="card tw"><h2>Sold today</h2><table><thead><tr><th>Item</th><th class="n">Qty</th><th class="n">Amount</th></tr></thead><tbody>${top.map(x => `<tr><td>${esc(x.name)}</td><td class="n">${fq(x.qty)}</td><td class="n">${peso(x.amt)}</td></tr>`).join('')}</tbody></table><p class="small mut">Counted dishes were added to Kitchen stocks → Sold automatically.</p></section>` : ''}
+   ${voids.length ? `<section class="card"><h2>Voided orders</h2>${voids.map(o => `<div class="mline"><span>#${o.order_no} · ${peso(o.total)}${o.paid_at ? ' <b class="bad-t">(was paid)</b>' : ''}<br><small class="mut">${esc(o.void_reason || '')} · by ${esc(people[o.voided_by] || '')}</small></span></div>`).join('')}</section>` : ''}
+   ${can('restaurant', 'cashier', 'manager', 'finance') ? `<form class="card" data-form="saveZ" data-date="${d}"><h2>Registered POS Z-reading</h2><p class="small mut">At closing, copy the totals from the registered POS's Z-reading. The app compares them with its own orders — a difference means a sale was rung on one system but not the other.</p>
+     <div class="grid">${[['gross', 'Gross sales (before SC)', z.gross], ['service_charge', 'Service charge', z.service_charge], ['discounts', 'Discounts', z.discounts], ['cash', 'Cash', z.cash], ['card', 'Card', z.card], ['gcash', 'GCash / other', z.gcash], ['charge', 'Charge / AR', z.charge]].map(([k, l, mine]) => `<label>${l}<input name="${k}" type="number" step="any" min="0" value="${reg && reg[k] != null ? num(reg[k]) : ''}"><small>${reg && reg[k] != null ? diff(reg[k], mine) : 'app: ' + peso(mine)}</small></label>`).join('')}
+      <label>Guests<input name="guests" type="number" min="0" value="${reg?.guests ?? ''}"></label><label>Beginning invoice no.<input name="or_from" value="${esc(reg?.or_from || '')}"></label><label>Ending invoice no.<input name="or_to" value="${esc(reg?.or_to || '')}"></label></div>
+     <div class="row end"><button class="pri">Save Z-reading</button></div></form>` : ''}
+   ${orders.length ? `<details class="card"><summary>All orders (${orders.length})</summary><div class="tw"><table><thead><tr><th>#</th><th>Type</th><th>Time</th><th class="n">Total</th><th>Paid by</th><th>Status</th></tr></thead><tbody>
+     ${orders.map(o => `<tr><td>${o.order_no}</td><td>${KIND_L[o.kind]}${o.table_no ? ' · T' + esc(o.table_no) : ''}</td><td>${o.paid_at ? esc(new Date(o.paid_at).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })) : ''}</td><td class="n">${peso(o.total)}</td><td>${['cash', 'gcash', 'card', 'charge'].filter(k => num(o['paid_' + k])).join(' + ')}${o.invoice_no ? `<div class="small mut">inv ${esc(o.invoice_no)}</div>` : ''}</td><td>${chip(o.status, o.status === 'paid' ? 'ok' : o.status === 'void' ? 'bad' : 'warn')}</td></tr>`).join('')}</tbody></table></div></details>` : ''}`;
+};
+FORMS.saveZ = async (f, el) => {
+  const n = k => f[k] === '' ? null : num(f[k]);
+  await db.upsert('daily_sales', { sale_date: el.dataset.date, gross: n('gross') ?? 0, discounts: n('discounts') ?? 0, service_charge: n('service_charge') ?? 0, cash: n('cash'), card: n('card'), gcash: n('gcash'), charge: n('charge'),
+    guests: f.guests === '' ? null : Math.round(num(f.guests)), or_from: f.or_from || null, or_to: f.or_to || null, source: 'registered_pos', verified_by: S.user.id }, 'sale_date');
+  toast('Z-reading saved'); refresh();
+};
+ACT.posCloseShift = async () => {
+  const v = prompt('Count all the cash in the drawer. Total cash (₱):'); if (v === null || v === '') return;
+  try { const s = await db.rpc('pos_close_shift', { p_counted: num(v), p_note: null });
+    toast(num(s.over_short) === 0 ? 'Drawer closed — cash is exact' : `Drawer closed — ${num(s.over_short) < 0 ? 'short' : 'over'} ${peso(Math.abs(num(s.over_short)))}`, num(s.over_short) < 0); refresh(); }
+  catch (err) { toast(err.message, true); }
+};
+
 // Restaurant reuses the purchasing, receiving and store pages; they read the workspace from the address (#/r/…)
 ['requests', 'pr', 'orders', 'po', 'stock', 'count'].forEach(k => routes['r/' + k] = (...a) => routes['c/' + k](...a));
 
