@@ -177,42 +177,60 @@ routes.home = async () => {
 };
 
 /* ================= EVENTS ================= */
+// The client is the headline; the event name is optional (shown only when it adds something)
+const evClient = (e, c) => c?.name || e.sheet?.client || e.title;
+const evName = (e, c) => { const n = (e.title || '').trim(), cl = evClient(e, c); return n && n !== cl && !n.startsWith(cl + ' · ') ? n : ''; };
+const evSub = (e, c) => evName(e, c) || e.event_type || '';
+const autoTitle = (client, type) => [client, type].filter(Boolean).join(' · ');
+async function saveClient(f, current) {
+  const name = (f.client_name || '').trim(), phone = (f.client_phone || '').trim() || null, email = (f.client_email || '').trim() || null;
+  if (!name) return current?.id || null;
+  if (current && current.name === name) { if (phone !== (current.phone || null) || (email && email !== current.email)) await db.update('clients', { phone, ...(email ? { email } : {}) }, { id: current.id }); return current.id; }
+  return (await db.insert('clients', { name, phone, email }))[0].id;
+}
 routes['c/events'] = async arg => {
   const tab = arg || 'upcoming', t = today();
-  const opts = { cols: 'id,ref,title,kind,event_type,event_date,serve_time,pax,status,venue', order: [['event_date', tab !== 'past']] };
+  const opts = { cols: 'id,ref,title,kind,event_type,event_date,serve_time,pax,status,venue,client_id,sheet', order: [['event_date', tab !== 'past']] };
   if (tab === 'upcoming') opts.gte = { event_date: t }; if (tab === 'past') opts.lte = { event_date: t };
   let ev = await db.select('events', opts);
   if (tab === 'upcoming') ev = ev.filter(e => !['cancelled', 'closed'].includes(e.status));
+  const cids = [...new Set(ev.map(e => e.client_id).filter(Boolean))], cl = {};
+  if (cids.length) (await db.select('clients', { cols: 'id,name', in: { id: cids } })).forEach(c => cl[c.id] = c);
   const tabs = [['upcoming', 'Upcoming'], ['past', 'Past'], ['all', 'All']];
   return `<div class="row"><h1>Events</h1><span class="sp"></span>${can('catering', 'coordinator', 'manager') ? '<a class="btn pri" href="#/c/event-new">＋ New event</a>' : ''}</div>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/events/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
    ${ev.length ? `<div class="list">${ev.map(e => `<a class="li" href="#/c/event/${e.id}"><div class="li-date"><b>${esc(fmtD(e.event_date).split(',')[0])}</b><span>${esc(fmtD(e.event_date).split(',').slice(1).join(','))}</span></div>
-      <div class="li-main"><b>${esc(e.title)}</b><span class="mut small">${esc(e.ref)} · ${KIND[e.kind]}${e.pax ? ' · ' + e.pax + ' guests' : ''}${e.serve_time ? ' · ' + fmtClock(e.serve_time) : ''}${e.venue ? ' · ' + esc(e.venue) : ''}</span></div>
+      <div class="li-main"><b>${esc(evClient(e, cl[e.client_id]))}</b><span class="mut small">${evSub(e, cl[e.client_id]) ? esc(evSub(e, cl[e.client_id])) + ' · ' : ''}${esc(e.ref)} · ${KIND[e.kind]}${e.pax ? ' · ' + e.pax + ' guests' : ''}${e.serve_time ? ' · ' + fmtClock(e.serve_time) : ''}${e.venue ? ' · ' + esc(e.venue) : ''}</span></div>
       ${chip(EVENT_STATUS[e.status], statusTone(e.status))}</a>`).join('')}</div>` : '<div class="empty">No events here.</div>'}`;
 };
 
 routes['c/event-new'] = async () => {
   if (!can('catering', 'coordinator', 'manager')) return '<div class="card">Only coordinators and managers can add events.</div>';
   return `<h1>New event</h1><form class="card" data-form="newEvent">
+    <h3 style="margin-top:0">Client</h3>
+    <div class="grid">
+     <label>Client name *<input name="client_name" required placeholder="e.g. Maria Santos, or UNILAB" autocapitalize="words"></label>
+     <label>Mobile<input name="client_phone" inputmode="tel" placeholder="09XX XXX XXXX"></label>
+     <label>Email<input name="client_email" type="email"></label>
+    </div>
+    <h3>Event</h3>
     <div class="grid">
      <label>Order type<select name="kind">${Object.entries(KIND).map(([k, l]) => opt(k, l)).join('')}</select></label>
-     <label>Event name<input name="title" required placeholder="e.g. Santos Wedding"></label>
-     <label>Event type<select name="event_type">${opt('', '—')}${EV_TYPES.map(x => opt(x, x)).join('')}</select></label>
-     <label>Date<input name="event_date" type="date" required value="${today()}"></label>
-     <label>Serving time<input name="serve_time" type="time"></label>
+     <label>Occasion<select name="event_type">${opt('', '—')}${EV_TYPES.map(x => opt(x, x)).join('')}</select></label>
+     <label>Date *<input name="event_date" type="date" required value="${today()}"></label>
+     <label>Serving / ready time<input name="serve_time" type="time"></label>
      <label>Guests<input name="pax" type="number" min="0" inputmode="numeric"></label>
-     <label>Venue<input name="venue"></label>
+     <label>Venue / delivery address<input name="venue"></label>
      <label>Contract price ₱<input name="contract_price" type="number" step="any" min="0"></label>
-     <label>Client name<input name="client_name"></label>
-     <label>Client mobile<input name="client_phone" inputmode="tel"></label>
-    </div><p class="small mut">Next step: after you tap Create event, the event page opens and you add the menu (dishes) there.</p>
+     <label>Event name (optional)<input name="title" placeholder="e.g. 100th Anniversary"></label>
+    </div><p class="small mut">Leave the event name blank and the client's name is used. Next, the event page opens and you add the menu there.</p>
     <div class="row end"><a class="btn ghost" href="#/c/events">Cancel</a><button class="pri">Create event</button></div></form>`;
 };
 const FORMS = {};
 FORMS.newEvent = async f => {
-  let client_id = null;
-  if (f.client_name) client_id = (await db.insert('clients', { name: f.client_name, phone: f.client_phone || null }))[0].id;
-  const row = { kind: f.kind, title: f.title.trim(), event_type: f.event_type || null, event_date: f.event_date, serve_time: f.serve_time || null,
+  if (!(f.client_name || '').trim()) return toast('Enter the client name.', true);
+  const client_id = await saveClient(f, null);
+  const row = { kind: f.kind, title: (f.title || '').trim() || autoTitle(f.client_name.trim(), f.event_type), event_type: f.event_type || null, event_date: f.event_date, serve_time: f.serve_time || null,
     pax: f.pax ? parseInt(f.pax) : null, venue: f.venue || null, contract_price: f.contract_price ? num(f.contract_price) : null, client_id, status: 'draft' };
   const ev = (await db.insert('events', row))[0];
   toast(`Event ${ev.ref} created — now add the menu.`); go('#/c/event/' + ev.id);
@@ -241,15 +259,17 @@ routes['c/event'] = async id => {
   const toBuy = needs.filter(n => num(n.to_buy) > 0);
   const margin = cost && ev.contract_price ? num(ev.contract_price) - num(cost.total_cost) : null;
   return `<div class="row"><a href="#/c/events" class="back">‹ Events</a></div>
-  <div class="row"><h1>${esc(ev.title)}</h1>${chip(EVENT_STATUS[ev.status], statusTone(ev.status))}<span class="sp"></span><button class="pri" data-act="evPdf" data-id="${ev.id}" title="One-page event sheet for the kitchen and the client">📄 Event sheet PDF</button></div>
-  <p class="lede">${esc(ev.ref)} · ${KIND[ev.kind]} · ${esc(fmtD(ev.event_date))}${ev.serve_time ? ' · ' + fmtClock(ev.serve_time) : ''}${ev.pax ? ' · <b>' + ev.pax + ' guests</b>' : ''}${ev.venue ? ' · ' + esc(ev.venue) : ''}${client ? ' · ' + esc(client.name) + (client.phone ? ' (' + esc(client.phone) + ')' : '') : ''}</p>
+  <div class="row"><h1>${esc(evClient(ev, client))}</h1>${chip(EVENT_STATUS[ev.status], statusTone(ev.status))}<span class="sp"></span><button class="pri" data-act="evPdf" data-id="${ev.id}" title="One-page event sheet for the kitchen and the client">📄 Event sheet PDF</button></div>
+  ${evHero(ev, client)}
 
   ${canEdit ? `<details class="card"><summary>Edit details & status</summary><form data-form="editEvent" data-id="${ev.id}" class="mt">
     <div class="grid">
      <label>Status<select name="status">${Object.entries(EVENT_STATUS).filter(([k]) => k !== 'closed').map(([k, l]) => opt(k, l, ev.status === k)).join('')}</select></label>
-     <label>Event name<input name="title" value="${esc(ev.title)}" required></label>
+     <label>Client name<input name="client_name" value="${esc(client?.name || '')}" required></label>
+     <label>Client mobile<input name="client_phone" value="${esc(client?.phone || '')}" inputmode="tel"></label>
+     <label>Event name (optional)<input name="title" value="${esc(evName(ev, client))}" placeholder="Blank = client name"></label>
      <label>Order type<select name="kind">${Object.entries(KIND).map(([k, l]) => opt(k, l, ev.kind === k)).join('')}</select></label>
-     <label>Event type<select name="event_type">${opt('', '—')}${EV_TYPES.map(x => opt(x, x, ev.event_type === x)).join('')}</select></label>
+     <label>Occasion<select name="event_type">${opt('', '—')}${EV_TYPES.map(x => opt(x, x, ev.event_type === x)).join('')}</select></label>
      <label>Date<input name="event_date" type="date" value="${esc(ev.event_date)}" required></label>
      <label>Serving time<input name="serve_time" type="time" value="${esc((ev.serve_time || '').slice(0, 5))}"></label>
      <label>Guests<input name="pax" type="number" min="0" value="${esc(ev.pax ?? '')}"></label>
@@ -305,7 +325,10 @@ routes['c/event'] = async id => {
     <p class="small mut">Ingredients used = stock issued to the event minus leftovers returned, at purchase prices.</p></section>` : ''}`;
 };
 FORMS.editEvent = async (f, el) => {
-  await db.update('events', { status: f.status, title: f.title.trim(), kind: f.kind, event_type: f.event_type || null, event_date: f.event_date, serve_time: f.serve_time || null,
+  const [ev] = await db.select('events', { cols: 'client_id', eq: { id: el.dataset.id } });
+  const cur = ev?.client_id ? (await db.select('clients', { eq: { id: ev.client_id } }))[0] : null;
+  const client_id = await saveClient(f, cur), cname = (f.client_name || cur?.name || '').trim();
+  await db.update('events', { status: f.status, client_id, title: (f.title || '').trim() || autoTitle(cname, f.event_type), kind: f.kind, event_type: f.event_type || null, event_date: f.event_date, serve_time: f.serve_time || null,
     pax: f.pax ? parseInt(f.pax) : null, venue: f.venue || null, contract_price: f.contract_price ? num(f.contract_price) : null }, { id: el.dataset.id });
   toast('Saved'); refresh();
 };
@@ -397,7 +420,7 @@ footer{margin-top:4mm;text-align:center;font-size:7.2pt;color:var(--lab);letter-
 <div class="hero">${hero.map(([l, v]) => `<div><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join('')}</div>
 <div class="cols"><div>
 <section><h2>Client${cat ? ' &amp; venue' : ''}<small>Details</small></h2><table class="kv">
-${row('Client', who)}${row('Contact person', d.contact)}${row('Mobile', mobile)}${row('Email', email)}${cat ? row('Event', ev.title !== who ? ev.title : '') + row('Venue', ev.venue) + row('Coordinator', d.coord) + row('Package', d.pkg) : row(del ? 'Deliver to' : 'Pick-up at', del ? ev.venue : (ev.venue || "Romualdo's, 13 Juna Ave., Juna Subd.")) + row('Good for', ev.pax ? ev.pax + ' pax' : '')}
+${row('Client', who)}${row('Contact person', d.contact)}${row('Mobile', mobile)}${row('Email', email)}${cat ? row('Event', evName(ev, client)) + row('Venue', ev.venue) + row('Coordinator', d.coord) + row('Package', d.pkg) : row(del ? 'Deliver to' : 'Pick-up at', del ? ev.venue : (ev.venue || "Romualdo's, 13 Juna Ave., Juna Subd.")) + row('Good for', ev.pax ? ev.pax + ' pax' : '')}
 </table></section>
 ${times.length ? `<section><h2>Timeline<small>Schedule</small></h2><div class="times">${times.map(([l, t]) => `<div><span>${l}</span><b>${esc(fmtClock(t))}</b></div>`).join('')}</div></section>` : ''}
 ${setup.some(x => x[1]) ? `<section><h2>Setup &amp; service<small>On site</small></h2><table class="kv">${setup.map(([l, v]) => row(l, v)).join('')}</table></section>` : ''}
@@ -412,6 +435,14 @@ window.addEventListener('load',function(){(document.fonts?document.fonts.ready:P
 <\/script></body></html>`;
 }
 
+function evHero(ev, client) {
+  const s = ev.sheet || {}, cat = ev.kind === "buffet", del = s.fulfil === "Delivery", sub = evName(ev, client);
+  const cells = [[cat ? 'Date' : del ? 'Delivery' : 'Pick-up', fmtD(ev.event_date)], [cat ? 'Serving' : 'Ready by', ev.serve_time ? fmtClock(ev.serve_time) : '—'],
+    ['Guests', ev.pax ? ev.pax + ' pax' : '—'], ['Occasion', ev.event_type || '—'], [cat ? 'Venue' : del ? 'Deliver to' : 'Pick-up at', ev.venue || (cat || del ? '—' : "Romualdo's")]];
+  const contact = [s.contact, s.mobile || client?.phone, s.email || client?.email].filter(Boolean);
+  return `<div class="ev-sub">${sub ? `<b>${esc(sub)}</b> · ` : ''}${esc(ev.ref)} · ${KIND[ev.kind]}${contact.length ? ' · ' + contact.map(esc).join(' · ') : ''}${ev.contract_price ? ` · Contract <b>${peso(ev.contract_price)}</b>` : ''}</div>
+   <div class="ev-hero">${cells.map(([l, v]) => `<div><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join('')}</div>`;
+}
 FORMS.addMenu = async (f, el) => {
   const id = el.dataset.id, qty = f.qty ? num(f.qty) : null;
   if (f.pack_id) { await db.insert('event_menu', { event_id: id, course: f.course, pack_id: f.pack_id, qty }); return refresh(); }
