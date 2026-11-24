@@ -850,61 +850,87 @@ FORMS.addKDish = async f => {
 };
 
 /* ================= RESTAURANT · POS (order taking) ================= */
-// Tablet order taking. Prices, service charge and Senior/PWD discounts are worked out by the database;
-// this screen only sends dish, quantity and notes. Paying an order adds its dishes to the kitchen's Sold.
+// Tablet POS laid out like the common café POS: dark menu grid on the left, the bill on the right.
+// Tap dishes → tap cash notes → Charge. Each tile shows the portions left from today's kitchen count.
+// Prices, service charge and Senior/PWD discounts are worked out by the database; paying adds the dishes to the kitchen's Sold.
 // The BIR invoice still comes from the registered POS — the slip printed here says so.
-const POS = { order: null, menu: [], sec: 'All', q: '', t: null, busy: false, settings: null, shift: null };
+const POS = { order: null, menu: [], sec: 'All', q: '', t: null, busy: false, settings: null, shift: null, tab: 'change', cash: 0, left: {}, drawer: false, search: false };
 const KIND_L = { dine_in: 'Dine-in', take_out: 'Take-out', delivery: 'Delivery' };
+const KIND_I = { dine_in: '🍽', take_out: '🛍', delivery: '🛵' };
+const PROT_C = { Chicken: '#e8a33d', Pork: '#d9577a', Beef: '#c2412d', 'Fish & Seafood': '#3b8fd9', 'Veggies and Produce': '#46a35a', 'Noodles & Pasta': '#9b6ad8', Rice: '#b8ab8a', Others: '#7d8597' };
 const posCan = () => can('restaurant', 'cashier', 'manager', 'staff');
 const posCash = () => can('restaurant', 'cashier', 'manager');
 function posBlank() { return { id: null, kind: 'dine_in', table_no: '', pax: 1, seniors: 0, customer: '', note: '', lines: [], subtotal: 0, sc_amount: 0, discount: 0, total: 0, order_no: null }; }
-function posTotals(o) {   // preview while typing; the database recalculates on every save
+function posTotals(o) {   // preview while tapping; the database recalculates on every save
   const st = POS.settings || { sc_rate: 10, senior_pct: 20 }, sub = o.lines.reduce((a, l) => a + num(l.qty) * num(l.price), 0);
   const sc = o.kind === 'dine_in' ? Math.round(sub * num(st.sc_rate)) / 100 : 0;
   const disc = o.seniors > 0 ? Math.round(sub * Math.min(o.seniors, o.pax) / Math.max(o.pax, 1) * num(st.senior_pct)) / 100 : 0;
-  return { sub, sc, disc, total: sub + sc - disc };
+  return { sub, sc, disc, total: Math.round((sub + sc - disc) * 100) / 100 };
 }
 routes['r/pos'] = async arg => {
   if (!posCan()) return '<div class="card">The POS is for cashiers, servers and managers. Ask the owner to add the Cashier or Staff job in Restaurant.</div>';
-  const [menu, [st], [shift], open] = await Promise.all([
+  const [menu, [st], [shift], open, sheet] = await Promise.all([
     db.select('restaurant_menu', { eq: { on_pos: true }, order: [['sort']] }), db.select('pos_settings'),
-    db.select('pos_shifts', { order: [['opened_at', false]], limit: 1 }), db.select('pos_orders', { eq: { status: 'open' }, order: [['opened_at']] })]);
+    db.select('pos_shifts', { order: [['opened_at', false]], limit: 1 }), db.select('pos_orders', { eq: { status: 'open' }, order: [['opened_at']] }),
+    db.rpc('kitchen_sheet', { p_date: today() }).catch(() => [])]);
   POS.menu = menu.map(m => ({ ...m, name: S.dishById[m.dish_id]?.name || '?' })); POS.settings = st; POS.shift = shift && !shift.closed_at ? shift : null; POS.open = open;
-  if (arg && arg !== 'new') { const [o] = await db.select('pos_orders', { eq: { id: arg } }); if (o && o.status === 'open') POS.order = { ...o, lines: await db.select('pos_lines', { eq: { order_id: arg }, order: [['created_at']] }) }; else POS.order = posBlank(); }
-  else if (arg === 'new' || !POS.order || (POS.order.id && !open.some(o => o.id === POS.order.id))) POS.order = posBlank();
-  document.body.classList.add('pos-mode');
+  POS.left = Object.fromEntries(sheet.map(r => [r.dish_id, num(r.ending)]));      // portions left per counted dish
+  if (arg && arg !== 'new') { const [o] = await db.select('pos_orders', { eq: { id: arg } }); POS.order = o && o.status === 'open' ? { ...o, lines: await db.select('pos_lines', { eq: { order_id: arg }, order: [['created_at']] }) } : posBlank(); POS.cash = 0; }
+  else if (arg === 'new' || !POS.order || (POS.order.id && !open.some(o => o.id === POS.order.id))) { POS.order = posBlank(); POS.cash = 0; }
+  POS.drawer = false;
   return posHtml();
 };
-function posHtml() {
-  const o = POS.order, T = posTotals(o), secs = ['All', ...new Set(POS.menu.map(m => m.section))];
-  const priced = POS.menu.filter(m => m.price != null), unpriced = POS.menu.length - priced.length;
-  const items = priced.filter(m => (POS.sec === 'All' || m.section === POS.sec) && (!POS.q || m.name.toLowerCase().includes(POS.q.toLowerCase())));
-  return `<div class="pos">
-   <div class="pos-left">
-    <div class="pos-top">${POS.shift ? `<span class="chip ok">Drawer open · ${peso(POS.shift.opening_cash)} start</span>` : posCash() ? '<button class="pri" data-act="posShift">Open cash drawer</button>' : '<span class="chip warn">Cash drawer not open — the cashier opens it</span>'}
-     <span class="sp"></span><a class="btn ghost" href="#/r/sales">Sales today</a></div>
-    <div class="pos-open">${POS.open.map(x => `<a class="otab ${x.id === o.id ? 'on' : ''}" href="#/r/pos/${x.id}"><b>${x.table_no ? 'T' + esc(x.table_no) : '#' + x.order_no}</b><small>${KIND_L[x.kind]} · ${peso(x.total)}</small></a>`).join('')}<a class="otab new ${!o.id ? 'on' : ''}" href="#/r/pos/new"><b>＋</b><small>New order</small></a></div>
-    <div class="pos-secs">${secs.map(x => `<button type="button" class="${POS.sec === x ? 'on' : ''}" data-possec="${esc(x)}">${esc(x)}</button>`).join('')}</div>
-    <input class="search" placeholder="Find a dish…" value="${esc(POS.q)}" data-posq>
-    <div class="pos-grid">${items.map(m => { const inOrder = o.lines.filter(l => l.dish_id === m.dish_id).reduce((a, l) => a + num(l.qty), 0);
-      return `<button type="button" class="tile ${m.price == null ? 'noprice' : ''}" data-posadd="${m.dish_id}"${m.price == null ? ' disabled' : ''}>${inOrder ? `<i>${fq(inOrder)}</i>` : ''}<b>${esc(m.name)}</b><span>${m.price == null ? 'no price' : peso(m.price)}</span></button>`; }).join('') || '<div class="empty">No dishes. Set prices under Kitchen stocks → Menu, prices &amp; par.</div>'}</div>
-    ${unpriced ? `<p class="small mut">${unpriced} menu item${unpriced > 1 ? 's are' : ' is'} hidden because ${unpriced > 1 ? 'they have' : 'it has'} no price yet${can('restaurant', 'manager', 'chef') ? ' — <a href="#/r/kitchen/dishes">set prices</a>' : ''}.</p>` : ''}
-   </div>
-   <div class="pos-right card">
-    <div class="row"><h2>${o.id ? `Order #${o.order_no}` : 'New order'}</h2><span class="sp"></span>${o.id ? `<button class="x" title="Void order" data-act="posVoid">Void</button>` : ''}</div>
-    <div class="seg pos-kind">${Object.entries(KIND_L).map(([k, l]) => `<button type="button" class="${o.kind === k ? 'on' : ''}" data-poskind="${k}">${l}</button>`).join('')}</div>
-    <div class="pos-meta">${o.kind === 'dine_in' ? `<label>Table<input data-posf="table_no" value="${esc(o.table_no || '')}" inputmode="numeric"></label>` : `<label>Name<input data-posf="customer" value="${esc(o.customer || '')}"></label>`}
-     <label>Guests<span class="step"><button type="button" data-posstep="pax|-1">−</button><b>${o.pax}</b><button type="button" data-posstep="pax|1">＋</button></span></label>
-     <label>Senior/PWD<span class="step"><button type="button" data-posstep="seniors|-1">−</button><b>${o.seniors}</b><button type="button" data-posstep="seniors|1">＋</button></span></label></div>
-    <div class="pos-lines">${o.lines.length ? o.lines.map((l, i) => `<div class="pline ${l.sent_at ? 'sent' : ''}"><div class="pl-name" data-posnote="${i}"><b>${esc(l.name)}</b>${l.note ? `<small>${esc(l.note)}</small>` : ''}${l.sent_at ? '<small class="mut">sent to kitchen</small>' : ''}</div>
-       <span class="step"><button type="button" data-posqty="${i}|-1">−</button><b>${fq(l.qty)}</b><button type="button" data-posqty="${i}|1">＋</button></span><span class="pl-amt">${peso(num(l.qty) * num(l.price))}</span></div>`).join('') : '<p class="mut small">Tap dishes to add them. Tap a dish name in the order to add a note (no onions, extra rice…).</p>'}</div>
-    <div class="pos-tot"><div><span>Subtotal</span><b>${peso(T.sub)}</b></div>${T.sc ? `<div><span>Service charge ${fq(POS.settings?.sc_rate ?? 10)}%</span><b>${peso(T.sc)}</b></div>` : ''}${T.disc ? `<div><span>Senior/PWD ${fq(POS.settings?.senior_pct ?? 20)}% (${o.seniors} of ${o.pax})</span><b>−${peso(T.disc)}</b></div>` : ''}<div class="grand"><span>Total</span><b>${peso(T.total)}</b></div></div>
-    <div class="pos-btns"><button type="button" class="ghost big" data-act="posSend"${o.lines.some(l => !l.sent_at) ? '' : ' disabled'}>Send to kitchen</button>
-     <button type="button" class="pri big" data-act="posBill"${o.lines.length && posCash() ? '' : ' disabled'}>Bill out ${o.lines.length ? peso(T.total) : ''}</button></div>
-    ${!posCash() ? '<p class="small mut">Only the cashier bills out.</p>' : ''}
-   </div></div>`;
+function posLeft(m) {   // portions left after what is already on this order (null = dish not counted)
+  if (!(m.dish_id in POS.left) || !m.active) return null;
+  const onOrder = POS.order.lines.filter(l => l.dish_id === m.dish_id).reduce((a, l) => a + num(l.qty), 0);
+  return POS.left[m.dish_id] - onOrder;
 }
-function posPaint() { const y = scrollY; $('#main').innerHTML = posHtml(); window.scrollTo(0, y); }
+function posHtml() {
+  const o = POS.order, T = posTotals(o), first = (S.me.full_name || '').split(' ')[0];
+  const priced = POS.menu.filter(m => m.price != null), unpriced = POS.menu.length - priced.length;
+  const secs = ['All', ...new Set(priced.map(m => m.section))];
+  const items = priced.filter(m => (POS.sec === 'All' || m.section === POS.sec) && (!POS.q || m.name.toLowerCase().includes(POS.q.toLowerCase())));
+  const nItems = o.lines.reduce((a, l) => a + num(l.qty), 0), change = POS.cash - T.total;
+  const tabBody = {
+    change: `<div class="notes">${[20, 50, 100, 200, 500, 1000].map((v, i) => `<button type="button" class="note n${i}" data-posnote-cash="${v}">₱${v.toLocaleString()}</button>`).join('')}
+       <button type="button" class="note exact" data-posnote-cash="exact">Exact</button><input class="note-in" type="number" inputmode="decimal" min="0" step="any" placeholder="Enter amount" data-poscashin value="${POS.cash || ''}"><button type="button" class="note clr" data-posnote-cash="0" title="Clear">🗑</button></div>`,
+    discount: `<div class="ptab-grid"><label>Guests<span class="step"><button type="button" data-posstep="pax|-1">−</button><b>${o.pax}</b><button type="button" data-posstep="pax|1">＋</button></span></label>
+       <label>Senior / PWD<span class="step"><button type="button" data-posstep="seniors|-1">−</button><b>${o.seniors}</b><button type="button" data-posstep="seniors|1">＋</button></span></label>
+       <p class="small mut">${fq(POS.settings?.senior_pct ?? 20)}% off each Senior/PWD's share of the bill. Check their ID.</p></div>`,
+    service: `<div class="seg pos-kind">${Object.entries(KIND_L).map(([k, l]) => `<button type="button" class="${o.kind === k ? 'on' : ''}" data-poskind="${k}">${KIND_I[k]} ${l}</button>`).join('')}</div>
+       <div class="ptab-grid">${o.kind === 'dine_in' ? `<label>Table<input data-posf="table_no" value="${esc(o.table_no || '')}" inputmode="numeric"></label>` : `<label>Customer name<input data-posf="customer" value="${esc(o.customer || '')}"></label>`}
+       <p class="small mut">${o.kind === 'dine_in' ? `${fq(POS.settings?.sc_rate ?? 10)}% service charge applies to dine-in.` : 'No service charge on take-out and delivery.'}</p></div>`,
+    print: `<div class="ptab-grid"><button type="button" class="pbtn" data-act="posSend"${o.lines.some(l => !l.sent_at) ? '' : ' disabled'}>🍳 Send to kitchen</button><button type="button" class="pbtn" data-act="posPreBill"${o.lines.length ? '' : ' disabled'}>🧾 Print bill</button>
+       <button type="button" class="pbtn" data-act="posBill"${o.lines.length && posCash() ? '' : ' disabled'}>💳 Card / split / charge</button>${o.id ? '<button type="button" class="pbtn danger" data-act="posVoid">✕ Void order</button>' : ''}</div>`
+  }[POS.tab];
+  return `<div class="pos2">
+   <div class="p-left">
+    <div class="p-bar"><button type="button" class="ic" data-posdrawer title="Orders and menu">☰</button><button type="button" class="ic ${POS.search ? 'on' : ''}" data-possearch title="Search">⌕</button>
+     ${POS.search ? `<input class="p-search" placeholder="Find a dish…" value="${esc(POS.q)}" data-posq>` : `<div class="p-tabs">${secs.map(x => `<button type="button" class="${POS.sec === x ? 'on' : ''}" data-possec="${esc(x)}">${esc(x)}</button>`).join('')}</div>`}</div>
+    <div class="p-grid">${items.map(m => { const left = posLeft(m), inO = o.lines.filter(l => l.dish_id === m.dish_id).reduce((a, l) => a + num(l.qty), 0);
+      return `<button type="button" class="p-tile ${left !== null && left <= 0 ? 'out' : ''}" style="--c:${PROT_C[m.protein] || PROT_C.Others}" data-posadd="${m.dish_id}">${inO ? `<i>${fq(inO)}</i>` : ''}<b>${esc(m.name)}</b><small>${peso(m.price).replace('.00', '')}${left !== null ? ` · ${left <= 0 ? 'out' : fq(left) + ' left'}` : ''}</small></button>`; }).join('') || '<div class="p-empty">No dishes here.</div>'}</div>
+    ${unpriced ? `<p class="p-note">${unpriced} item${unpriced > 1 ? 's' : ''} hidden — no price yet${can('restaurant', 'manager', 'chef') ? ' · <a href="#/r/kitchen/dishes">set prices</a>' : ''}</p>` : ''}
+   </div>
+   <div class="p-right">
+    <div class="p-head"><span class="hello">Hello ${esc(first)}</span><span class="sp"></span>${POS.shift ? '' : posCash() ? '<button type="button" class="chipbtn" data-act="posShift">Open drawer</button>' : '<span class="chip warn">Drawer closed</span>'}<button type="button" class="ic light" data-postab="service" title="${KIND_L[o.kind]}">${KIND_I[o.kind]}</button></div>
+    <div class="p-items"><span>${o.id ? `ORDER #${o.order_no}${o.table_no ? ' · T' + esc(o.table_no) : ''}` : 'ITEMS'} <em>${fq(nItems)}</em></span><span class="sp"></span>${o.lines.length && !o.lines.some(l => l.sent_at) ? '<button type="button" class="ic light" data-posclear title="Clear">🗑</button>' : ''}</div>
+    <div class="p-lines">${o.lines.length ? o.lines.map((l, i) => `<div class="pl ${l.sent_at ? 'sent' : ''}"><div class="pl-n" data-posnote="${i}"><b>${esc(l.name)}</b>${l.note ? `<small>${esc(l.note)}</small>` : ''}${l.sent_at ? '<small class="k">in the kitchen</small>' : ''}</div>
+       <span class="step sm"><button type="button" data-posqty="${i}|-1">−</button><b>${fq(l.qty)}</b><button type="button" data-posqty="${i}|1">＋</button></span><span class="pl-a">${peso(num(l.qty) * num(l.price))}</span></div>`).join('')
+      : `<div class="p-tap"><div class="p-circle">▦</div><b>Tap an item</b><span>to add to order ${o.order_no ? '#' + o.order_no : '#' + ((POS.open.reduce((a, x) => Math.max(a, x.order_no), 0)) + 1)}</span></div>`}</div>
+    <div class="p-tabs2">${[['change', 'Change'], ['discount', 'Discount'], ['service', 'Service'], ['print', 'More']].map(([k, l]) => `<button type="button" class="${POS.tab === k ? 'on' : ''}" data-postab="${k}">${l}${k === 'discount' && o.seniors ? ' •' : ''}</button>`).join('')}</div>
+    <div class="p-tabbody">${tabBody}</div>
+    <div class="p-sum"><div><div class="big"><span>Subtotal</span><b>${peso(T.sub)}</b></div>${T.sc ? `<div><span>Service ${fq(POS.settings?.sc_rate ?? 10)}%</span><span>${peso(T.sc)}</span></div>` : ''}<div><span>Disc. amount</span><span>${T.disc ? '−' + peso(T.disc) : '₱0'}</span></div></div>
+     <div><div class="big"><span>Total</span><b>${peso(T.total)}</b></div><div><span>Cash received</span><span>${peso(POS.cash)}</span></div><div><span>Change</span><span class="${POS.cash && change < 0 ? 'bad-t' : ''}">${POS.cash ? (change < 0 ? 'short ' + peso(-change) : peso(change)) : '₱0'}</span></div></div></div>
+    <div class="p-act"><button type="button" class="sq" data-postab="service" title="Order type">${KIND_I[o.kind]}</button><button type="button" class="sq" data-act="posSend" title="Send to kitchen"${o.lines.some(l => !l.sent_at) ? '' : ' disabled'}>🍳</button>
+     <button type="button" class="charge" data-act="posCharge"${o.lines.length && posCash() ? '' : ' disabled'}>Charge</button><button type="button" class="gcash" data-act="posGcash"${o.lines.length && posCash() ? '' : ' disabled'}>GCash</button></div>
+   </div>
+   ${POS.drawer ? `<div class="p-drawer" data-posdrawer-bg><div class="p-dpanel"><h2>Open orders</h2>
+     ${POS.open.map(x => `<a class="otab ${x.id === o.id ? 'on' : ''}" href="#/r/pos/${x.id}"><b>${x.table_no ? 'Table ' + esc(x.table_no) : '#' + x.order_no + ' · ' + KIND_L[x.kind]}</b><small>${peso(x.total)}</small></a>`).join('') || '<p class="mut small">No open orders.</p>'}
+     <a class="btn pri" href="#/r/pos/new">＋ New order</a><hr>
+     <a href="#/r/sales">Sales today</a><a href="#/r/kitchen">Kitchen stocks</a>${POS.shift && posCash() ? '<a href="#/r/sales">Close the cash drawer</a>' : ''}<a href="#/">Exit POS</a></div></div>` : ''}
+  </div>`;
+}
+function posPaint() { $('#main').innerHTML = posHtml(); }
 function posQueueSave() { clearTimeout(POS.t); POS.t = setTimeout(() => posSave().catch(err => toast(err.message, true)), 700); }
 async function posSave() {
   clearTimeout(POS.t); const o = POS.order; if (!o.id && !o.lines.length) return o;
@@ -917,29 +943,67 @@ async function posSave() {
     const wasNew = !o.id; POS.order = { ...r, lines };
     if (wasNew) { history.replaceState(null, '', '#/r/pos/' + r.id); POS.open = await db.select('pos_orders', { eq: { status: 'open' }, order: [['opened_at']] }); }
     else POS.open = POS.open.map(x => x.id === r.id ? r : x);
-    posPaint(); return POS.order;
+    if (!$('[data-posq]') || document.activeElement !== $('[data-posq]')) posPaint();
+    return POS.order;
   } finally { POS.busy = false; }
 }
 document.addEventListener('click', async e => {
   if (!current.startsWith('r/pos')) return;
+  if (e.target.matches('[data-posdrawer-bg]')) { POS.drawer = false; return posPaint(); }
   const b = e.target.closest('button,[data-posnote]'); if (!b) return; const o = POS.order;
+  if (b.dataset.posdrawer !== undefined) { POS.drawer = true; return posPaint(); }
+  if (b.dataset.possearch !== undefined) { POS.search = !POS.search; if (!POS.search) POS.q = ''; posPaint(); return $('[data-posq]')?.focus(); }
   if (b.dataset.possec) { POS.sec = b.dataset.possec; return posPaint(); }
-  if (b.dataset.posadd) { const m = POS.menu.find(x => x.dish_id === b.dataset.posadd); const l = o.lines.find(x => x.dish_id === m.dish_id && !x.sent_at && !x.note);
+  if (b.dataset.postab) { POS.tab = b.dataset.postab; return posPaint(); }
+  if (b.dataset.posclear !== undefined) { if (!confirm('Clear this order?')) return; o.lines = []; POS.cash = 0; posPaint(); return o.id ? posQueueSave() : null; }
+  if (b.dataset.posnoteCash !== undefined) { const v = b.dataset.posnoteCash; POS.cash = v === 'exact' ? posTotals(o).total : v === '0' ? 0 : POS.cash + Number(v); return posPaint(); }
+  if (b.dataset.posadd) { const m = POS.menu.find(x => x.dish_id === b.dataset.posadd), left = posLeft(m);
+    if (left !== null && left <= 0 && !confirm(`${m.name} shows 0 portions left in the kitchen count. Add it anyway?`)) return;
+    const l = o.lines.find(x => x.dish_id === m.dish_id && !x.sent_at && !x.note);
     if (l) l.qty = num(l.qty) + 1; else o.lines.push({ dish_id: m.dish_id, name: m.name, price: m.price, qty: 1 }); posPaint(); return posQueueSave(); }
   if (b.dataset.posqty) { const [i, d] = b.dataset.posqty.split('|').map(Number), l = o.lines[i]; const nq = num(l.qty) + d;
     if (l.sent_at && d < 0 && !can('restaurant', 'manager')) return toast('This dish is already with the kitchen — ask a manager to reduce it.', true);
     if (nq <= 0) o.lines.splice(i, 1); else l.qty = nq; posPaint(); return posQueueSave(); }
-  if (b.dataset.posstep) { const [f, d] = b.dataset.posstep.split('|'); o[f] = Math.max(num(o[f]) + Number(d), f === 'pax' ? 1 : 0); if (f === 'pax' && o.seniors > o.pax) o.seniors = o.pax; posPaint(); return posQueueSave(); }
+  if (b.dataset.posstep) { const [f, d] = b.dataset.posstep.split('|'); o[f] = Math.max(num(o[f]) + Number(d), f === 'pax' ? 1 : 0); if (o.seniors > o.pax) o.seniors = o.pax; posPaint(); return posQueueSave(); }
   if (b.dataset.poskind) { o.kind = b.dataset.poskind; posPaint(); return posQueueSave(); }
-  if (b.dataset.posnote !== undefined) { const l = o.lines[b.dataset.posnote]; const n = prompt(`Note for ${l.name}:`, l.note || ''); if (n === null) return; l.note = n.trim(); posPaint(); return posQueueSave(); }
+  if (b.dataset.posnote !== undefined) { const l = o.lines[b.dataset.posnote]; const n = prompt(`Note for ${l.name} (no onions, extra sauce…):`, l.note || ''); if (n === null) return; l.note = n.trim(); posPaint(); return posQueueSave(); }
 });
-document.addEventListener('input', e => { if (e.target.matches('[data-posq]')) { POS.q = e.target.value; const pos = e.target.selectionStart; posPaint(); const i = $('[data-posq]'); i.focus(); i.setSelectionRange(pos, pos); } });
+document.addEventListener('input', e => {
+  if (e.target.matches('[data-posq]')) { POS.q = e.target.value; const pos = e.target.selectionStart; posPaint(); const i = $('[data-posq]'); i.focus(); i.setSelectionRange(pos, pos); }
+  if (e.target.matches('[data-poscashin]')) { POS.cash = num(e.target.value); const v = e.target.value; posPaint(); const i = $('[data-poscashin]'); i.focus(); i.value = v; }
+});
 document.addEventListener('change', e => { const f = e.target.dataset?.posf; if (f && POS.order) { POS.order[f] = e.target.value.trim(); posQueueSave(); } });
+async function posPayNow(pay) {
+  try {
+    const o = await posSave();
+    const r = await db.rpc('pos_pay', { p_order: o.id, p_cash: pay.cash || 0, p_card: pay.card || 0, p_gcash: pay.gcash || 0, p_charge: pay.charge || 0, p_ref: pay.ref || '', p_invoice: pay.invoice || '' });
+    const lines = POS.order.lines; toast(num(r.change_due) ? `Paid · change ${peso(r.change_due)}` : 'Paid');
+    if (confirm(`Paid${num(r.change_due) ? ' — change ' + peso(r.change_due) : ''}. Print the order slip?`)) posSlip(r, lines);
+    POS.order = posBlank(); POS.cash = 0; POS.tab = 'change'; go('#/r/pos/new');
+  } catch (err) { toast(err.message, true); }
+}
+ACT.posCharge = async () => {
+  const T = posTotals(POS.order);
+  if (!POS.cash) return toast('Tap the cash received (₱20 … ₱1,000 or Exact), then Charge.', true);
+  if (POS.cash < T.total) return toast(`Cash is short by ${peso(T.total - POS.cash)}.`, true);
+  posPayNow({ cash: POS.cash });
+};
+ACT.posGcash = async () => {
+  const ref = prompt(`GCash payment of ${peso(posTotals(POS.order).total)}. Reference number (from the customer's GCash receipt):`); if (ref === null) return;
+  const o = await posSave(); posPayNow({ gcash: num(o.total), ref: ref.trim() ? 'GCash ' + ref.trim() : null });
+};
+ACT.posPreBill = async () => {
+  const o = await posSave();
+  posPrint(`<h2>Romualdo's</h2><p>BILL · Order #${o.order_no}${o.table_no ? ' · Table ' + esc(o.table_no) : ''}</p><hr>
+   ${POS.order.lines.map(l => `<div class="tl"><span>${fq(l.qty)} × ${esc(l.name)}</span><span>${peso(num(l.qty) * num(l.price))}</span></div>`).join('')}<hr>
+   <div class="tl"><span>Subtotal</span><span>${peso(o.subtotal)}</span></div>${num(o.sc_amount) ? `<div class="tl"><span>Service charge</span><span>${peso(o.sc_amount)}</span></div>` : ''}${num(o.discount) ? `<div class="tl"><span>Senior/PWD discount</span><span>−${peso(o.discount)}</span></div>` : ''}
+   <div class="tl big"><span>TOTAL</span><span>${peso(o.total)}</span></div><hr><p class="foot">${esc(POS.settings?.slip_footer || '')}</p>`);
+};
 ACT.posSend = async () => {
   const o = await posSave(); const lines = await db.rpc('pos_send', { p_order: o.id });
   if (lines.length) posPrint(`<h2>KITCHEN · ${o.table_no ? 'Table ' + esc(o.table_no) : KIND_L[o.kind]}</h2><p>Order #${o.order_no} · ${new Date().toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })} · ${esc(who())}</p><hr>
     ${lines.map(l => `<div class="tk"><b>${fq(l.qty)} × ${esc(l.name)}</b>${l.note ? `<div>→ ${esc(l.note)}</div>` : ''}</div>`).join('')}`);
-  toast(`Sent ${lines.length} item${lines.length === 1 ? '' : 's'} to the kitchen`); POS.order.lines.forEach(l => l.sent_at = l.sent_at || new Date().toISOString()); posPaint();
+  toast(lines.length ? `Sent ${lines.length} item${lines.length === 1 ? '' : 's'} to the kitchen` : 'Nothing new to send'); POS.order.lines.forEach(l => l.sent_at = l.sent_at || new Date().toISOString()); posPaint();
 };
 ACT.posBill = async () => {
   const o = await posSave(), t = num(o.total);
@@ -959,11 +1023,7 @@ ACT.posBill = async () => {
   box.addEventListener('click', ev => { if (ev.target.dataset.close !== undefined) box.remove(); if (ev.target.dataset.cash) { f.cash.value = ev.target.dataset.cash; upd(); } });
   f.addEventListener('input', upd); f.cash.focus();
   f.addEventListener('submit', async ev => { ev.preventDefault(); const v = k => f[k].value === '' ? 0 : num(f[k].value);
-    try { const r = await db.rpc('pos_pay', { p_order: o.id, p_cash: v('cash'), p_card: v('card'), p_gcash: v('gcash'), p_charge: v('charge'), p_ref: f.ref.value, p_invoice: f.invoice.value });
-      box.remove(); toast(num(r.change_due) ? `Paid · change ${peso(r.change_due)}` : 'Paid');
-      if (confirm('Print the order slip for the customer?')) posSlip(r, POS.order.lines);
-      POS.order = posBlank(); go('#/r/pos/new');
-    } catch (err) { toast(err.message, true); } });
+    box.remove(); posPayNow({ cash: v('cash'), card: v('card'), gcash: v('gcash'), charge: v('charge'), ref: f.ref.value, invoice: f.invoice.value }); });
 };
 ACT.posVoid = async () => {
   const reason = prompt('Why is this order being voided? (Paid or already-cooking orders need a manager.)'); if (!reason) return;
