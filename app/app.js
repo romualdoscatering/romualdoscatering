@@ -134,9 +134,9 @@ function renderShell(key) {
   const inCat = key.startsWith('c/'), inRes = key.startsWith('r/');
   const nav = inCat ? [['c/events', 'Events'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes']]
     : inRes ? [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']] : [];
-  $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/">Romualdo's<small>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</small></a>
-    <div class="who"><span>${esc(who())}</span>${isAdmin() ? '<a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
-    ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">Switch workspace</a></nav>` : ''}`;
+  $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
+    <div class="who"><span>Hi, ${esc(who().split(' ')[0])}</span>${isAdmin() ? '<a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
+    ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a></nav>` : ''}`;
 }
 function navOf(key) {
   return { 'c/event': 'c/events', 'c/event-new': 'c/events', 'c/pr': 'c/requests', 'c/po': 'c/orders', 'c/count': 'c/stock', 'c/recipe': 'c/recipes', 'c/inquiry': 'c/inquiries',
@@ -145,7 +145,7 @@ function navOf(key) {
 
 /* ================= login ================= */
 function renderLogin(msg) {
-  $('#top').innerHTML = `<div class="bar"><span class="brand">Romualdo's<small>Staff</small></span></div>`;
+  $('#top').innerHTML = `<div class="bar"><span class="brand"><img src="../assets/logo.png" alt="Romualdo's"><em>Staff</em></span></div>`;
   $('#main').innerHTML = `<form class="card login" id="loginForm"><h1>Log in</h1>
     ${msg ? `<p class="alert warn">${esc(msg)}</p>` : ''}
     <label>Email or username<input name="login" autocomplete="username" autocapitalize="none" required></label>
