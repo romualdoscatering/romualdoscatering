@@ -53,8 +53,8 @@
     <!-- Reset form -->
     <section id="reset" class="hidden">
       <div class="who"><span>Signed in as <b id="who"></b></span><button id="btn-out" class="link">Sign out</button></div>
-      <label for="staff-email">Staff login email</label>
-      <input id="staff-email" type="email" placeholder="name@staff.romualdos.ph" autocomplete="off">
+      <label for="staff-email">Staff username or email</label>
+      <input id="staff-email" type="text" placeholder="e.g. jyrellrye" autocomplete="off" autocapitalize="none" spellcheck="false">
       <label for="staff-pass">New temporary password (min. 8)</label>
       <div class="row">
         <input id="staff-pass" type="text" autocomplete="off" spellcheck="false">
@@ -110,7 +110,8 @@ $("btn-gen").onclick = () => {
 };
 
 $("btn-reset").onclick = async () => {
-  const email = $("staff-email").value.trim();
+  let email = $("staff-email").value.trim().toLowerCase();
+  if (email && !email.includes("@")) email += "@staff.romualdos.ph"; // allow just the username, like /app
   const new_password = $("staff-pass").value.trim();
   if (!email || new_password.length < 8) return say($("reset-msg"), "Enter the staff email and a password of 8+ characters.");
   if (!confirm("Set a new password for " + email + "?")) return;
