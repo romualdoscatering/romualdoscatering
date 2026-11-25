@@ -115,12 +115,15 @@ $("btn-reset").onclick = async () => {
   if (!email || new_password.length < 8) return say($("reset-msg"), "Enter the staff email and a password of 8+ characters.");
   if (!confirm("Set a new password for " + email + "?")) return;
   $("btn-reset").disabled = true; say($("reset-msg"), "Working…", true);
-  const { error } = await sb.functions.invoke(FUNCTION_NAME, { body: { email, new_password } });
+  const { data, error } = await sb.functions.invoke(FUNCTION_NAME, { body: { email, new_password } });
   $("btn-reset").disabled = false;
   if (error) {
     let detail = error.message;
     try { detail = (await error.context.json()).error || detail; } catch (_) {}
     return say($("reset-msg"), "Failed: " + detail);
+  }
+  if (!data || data.ok !== true) {
+    return say($("reset-msg"), "Failed: the server function gave an unexpected reply, so the password was NOT changed. Check that the function's code is the reset code.");
   }
   say($("reset-msg"), "Done — " + email + " can now log in with the new password.", true);
 };
