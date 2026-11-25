@@ -1315,7 +1315,7 @@ FORMS.addKDish = async f => {
 // Tap dishes → tap cash notes → Charge. Each tile shows the portions left from today's kitchen count.
 // Prices, service charge and Senior/PWD discounts are worked out by the database; paying adds the dishes to the kitchen's Sold.
 // The BIR invoice still comes from the registered POS — the slip printed here says so.
-const POS = { order: null, menu: [], sec: 'All', q: '', t: null, busy: false, settings: null, shift: null, tab: 'change', cash: 0, left: {}, drawer: false, search: false };
+const POS = { order: null, menu: [], sec: 'All', q: '', t: null, busy: false, settings: null, shift: null, tab: undefined, cash: 0, left: {}, drawer: false, search: false };
 const KIND_L = { dine_in: 'Dine-in', take_out: 'Take-out', delivery: 'Delivery' };
 const KIND_I = { dine_in: '🍽', take_out: '🛍', delivery: '🛵' };
 const PROT_C = { Chicken: '#e8a33d', Pork: '#d9577a', Beef: '#c2412d', 'Fish & Seafood': '#3b8fd9', 'Veggies and Produce': '#46a35a', 'Noodles & Pasta': '#9b6ad8', Rice: '#b8ab8a', Others: '#7d8597' };
@@ -1347,16 +1347,36 @@ function posLeft(m) {   // portions left after what is already on this order (nu
   return POS.left[m.dish_id] - onOrder;
 }
 function posSum(o) {
-  const T = posTotals(o), change = POS.cash - T.total;
-  return `<div class="p-sum"><div><div class="big"><span>Subtotal</span><b>${peso(T.sub)}</b></div>${T.sc ? `<div><span>Service ${fq(POS.settings?.sc_rate ?? 10)}%</span><span>${peso(T.sc)}</span></div>` : ''}<div><span>Disc. amount</span><span>${T.disc ? '−' + peso(T.disc) : '₱0'}</span></div></div>
-     <div><div class="big"><span>Total</span><b>${peso(T.total)}</b></div><div><span>Cash received</span><span>${peso(POS.cash)}</span></div><div><span>${POS.cash && change < 0 ? 'Still due' : 'Change'}</span><span class="${POS.cash && change < 0 ? 'bad-t' : POS.cash ? 'ok-t' : ''}">${POS.cash ? peso(Math.abs(change)) : '₱0'}</span></div></div></div>`;
+  const T = posTotals(o), change = POS.cash - T.total, short = POS.cash && change < 0;
+  return `<div class="p-sum">
+    <div class="ps-row"><span>Subtotal</span><span>${peso(T.sub)}</span></div>
+    ${T.sc ? `<div class="ps-row"><span>Service charge ${fq(POS.settings?.sc_rate ?? 10)}%</span><span>${peso(T.sc)}</span></div>` : ''}
+    ${T.disc ? `<div class="ps-row disc"><span>Senior / PWD (${o.seniors} of ${o.pax})</span><span>−${peso(T.disc)}</span></div>` : ''}
+    <div class="ps-total"><span>Total</span><b>${peso(T.total)}</b></div>
+    ${POS.cash ? `<div class="ps-cash ${short ? 'short' : ''}"><span>Cash ${peso(POS.cash)}</span><b>${short ? 'Still due ' + peso(-change) : 'Change ' + peso(change)}</b></div>` : ''}
+  </div>`;
+}
+const POS_LOW = 3;   // "only a few left" warning on the tile
+function posTile(m, o) {
+  const left = posLeft(m), inO = o.lines.filter(l => l.dish_id === m.dish_id).reduce((a, l) => a + num(l.qty), 0);
+  const out = left !== null && left <= 0, low = left !== null && left > 0 && left <= POS_LOW;
+  const stock = left === null ? '' : out ? '<span class="st out">Sold out</span>' : `<span class="st ${low ? 'low' : ''}">${fq(left)} left</span>`;
+  return `<button type="button" class="p-tile${out ? ' out' : ''}${inO ? ' in' : ''}" style="--c:${PROT_C[m.protein] || PROT_C.Others}" data-posadd="${m.dish_id}" title="${esc(m.name)}">
+    ${inO ? `<i class="q">${fq(inO)}</i>` : ''}<b class="nm">${esc(m.name)}</b><span class="ft"><span class="pr">${peso(m.price).replace('.00', '')}</span>${stock}</span></button>`;
 }
 function posHtml() {
   const o = POS.order, T = posTotals(o), first = (S.me.full_name || '').split(' ')[0];
+  if (POS.tab === 'service') POS.tab = 'change';
+  if (POS.tab === undefined) POS.tab = innerHeight > 820 ? 'change' : null;   // short tablets: keypad folded until 💵 Cash is tapped
   const priced = POS.menu.filter(m => m.price != null), unpriced = POS.menu.length - priced.length;
-  const secs = ['All', ...new Set(priced.map(m => m.section))];
-  const items = priced.filter(m => (POS.sec === 'All' || m.section === POS.sec) && (!POS.q || m.name.toLowerCase().includes(POS.q.toLowerCase())));
-  const nItems = o.lines.reduce((a, l) => a + num(l.qty), 0), change = POS.cash - T.total;
+  const secs = [...new Set(priced.map(m => m.section))];
+  const q = POS.q.trim().toLowerCase();
+  const items = priced.filter(m => (q ? m.name.toLowerCase().includes(q) : POS.sec === 'All' || m.section === POS.sec));
+  const nItems = o.lines.reduce((a, l) => a + num(l.qty), 0), unsent = o.lines.filter(l => !l.sent_at).reduce((a, l) => a + num(l.qty), 0);
+  const nextNo = o.order_no || (POS.open.reduce((a, x) => Math.max(a, x.order_no), 0) + 1);
+  // All, no search: the menu's own sections as headings, in menu order (staff find dishes where the printed menu has them)
+  const grid = q || POS.sec !== 'All' ? items.map(m => posTile(m, o)).join('')
+    : secs.map(s => { const l = items.filter(m => m.section === s); return l.length ? `<h4 class="p-sec">${esc(s)}<span>${l.length}</span></h4>${l.map(m => posTile(m, o)).join('')}` : ''; }).join('');
   const tabBody = {
     change: `<div class="notes">${[20, 50, 100, 200, 500, 1000].map((v, i) => `<button type="button" class="note n${i}" data-posnote-cash="${v}">₱${v.toLocaleString()}</button>`).join('')}
        <button type="button" class="note exact" data-posnote-cash="exact">Exact</button><button type="button" class="note clr" data-posnote-cash="0" title="Clear the cash">Clear</button>
@@ -1364,32 +1384,34 @@ function posHtml() {
     discount: `<div class="ptab-grid"><label>Guests<span class="step"><button type="button" data-posstep="pax|-1">−</button><b>${o.pax}</b><button type="button" data-posstep="pax|1">＋</button></span></label>
        <label>Senior / PWD<span class="step"><button type="button" data-posstep="seniors|-1">−</button><b>${o.seniors}</b><button type="button" data-posstep="seniors|1">＋</button></span></label>
        <p class="small mut">${fq(POS.settings?.senior_pct ?? 20)}% off each Senior/PWD's share of the bill. Check their ID.</p></div>`,
-    service: `<div class="seg pos-kind">${Object.entries(KIND_L).map(([k, l]) => `<button type="button" class="${o.kind === k ? 'on' : ''}" data-poskind="${k}">${KIND_I[k]} ${l}</button>`).join('')}</div>
-       <div class="ptab-grid">${o.kind === 'dine_in' ? `<label>Table<input data-posf="table_no" value="${esc(o.table_no || '')}" inputmode="numeric"></label>` : `<label>Customer name<input data-posf="customer" value="${esc(o.customer || '')}"></label>`}
-       <p class="small mut">${o.kind === 'dine_in' ? `${fq(POS.settings?.sc_rate ?? 10)}% service charge applies to dine-in.` : 'No service charge on take-out and delivery.'}</p></div>`,
-    print: `<div class="ptab-grid"><button type="button" class="pbtn" data-act="posSend"${o.lines.some(l => !l.sent_at) ? '' : ' disabled'}>🍳 Send to kitchen</button><button type="button" class="pbtn" data-act="posPreBill"${o.lines.length ? '' : ' disabled'}>🧾 Print bill</button>
-       <button type="button" class="pbtn" data-act="posBill"${o.lines.length && posCash() ? '' : ' disabled'}>💳 Card / split / charge</button>${o.id ? '<button type="button" class="pbtn danger" data-act="posVoid">✕ Void order</button>' : ''}</div>`
-  }[POS.tab];
-  return `<div class="pos2">
+    print: `<div class="ptab-grid two"><button type="button" class="pbtn" data-act="posPreBill"${o.lines.length ? '' : ' disabled'}>🧾 Print bill</button>
+       <button type="button" class="pbtn" data-act="posBill"${o.lines.length && posCash() ? '' : ' disabled'}>💳 Card / split</button>${o.id ? '<button type="button" class="pbtn danger" data-act="posVoid">✕ Void order</button>' : ''}</div>`
+  }[POS.tab] || '';
+  return `<div class="pos2 pos3">
    <div class="p-left">
-    <div class="p-bar"><button type="button" class="ic" data-posdrawer title="Orders and menu">☰</button><button type="button" class="ic ${POS.search ? 'on' : ''}" data-possearch title="Search">⌕</button>
-     ${POS.search ? `<input class="p-search" placeholder="Find a dish…" value="${esc(POS.q)}" data-posq>` : `<div class="p-tabs">${secs.map(x => `<button type="button" class="${POS.sec === x ? 'on' : ''}" data-possec="${esc(x)}">${esc(x)}</button>`).join('')}</div>`}</div>
-    <div class="p-grid">${items.map(m => { const left = posLeft(m), inO = o.lines.filter(l => l.dish_id === m.dish_id).reduce((a, l) => a + num(l.qty), 0);
-      return `<button type="button" class="p-tile ${left !== null && left <= 0 ? 'out' : ''}" style="--c:${PROT_C[m.protein] || PROT_C.Others}" data-posadd="${m.dish_id}">${inO ? `<i>${fq(inO)}</i>` : ''}<b>${esc(m.name)}</b><small>${peso(m.price).replace('.00', '')}${left !== null ? ` · ${left <= 0 ? 'out' : fq(left) + ' left'}` : ''}</small></button>`; }).join('') || (posEditor() ? '' : '<div class="p-empty">No dishes here.</div>')}
-     ${posEditor() ? '<button type="button" class="p-tile add" data-act="posNewItem"><b>＋</b><small>Add item</small></button>' : ''}</div>
-    ${unpriced ? `<p class="p-note">${unpriced} item${unpriced > 1 ? 's' : ''} hidden — no price yet${can('restaurant', 'manager', 'chef') ? ' · <a href="#/r/kitchen/dishes">set prices</a>' : ''}</p>` : ''}
+    <div class="p-bar"><button type="button" class="ic" data-posdrawer title="Open orders and menu">☰</button><span class="p-brand">R</span>
+     <div class="p-tabs">${['All', ...secs].map(x => `<button type="button" class="${!q && POS.sec === x ? 'on' : ''}" data-possec="${esc(x)}">${esc(x)}<em>${x === 'All' ? priced.length : priced.filter(m => m.section === x).length}</em></button>`).join('')}</div>
+     <label class="p-find${q ? ' on' : ''}"><span>⌕</span><input placeholder="Find a dish  ( / )" value="${esc(POS.q)}" data-posq autocomplete="off">${q ? '<button type="button" class="clrq" data-posqclear title="Clear">✕</button>' : ''}</label></div>
+    <div class="p-grid">${grid || (posEditor() ? '' : `<div class="p-empty">${q ? `No dish matches “${esc(POS.q)}”.` : 'No dishes here.'}</div>`)}
+     ${posEditor() && !q ? '<button type="button" class="p-tile add" data-act="posNewItem"><b>＋</b><small>Add item</small></button>' : ''}</div>
+    <div class="p-foot"><span class="lg"><i style="--c:${PROT_C.Chicken}"></i>Chicken<i style="--c:${PROT_C.Pork}"></i>Pork<i style="--c:${PROT_C.Beef}"></i>Beef<i style="--c:${PROT_C['Fish & Seafood']}"></i>Seafood<i style="--c:${PROT_C['Veggies and Produce']}"></i>Veggies<i style="--c:${PROT_C['Noodles & Pasta']}"></i>Noodles</span>
+     <span class="sp"></span>${unpriced ? `<span>${unpriced} hidden — no price yet${can('restaurant', 'manager', 'chef') ? ' · <a href="#/r/kitchen/dishes">set prices</a>' : ''}</span>` : ''}</div>
    </div>
    <div class="p-right">
-    <div class="p-head"><span class="hello">Hello ${esc(first)}</span><span class="sp"></span>${POS.shift ? '' : posCash() ? '<button type="button" class="chipbtn" data-act="posShift">Open drawer</button>' : '<span class="chip warn">Drawer closed</span>'}<button type="button" class="ic light" data-postab="service" title="${KIND_L[o.kind]}">${KIND_I[o.kind]}</button></div>
-    <div class="p-items"><span>${o.id ? `ORDER #${o.order_no}${o.table_no ? ' · T' + esc(o.table_no) : ''}` : 'ITEMS'} <em>${fq(nItems)}</em></span><span class="sp"></span>${o.lines.length && !o.lines.some(l => l.sent_at) ? '<button type="button" class="ic light" data-posclear title="Clear">🗑</button>' : ''}</div>
-    <div class="p-lines">${o.lines.length ? o.lines.map((l, i) => `<div class="pl ${l.sent_at ? 'sent' : ''}"><div class="pl-n" data-posnote="${i}"><b>${esc(l.name)}</b>${l.note ? `<small>${esc(l.note)}</small>` : ''}${l.sent_at ? '<small class="k">in the kitchen</small>' : ''}</div>
-       <span class="step sm"><button type="button" data-posqty="${i}|-1">−</button><b>${fq(l.qty)}</b><button type="button" data-posqty="${i}|1">＋</button></span><span class="pl-a">${peso(num(l.qty) * num(l.price))}</span></div>`).join('')
-      : `<div class="p-tap"><div class="p-circle">▦</div><b>Tap an item</b><span>to add to order ${o.order_no ? '#' + o.order_no : '#' + ((POS.open.reduce((a, x) => Math.max(a, x.order_no), 0)) + 1)}</span></div>`}</div>
-    <div class="p-tabs2">${[['change', 'Change'], ['discount', 'Discount'], ['service', 'Service'], ['print', 'More']].map(([k, l]) => `<button type="button" class="${POS.tab === k ? 'on' : ''}" data-postab="${k}">${l}${k === 'discount' && o.seniors ? ' •' : ''}</button>`).join('')}</div>
-    <div class="p-tabbody">${tabBody}</div>
+    <div class="p-head"><div class="p-ono"><small>${o.id ? 'Order' : 'New order'}</small><b>#${nextNo}</b></div>
+     <div class="p-kind">${Object.entries(KIND_L).map(([k, l]) => `<button type="button" class="${o.kind === k ? 'on' : ''}" data-poskind="${k}"><span>${KIND_I[k]}</span>${l}</button>`).join('')}</div></div>
+    <div class="p-meta">${o.kind === 'dine_in' ? `<label>Table<input data-posf="table_no" value="${esc(o.table_no || '')}" inputmode="numeric" placeholder="—"></label>` : `<label class="wide">Name<input data-posf="customer" value="${esc(o.customer || '')}" placeholder="Customer"></label>`}
+     <span class="who">👤 ${esc(first)}</span>${POS.shift ? '<span class="dr ok">Drawer open</span>' : posCash() ? '<button type="button" class="dr btn" data-act="posShift">Open drawer</button>' : '<span class="dr">Drawer closed</span>'}</div>
+    ${POS.open.filter(x => x.id !== o.id).length ? `<div class="p-open">${POS.open.filter(x => x.id !== o.id).map(x => `<a href="#/r/pos/${x.id}" title="Switch to this order"><b>${x.table_no ? 'T' + esc(x.table_no) : '#' + x.order_no}</b>${KIND_I[x.kind]} ${peso(x.total).replace('.00', '')}</a>`).join('')}<a href="#/r/pos/new" class="new" title="New order">＋</a></div>` : ''}
+    <div class="p-items"><span>${fq(nItems)} item${nItems === 1 ? '' : 's'}</span>${unsent && o.lines.some(l => l.sent_at) ? `<span class="chip warn">${fq(unsent)} not sent yet</span>` : ''}<span class="sp"></span>${o.lines.length && !o.lines.some(l => l.sent_at) ? '<button type="button" class="lnk" data-posclear>Clear order</button>' : ''}</div>
+    <div class="p-lines">${o.lines.length ? o.lines.map((l, i) => `<div class="pl ${l.sent_at ? 'sent' : ''}${POS.flash === l.dish_id && !l.sent_at ? ' flash' : ''}"><div class="pl-n" data-posnote="${i}"><b>${esc(l.name)}</b><small class="u">${peso(l.price).replace('.00', '')} each${l.sent_at ? ' · <span class="k">🍳 sent</span>' : ''}</small>${l.note ? `<small class="nt">✎ ${esc(l.note)}</small>` : '<small class="add">+ note</small>'}</div>
+       <span class="step sm"><button type="button" data-posqty="${i}|-1" aria-label="One less">−</button><b>${fq(l.qty)}</b><button type="button" data-posqty="${i}|1" aria-label="One more">＋</button></span><span class="pl-a">${peso(num(l.qty) * num(l.price)).replace('.00', '')}</span></div>`).join('')
+      : `<div class="p-tap"><div class="p-circle">🍽</div><b>Tap a dish to start order #${nextNo}</b><span>${KIND_L[o.kind]}${o.kind === 'dine_in' ? ' · set the table above' : ''}</span></div>`}</div>
     ${posSum(o)}
-    <div class="p-act"><button type="button" class="sq" data-postab="service" title="Order type">${KIND_I[o.kind]}</button><button type="button" class="sq" data-act="posSend" title="Send to kitchen"${o.lines.some(l => !l.sent_at) ? '' : ' disabled'}>🍳</button>
-     <button type="button" class="charge" data-act="posCharge"${o.lines.length && posCash() ? '' : ' disabled'}>Charge</button><button type="button" class="gcash" data-act="posGcash"${o.lines.length && posCash() ? '' : ' disabled'}>GCash</button></div>
+    <div class="p-tabs2">${[['change', '💵 Cash'], ['discount', '🪪 Senior / PWD'], ['print', '⋯ More']].map(([k, l]) => `<button type="button" class="${POS.tab === k ? 'on' : ''}" data-postab="${k}">${l}${k === 'discount' && o.seniors ? ` <em>${o.seniors}</em>` : ''}</button>`).join('')}</div>
+    ${tabBody ? `<div class="p-tabbody">${tabBody}</div>` : ''}
+    <div class="p-act"><button type="button" class="send" data-act="posSend"${unsent ? '' : ' disabled'}>🍳 Send${unsent ? ` <em>${fq(unsent)}</em>` : ''}</button>
+     <button type="button" class="charge" data-act="posCharge"${o.lines.length && posCash() ? '' : ' disabled'}>Charge <b>${peso(T.total).replace('.00', '')}</b></button><button type="button" class="gcash" data-act="posGcash"${o.lines.length && posCash() ? '' : ' disabled'}>GCash</button></div>
    </div>
    ${POS.drawer ? `<div class="p-drawer" data-posdrawer-bg><div class="p-dpanel"><h2>Open orders</h2>
      ${POS.open.map(x => `<a class="otab ${x.id === o.id ? 'on' : ''}" href="#/r/pos/${x.id}"><b>${x.table_no ? 'Table ' + esc(x.table_no) : '#' + x.order_no + ' · ' + KIND_L[x.kind]}</b><small>${peso(x.total)}</small></a>`).join('') || '<p class="mut small">No open orders.</p>'}
@@ -1397,7 +1419,14 @@ function posHtml() {
      ${posEditor() ? '<a href="javascript:void 0" data-act="posNewItem">＋ Add an item to the POS</a>' : ''}<a href="#/r/sales">Sales today</a><a href="#/r/kitchen">Kitchen stocks</a>${POS.shift && posCash() ? '<a href="#/r/sales">Close the cash drawer</a>' : ''}<a href="#/">Exit POS</a></div></div>` : ''}
   </div>`;
 }
-function posPaint() { $('#main').innerHTML = posHtml(); }
+// Re-draw without losing the menu or bill scroll position; a just-added line glows for a moment
+function posPaint() {
+  const g = $('.p-grid')?.scrollTop || 0, l = $('.p-lines')?.scrollTop || 0;
+  $('#main').innerHTML = posHtml();
+  const G = $('.p-grid'), L = $('.p-lines'); if (G) G.scrollTop = g;
+  if (L) { const f = L.querySelector('.pl.flash'); if (f && POS.flashNew) f.scrollIntoView({ block: 'nearest' }); else L.scrollTop = l; }
+  POS.flashNew = false;
+}
 function posQueueSave() { clearTimeout(POS.t); POS.t = setTimeout(() => posSave().catch(err => toast(err.message, true)), 700); }
 async function posSave() {
   clearTimeout(POS.t); const o = POS.order; if (!o.id && !o.lines.length) return o;
@@ -1420,14 +1449,15 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('button,[data-posnote]'); if (!b) return; const o = POS.order;
   if (b.dataset.posdrawer !== undefined) { POS.drawer = true; return posPaint(); }
   if (b.dataset.possearch !== undefined) { POS.search = !POS.search; if (!POS.search) POS.q = ''; posPaint(); return $('[data-posq]')?.focus(); }
-  if (b.dataset.possec) { POS.sec = b.dataset.possec; return posPaint(); }
-  if (b.dataset.postab) { POS.tab = b.dataset.postab; return posPaint(); }
+  if (b.dataset.possec) { POS.sec = b.dataset.possec; POS.q = ''; $('.p-grid') && ($('.p-grid').scrollTop = 0); posPaint(); $('.p-grid').scrollTop = 0; return; }
+  if (b.dataset.posqclear !== undefined) { POS.q = ''; posPaint(); return $('[data-posq]')?.focus(); }
+  if (b.dataset.postab) { POS.tab = POS.tab === b.dataset.postab ? null : b.dataset.postab; return posPaint(); }
   if (b.dataset.posclear !== undefined) { if (!confirm('Clear this order?')) return; o.lines = []; POS.cash = 0; posPaint(); return o.id ? posQueueSave() : null; }
   if (b.dataset.posnoteCash !== undefined) { const v = b.dataset.posnoteCash; POS.cash = v === 'exact' ? posTotals(o).total : v === '0' ? 0 : POS.cash + Number(v); return posPaint(); }
   if (b.dataset.posadd) { const m = POS.menu.find(x => x.dish_id === b.dataset.posadd), left = posLeft(m);
     if (left !== null && left <= 0 && !confirm(`${m.name} shows 0 portions left in the kitchen count. Add it anyway?`)) return;
     const l = o.lines.find(x => x.dish_id === m.dish_id && !x.sent_at && !x.note);
-    if (l) l.qty = num(l.qty) + 1; else o.lines.push({ dish_id: m.dish_id, name: m.name, price: m.price, qty: 1 }); posPaint(); return posQueueSave(); }
+    if (l) l.qty = num(l.qty) + 1; else o.lines.push({ dish_id: m.dish_id, name: m.name, price: m.price, qty: 1 }); POS.flash = m.dish_id; POS.flashNew = true; clearTimeout(POS.ft); POS.ft = setTimeout(() => { POS.flash = null; document.querySelector('.pl.flash')?.classList.remove('flash'); }, 900); posPaint(); return posQueueSave(); }
   if (b.dataset.posqty) { const [i, d] = b.dataset.posqty.split('|').map(Number), l = o.lines[i]; const nq = num(l.qty) + d;
     if (l.sent_at && d < 0 && !can('restaurant', 'manager')) return toast('This dish is already with the kitchen — ask a manager to reduce it.', true);
     if (nq <= 0) o.lines.splice(i, 1); else l.qty = nq; posPaint(); return posQueueSave(); }
@@ -1440,6 +1470,13 @@ document.addEventListener('input', e => {
   if (e.target.matches('[data-poscashin]')) {
     const i = e.target; let v = i.value.replace(/[^0-9.]/g, '').replace(/^0+(?=\d)/, ''); const d = v.indexOf('.'); if (d >= 0) v = v.slice(0, d + 1) + v.slice(d + 1).replace(/\./g, '').slice(0, 2);
     if (v !== i.value) i.value = v; POS.cash = num(v); const sum = $('.p-sum'); if (sum) sum.outerHTML = posSum(POS.order); }
+});
+document.addEventListener('keydown', e => {
+  if (!current.startsWith('r/pos')) return;
+  const inField = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement?.tagName || '');
+  if (e.key === '/' && !inField) { e.preventDefault(); $('[data-posq]')?.focus(); }
+  if (e.key === 'Escape' && document.activeElement?.matches('[data-posq]')) { POS.q = ''; posPaint(); }
+  if (e.key === 'Enter' && document.activeElement?.matches('[data-posq]')) { const t = $('.p-grid .p-tile:not(.out):not(.add)'); if (t) { t.click(); POS.q = ''; posPaint(); $('[data-posq]')?.focus(); } }
 });
 document.addEventListener('change', e => { const f = e.target.dataset?.posf; if (f && POS.order) { POS.order[f] = e.target.value.trim(); posQueueSave(); } });
 
@@ -1490,12 +1527,12 @@ async function posPayNow(pay) {
     const r = await db.rpc('pos_pay', { p_order: o.id, p_cash: pay.cash || 0, p_card: pay.card || 0, p_gcash: pay.gcash || 0, p_charge: pay.charge || 0, p_ref: pay.ref || '', p_invoice: pay.invoice || '' });
     const lines = POS.order.lines; toast(num(r.change_due) ? `Paid · change ${peso(r.change_due)}` : 'Paid');
     if (confirm(`Paid${num(r.change_due) ? ' — change ' + peso(r.change_due) : ''}. Print the order slip?`)) posSlip(r, lines);
-    POS.order = posBlank(); POS.cash = 0; POS.tab = 'change'; go('#/r/pos/new');
+    POS.order = posBlank(); POS.cash = 0; POS.tab = undefined; go('#/r/pos/new');
   } catch (err) { toast(err.message, true); }
 }
 ACT.posCharge = async () => {
   const T = posTotals(POS.order);
-  if (!POS.cash) return toast('Tap the cash received (₱20 … ₱1,000 or Exact), then Charge.', true);
+  if (!POS.cash) { if (POS.tab !== 'change') { POS.tab = 'change'; posPaint(); } return toast('Tap the cash received (₱20 … ₱1,000 or Exact), then Charge.'); }
   if (POS.cash < T.total) return toast(`Cash is short by ${peso(T.total - POS.cash)}.`, true);
   posPayNow({ cash: POS.cash });
 };
