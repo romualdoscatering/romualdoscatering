@@ -468,6 +468,9 @@ FORMS.returnLeft = async (f, el) => {
   toast('Leftovers returned to the catering store'); refresh();
 };
 const ACT = {};
+async function loadLogo() {
+  if (!S.logoData) S.logoData = await fetch(new URL('../assets/logo.png', location.href)).then(r => r.blob()).then(b => new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); })).catch(() => '');
+}
 ACT.evPdf = async el => {
   const w = window.open('', '_blank');   // open now, while it still counts as a tap, so the browser doesn't block it
   if (!w) return toast('The browser blocked the PDF window. Allow pop-ups for romualdos.ph and try again.', true);
@@ -475,7 +478,7 @@ ACT.evPdf = async el => {
   try {
     const id = el.dataset.id, [ev] = await db.select('events', { eq: { id } });
     const [menu, client] = await Promise.all([db.select('event_menu', { eq: { event_id: id }, order: [['sort'], ['course']] }), ev.client_id ? db.select('clients', { eq: { id: ev.client_id } }).then(r => r[0]) : null]);
-    if (!S.logoData) S.logoData = await fetch(new URL('../assets/logo.png', location.href)).then(r => r.blob()).then(b => new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); })).catch(() => '');
+    await loadLogo();
     w.document.open(); w.document.write(sheetHtml(ev, menu, client)); w.document.close();
   } catch (e) { w.close(); throw e; }
 };
@@ -515,7 +518,7 @@ routes['c/pr'] = async id => {
   const advances = buyer ? await db.select('cash_advances', { eq: { ws: p.ws, status: 'open' }, order: [['released_at', false]] }) : [];
   const total = lines.reduce((s, l) => s + num(l.approved_qty ?? l.qty) * num(l.est_unit_cost), 0);
   return `<div class="row"><a href="#/${P()}/requests" class="back">‹ Requests</a></div>
-  <div class="row"><h1>${esc(p.pr_no)}</h1>${chip(PR_STATUS[p.status], statusTone(p.status))}</div>
+  <div class="row"><h1>${esc(p.pr_no)}</h1>${chip(PR_STATUS[p.status], statusTone(p.status))}<span class="sp"></span>${lines.length ? `<button type="button" class="ghost" data-act="prPreview" data-id="${id}">🧾 Preview list</button>` : ''}</div>
   <p class="lede">${p.event_id ? `<a href="#/c/event/${p.event_id}">${esc(p.event_ref + ' · ' + p.event_title)}</a> · ` : ''}${esc(p.purpose || '')}<br><span class="small mut">Requested by ${esc(p.requested_by_name || '')} · ${esc(fmtT(p.created_at))}${p.needed_by ? ' · needed by ' + esc(fmtD(p.needed_by)) : ''}${p.approved_by_name ? ` · ${p.status === 'rejected' ? 'rejected' : 'approved'} by ${esc(p.approved_by_name)} ${esc(fmtT(p.approved_at))}` : ''}</span></p>
   ${p.decision_note ? `<div class="alert ${p.status === 'rejected' ? 'bad' : 'info'}">${esc(p.decision_note)}</div>` : ''}
   <form class="card" data-form="${approver ? 'approvePR' : editable ? 'saveDraft' : 'none'}" data-id="${id}">
@@ -542,6 +545,80 @@ routes['c/pr'] = async id => {
     <div class="row end"><button class="pri">Create order</button></div></form>` : ''}
   ${orders.length ? `<section class="card"><h2>Orders</h2><div class="list">${orders.map(o => `<a class="li" href="#/${P()}/po/${o.id}"><div class="li-main"><b>${esc(o.po_no)}</b><span class="mut small">${esc(o.supplier || '')} · ${o.line_count} items · by ${esc(o.buyer_name || '')}</span></div>${chip(PO_STATUS[o.status], statusTone(o.status))}</a>`).join('')}</div></section>` : ''}`;
 };
+// Printable purchase list — opens in a new tab, grouped the way the buyer shops (proteins → market → grocery)
+ACT.prPreview = async el => {
+  const w = window.open('', '_blank');   // open while it still counts as a tap, so pop-up blockers allow it
+  if (!w) return toast('The browser blocked the preview. Allow pop-ups for romualdos.ph and try again.', true);
+  w.document.write('<!DOCTYPE html><title>Preparing list…</title><body style="font:15px Montserrat,Arial,sans-serif;color:#1A2C54;display:grid;place-items:center;height:90vh;margin:0">Preparing the purchase list…</body>');
+  try {
+    const id = el.dataset.id, [[p], lines] = await Promise.all([db.select('pr_overview', { eq: { id } }), db.select('pr_lines', { eq: { pr_id: id } })]);
+    // a draft being edited: show the quantities on screen, even if not saved yet
+    const f = document.querySelector(`form[data-id="${id}"]`);
+    const typed = l => { const v = f?.elements['q_' + l.id]?.value; return v != null && v !== '' ? num(v) : null; };
+    const rows = lines.map(l => ({ ...l, q: typed(l) ?? num(l.approved_qty ?? l.qty) })).filter(l => l.q > 0);
+    await loadLogo();
+    w.document.open(); w.document.write(prListHtml(p, rows)); w.document.close();
+  } catch (e) { w.close(); throw e; }
+};
+function prListHtml(p, rows) {
+  const logo = S.logoData || new URL('../assets/logo.png', location.href).href;
+  const amt = l => buyRound(l.item_id, l.q) * num(l.est_unit_cost);
+  const groups = new Map();
+  [...rows].sort((a, b) => { const ra = shopRank(a.item_id), rb = shopRank(b.item_id);
+    return ra - rb || (ra < 4 ? b.q - a.q : 0) || itemName(a.item_id).localeCompare(itemName(b.item_id)); })
+    .forEach(l => { const g = shopRank(l.item_id); groups.has(g) || groups.set(g, []); groups.get(g).push(l); });
+  const total = rows.reduce((s, l) => s + amt(l), 0), noPrice = rows.filter(l => !num(l.est_unit_cost)).length;
+  const approved = p.status !== 'draft' && p.status !== 'submitted' && p.status !== 'rejected';
+  const info = [['Purpose', p.event_title ? `${p.event_ref} · ${p.event_title}` : (p.purpose || '—')], ['Needed by', p.needed_by ? fmtD(p.needed_by) : 'Not set'],
+    ['Priority', p.priority === 'urgent' ? 'URGENT' : 'Normal'], ['Requested by', p.requested_by_name || '—']];
+  const body = [...groups].map(([g, ls]) => `<tbody><tr class="gh"><td colspan="5">${g < 4 ? 'Protein · ' : ''}${esc(SHOP_HEADS[g])}<span>${ls.length} item${ls.length > 1 ? 's' : ''}${ls.some(l => num(l.est_unit_cost)) ? ' · ' + peso(ls.reduce((s, l) => s + amt(l), 0)) : ''}</span></td></tr>
+    ${ls.map(l => { const sp = packSplit(l.item_id, l.q), c = num(l.est_unit_cost);
+      return `<tr><td class="ck"><i></i></td><td><b>${esc(itemName(l.item_id))}</b>${l.note ? `<div class="nt">${esc(l.note)}</div>` : ''}</td>
+      <td class="n q">${fq(buyRound(l.item_id, l.q))} ${esc(itemUnit(l.item_id))}${sp ? `<div class="nt">${esc(sp)}</div>` : ''}</td>
+      <td class="n">${c ? `${peso(c)}<span class="nt"> /${esc(itemUnit(l.item_id))}</span>` : '<span class="nt">—</span>'}</td><td class="n a">${c ? peso(amt(l)) : '—'}</td></tr>`; }).join('')}</tbody>`).join('');
+  const title = `Purchase List - ${p.pr_no}${p.needed_by ? ' - ' + fmtLong(p.needed_by).replace(/^\w+, /, '') : ''}`;
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital@1&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+@page{size:A4;margin:12mm 12mm 14mm}*{box-sizing:border-box}html,body{margin:0}
+body{font:10.5pt/1.4 Montserrat,Arial,sans-serif;color:#111827;background:#ECE8DA;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.bar{position:sticky;top:0;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:12px;background:#F7F4EA;border-bottom:1px solid #E4DFC8;z-index:2}
+.bar button{font:600 13px Montserrat,Arial;border:0;border-radius:8px;padding:10px 18px;cursor:pointer;background:#1A2C54;color:#fff}.bar button.alt{background:#fff;color:#1A2C54;border:1px solid #CFC9B0}.bar span{align-self:center;font-size:12px;color:#4A5265}
+.page{max-width:210mm;margin:16px auto;padding:12mm;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.12)}
+header{display:flex;align-items:center;gap:5mm;padding-bottom:3mm;border-bottom:1.5pt solid #1A2C54}header img{height:15mm}
+.hd{flex:1}.tag{font-size:7.5pt;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#7A4F00}
+h1{font:italic 400 21pt/1.1 'Playfair Display',Georgia,serif;margin:1mm 0 0;color:#1A2C54}
+.meta{text-align:right;font-size:9pt;line-height:1.6}.meta b{font-size:13pt;color:#1A2C54;display:block}
+.st{display:inline-block;border:1pt solid #1A2C54;border-radius:20px;padding:0 2.5mm;font-size:7.5pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.info{display:grid;grid-template-columns:1.7fr 1fr .7fr 1fr;border:1pt solid #9C9479;border-radius:2mm;margin:4mm 0 5mm}
+.info div{padding:2mm 3mm}.info div+div{border-left:.8pt solid #9C9479}
+.info span{display:block;font-size:7pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#4A5265}.info b{font-weight:600}.urg{color:#9B1C1C}
+table{width:100%;border-collapse:collapse}thead{display:table-header-group}
+th{font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#4A5265;text-align:left;padding:1.5mm;border-bottom:1.2pt solid #1A2C54}
+td{padding:1.6mm 1.5mm;border-bottom:.6pt solid #CFC8B0;vertical-align:top}tr{break-inside:avoid}
+.n{text-align:right;white-space:nowrap}.q{font-weight:700;font-size:11pt;color:#1A2C54}.a{font-weight:600}
+.nt{font-size:8.5pt;color:#4A5265;font-weight:400}
+.ck{width:7mm}.ck i{display:block;width:4mm;height:4mm;border:1.2pt solid #1A2C54;border-radius:.8mm;margin-top:.5mm}
+tr.gh td{padding:3.5mm 1.5mm 1.2mm;border-bottom:1pt solid #9C9479;font-size:8pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#7A4F00;break-after:avoid}
+tr.gh span{float:right;letter-spacing:.04em;color:#1A2C54}
+.tot{display:flex;justify-content:space-between;align-items:baseline;margin-top:3mm;padding:2.5mm 1.5mm;border-top:1.5pt solid #1A2C54;border-bottom:1.5pt solid #1A2C54}
+.tot b{font-size:14pt;color:#1A2C54}.foot{font-size:8.5pt;color:#4A5265;margin:2mm 1.5mm 0}
+.sign{display:grid;grid-template-columns:repeat(3,1fr);gap:10mm;margin-top:12mm;break-inside:avoid}.sign div{border-top:1pt solid #1A2C54;padding-top:1.2mm;font-size:8pt;color:#4A5265}.sign b{display:block;color:#111827;font-size:9pt;min-height:1.3em}
+@media print{body{background:#fff}.bar{display:none}.page{margin:0;padding:0;max-width:none;box-shadow:none}}
+@media (max-width:600px){.page{padding:5mm;margin:0}.info{grid-template-columns:1fr 1fr}.info div:nth-child(3){border-left:0}.info div:nth-child(n+3){border-top:.8pt solid #9C9479}.sign{grid-template-columns:1fr}}
+</style></head><body>
+<div class="bar"><button onclick="window.print()">Print / Save as PDF</button><button class="alt" onclick="window.close()">Close</button></div>
+<div class="page">
+<header><img src="${logo}" alt="Romualdo's"><div class="hd"><div class="tag">${p.ws === 'restaurant' ? 'Restaurant' : 'Catering'} · Purchasing</div><h1>Purchase List</h1></div>
+<div class="meta"><b>${esc(p.pr_no)}</b><span class="st">${esc(PR_STATUS[p.status] || p.status)}</span><br>Printed ${esc(new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }))}</div></header>
+<div class="info">${info.map(([l, v]) => `<div><span>${l}</span><b class="${v === 'URGENT' ? 'urg' : ''}">${esc(v)}</b></div>`).join('')}</div>
+${rows.length ? `<table><thead><tr><th></th><th>Item</th><th class="n">Buy</th><th class="n">Est. price</th><th class="n">Est. amount</th></tr></thead>${body}</table>
+<div class="tot"><span><b style="font-size:10.5pt">${rows.length}</b> item${rows.length > 1 ? 's' : ''} to buy</span><span>Estimated total &nbsp;<b>${peso(total)}</b></span></div>
+${noPrice ? `<p class="foot">${noPrice} item${noPrice > 1 ? 's have' : ' has'} no price yet and ${noPrice > 1 ? 'are' : 'is'} not in the total.</p>` : ''}
+${p.decision_note ? `<p class="foot"><b>Note:</b> ${esc(p.decision_note)}</p>` : ''}` : '<p>No items on this request yet.</p>'}
+<div class="sign"><div><b>${esc(p.requested_by_name || '')}</b>Requested by</div><div><b>${approved ? esc(p.approved_by_name || '') : ''}</b>Approved by</div><div><b></b>Purchased by · Date</div></div>
+</div></body></html>`;
+}
 async function saveDraftLines(f, id) {
   const lines = Object.entries(f).filter(([k]) => k.startsWith('q_'));
   for (const [k, v] of lines) { if (num(v) > 0) await db.update('pr_lines', { qty: num(v) }, { id: k.slice(2) }); }
