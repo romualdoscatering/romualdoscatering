@@ -169,7 +169,9 @@ function checkStaff(coll, before, after, fin) {
     if (keys.some(function (k) { return !same(before[k], after[k]); })) forbid('Only Admin accounts can edit items (Staff can add new items).');
     return;
   }
-  if (after.status === 'void' && before.status !== 'void') forbid('Only Admin accounts can void records.');
+  // Event sheets: anyone may delete one that isn't approved yet (it's hidden, not erased; an Admin can restore it).
+  const sheetDel = coll === 'events' && after.status === 'void' && before.status !== 'void' && before.sheet && ((before.sheet || {}).status || 'draft') !== 'approved' && !before.archive;
+  if (after.status === 'void' && before.status !== 'void' && !sheetDel) forbid(coll === 'events' && (before.sheet || {}).status === 'approved' ? 'This sheet is approved by the client. Only an Admin can delete it.' : 'Only Admin accounts can void records.');
   if (before.status === 'void' && after.status !== 'void') forbid('Only Admin accounts can restore voided records.');
   if (coll === 'prs') {
     if (after.status !== before.status && ['approved', 'rejected'].indexOf(after.status) >= 0) forbid('Only Admin accounts can approve or reject requisitions.');
