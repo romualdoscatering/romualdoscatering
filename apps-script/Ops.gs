@@ -37,6 +37,7 @@ function handleOps(req) {
     case 'scFile': return scFile(me, req);
     case 'kinvSync': return kinvSync(me);
     case 'kinvMail': return kinvMailSend(me, req);
+    case 'webImport': return webImport(me);
     default:         return { ok: false, error: 'Unknown action.' };
   }
 }
@@ -153,6 +154,7 @@ function checkStaff(coll, before, after, fin) {
     if (after.status === 'void' && (!before || before.status !== 'void')) forbid('Only Admin accounts can void records.');
     return;
   }
+  if (coll === 'events' && !fin && ((((before || {}).sheet || {}).pay || 'unpaid') !== ((after.sheet || {}).pay || 'unpaid'))) forbid('Only Admin and Finance accounts can change the payment status.');
   if (coll === 'events' && !fin) {
     const sb = (before || {}).sheet || {}, sa = after.sheet || {}, prices = function (sh) { return (sh.menu || []).filter(function (m) { return m.price; }).map(function (m) { return m.dish + '=' + m.price; }).sort().join('|'); };
     if (!same(sb.bill || null, sa.bill || null) || prices(sb) !== prices(sa)) forbid('Only Admin and Finance accounts can change billing and prices on an event sheet.');
@@ -862,4 +864,57 @@ function kinvMailSend(me, req) {
     'Kitchen stocks daily report for ' + day + '. The PDF is attached.', { name: "Romualdo's Ops", attachments: [pdf],
       htmlBody: '<div style="font-family:Arial,sans-serif;color:#14213F;max-width:760px">' + body + '<p style="font-size:11px;color:#5B6478;margin-top:12px">Sent automatically when the day was saved in Romualdo\'s Ops (Kitchen stocks) by ' + (me.name || me.username) + '. Same copy as the PDF attached.</p></div>' });
   return { ok: true };
+}
+
+
+/* ---------------- Website inquiries → event sheets (draft) ----------------
+   Every order or catering inquiry sent from romualdos.ph becomes a draft event sheet in /ops,
+   with the same reference no. (RCS-…). Corporate catalogue downloads are leads only and stay on the website list. */
+function webSheetFor(q) {
+  const c = q.customer || {}, ev = q.event || {}, p = q.plan || {}, es = q.estimate || {};
+  const tray = p.kind === 'tray', course = function (k) { return (typeof COURSE_NAMES !== 'undefined' && COURSE_NAMES[k]) || k || ''; };
+  const sheet = {
+    ref: q.ref, kind: tray ? 'trays' : 'catering', fulfil: tray ? (p.fulfil || 'Pick-up') : '', client: c.name || '', contact: '', mobile: c.phone || '', email: c.email || '',
+    source: 'Website (romualdos.ph)', type: tray ? '' : (ev.type || ''), date: ev.date || '', serve: ev.time || '', call: '', pull: '',
+    venue: tray ? (p.fulfil === 'Delivery' ? (ev.venue || '') : '') : (ev.venue || ''), coord: '', pax: tray ? '' : (ev.pax || ''),
+    pkg: tray ? '' : (p.kind === 'package' ? (p.packageName || 'Package') : p.chefPick ? 'Custom (chef to recommend)' : 'Custom menu'),
+    motif: '', setup: '', equip: '', staff: tray ? '' : (p.waiters ? p.waiters + ' waiter' + (p.waiters > 1 ? 's' : '') + ' (1 per 25 guests)' : ''), allergy: '',
+    special: q.notes || '',
+    status: 'draft', pay: 'unpaid', approvedOn: '', preparedBy: '', web: { ref: q.ref, at: q.createdAt || new Date().toISOString(), payment: p.payment || '' }, savedAt: Date.now()
+  };
+  if (tray) {
+    sheet.menu = (q.items || []).map(function (i) { const m = { course: course(i.cat), dish: i.dish, qty: String(i.qty || 1), t: 'main', note: '' }; if (i.perHead > 0) m.price = i.perHead; return m; });
+  } else {
+    sheet.menu = p.chefPick ? [{ course: 'Menu', dish: 'Chef to recommend', note: '' }] : (q.items || []).map(function (i) { return { course: course(i.cat), dish: i.dish, note: i.tier === 'request' ? 'Special request (off-menu): confirm price' : '' }; });
+    const pax = Number(ev.pax) || 0, fee = Number(p.serviceFee) || 0;
+    const food = Number(p.foodPerHead) || (fee && pax && es.total ? Math.max(0, Math.round((es.total - fee) / pax)) : (Number(p.pricePerHead) || Number(es.perHead) || 0));
+    if (food > 0 || fee > 0) sheet.bill = { sections: food > 0 ? [{ title: (sheet.pkg || 'Menu') + ' (food, per head)', rate: food, qty: '' }] : [], extras: fee > 0 ? [{ label: 'Service team (' + (p.waiters || 0) + ' × waiter)', amount: fee }] : [], discount: 0, paid: 0, paidNote: '' };
+  }
+  return { name: sheet.client, client: sheet.client, date: sheet.date, pax: Number(sheet.pax) || '', venue: sheet.venue, contract: 0, notes: '', status: 'planned', plan: [], sheet: sheet };
+}
+/** Adds draft event sheets for inquiries that aren't in /ops yet. Returns the new [{id, ev}]. */
+function importWebInquiries(list) {
+  list = (list || []).filter(function (q) { return q && q.ref && (q.plan || {}).kind !== 'corporate' && q.status !== 'Declined' && (q.customer || {}).name && (q.event || {}).date; });
+  if (!list.length) return [];
+  const made = withLock(function () {
+    const sh = opsSheet(), have = {};
+    readAll(sh).forEach(function (r) { if (r.coll !== 'events') return; const d = toDoc(r).data, s = d.sheet || {}; if (s.ref) have[s.ref] = 1; if (s.web && s.web.ref) have[s.web.ref] = 1; });
+    const now = Date.now(), rows = [], out = [];
+    list.forEach(function (q) {
+      if (have[q.ref]) return; have[q.ref] = 1;
+      const ev = webSheetFor(q), id = 'web-' + q.ref.toLowerCase();
+      ev.createdAt = now; ev.createdBy = 'website'; ev.updatedAt = now; ev.updatedBy = 'website';
+      rows.push(['events/' + id, 'events', JSON.stringify(ev), now, 'website', now, 'website']); out.push({ id: id, ev: ev });
+    });
+    if (rows.length) { sh.getRange(sh.getLastRow() + 1, 1, rows.length, OPS.HEAD.length).setValues(rows); bumpVersion(); }
+    return out;
+  });
+  made.forEach(function (x) { try { syncCalendar(x.id, x.ev, false); } catch (e) { Logger.log('calendar ' + x.id + ': ' + e); } });
+  return made;
+}
+/** /ops pulls in any website inquiries for today onward that aren't event sheets yet (catches anything sent before this link existed). */
+function webImport(me) {
+  const from = Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd');
+  const list = (readDb().inquiries || []).filter(function (q) { return q.source === 'web' && ((q.event || {}).date || '') >= from; });
+  return { ok: true, added: importWebInquiries(list).length };
 }

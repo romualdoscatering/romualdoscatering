@@ -720,6 +720,9 @@ ACT.prodToReq = () => {
 const SHEET_COURSES = ['Soup', 'Salad / appetizer', 'Main dish', 'Main dish', 'Main dish', 'Main dish', 'Pasta / noodles', 'Vegetables', 'Rice', 'Dessert', 'Drinks'];
 const EV_TYPES = ['Anniversary', 'Birthday', 'Christening / Baptism', 'Christmas Party', 'Corporate Event', 'Debut', 'Funeral / Wake', 'Graduation', 'Retirement Party', 'Reunion', 'Seminar', 'Training', 'Wedding', 'Other'];  // A–Z, Other last — same list as the website's booking form
 const SHEET_STATUS = [['draft', 'Draft'], ['approval', 'For client approval'], ['approved', 'Approved by client'], ['cancelled', 'Cancelled']];
+const SHEET_PAY = [['unpaid', 'Unpaid'], ['down', 'Down payment received'], ['paid', 'Paid in full']];
+const payLabel = v => (SHEET_PAY.find(x => x[0] === (v || 'unpaid')) || SHEET_PAY[0])[1];
+const payChip = v => `<span class="chip ${v === 'paid' ? 'ok' : v === 'down' ? 'info' : 'bad'}">${payLabel(v)}</span>`;
 const SHEET_KINDS = [['catering', 'Catering / buffet event'], ['trays', 'Food trays'], ['packs', 'Food packs']];
 const sheetKindLabel = k => ({trays: 'Food trays', packs: 'Food packs'})[k] || 'Catering';
 /* Order lines for trays/packs: 'main' = the meal pack or tray itself (this is what is counted), 'drink' and 'addon' are listed but not counted.
@@ -752,12 +755,13 @@ V.sheets = () => {
   const inp = (k, ph = '', type = 'text', extra = '') => `<input type="${type}" data-b="sheet.${k}" placeholder="${esc(ph)}" ${extra}>`;
   const listRow = e => { const sh = sheetOf(e), st = SHEET_STATUS.find(x => x[0] === sh.status) || SHEET_STATUS[0];
     return `<tr class="click" data-act="editSheet" data-arg="${e.id}"><td>${fmtD(e.date)}</td><td><b>${esc(sh.client || e.name)}</b>${sh.kind && sh.kind !== 'catering' ? ` <span class="chip warn">${sheetKindLabel(sh.kind)}</span>` : ` <span class="chip" style="background:#E3E7F0;color:#1A2C54">Catering</span>`}<div class="small mut">${esc([sh.kind && sh.kind !== 'catering' ? sh.fulfil : sh.type, sh.venue].filter(Boolean).join(' · '))}</div></td><td class="n">${esc(sh.pax || e.pax || '')}</td>
-      <td><span class="chip ${sh.status === 'approved' ? 'ok' : sh.status === 'approval' ? 'warn' : sh.status === 'cancelled' ? 'mut' : 'info'}">${st[1]}</span></td>
+      <td><span class="chip ${sh.status === 'approved' ? 'ok' : sh.status === 'approval' ? 'warn' : sh.status === 'cancelled' ? 'mut' : 'info'}">${st[1]}</span>${sh.status !== 'cancelled' ? ' ' + payChip(sh.pay) : ''}${sh.web ? ' <span class="chip mut" title="Sent from the website">🌐 Website</span>' : ''}</td>
       <td class="row"><button class="sm" data-act="editSheet" data-arg="${e.id}">Edit</button><button class="sm pri" data-act="pdfSheet" data-arg="${e.id}">${S.canBill && sheetBillCalc(sh).any ? 'PDF + billing' : 'PDF'}</button>${S.canBill && sheetBillCalc(sh).any ? `<button class="sm" data-act="pdfSheetNoBill" data-arg="${e.id}" title="Event sheet only, without prices">No prices</button>` : ''}${S.canBill ? `<button class="sm ghost" data-act="delSheet" data-arg="${e.id}" title="Delete this event sheet" style="color:#9B1C1C">Delete</button>` : ''}</td></tr>`; };
   return `<h2>Event sheets</h2>
   <p class="lede">Encode each event's details once. <b>Generate PDF</b> makes a polished event sheet with the Romualdo's logo, for the kitchen and for the client to approve. Billing is not included; that stays with the admin and finance.</p>
   <div class="card" id="sheetForm"><div class="row" style="margin-bottom:6px"><h3 style="margin:0">${d.id ? 'Edit event sheet' : 'New event sheet'}</h3><span id="sheetSaveState" class="save-state ${AS.err ? 'warn' : AS.dirty ? 'busy' : 'ok'}">${esc(saveStateText())}</span><span class="spacer"></span>${d.id ? '<button class="sm ghost" data-act="newSheet">＋ Start a new one instead</button>' : ''}</div>
    ${AS.restoredAt ? `<div class="alert info" style="margin:8px 0">Restored your unsaved work from ${esc(clockNow(AS.restoredAt))}${new Date(AS.restoredAt).toDateString() !== new Date().toDateString() ? ' on ' + esc(fmtD(new Date(AS.restoredAt).toISOString().slice(0, 10))) : ''}. It saves online automatically. <span class="spacer"></span><button class="sm ghost" data-act="discardDraft">Discard draft</button></div>` : ''}
+   ${d.web ? `<div class="alert info" style="margin:0 0 8px">🌐 Sent from the website on ${esc(fmtD(String(d.web.at || '').slice(0, 10)))} · Ref. ${esc(d.web.ref)}${d.web.payment ? ' · Will pay by ' + esc(d.web.payment) : ''}. Check the details with the client, then set the status and payment below.</div>` : ''}
    <div class="row" style="margin:4px 0 8px"><b class="small">This is for:</b><div class="seg">${SHEET_KINDS.map(([v, l]) => `<button type="button" class="${(d.kind || 'catering') === v ? 'on' : ''}" data-act="sheetKind" data-arg="${v}">${l}</button>`).join('')}</div></div>
    ${cat ? '' : `<div class="alert info" style="margin:0 0 8px">For clients ordering food only (no buffet set-up). Order at least 2 days ahead; next-day orders are by call or message.</div>`}
    <h4 class="sub">1. Client</h4>
@@ -789,7 +793,7 @@ V.sheets = () => {
    <h4 class="sub">${cat ? 5 : 4}. Notes</h4>
    <div class="grid">${lab('Allergies / dietary needs', `<textarea data-b="sheet.allergy" rows="2"></textarea>`)}${lab('Special requests', `<textarea data-b="sheet.special" rows="2"></textarea>`)}</div>
    <h4 class="sub">${cat ? 6 : 5}. Approval</h4>
-   <div class="grid">${lab('Status', sel('sheet.status', SHEET_STATUS.map(([v, l]) => opt(v, l)).join(''), false))}${lab('Approved on', inp('approvedOn', '', 'date'))}${lab('Prepared by', inp('preparedBy', S.me?.name || '', 'text', 'list="dl-staff"'))}</div>
+   <div class="grid">${lab('Status', sel('sheet.status', SHEET_STATUS.map(([v, l]) => opt(v, l)).join(''), false))}${S.canBill ? lab('Payment', sel('sheet.pay', SHEET_PAY.map(([v, l]) => opt(v, l)).join(''), false)) : lab('Payment', `<input value="${esc(payLabel(d.pay))}" disabled title="Admin and Finance update the payment status">`)}${lab('Approved on', inp('approvedOn', '', 'date'))}${lab('Prepared by', inp('preparedBy', S.me?.name || '', 'text', 'list="dl-staff"'))}</div>
    <div class="row end" style="margin-top:12px">${d.id ? `<button class="ghost" data-act="openEvent" data-arg="${d.id}">Costing &amp; stock →</button>` : ''}<button class="ghost" data-act="newSheet">Clear</button><button data-act="saveSheet" data-arg="pdf">Save &amp; generate PDF</button><button class="pri" data-act="saveSheet">Save</button></div>
   </div>
   <div class="card"><h3>Upcoming events (${up.length})</h3>
@@ -1363,7 +1367,7 @@ function printSheet(id, w, noBill) {
     : [[d.fulfil === 'Delivery' ? 'Delivery date' : 'Pick-up date', fmtLong(d.date)], [d.fulfil === 'Delivery' ? 'Delivery time' : 'Ready by', d.serve ? fmtClock(d.serve) : 'To be confirmed'], ['Order', (orderLabel(os, k) || kl) + (d.fulfil ? ' · ' + d.fulfil : '')]];
   const docTitle = cat ? 'Event Details' : k === 'packs' ? 'Food Pack Order' : 'Food Tray Order';
   const BC = S.canBill && !noBill ? sheetBillCalc(d) : {any: false}, priced = BC.any && !cat && menu.some(m => num(m.price) > 0);
-  const billPage = BC.any ? `<div class="page pb"><div class="bill-h"><img src="${logo}" alt="Romualdo's"><div><div class="tag">Catering Services · Davao City</div><h1>Billing Statement</h1><div class="who">${esc(d.client)}</div></div><div class="meta">Ref. ${esc(ref)}<br>Issued ${esc(new Date().toLocaleDateString('en-PH', {month: 'long', day: 'numeric', year: 'numeric'}))}</div></div>
+  const billPage = BC.any ? `<div class="page pb"><div class="bill-h"><img src="${logo}" alt="Romualdo's"><div><div class="tag">Catering Services · Davao City</div><h1>Billing Statement</h1><div class="who">${esc(d.client)}</div></div><div class="meta">Ref. ${esc(ref)}<br><b>${esc(payLabel(d.pay))}</b><br>Issued ${esc(new Date().toLocaleDateString('en-PH', {month: 'long', day: 'numeric', year: 'numeric'}))}</div></div>
 <p class="addr">${esc(billCfg('billAddress'))}<br>${esc(billCfg('billContact'))}</p>
 <div class="boxes"><div><h3>Bill to</h3><p><b>Name:</b> ${esc(d.client)}${d.contact ? ' – ' + esc(d.contact) : ''}</p>${d.mobile ? `<p><b>Mobile:</b> ${esc(d.mobile)}</p>` : ''}${d.email ? `<p><b>Email:</b> ${esc(d.email)}</p>` : ''}</div>
 <div><h3>${cat ? 'Event' : 'Order'}</h3><p><b>${cat ? 'Date of event' : d.fulfil === 'Delivery' ? 'Delivery date' : 'Pick-up date'}:</b> ${esc(fmtLong(d.date))}</p>${d.serve ? `<p><b>Time:</b> ${esc(fmtClock(d.serve))}</p>` : ''}${d.pax ? `<p><b>${cat ? 'Guaranteed pax' : 'Good for'}:</b> ${esc(d.pax)}</p>` : ''}${d.venue ? `<p><b>${cat ? 'Venue' : 'Address'}:</b> ${esc(d.venue)}</p>` : ''}</div></div>
@@ -1373,11 +1377,11 @@ function printSheet(id, w, noBill) {
   const title = `${cat ? 'Event Sheet' : docTitle} - ${d.client} - ${fmtLong(d.date).replace(/^\w+, /, '')}`;
   const html = sheetDocHtml(title, `<div class="page" id="pg">
 <header><img src="${logo}" alt="Romualdo's"><div class="hd"><div class="tag">Catering Services · Davao City</div><h1>${esc(docTitle)}</h1><div class="who">${esc(d.client)}</div></div>
-<div class="meta">Ref. ${esc(ref)}<br><span class="status">${esc(st)}</span><br>Issued ${esc(new Date().toLocaleDateString('en-PH', {month: 'long', day: 'numeric', year: 'numeric'}))}</div></header>
+<div class="meta">Ref. ${esc(ref)}<br><span class="status">${esc(st)}${d.status !== 'cancelled' ? ' · ' + esc(payLabel(d.pay)) : ''}</span><br>Issued ${esc(new Date().toLocaleDateString('en-PH', {month: 'long', day: 'numeric', year: 'numeric'}))}</div></header>
 <div class="hero">${hero.map(([l, v]) => `<div><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join('')}</div>
 <div class="cols"><div>
 <section><h2>Client${cat ? ' &amp; venue' : ''}<small>Details</small></h2><table class="kv">
-${row('Client', d.client)}${row('Contact person', d.contact)}${row('Mobile', d.mobile)}${row('Email', d.email)}${cat ? row('Venue', d.venue) + row('Coordinator', d.coord) + row('Package', d.pkg) : row(d.fulfil === 'Delivery' ? 'Deliver to' : 'Pick-up at', d.fulfil === 'Delivery' ? d.venue : (d.venue || "Romualdo's, 13 Juna Ave., Juna Subd.")) + row('Good for', d.pax ? d.pax + ' pax' : '')}
+${row('Client', d.client)}${row('Contact person', d.contact)}${row('Mobile', d.mobile)}${row('Email', d.email)}${row('Payment by', d.web?.payment)}${cat ? row('Venue', d.venue) + row('Coordinator', d.coord) + row('Package', d.pkg) : row(d.fulfil === 'Delivery' ? 'Deliver to' : 'Pick-up at', d.fulfil === 'Delivery' ? d.venue : (d.venue || "Romualdo's, 13 Juna Ave., Juna Subd.")) + row('Good for', d.pax ? d.pax + ' pax' : '')}
 </table></section>
 ${times.length ? `<section><h2>Timeline<small>Schedule</small></h2><div class="times">${times.map(([l, t]) => `<div><span>${l}</span><b>${esc(fmtClock(t))}</b></div>`).join('')}</div></section>` : ''}
 ${setup.some(x => x[1]) ? `<section><h2>Setup &amp; service<small>On site</small></h2><table class="kv">${setup.map(([l, v]) => row(l, v)).join('')}</table></section>` : ''}
@@ -2964,7 +2968,7 @@ document.addEventListener('change', e => {
   if (p.startsWith('sheet.')) sheetTouched();
   if ('rr' in el.dataset) render();
 });
-function route() { let h = location.hash.slice(1); if (h === 'expenses') { h = 'purchases'; history.replaceState(null, '', '#purchases'); } D.ui.tab = TABS.some(t => t[0] === h) ? h : 'dash'; render(); window.scrollTo(0, 0); }
+function route() { let h = location.hash.slice(1); const qm = h.match(/^(\w+)\?ref=([\w-]+)$/); if (qm) { h = qm[1]; D.ui.openRef = qm[2]; history.replaceState(null, '', '#' + h); } if (h === 'expenses') { h = 'purchases'; history.replaceState(null, '', '#purchases'); } D.ui.tab = TABS.some(t => t[0] === h) ? h : 'dash'; render(); window.scrollTo(0, 0); }
 window.addEventListener('hashchange', route);
 
 /* ============ backend (Google Apps Script — same logins as the inquiry dashboard) ============ */
@@ -3010,6 +3014,8 @@ async function sync(full) {
     const wasAdmin = S.isAdmin, wasBill = S.canBill;
     S.me = r.me; S.isAdmin = r.me.role === 'Admin'; S.canBill = S.isAdmin || r.me.role === 'Finance';
     if (!r.unchanged) { if (r.users) S.users = r.users; applyDocs(r.docs, true); }
+    if (D.ui.openRef) { const e = Object.values(S.events).find(x => x.sheet && (x.sheet.ref === D.ui.openRef || x.sheet.web?.ref === D.ui.openRef)); if (e) { D.ui.openRef = ''; setTimeout(() => ACT.editSheet(e.id), 0); } else if (S.webPulled) { toast('That website order is not in Event sheets yet.', true); D.ui.openRef = ''; } }
+    if (!S.webPulled) { S.webPulled = true; api('webImport').then(x => { if (x.added) { toast(x.added + ' website order' + (x.added > 1 ? 's' : '') + ' added to Event sheets'); sync(); } }).catch(() => {}); }
     VER = r.ver; S.lastSync = Date.now(); S.syncErr = '';
     if (!opsDraftRestored) opsDraftRestore();
     if (wasAdmin !== S.isAdmin || wasBill !== S.canBill) schedule();
@@ -3036,7 +3042,7 @@ window.addEventListener('pagehide', opsDraftWrite); document.addEventListener('v
 const TOKEN_KEY = 'rcs_ops_token';
 function saveToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} try { t ? sessionStorage.setItem('rcs_token', t) : sessionStorage.removeItem('rcs_token'); } catch (e) {} }
 function readToken() { try { return sessionStorage.getItem('rcs_token') || localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
-function endSession(msg) { opsDraftWrite(); opsDraftRestored = false; S.token = ''; S.me = null; S.isAdmin = false; S.canBill = false; S.lastSync = 0; S.loginMsg = msg || ''; CACHE.clear(); VER = 0; AFTER = 0; saveToken(''); closeModal(); rebuild(); render(); }
+function endSession(msg) { S.webPulled = false; opsDraftWrite(); opsDraftRestored = false; S.token = ''; S.me = null; S.isAdmin = false; S.canBill = false; S.lastSync = 0; S.loginMsg = msg || ''; CACHE.clear(); VER = 0; AFTER = 0; saveToken(''); closeModal(); rebuild(); render(); }
 function loginView() {
   return `<div class="card login"><h2>Staff login</h2>
    <p class="lede" style="text-align:center">Use the same username and password as the inquiry dashboard.</p>

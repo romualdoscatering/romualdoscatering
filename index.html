@@ -1342,7 +1342,7 @@ function detailHtml(q){
       <li>Payment: <b>${esc(q.plan.payment||"—")}</b> — send payment details to the customer</li>
       <li>Notes: ${esc(q.notes||"—")}</li>
     </ul>
-    ${state.canEdit?`<button class="btn small danger" data-del="${esc(q._id)}">${state.confirmDel===q._id?"Click again to delete":"Delete inquiry"}</button>`:""}</div></div>`;
+    ${q.source==="web"&&q.plan?.kind!=="corporate"?`<a class="btn small" style="margin-right:8px" href="/ops/#sheets?ref=${encodeURIComponent(q.ref||"")}" target="_blank" rel="noopener">Open event sheet &amp; PDF in /ops →</a>`:""}${state.canEdit?`<button class="btn small danger" data-del="${esc(q._id)}">${state.confirmDel===q._id?"Click again to delete":"Delete inquiry"}</button>`:""}</div></div>`;
   }
   const items=(q.items||[]).map(i=>`<li>${esc(COURSES[i.cat]||i.cat)}: <b>${esc(i.dish)}</b>${i.tier?` <span class="hint">(${i.tier==="request"?"<b style='color:var(--wine)'>Special request — off-menu</b>":i.tier==="premium"?"Premium":"Standard"}${i.perHead?` · ${peso(i.perHead)}/head`:""})</span>`:""}</li>`).join("");
   return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
@@ -1355,7 +1355,7 @@ function detailHtml(q){
       <li>Notes: ${esc(q.notes||"—")}</li>
       <li>Source: ${q.source==="message"?"Customer message (pasted by staff)":"Website form"}</li>
     </ul>
-    ${state.canEdit?`<button class="btn small danger" data-del="${esc(q._id)}">${state.confirmDel===q._id?"Click again to delete":"Delete inquiry"}</button>`:""}</div>
+    ${q.source==="web"&&q.plan?.kind!=="corporate"?`<a class="btn small" style="margin-right:8px" href="/ops/#sheets?ref=${encodeURIComponent(q.ref||"")}" target="_blank" rel="noopener">Open event sheet &amp; PDF in /ops →</a>`:""}${state.canEdit?`<button class="btn small danger" data-del="${esc(q._id)}">${state.confirmDel===q._id?"Click again to delete":"Delete inquiry"}</button>`:""}</div>
   </div>`;
 }
 

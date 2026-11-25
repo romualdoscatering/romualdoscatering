@@ -189,6 +189,8 @@ function submitInquiry(q, source, honeypot) {
   });
   // Email alert for inquiries sent from the website. A failed email never blocks saving the inquiry.
   if (res.ok && !res.dup && source === 'web') { try { sendInquiryAlert(inq); } catch (e) { console.error('Alert email failed: ' + e); } }
+  // …and put it in /ops as a draft event sheet (same reference no.). A failure here never blocks the inquiry.
+  if (res.ok && !res.dup && source === 'web') { try { importWebInquiries([inq]); } catch (e) { console.error('Ops link failed: ' + e); } }
   return res;
 }
 
