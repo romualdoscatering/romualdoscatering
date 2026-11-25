@@ -3,9 +3,16 @@
 <head>
 <script>window.RC_API_URL = 'https://script.google.com/macros/s/AKfycbxbXsJ85OCUtYluklVpLBe6c3nIDx3cHyhkHjAk-W9j9rKNPOd16MwZxwkbDUIEDxQJ/exec';</script>
 <link rel="icon" href="/favicon.ico">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="theme-color" content="#FBF8EE">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Time Clock">
 <base target="_top">
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cut">
 <title>Romualdo's Time Clock & HR</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -38,7 +45,7 @@ button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 .num{font-variant-numeric:tabular-nums}
-header.top{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:10px 18px;background:#ffffff;color:#1A2C54;border-bottom:3px solid #E89908}
+header.top{padding-top:max(10px,env(safe-area-inset-top)) !important;display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;padding:10px 18px;background:#ffffff;color:#1A2C54;border-bottom:3px solid #E89908}
 .brand{display:flex;align-items:center;gap:12px}
 .brand img{height:30px;width:auto;display:block}
 .brand h1{font-size:20px;font-style:italic;font-weight:500;color:#1A2C54;padding-left:12px;border-left:1px solid #E4DFC8}
@@ -418,6 +425,20 @@ function hm2min(s){ if (!s) return null; const [h, m] = String(s).split(':').map
 function phNow(){ const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).formatToParts(new Date()).map(x => [x.type, x.value])); const h = +p.hour % 24; return { iso: `${p.year}-${p.month}-${p.day}`, h, m: +p.minute, s: +p.second, mins: h*60 + +p.minute }; }
 function niceDate(iso){ return new Date(iso + 'T12:00:00+08:00').toLocaleDateString(LANG === 'tl' ? 'fil-PH' : 'en-US', { timeZone: TZ, weekday: 'short', month: 'short', day: 'numeric' }); }
 function dowShort(iso){ return new Date(iso + 'T12:00:00+08:00').toLocaleDateString('en-US', { timeZone: TZ, weekday: 'short' }); }
+/* ---- home-screen app (install) ---- */
+const STANDALONE = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let INSTALL_EVT = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); INSTALL_EVT = e; const b = document.getElementById('inst-box'); if (b) b.outerHTML = installTip(); });
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+function installTip(){
+  if (STANDALONE) return '<p class="muted" id="inst-box" style="margin:0;font-size:14px">✅ Running as the Time Clock app on this tablet.</p>';
+  const first = '<b>Step 1: put the Time Clock on this tablet\'s home screen</b>, then open it from there and register it below. Register inside the home-screen app, not the browser: on iPads the two keep separate memory.';
+  if (INSTALL_EVT) return `<div id="inst-box" style="background:#FCEFD3;border-radius:10px;padding:12px 14px;font-size:14px">${first}<br><button class="btn primary" style="margin-top:8px" onclick="doInstall()">📲 Add the Time Clock to the home screen</button></div>`;
+  return `<div id="inst-box" style="background:#FCEFD3;border-radius:10px;padding:12px 14px;font-size:14px">${first}<br>${IOS ? 'iPad/iPhone: in Safari tap <b>Share</b> (the square with an arrow), then <b>Add to Home Screen</b>.' : 'Android: open the browser menu <b>⋮</b> and tap <b>Add to Home screen</b> (or <b>Install app</b>).'}</div>`;
+}
+async function doInstall(){ if (!INSTALL_EVT) return; INSTALL_EVT.prompt(); try { await INSTALL_EVT.userChoice; } catch (e) {} INSTALL_EVT = null; const b = document.getElementById('inst-box'); if (b) b.outerHTML = installTip(); }
+window.doInstall = doInstall;
 function toast(msg){ const el = document.getElementById('toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.remove('show'), 4200); }
 function addDaysIso(iso, n){ const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 const store = { get(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v){ try { localStorage.setItem(k, v); } catch (e) {} } };
@@ -903,7 +924,7 @@ function renderAdmin(){
     <div class="card adminbox"><h3 style="font-family:var(--display);font-size:24px">Kiosk tablet</h3>
       <p class="muted" style="margin:0">Only registered tablets can record punches, so no one can clock in from home. Open this page on the reception tablet, sign in, and press the button.</p>
       <div class="field"><label for="d-name">Tablet name</label><input id="d-name" value="Reception tablet"></div>
-      <button class="btn" id="d-go">Register this tablet as the kiosk</button><div class="muted" id="d-out">${K.device ? 'This browser is already registered as a kiosk.' : 'This browser is not a kiosk.'}</div></div>
+      ${installTip()}<button class="btn" id="d-go">Register this tablet as the kiosk</button><div class="muted" id="d-out">${K.device ? 'This browser is already registered as a kiosk.' : 'This browser is not a kiosk.'}</div></div>
     <div class="card adminbox"><h3 style="font-family:var(--display);font-size:24px">Set a staff PIN</h3>
       <div class="grid2"><div class="field"><label for="p-code">Staff</label><select id="p-code">${D.staff.map(s => `<option value="${esc(s.code)}">${esc(s.code)} ${esc(s.name)}${s.hasPin ? '' : ' (no PIN yet)'}</option>`).join('')}</select></div>
       <div class="field"><label for="p-pin">New 4-digit PIN</label><input id="p-pin" inputmode="numeric" maxlength="4" autocomplete="off"></div></div>
