@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Staff Password Reset · Romualdo's</title>
+<style>
+  :root { --navy:#14213d; --cream:#f6f1e7; --gold:#c9a227; --ink:#1d1d1d; --red:#b3261e; --green:#1a7f37; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         background:var(--cream); color:var(--ink); font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; padding:20px; }
+  .card { width:100%; max-width:420px; background:#fff; border-radius:14px; box-shadow:0 6px 24px rgba(20,33,61,.12); overflow:hidden; }
+  header { background:var(--navy); color:#fff; padding:18px 22px; }
+  header h1 { margin:0; font-size:19px; letter-spacing:.2px; }
+  header p { margin:4px 0 0; font-size:13px; color:var(--gold); }
+  main { padding:20px 22px 24px; }
+  label { display:block; font-size:14px; font-weight:600; margin:12px 0 4px; }
+  input { width:100%; padding:11px 12px; font-size:16px; border:1px solid #cfc8b8; border-radius:8px; }
+  input:focus { outline:2px solid var(--gold); border-color:var(--gold); }
+  .row { display:flex; gap:8px; }
+  .row input { flex:1; }
+  button { cursor:pointer; border:0; border-radius:8px; padding:11px 14px; font-size:15px; font-weight:600; }
+  .primary { background:var(--navy); color:#fff; width:100%; margin-top:16px; }
+  .primary:disabled { opacity:.6; cursor:default; }
+  .ghost { background:var(--cream); color:var(--navy); border:1px solid #cfc8b8; }
+  .msg { margin:14px 0 0; min-height:1.3em; font-size:14px; }
+  .ok { color:var(--green); } .err { color:var(--red); }
+  .who { font-size:13px; color:#555; display:flex; justify-content:space-between; align-items:center; }
+  .link { background:none; color:var(--navy); text-decoration:underline; padding:0; font-weight:500; font-size:13px; }
+  .hidden { display:none; }
+  .note { font-size:12.5px; color:#666; margin-top:16px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <header>
+    <h1>Staff Password Reset</h1>
+    <p>Romualdo's · Admins only</p>
+  </header>
+  <main>
+
+    <!-- Admin sign-in -->
+    <section id="login">
+      <label for="admin-email">Admin email</label>
+      <input id="admin-email" type="email" autocomplete="username">
+      <label for="admin-pass">Admin password</label>
+      <input id="admin-pass" type="password" autocomplete="current-password">
+      <button id="btn-login" class="primary">Sign in</button>
+      <p id="login-msg" class="msg"></p>
+    </section>
+
+    <!-- Reset form -->
+    <section id="reset" class="hidden">
+      <div class="who"><span>Signed in as <b id="who"></b></span><button id="btn-out" class="link">Sign out</button></div>
+      <label for="staff-email">Staff login email</label>
+      <input id="staff-email" type="email" placeholder="name@staff.romualdos.ph" autocomplete="off">
+      <label for="staff-pass">New temporary password (min. 8)</label>
+      <div class="row">
+        <input id="staff-pass" type="text" autocomplete="off" spellcheck="false">
+        <button id="btn-gen" class="ghost" type="button">Generate</button>
+      </div>
+      <button id="btn-reset" class="primary">Set password</button>
+      <p id="reset-msg" class="msg"></p>
+      <p class="note">Give the new password to the staff member in person or by private message, and ask them to change it after logging in.</p>
+    </section>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ---- Settings ------------------------------------------------------------
+const SUPABASE_URL = "https://skqmlqujmjkzmiykkand.supabase.co";
+const SUPABASE_KEY = "sb_publishable_FWjts74xJz3wuGA0bhMXfQ_5iQhckcf"; // public key, same one /app uses
+const FUNCTION_NAME = "admin-reset-function";
+// --------------------------------------------------------------------------
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: { storageKey: "romualdos-staff-reset" } // own session, doesn't disturb /app
+});
+const $ = (id) => document.getElementById(id);
+const say = (el, text, ok) => { el.textContent = text; el.className = "msg " + (ok ? "ok" : "err"); };
+
+async function show() {
+  const { data } = await sb.auth.getSession();
+  const user = data.session?.user;
+  $("login").classList.toggle("hidden", !!user);
+  $("reset").classList.toggle("hidden", !user);
+  if (user) $("who").textContent = user.email;
+}
+
+$("btn-login").onclick = async () => {
+  const email = $("admin-email").value.trim(), password = $("admin-pass").value;
+  if (!email || !password) return say($("login-msg"), "Enter your email and password.");
+  $("btn-login").disabled = true; say($("login-msg"), "Signing in…", true);
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  $("btn-login").disabled = false;
+  if (error) return say($("login-msg"), "Sign-in failed: " + error.message);
+  $("admin-pass").value = ""; say($("login-msg"), "", true); show();
+};
+$("admin-pass").addEventListener("keydown", (e) => { if (e.key === "Enter") $("btn-login").click(); });
+
+$("btn-out").onclick = async () => { await sb.auth.signOut(); show(); };
+
+$("btn-gen").onclick = () => {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const a = new Uint32Array(10); crypto.getRandomValues(a);
+  $("staff-pass").value = Array.from(a, (n) => chars[n % chars.length]).join("");
+};
+
+$("btn-reset").onclick = async () => {
+  const email = $("staff-email").value.trim();
+  const new_password = $("staff-pass").value.trim();
+  if (!email || new_password.length < 8) return say($("reset-msg"), "Enter the staff email and a password of 8+ characters.");
+  if (!confirm("Set a new password for " + email + "?")) return;
+  $("btn-reset").disabled = true; say($("reset-msg"), "Working…", true);
+  const { error } = await sb.functions.invoke(FUNCTION_NAME, { body: { email, new_password } });
+  $("btn-reset").disabled = false;
+  if (error) {
+    let detail = error.message;
+    try { detail = (await error.context.json()).error || detail; } catch (_) {}
+    return say($("reset-msg"), "Failed: " + detail);
+  }
+  say($("reset-msg"), "Done — " + email + " can now log in with the new password.", true);
+};
+
+show();
+</script>
+</body>
+</html>
