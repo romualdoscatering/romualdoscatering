@@ -556,68 +556,75 @@ ACT.prPreview = async el => {
     const f = document.querySelector(`form[data-id="${id}"]`);
     const typed = l => { const v = f?.elements['q_' + l.id]?.value; return v != null && v !== '' ? num(v) : null; };
     const rows = lines.map(l => ({ ...l, q: typed(l) ?? num(l.approved_qty ?? l.qty) })).filter(l => l.q > 0);
-    await loadLogo();
     w.document.open(); w.document.write(prListHtml(p, rows)); w.document.close();
   } catch (e) { w.close(); throw e; }
 };
+// One-sheet buying list: two columns on paper/tablet, one on phones; shrinks to fit a single A4 page.
+// Tap a line on the phone to tick it off (remembered on that phone for this request).
 function prListHtml(p, rows) {
-  const logo = S.logoData || new URL('../assets/logo.png', location.href).href;
   const amt = l => buyRound(l.item_id, l.q) * num(l.est_unit_cost);
   const groups = new Map();
   [...rows].sort((a, b) => { const ra = shopRank(a.item_id), rb = shopRank(b.item_id);
     return ra - rb || (ra < 4 ? b.q - a.q : 0) || itemName(a.item_id).localeCompare(itemName(b.item_id)); })
     .forEach(l => { const g = shopRank(l.item_id); groups.has(g) || groups.set(g, []); groups.get(g).push(l); });
   const total = rows.reduce((s, l) => s + amt(l), 0), noPrice = rows.filter(l => !num(l.est_unit_cost)).length;
-  const approved = p.status !== 'draft' && p.status !== 'submitted' && p.status !== 'rejected';
-  const info = [['Purpose', p.event_title ? `${p.event_ref} · ${p.event_title}` : (p.purpose || '—')], ['Needed by', p.needed_by ? fmtD(p.needed_by) : 'Not set'],
-    ['Priority', p.priority === 'urgent' ? 'URGENT' : 'Normal'], ['Requested by', p.requested_by_name || '—']];
-  const body = [...groups].map(([g, ls]) => `<tbody><tr class="gh"><td colspan="5">${g < 4 ? 'Protein · ' : ''}${esc(SHOP_HEADS[g])}<span>${ls.length} item${ls.length > 1 ? 's' : ''}${ls.some(l => num(l.est_unit_cost)) ? ' · ' + peso(ls.reduce((s, l) => s + amt(l), 0)) : ''}</span></td></tr>
-    ${ls.map(l => { const sp = packSplit(l.item_id, l.q), c = num(l.est_unit_cost);
-      return `<tr><td class="ck"><i></i></td><td><b>${esc(itemName(l.item_id))}</b>${l.note ? `<div class="nt">${esc(l.note)}</div>` : ''}</td>
-      <td class="n q">${fq(buyRound(l.item_id, l.q))} ${esc(itemUnit(l.item_id))}${sp ? `<div class="nt">${esc(sp)}</div>` : ''}</td>
-      <td class="n">${c ? `${peso(c)}<span class="nt"> /${esc(itemUnit(l.item_id))}</span>` : '<span class="nt">—</span>'}</td><td class="n a">${c ? peso(amt(l)) : '—'}</td></tr>`; }).join('')}</tbody>`).join('');
-  const title = `Purchase List - ${p.pr_no}${p.needed_by ? ' - ' + fmtLong(p.needed_by).replace(/^\w+, /, '') : ''}`;
+  const short = n => peso(n).replace(/\.00$/, '');
+  const approved = ['approved', 'ordered', 'received'].includes(p.status);
+  const what = p.event_title ? `${p.event_ref} · ${p.event_title}` : (p.purpose || '');
+  const body = [...groups].map(([g, ls]) => {
+    const sub = ls.reduce((s, l) => s + amt(l), 0);
+    return `<div class="g"><div class="gh"><b>${g === 4 ? 'Wet market · Bankerohan' : esc(SHOP_HEADS[g])}</b><span>${ls.length}${sub ? ' · ' + short(sub) : ''}</span></div>
+    ${ls.map(l => { const sp = packSplit(l.item_id, l.q), c = num(l.est_unit_cost), u = itemUnit(l.item_id), dish = (l.note || '').replace(/^for:\s*/i, '');
+      return `<div class="r" data-k="${l.id || l.item_id}"><i></i><div class="nm"><b>${esc(itemName(l.item_id))}</b>${dish ? `<small>${esc(dish)}</small>` : ''}</div>
+      <div class="q"><b>${fq(buyRound(l.item_id, l.q))} ${esc(u)}</b>${sp ? `<small>${esc(sp)}</small>` : ''}</div>
+      <div class="a">${c ? `<b>${short(amt(l))}</b><small>@${short(c)}/${esc(u)}</small>` : '<small>no price</small>'}</div><div class="w"></div></div>`; }).join('')}</div>`;
+  }).join('');
+  const title = `Purchase List - ${p.pr_no}${p.needed_by ? ' - ' + fmtD(p.needed_by) : ''}`;
   return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital@1&family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-@page{size:A4;margin:12mm 12mm 14mm}*{box-sizing:border-box}html,body{margin:0}
-body{font:10.5pt/1.4 Montserrat,Arial,sans-serif;color:#111827;background:#ECE8DA;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.bar{position:sticky;top:0;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;padding:12px;background:#F7F4EA;border-bottom:1px solid #E4DFC8;z-index:2}
-.bar button{font:600 13px Montserrat,Arial;border:0;border-radius:8px;padding:10px 18px;cursor:pointer;background:#1A2C54;color:#fff}.bar button.alt{background:#fff;color:#1A2C54;border:1px solid #CFC9B0}.bar span{align-self:center;font-size:12px;color:#4A5265}
-.page{max-width:210mm;margin:16px auto;padding:12mm;background:#fff;box-shadow:0 2px 14px rgba(0,0,0,.12)}
-header{display:flex;align-items:center;gap:5mm;padding-bottom:3mm;border-bottom:1.5pt solid #1A2C54}header img{height:15mm}
-.hd{flex:1}.tag{font-size:7.5pt;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:#7A4F00}
-h1{font:italic 400 21pt/1.1 'Playfair Display',Georgia,serif;margin:1mm 0 0;color:#1A2C54}
-.meta{text-align:right;font-size:9pt;line-height:1.6}.meta b{font-size:13pt;color:#1A2C54;display:block}
-.st{display:inline-block;border:1pt solid #1A2C54;border-radius:20px;padding:0 2.5mm;font-size:7.5pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
-.info{display:grid;grid-template-columns:1.7fr 1fr .7fr 1fr;border:1pt solid #9C9479;border-radius:2mm;margin:4mm 0 5mm}
-.info div{padding:2mm 3mm}.info div+div{border-left:.8pt solid #9C9479}
-.info span{display:block;font-size:7pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#4A5265}.info b{font-weight:600}.urg{color:#9B1C1C}
-table{width:100%;border-collapse:collapse}thead{display:table-header-group}
-th{font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#4A5265;text-align:left;padding:1.5mm;border-bottom:1.2pt solid #1A2C54}
-td{padding:1.6mm 1.5mm;border-bottom:.6pt solid #CFC8B0;vertical-align:top}tr{break-inside:avoid}
-.n{text-align:right;white-space:nowrap}.q{font-weight:700;font-size:11pt;color:#1A2C54}.a{font-weight:600}
-.nt{font-size:8.5pt;color:#4A5265;font-weight:400}
-.ck{width:7mm}.ck i{display:block;width:4mm;height:4mm;border:1.2pt solid #1A2C54;border-radius:.8mm;margin-top:.5mm}
-tr.gh td{padding:3.5mm 1.5mm 1.2mm;border-bottom:1pt solid #9C9479;font-size:8pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#7A4F00;break-after:avoid}
-tr.gh span{float:right;letter-spacing:.04em;color:#1A2C54}
-.tot{display:flex;justify-content:space-between;align-items:baseline;margin-top:3mm;padding:2.5mm 1.5mm;border-top:1.5pt solid #1A2C54;border-bottom:1.5pt solid #1A2C54}
-.tot b{font-size:14pt;color:#1A2C54}.foot{font-size:8.5pt;color:#4A5265;margin:2mm 1.5mm 0}
-.sign{display:grid;grid-template-columns:repeat(3,1fr);gap:10mm;margin-top:12mm;break-inside:avoid}.sign div{border-top:1pt solid #1A2C54;padding-top:1.2mm;font-size:8pt;color:#4A5265}.sign b{display:block;color:#111827;font-size:9pt;min-height:1.3em}
-@media print{body{background:#fff}.bar{display:none}.page{margin:0;padding:0;max-width:none;box-shadow:none}}
-@media (max-width:600px){.page{padding:5mm;margin:0}.info{grid-template-columns:1fr 1fr}.info div:nth-child(3){border-left:0}.info div:nth-child(n+3){border-top:.8pt solid #9C9479}.sign{grid-template-columns:1fr}}
+@page{size:A4;margin:8mm}*{box-sizing:border-box}html,body{margin:0}
+body{font:13px/1.25 -apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#000;background:#E9E6DC;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.bar{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;padding:8px 10px;background:#1A2C54;color:#fff;font-size:12px}
+.bar button{font:600 13px inherit;font-family:inherit;border:0;border-radius:6px;padding:8px 12px;background:#fff;color:#1A2C54}.bar .sp{flex:1}
+.page{background:#fff;padding:10px;margin:0 auto;max-width:194mm}
+.top{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 10px;border-bottom:2px solid #000;padding-bottom:4px}
+.top h1{font-size:15px;margin:0;letter-spacing:.02em}.top .no{font-weight:700}.top .st{border:1px solid #000;padding:0 5px;font-size:10px;font-weight:700;text-transform:uppercase}
+.top .sp{flex:1}.top .tt{font-size:15px;font-weight:700}
+.sub{display:flex;flex-wrap:wrap;gap:2px 14px;padding:4px 0 6px;font-size:12px;border-bottom:1px solid #000}.sub span{white-space:nowrap}.sub em{font-style:normal;color:#444}.urg{color:#B00000;font-weight:700}
+.cols{column-count:2;column-gap:14px;column-rule:1px solid #bbb;margin-top:6px}
+.g{margin-bottom:6px}.gh{display:flex;justify-content:space-between;background:#1A2C54;color:#fff;padding:2px 5px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;break-after:avoid;break-inside:avoid}
+.r{display:grid;grid-template-columns:14px 1fr auto 62px 0;gap:0 6px;align-items:start;padding:3px 2px;border-bottom:1px solid #ccc;break-inside:avoid;cursor:pointer}
+.r i{width:12px;height:12px;border:1.5px solid #000;margin-top:2px}.r b{font-weight:600}
+.r small{display:block;font-size:10.5px;color:#444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.nm{min-width:0}.q{text-align:right;white-space:nowrap}.a{text-align:right;white-space:nowrap}.a b{font-weight:500}
+.r.done{background:#EEF6EE}.r.done i{background:#1A7F37;border-color:#1A7F37}.r.done .nm b{text-decoration:line-through;color:#555}
+.end{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:baseline;border-top:2px solid #000;margin-top:4px;padding-top:4px;font-size:12px}
+.end .tt{font-size:15px;font-weight:700}.end .sp{flex:1}.sig{display:none}
+@media (max-width:640px){.cols{column-count:1}body{font-size:15px}.r{padding:7px 2px;grid-template-columns:18px 1fr auto 70px 0}.r i{width:16px;height:16px}.page{padding:8px}}
+@media print{body{background:#fff}.bar{display:none}}
+body.pp{font-size:11.5px}.pp .page{width:194mm;max-width:none;padding:0;margin:0}
+.pp .cols{column-count:2}.pp .r{grid-template-columns:12px 1fr auto 58px 15mm;padding:2px 1px}.pp .r i{width:11px;height:11px}
+.pp .r .w{border-bottom:1px solid #000;height:12px;align-self:end}.pp .r small{font-size:9.5px}.pp .r.done{background:none}
+.pp .sig{display:flex;gap:10px;margin-top:8px;font-size:10px}.pp .sig div{flex:1;border-top:1px solid #000;padding-top:2px}.pp .sig b{display:block;font-size:11px}
 </style></head><body>
-<div class="bar"><button onclick="window.print()">Print / Save as PDF</button><button class="alt" onclick="window.close()">Close</button></div>
-<div class="page">
-<header><img src="${logo}" alt="Romualdo's"><div class="hd"><div class="tag">${p.ws === 'restaurant' ? 'Restaurant' : 'Catering'} · Purchasing</div><h1>Purchase List</h1></div>
-<div class="meta"><b>${esc(p.pr_no)}</b><span class="st">${esc(PR_STATUS[p.status] || p.status)}</span><br>Printed ${esc(new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }))}</div></header>
-<div class="info">${info.map(([l, v]) => `<div><span>${l}</span><b class="${v === 'URGENT' ? 'urg' : ''}">${esc(v)}</b></div>`).join('')}</div>
-${rows.length ? `<table><thead><tr><th></th><th>Item</th><th class="n">Buy</th><th class="n">Est. price</th><th class="n">Est. amount</th></tr></thead>${body}</table>
-<div class="tot"><span><b style="font-size:10.5pt">${rows.length}</b> item${rows.length > 1 ? 's' : ''} to buy</span><span>Estimated total &nbsp;<b>${peso(total)}</b></span></div>
-${noPrice ? `<p class="foot">${noPrice} item${noPrice > 1 ? 's have' : ' has'} no price yet and ${noPrice > 1 ? 'are' : 'is'} not in the total.</p>` : ''}
-${p.decision_note ? `<p class="foot"><b>Note:</b> ${esc(p.decision_note)}</p>` : ''}` : '<p>No items on this request yet.</p>'}
-<div class="sign"><div><b>${esc(p.requested_by_name || '')}</b>Requested by</div><div><b>${approved ? esc(p.approved_by_name || '') : ''}</b>Approved by</div><div><b></b>Purchased by · Date</div></div>
-</div></body></html>`;
+<div class="bar"><span>Tap an item to tick it off</span><span class="sp"></span><button onclick="window.print()">Print / PDF</button><button onclick="window.close()">Close</button></div>
+<div class="page" id="pg">
+<div class="top"><h1>ROMUALDO'S ${p.ws === 'restaurant' ? 'RESTAURANT' : 'CATERING'} · PURCHASE LIST</h1><span class="no">${esc(p.pr_no)}</span><span class="st">${esc(PR_STATUS[p.status] || p.status)}</span><span class="sp"></span><span>${rows.length} items · est. <span class="tt">${short(total)}</span></span></div>
+<div class="sub">${what ? `<span><em>For</em> ${esc(what)}</span>` : ''}<span><em>Need by</em> <b>${p.needed_by ? esc(fmtD(p.needed_by)) : '—'}</b></span>${p.priority === 'urgent' ? '<span class="urg">URGENT</span>' : ''}<span><em>By</em> ${esc(p.requested_by_name || '—')}</span></div>
+${rows.length ? `<div class="cols">${body}</div>` : '<p>No items on this request yet.</p>'}
+<div class="end"><span>${noPrice ? `${noPrice} item${noPrice > 1 ? 's' : ''} without a price, not in total` : 'All items priced'}${p.decision_note ? ` · <b>Note:</b> ${esc(p.decision_note)}` : ''}</span><span class="sp"></span><span>Est. total <span class="tt">${peso(total)}</span></span><span>Actual ₱ ____________</span></div>
+<div class="sig"><div><b>${esc(p.requested_by_name || '')}</b>Requested by</div><div><b>${approved ? esc(p.approved_by_name || '') : '&nbsp;'}</b>Approved by</div><div><b>&nbsp;</b>Purchased by · date</div><div><b>&nbsp;</b>Received by · date</div></div>
+</div><script>
+var K='prl-${p.id || p.pr_no}',done={};try{done=JSON.parse(localStorage.getItem(K)||'{}')}catch(e){}
+document.querySelectorAll('.r').forEach(function(r){if(done[r.dataset.k])r.classList.add('done');r.onclick=function(){r.classList.toggle('done');done[r.dataset.k]=r.classList.contains('done');try{localStorage.setItem(K,JSON.stringify(done))}catch(e){}}});
+// printing: shrink the sheet so it lands on one A4 page (down to 55% for very long lists)
+var pg=document.getElementById('pg');
+function fit(){document.body.classList.add('pp');pg.style.zoom=1;var H=281*96/25.4,h=pg.scrollHeight;pg.style.zoom=h>H?Math.max(.55,(H-4)/h):1}
+function unfit(){document.body.classList.remove('pp');pg.style.zoom=1}
+window.addEventListener('beforeprint',fit);window.addEventListener('afterprint',unfit);
+try{matchMedia('print').addEventListener('change',function(m){m.matches?fit():unfit()})}catch(e){}
+if(/[?#]print/.test(location.href))fit();
+<\/script></body></html>`;
 }
 async function saveDraftLines(f, id) {
   const lines = Object.entries(f).filter(([k]) => k.startsWith('q_'));
