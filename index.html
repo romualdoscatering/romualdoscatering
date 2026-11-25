@@ -2870,7 +2870,7 @@ async function api(action,payload={}){
     try{
       const res=await fetch(API_URL,{method:"POST",body,signal:ctl?ctl.signal:undefined});
       const data=await res.json();clearTimeout(tm);clearTimeout(slow);
-      if(send&&data&&data.ok&&!data.dup&&!payload.website)toApp({...(payload.inquiry||{}),ref:data.ref});
+      /* the server now copies each inquiry into the staff app itself (with retries) */
       if(data&&data.auth&&state.token&&action!=="login"){endSession(data.error)}
       return data||{ok:false,error:"Empty response"};
     }catch(e){clearTimeout(tm);clearTimeout(slow)}

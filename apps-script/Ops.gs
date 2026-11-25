@@ -536,6 +536,7 @@ function syncAllBookings(force) {
   return n;
 }
 function dailyBookingJob() {
+  try { appFlush(0, true); } catch (e) { Logger.log('app copy: ' + e); }      // website inquiries the staff app is missing
   try { syncAllBookings(false); } catch (e) { Logger.log(e); }
   const target = Utilities.formatDate(new Date(Date.now() + BOOK.DAYS_BEFORE * 864e5), BOOK.TZ, 'yyyy-MM-dd');
   const P = bookProps(), dkey = 'alert_' + target;
@@ -916,5 +917,6 @@ function importWebInquiries(list) {
 function webImport(me) {
   const from = Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd');
   const list = (readDb().inquiries || []).filter(function (q) { return q.source === 'web' && ((q.event || {}).date || '') >= from; });
+  try { appFlush(20); } catch (e) {}                 // also retries any inquiry the staff app didn't receive
   return { ok: true, added: importWebInquiries(list).length };
 }

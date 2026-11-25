@@ -21,7 +21,10 @@ const CONFIG = {
   LOCK_SECONDS: 15 * 60,                               // lock length
   MAX_SUBMITS_PER_HOUR: 60,                            // spam guard for the public form
   ALERT_EMAILS: ['romualdoscatering@gmail.com'],       // who gets an email for every new website inquiry
-  SITE_URL: 'https://romualdos.ph'
+  SITE_URL: 'https://romualdos.ph',
+  // Staff app (Supabase). The publishable key is public on purpose: the database only lets it hand in an inquiry.
+  APP_URL: 'https://skqmlqujmjkzmiykkand.supabase.co',
+  APP_KEY: 'sb_publishable_FWjts74xJz3wuGA0bhMXfQ_5iQhckcf'
 };
 
 const STATUSES = ['New', 'Contacted', 'Quoted', 'Booked', 'Declined'];
@@ -189,6 +192,8 @@ function submitInquiry(q, source, honeypot) {
   });
   // Email alert for inquiries sent from the website. A failed email never blocks saving the inquiry.
   if (res.ok && !res.dup && source === 'web') { try { sendInquiryAlert(inq); } catch (e) { console.error('Alert email failed: ' + e); } }
+  // …copy it into the staff app (romualdos.ph/app → Catering → Inquiries); if the app doesn't answer, it's retried later.
+  if (res.ok && !res.dup && source === 'web') { try { if (!appPush(inq)) appQueue([inq.ref]); appFlush(3); } catch (e) { appQueue([inq.ref]); console.error('App copy failed: ' + e); } }
   // …and put it in /ops as a draft event sheet (same reference no.). A failure here never blocks the inquiry.
   if (res.ok && !res.dup && source === 'web') { try { importWebInquiries([inq]); } catch (e) { console.error('Ops link failed: ' + e); } }
   return res;
@@ -675,3 +680,56 @@ function importShootPhotos() {
   });
   console.log('SHOOT_IMPORT ' + JSON.stringify(out));
 }
+
+
+/* ===================== COPY TO THE STAFF APP (Supabase) =====================
+   The server sends each website inquiry to the app, so it never depends on the customer's phone staying open.
+   The app keeps one copy per reference number, so a re-send never makes a duplicate. */
+const APP_PENDING = 'APP_PENDING', APP_BACKFILL = 'APP_BACKFILL_DONE';
+function appPayload(q) {
+  const o = { ref: q.ref, customer: q.customer, event: q.event, notes: q.notes, plan: q.plan, items: q.items, estimate: q.estimate, createdAt: q.createdAt };
+  if (q.corp) o.corp = q.corp;
+  return o;
+}
+/** Sends one inquiry. true = the app has it (new or already there). */
+function appPush(q) {
+  if (!CONFIG.APP_URL || !CONFIG.APP_KEY || !q || !q.ref) return false;
+  const r = UrlFetchApp.fetch(CONFIG.APP_URL + '/rest/v1/rpc/submit_booking', {
+    method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { apikey: CONFIG.APP_KEY, Authorization: 'Bearer ' + CONFIG.APP_KEY },
+    payload: JSON.stringify({ p: appPayload(q) })
+  });
+  const code = r.getResponseCode();
+  if (code >= 200 && code < 300) return true;
+  console.error('App copy ' + q.ref + ': HTTP ' + code + ' ' + r.getContentText().slice(0, 200));
+  return false;
+}
+function appPending() { try { return JSON.parse(PropertiesService.getScriptProperties().getProperty(APP_PENDING) || '[]'); } catch (e) { return []; } }
+function appQueue(refs) {
+  const P = PropertiesService.getScriptProperties(), list = appPending();
+  refs.forEach(function (r) { if (r && list.indexOf(r) < 0) list.push(r); });
+  P.setProperty(APP_PENDING, JSON.stringify(list.slice(-300)));
+}
+/** Re-sends what the app is missing: anything that failed before, plus (daily) the last 3 days, plus a one-time catch-up
+    of everything still coming up. Stops early if the app is unreachable; the rest waits for the next run. */
+function appFlush(max, daily) {
+  const P = PropertiesService.getScriptProperties(), pending = appPending(), backfill = !P.getProperty(APP_BACKFILL);
+  if (!pending.length && !backfill && !daily) return { sent: 0, left: 0 };
+  const today = Utilities.formatDate(new Date(), 'Asia/Manila', 'yyyy-MM-dd'), since = new Date(Date.now() - 3 * 864e5).toISOString();
+  const all = (readDb().inquiries || []).filter(function (q) { return q.source === 'web'; });
+  const want = {};
+  pending.forEach(function (r) { want[r] = 1; });
+  all.forEach(function (q) { if ((daily && q.createdAt >= since) || (backfill && ((q.event || {}).date || '') >= today)) want[q.ref] = 1; });
+  const list = all.filter(function (q) { return want[q.ref]; }).reverse();        // oldest first
+  let sent = 0, failed = [], stop = false;
+  list.forEach(function (q, i) {
+    if (stop || (max && i >= max)) { if (pending.indexOf(q.ref) >= 0 || backfill) failed.push(q.ref); return; }
+    let ok = false; try { ok = appPush(q); } catch (e) { console.error('App copy ' + q.ref + ': ' + e); }
+    if (ok) sent++; else { failed.push(q.ref); stop = true; }
+  });
+  P.setProperty(APP_PENDING, JSON.stringify(failed.slice(-300)));
+  if (backfill && !failed.length) P.setProperty(APP_BACKFILL, String(Date.now()));
+  return { sent: sent, left: failed.length };
+}
+/** Run from the editor to check the link: sends anything missing and logs the result. */
+function testAppLink() { Logger.log(JSON.stringify(appFlush(0, true))); }
