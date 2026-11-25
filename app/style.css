@@ -294,3 +294,10 @@ header#top .bar{flex-wrap:nowrap}
 .ev-hero b{display:block;font-family:'Playfair Display',Georgia,serif;font-weight:500;font-size:17px;color:var(--navy);margin-top:2px;overflow-wrap:anywhere}
 @media (max-width:760px){.ev-hero{grid-template-columns:repeat(2,1fr)}.ev-hero div:nth-child(odd){border-left:0}.ev-hero div{border-top:1px solid #e3ddcf}.ev-hero div:nth-child(-n+2){border-top:0}.ev-hero div:last-child{grid-column:1/-1}}
 button.pdf,.btn.pdf{background:linear-gradient(180deg,#e2c77e,#c9a44c);border-color:#b58f35;color:#14213f;font-weight:700;box-shadow:0 2px 8px #c9a44c55}button.pdf:hover,.btn.pdf:hover{background:linear-gradient(180deg,#ecd593,#d2ae55);border-color:#9c7a2b}button.pdf.lg{font-size:15px;padding:11px 18px}button.pdf.sm{padding:5px 10px;font-size:12.5px;box-shadow:none}
+/* Kitchen count: section headings stand out, rows a little tighter */
+.kcard{padding:12px 14px;margin-bottom:10px}
+.kcard>h3{margin:0 0 6px;padding:8px 12px;background:#f6ecd2;border-left:4px solid var(--gold);border-radius:8px;color:var(--navy);font-size:13.5px;font-weight:800;letter-spacing:.14em}
+.kcard .khead{padding:0 12px 2px}
+.kcard .krow{padding:5px 12px;margin-top:4px}
+.kcard .krow .qty{padding-top:6px;padding-bottom:6px}
+@media (max-width:640px){.kcard{padding:10px}.kcard .krow{padding:5px 8px}}
