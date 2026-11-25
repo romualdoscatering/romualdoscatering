@@ -70,7 +70,8 @@ function doPost(e) {
       case 'scAttendance':
       case 'scFile':
       case 'kinvSync':
-      case 'kinvMail': return out(handleOps(req));
+      case 'kinvMail':
+      case 'webImport': return out(handleOps(req));
       default:          return out({ ok: false, error: 'Unknown action.' });
     }
   } catch (err) {
