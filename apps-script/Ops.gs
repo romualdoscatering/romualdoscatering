@@ -203,6 +203,14 @@ function opsWrite(me, ops) {
     const sh = opsSheet();
     const rows = readAll(sh), byPath = {};
     rows.forEach(function (r) { byPath[r.path] = r; });
+    // Someone else saved this event sheet after this person opened it: don't overwrite their changes silently.
+    for (let i = 0; i < ops.length; i++) {
+      const o = ops[i], ex = o && o.path && byPath[o.path];
+      if (!o || typeof o.baseSheet !== 'number' || !ex || o.op === 'add') continue;
+      const cur = toDoc(ex).data;
+      if (((cur.sheet || {}).savedAt || 0) !== o.baseSheet)
+        return { ok: false, conflict: true, error: (ex.updatedBy || 'Someone') + ' changed this sheet while you were editing.', docs: [{ path: o.path, data: cur, updatedAt: ex.updatedAt }] };
+    }
     const now = Date.now(), changed = [], appends = [], updates = [];
     ops.forEach(function (o) {
       if (!o || !validPath(o.path)) forbid('Invalid record.');

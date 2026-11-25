@@ -767,6 +767,7 @@ V.sheets = () => {
   return `<h2>Event sheets</h2>
   <p class="lede">Encode each event's details once. <b>Generate PDF</b> makes a polished event sheet with the Romualdo's logo, for the kitchen and for the client to approve. Billing is not included; that stays with the admin and finance.</p>
   <div class="card" id="sheetForm"><div class="row" style="margin-bottom:6px"><h3 style="margin:0">${d.id ? 'Edit event sheet' : 'New event sheet'}</h3><span id="sheetSaveState" class="save-state ${AS.err ? 'warn' : AS.dirty ? 'busy' : 'ok'}">${esc(saveStateText())}</span><span class="spacer"></span>${d.id ? `<button class="pdf" data-act="saveSheet" data-arg="pdf" title="Saves, then prints this sheet at any status">🖨️ Print PDF</button><button class="sm ghost" data-act="newSheet">＋ Start a new one instead</button>` : ''}</div>
+   ${AS.conflict ? `<div class="alert bad" style="display:block;margin:8px 0;line-height:1.55"><b>⚠ ${esc(AS.conflict.by)} changed this sheet at ${esc(clockNow(AS.conflict.at))} while you were editing.</b> Your changes are kept on this device but are <b>not saved yet</b>, so nothing of theirs was overwritten.<br><button class="sm" data-act="conflictTheirs">See their version (drop my changes)</button> <button class="sm ghost" data-act="conflictMine">Save my version over theirs</button></div>` : ''}
    ${AS.restoredAt ? `<div class="alert info" style="margin:8px 0">Restored your unsaved work from ${esc(clockNow(AS.restoredAt))}${new Date(AS.restoredAt).toDateString() !== new Date().toDateString() ? ' on ' + esc(fmtD(new Date(AS.restoredAt).toISOString().slice(0, 10))) : ''}. It saves online automatically. <span class="spacer"></span><button class="sm ghost" data-act="discardDraft">Discard draft</button></div>` : ''}
    ${d.web ? `<div class="alert info" style="margin:0 0 8px">🌐 Sent from the website on ${esc(fmtD(String(d.web.at || '').slice(0, 10)))} · Ref. ${esc(d.web.ref)}${d.web.payment ? ' · Will pay by ' + esc(d.web.payment) : ''}. Check the details with the client, then set the status and payment below.</div>` : ''}
    <div class="row" style="margin:4px 0 8px"><b class="small">This is for:</b><div class="seg">${SHEET_KINDS.map(([v, l]) => `<button type="button" class="${(d.kind || 'catering') === v ? 'on' : ''}" data-act="sheetKind" data-arg="${v}">${l}</button>`).join('')}</div></div>
@@ -809,7 +810,7 @@ V.sheets = () => {
    <p class="small mut" style="margin:10px 0 0">Finished events and fulfilled orders are kept in the <a href="#archive">Archive</a>, with an Excel copy.</p>
   </div>`;
 };
-ACT.newSheet = async () => { await flushSheet(); AS.dirty = false; AS.restoredAt = 0; AS.lastOk = 0; draftClear(); D.sheet = newSheet(); render(); document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'}); };
+ACT.newSheet = async () => { await flushSheet(); AS.base = 0; AS.conflict = null; AS.dirty = false; AS.restoredAt = 0; AS.lastOk = 0; draftClear(); D.sheet = newSheet(); render(); document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'}); };
 ACT.addCourse = () => { D.sheet.menu.push((D.sheet.kind || 'catering') === 'catering' ? {course: 'Main dish', dish: '', note: ''} : {course: '', dish: '', qty: '', note: ''}); render(); sheetTouched(); };
 ACT.sheetKind = k => { const d = D.sheet, was = d.kind || 'catering'; if (was === k) return;
   const empty = !d.menu.some(m => (m.dish || '').trim());
@@ -817,15 +818,17 @@ ACT.sheetKind = k => { const d = D.sheet, was = d.kind || 'catering'; if (was ==
   else if ((was === 'catering') !== (k === 'catering')) d.menu = d.menu.map(m => ({...m, course: k === 'catering' ? (m.course || 'Main dish') : m.course}));
   d.kind = k; if (k !== 'catering' && !d.fulfil) d.fulfil = 'Pick-up'; render(); sheetTouched(); };
 ACT.rmCourse = i => { D.sheet.menu.splice(+i, 1); render(); sheetTouched(); };
-ACT.editSheet = async id => { const e = S.events[id]; if (!e) return; if (D.sheet?.id !== id) { await flushSheet(); AS.dirty = false; AS.restoredAt = 0; AS.lastOk = 0; draftClear(); } const sh = sheetOf(e); D.sheet = JSON.parse(JSON.stringify({...sh, pax: String(sh.pax || ''), menu: (sh.menu && sh.menu.length ? sh.menu : (sh.kind || 'catering') === 'catering' ? newSheet().menu : orderRows())})); if (D.ui.tab !== 'sheets') location.hash = 'sheets'; render(); setTimeout(() => document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'}), 50); };
+function loadSheet(e) { const sh = sheetOf(e); AS.base = e.sheet?.savedAt || 0; AS.conflict = null; D.sheet = JSON.parse(JSON.stringify({...sh, pax: String(sh.pax || ''), menu: (sh.menu && sh.menu.length ? sh.menu : (sh.kind || 'catering') === 'catering' ? newSheet().menu : orderRows())})); }
+ACT.editSheet = async id => { const e = S.events[id]; if (!e) return; if (D.sheet?.id !== id) { await flushSheet(); AS.dirty = false; AS.restoredAt = 0; AS.lastOk = 0; draftClear(); } loadSheet(e); if (D.ui.tab !== 'sheets') location.hash = 'sheets'; render(); setTimeout(() => document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'}), 50); };
 /* ---- auto-save: every keystroke is kept on this device at once (draft), and saved online a few seconds after typing stops ---- */
 const DRAFT_KEY = 'rcs_sheet_draft';
-const AS = {timer: 0, localTimer: 0, saving: false, dirty: false, lastOk: 0, err: '', restoredAt: 0, rev: 0};
+const AS = {timer: 0, localTimer: 0, saving: false, dirty: false, lastOk: 0, err: '', restoredAt: 0, rev: 0, base: 0, conflict: null};   // base = savedAt of the online version this form started from
 const clockNow = t => new Date(t || Date.now()).toLocaleTimeString('en-PH', {hour: 'numeric', minute: '2-digit'});
-function draftWrite() { try { localStorage.setItem(DRAFT_KEY, JSON.stringify({at: Date.now(), user: S.me?.username || '', data: D.sheet})); } catch (e) {} }
+function draftWrite() { try { localStorage.setItem(DRAFT_KEY, JSON.stringify({at: Date.now(), user: S.me?.username || '', base: AS.base, data: D.sheet})); } catch (e) {} }
 function draftRead() { try { const x = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); return x && x.data && (!x.user || !S.me || x.user === S.me.username) ? x : null; } catch (e) { return null; } }
 function draftClear() { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} }
 function saveStateText() {
+  if (AS.conflict) return 'Not saved — someone else changed this sheet';
   if (AS.saving) return 'Saving…';
   if (AS.err) return 'Kept on this device — will retry saving online (' + AS.err + ')';
   if (AS.dirty) return (D.sheet.client || '').trim() && D.sheet.date ? 'Unsaved changes — auto-saving…' : 'Draft kept on this device. Enter the client name and date to save it online.';
@@ -855,8 +858,9 @@ function cleanBill(b) {
 async function writeSheet(d) {
   const {client, sheet, base} = sheetPayload(d);
   let id = d.id;
-  if (id && S.events[id]) { if (!sheet.ref) sheet.ref = sheetRef({...d, id}); await upd('events/' + id, {...base, sheet}); }
-  else { id = id || genId(); sheet.ref = sheet.ref || sheetRef({...d, id}); await opsWrite([{op: 'add', path: 'events/' + id, data: {...base, contract: 0, notes: '', status: 'planned', plan: [], sheet}}]); }
+  if (/^EV-\d{8}-/.test(sheet.ref || '') && !['approved', 'cancelled'].includes(sheet.status) && sheet.date) sheet.ref = 'EV-' + sheet.date.replace(/-/g, '') + sheet.ref.slice(11);   // reference follows the event date until approved
+  if (id && S.events[id]) { if (!sheet.ref) sheet.ref = sheetRef({...d, id}); await opsWrite([{op: 'update', path: 'events/' + id, data: {...base, sheet}, ...(AS.force ? {} : {baseSheet: AS.base || 0})}]); AS.force = false; AS.base = sheet.savedAt; d.ref = sheet.ref; }
+  else { id = id || genId(); sheet.ref = sheet.ref || sheetRef({...d, id}); await opsWrite([{op: 'add', path: 'events/' + id, data: {...base, contract: 0, notes: '', status: 'planned', plan: [], sheet}}]); AS.base = sheet.savedAt; }
   return {id, sheet, client};
 }
 async function autoSaveSheet() {
@@ -875,10 +879,29 @@ async function autoSaveSheet() {
     if (AS.rev === rev && D.sheet === d) { AS.dirty = false; draftClear(); }
     else AS.timer = setTimeout(autoSaveSheet, 1500); // more typing happened while saving
     const h = document.querySelector('#sheetForm h3'); if (h && D.ui.tab === 'sheets') h.textContent = 'Edit event sheet';
-  } catch (e) { AS.err = e?.message ? String(e.message).slice(0, 60) : 'offline'; draftWrite(); AS.timer = setTimeout(autoSaveSheet, 15000); }
+  } catch (e) {
+    if (e?.data?.conflict) { sheetConflict(e.data); return; }
+    AS.err = e?.message ? String(e.message).slice(0, 60) : 'offline'; draftWrite(); AS.timer = setTimeout(autoSaveSheet, 15000); }
   finally { AS.saving = false; paintSaveState(); }
 }
-async function flushSheet() { if (AS.dirty) { draftWrite(); await autoSaveSheet(); } }
+async function flushSheet() { if (AS.dirty && !AS.conflict) { draftWrite(); await autoSaveSheet(); } }
+/* Someone else saved this sheet while it was open here: stop, keep this person's typing on the device, and let them choose. */
+function sheetConflict(data) {
+  clearTimeout(AS.timer); draftWrite();
+  const doc = data?.docs?.[0]; if (doc) applyDocs([doc], false);
+  AS.conflict = {by: doc?.data?.updatedBy || 'Someone', at: doc?.data?.sheet?.savedAt || doc?.updatedAt || Date.now()};
+  AS.err = ''; render(); document.getElementById('sheetForm')?.scrollIntoView({behavior: 'smooth'});
+}
+ACT.conflictTheirs = () => { const id = D.sheet?.id; draftClear(); AS.dirty = false; AS.conflict = null; AS.restoredAt = 0; if (id && S.events[id]) { D.sheet = null; ACT.editSheet(id); } toast('Showing the latest saved version'); };
+ACT.conflictMine = () => { AS.conflict = null; AS.force = true; AS.dirty = true; AS.rev++; autoSaveSheet(); render(); };
+/* After every sync: if the open sheet was changed elsewhere and nothing is being typed here, show the new version. */
+function sheetFreshCheck() {
+  const d = D.sheet, e = d?.id && S.events[d.id]; if (!e || !e.sheet || AS.saving || AS.conflict) return;
+  const sv = e.sheet.savedAt || 0; if (!sv || sv === AS.base) return;
+  if (AS.dirty) return;                       // they're typing: the save will raise the conflict box instead
+  const by = e.updatedBy; loadSheet(e); draftClear();
+  if (D.ui.tab === 'sheets') { render(); if (by && by !== S.me?.username) toast(`This sheet was just updated by ${by}`); }
+}
 window.addEventListener('beforeunload', e => { if (AS.dirty) { draftWrite(); if (!((D.sheet?.client || '').trim() && D.sheet?.date) || AS.err) return; e.preventDefault(); e.returnValue = ''; } });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && AS.dirty) { draftWrite(); autoSaveSheet(); } });
 function maybeRestoreDraft() {
@@ -886,7 +909,7 @@ function maybeRestoreDraft() {
   const x = draftRead(); if (!x) return;
   const cur = x.data.id && S.events[x.data.id]?.sheet;
   if (cur && (cur.savedAt || 0) >= x.at) { draftClear(); return; }   // the online copy is newer
-  D.sheet = {...newSheet(), ...x.data}; AS.restoredAt = x.at; AS.dirty = true;
+  D.sheet = {...newSheet(), ...x.data}; AS.restoredAt = x.at; AS.dirty = true; AS.base = typeof x.base === 'number' ? x.base : (cur?.savedAt || 0);
   clearTimeout(AS.timer); AS.timer = setTimeout(autoSaveSheet, 2500);
 }
 ACT.discardDraft = () => { draftClear(); AS.dirty = false; AS.restoredAt = 0; AS.err = ''; const id = D.sheet.id; D.sheet = id && S.events[id] ? JSON.parse(JSON.stringify({...sheetOf(S.events[id]), pax: String(S.events[id].sheet?.pax || '')})) : newSheet(); render(); toast('Draft discarded'); };
@@ -898,7 +921,9 @@ ACT.saveSheet = mode => {
   const win = mode === 'pdf' ? pdfWindow() : null;   // open now, while it still counts as the user's click, so Chrome doesn't block it
   guard(async () => {
     if (!d.id) d.id = genId();
-    const {id, sheet} = await writeSheet(d);
+    if (AS.conflict) throw new Error('Choose which version to keep first (box at the top of the sheet).');
+    let w; try { w = await writeSheet(d); } catch (e) { if (e?.data?.conflict) { sheetConflict(e.data); throw new Error('Someone else changed this sheet — see the box at the top.'); } throw e; }
+    const {id, sheet} = w;
     D.sheet = JSON.parse(JSON.stringify({...sheet, id, pax: String(sheet.pax || ''), menu: sheet.menu.length ? sheet.menu : sheet.kind === 'catering' ? newSheet().menu : orderRows()}));
     AS.dirty = false; AS.err = ''; AS.lastOk = Date.now(); AS.restoredAt = 0; draftClear();
     if (mode === 'pdf') setTimeout(() => printSheet(id, win), 300);
@@ -2989,7 +3014,7 @@ async function api(action, payload = {}) {
   catch (e) { throw new Error('No internet connection'); }
   let data; try { data = await res.json(); } catch (e) { throw new Error('The server did not answer properly. Has the new Apps Script version been deployed?'); }
   if (data.auth && action !== 'login') { endSession(data.error); const er = new Error(data.error); er.auth = true; throw er; }
-  if (!data.ok) throw new Error(data.error || 'Server error');
+  if (!data.ok) { const er = new Error(data.error || 'Server error'); er.data = data; throw er; }
   return data;
 }
 function applyDocs(docs, fromSync) {
@@ -3020,7 +3045,7 @@ async function sync(full) {
     const r = await api('opsSync', {ver: full ? 0 : VER, after: full ? 0 : Math.max(0, AFTER - 15000)});
     const wasAdmin = S.isAdmin, wasBill = S.canBill;
     S.me = r.me; S.isAdmin = r.me.role === 'Admin'; S.canBill = S.isAdmin || r.me.role === 'Finance';
-    if (!r.unchanged) { if (r.users) S.users = r.users; applyDocs(r.docs, true); }
+    if (!r.unchanged) { if (r.users) S.users = r.users; applyDocs(r.docs, true); sheetFreshCheck(); }
     if (D.ui.openRef) { const e = Object.values(S.events).find(x => x.sheet && (x.sheet.ref === D.ui.openRef || x.sheet.web?.ref === D.ui.openRef)); if (e) { D.ui.openRef = ''; setTimeout(() => ACT.editSheet(e.id), 0); } else if (S.webPulled) { toast('That website order is not in Event sheets yet.', true); D.ui.openRef = ''; } }
     if (!S.webPulled) { S.webPulled = true; api('webImport').then(x => { if (x.added) { toast(x.added + ' website order' + (x.added > 1 ? 's' : '') + ' added to Event sheets'); sync(); } }).catch(() => {}); }
     VER = r.ver; S.lastSync = Date.now(); S.syncErr = '';
