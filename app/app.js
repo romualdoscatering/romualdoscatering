@@ -181,6 +181,9 @@ routes.home = async () => {
 const evClient = (e, c) => c?.name || e.sheet?.client || e.title;
 const evName = (e, c) => { const n = (e.title || '').trim(), cl = evClient(e, c); return n && n !== cl && !n.startsWith(cl + ' · ') ? n : ''; };
 const evSub = (e, c) => evName(e, c) || e.event_type || '';
+// Money (contract price) lives in event_finance, readable only by finance, catering managers and the owner
+async function contractOf(ids) { const m = {}; if (ids.length && can('catering', 'manager', 'finance')) (await db.select('event_finance', { cols: 'event_id,contract_price', in: { event_id: ids } })).forEach(r => m[r.event_id] = r.contract_price); return m; }
+async function saveContract(id, f) { if (!('contract_price' in f) || !can('catering', 'manager', 'finance')) return; await db.upsert('event_finance', { event_id: id, contract_price: f.contract_price === '' ? null : num(f.contract_price), updated_at: new Date().toISOString() }, 'event_id'); }
 const autoTitle = (client, type) => [client, type].filter(Boolean).join(' · ');
 async function saveClient(f, current) {
   const name = (f.client_name || '').trim(), phone = (f.client_phone || '').trim() || null, email = (f.client_email || '').trim() || null;
@@ -222,7 +225,7 @@ routes['c/event-new'] = async () => {
      <label>Serving / ready time<input name="serve_time" type="time"></label>
      <label>Guests<input name="pax" type="number" min="0" inputmode="numeric"></label>
      <label>Venue / delivery address<input name="venue"></label>
-     <label>Contract price ₱<input name="contract_price" type="number" step="any" min="0"></label>
+     ${can('catering', 'manager', 'finance') ? '<label>Contract price ₱<input name="contract_price" type="number" step="any" min="0"></label>' : ''}
      <label>Event name (optional)<input name="title" placeholder="e.g. 100th Anniversary"></label>
     </div><p class="small mut">Leave the event name blank and the client's name is used. Next, the event page opens and you add the menu there.</p>
     <div class="row end"><a class="btn ghost" href="#/c/events">Cancel</a><button class="pri">Create event</button></div></form>`;
@@ -232,8 +235,9 @@ FORMS.newEvent = async f => {
   if (!(f.client_name || '').trim()) return toast('Enter the client name.', true);
   const client_id = await saveClient(f, null);
   const row = { kind: f.kind, title: (f.title || '').trim() || autoTitle(f.client_name.trim(), f.event_type), event_type: f.event_type || null, event_date: f.event_date, serve_time: f.serve_time || null,
-    pax: f.pax ? parseInt(f.pax) : null, venue: f.venue || null, contract_price: f.contract_price ? num(f.contract_price) : null, client_id, status: 'draft' };
+    pax: f.pax ? parseInt(f.pax) : null, venue: f.venue || null, client_id, status: 'draft' };
   const ev = (await db.insert('events', row))[0];
+  if (f.contract_price) await saveContract(ev.id, f);
   toast(`Event ${ev.ref} created — now add the menu.`); go('#/c/event/' + ev.id);
 };
 
@@ -249,6 +253,7 @@ routes['c/event'] = async id => {
     db.select('event_costing', { eq: { event_id: id } }).then(r => r[0]),
     db.select('event_extra_needs', { eq: { event_id: id } }),
   ]);
+  ev.contract_price = (await contractOf([ev.id]))[ev.id] ?? null;
   const B = await billBundle(ev, client);
   const recipeState = {}; const dishIds = [...new Set(menu.map(m => m.dish_id).filter(Boolean))];
   if (dishIds.length) (await db.select('recipes', { cols: 'dish_id,status', in: { dish_id: dishIds } })).forEach(r => recipeState[r.dish_id] = r.status);
@@ -276,7 +281,7 @@ routes['c/event'] = async id => {
      <label>Serving time<input name="serve_time" type="time" value="${esc((ev.serve_time || '').slice(0, 5))}"></label>
      <label>Guests<input name="pax" type="number" min="0" value="${esc(ev.pax ?? '')}"></label>
      <label>Venue<input name="venue" value="${esc(ev.venue || '')}"></label>
-     <label>Contract price ₱<input name="contract_price" type="number" step="any" min="0" value="${esc(ev.contract_price ?? '')}"></label>
+     ${canBill() ? `<label>Contract price ₱<input name="contract_price" type="number" step="any" min="0" value="${esc(ev.contract_price ?? '')}"></label>` : ''}
     </div><div class="row end">${can('catering', 'manager', 'finance') && ev.status === 'done' ? `<button type="button" class="ghost" data-act="closeEvent" data-id="${ev.id}">Close event (releases leftover stock)</button>` : ''}<button class="pri">Save</button></div></form></details>` : ''}
 
   ${canEdit ? sheetForm(ev, client) : ''}
@@ -318,7 +323,7 @@ routes['c/event'] = async id => {
   </section>` : ''}
 
   ${billCard(ev, B)}
-  ${cost ? `<section class="card"><h2>Costing</h2><div class="kpis">
+  ${cost && canBill() ? `<section class="card"><h2>Costing</h2><div class="kpis">
     <div class="kpi"><span>Contract</span><b>${ev.contract_price ? peso(ev.contract_price) : '—'}</b></div>
     <div class="kpi"><span>Ingredients used</span><b>${peso(cost.ingredients_used)}</b></div>
     <div class="kpi"><span>Event expenses</span><b>${peso(cost.expenses)}</b></div>
@@ -332,7 +337,8 @@ FORMS.editEvent = async (f, el) => {
   const cur = ev?.client_id ? (await db.select('clients', { eq: { id: ev.client_id } }))[0] : null;
   const client_id = await saveClient(f, cur), cname = (f.client_name || cur?.name || '').trim();
   await db.update('events', { status: f.status, client_id, title: (f.title || '').trim() || autoTitle(cname, f.event_type), kind: f.kind, event_type: f.event_type || null, event_date: f.event_date, serve_time: f.serve_time || null,
-    pax: f.pax ? parseInt(f.pax) : null, venue: f.venue || null, contract_price: f.contract_price ? num(f.contract_price) : null }, { id: el.dataset.id });
+    pax: f.pax ? parseInt(f.pax) : null, venue: f.venue || null }, { id: el.dataset.id });
+  await saveContract(el.dataset.id, f);
   toast('Saved'); refresh();
 };
 /* ================= EVENT SHEET (1-page PDF for the kitchen and the client — same layout as /ops) ================= */
@@ -897,7 +903,7 @@ routes['c/inquiry'] = async id => {
   const canAct = can('catering', 'coordinator', 'manager');
   const items = (p.items || []).filter(i => i.dish);
   const row = (l, v) => v ? `<tr><td class="mut">${l}</td><td>${v}</td></tr>` : '';
-  const plan = pl.kind === 'package' ? `${esc(pl.packageName || 'Package')}${num(pl.pricePerHead) ? ` · ${peso(pl.pricePerHead)} per head` : ''}` : esc(BK_KIND[pl.kind] || pl.kind || '');
+  const plan = pl.kind === 'package' ? `${esc(pl.packageName || 'Package')}${canBill() && num(pl.pricePerHead) ? ` · ${peso(pl.pricePerHead)} per head` : ''}` : esc(BK_KIND[pl.kind] || pl.kind || '');
   return `<div class="row"><a href="#/c/inquiries" class="back">‹ Inquiries</a></div>
   <div class="row"><h1>${esc(b.client_name || 'Inquiry')}</h1>${chip(BK_STATUS[b.status], BK_TONE[b.status])}</div>
   <p class="lede">${esc(b.ref)}${b.website_ref ? ' · website ref ' + esc(b.website_ref) : ''} · received ${esc(fmtT(b.received_at))}</p>
@@ -906,7 +912,7 @@ routes['c/inquiry'] = async id => {
    ${row('Company', esc([k.company, k.position].filter(Boolean).join(' · ')))}
    ${row('Event', esc([ev.type, ev.date ? fmtD(ev.date) : '', ev.time ? fmtClock(ev.time) : ''].filter(Boolean).join(' · ')))}${row('Venue', esc(ev.venue || ''))}${row('Guests', ev.pax ? esc(ev.pax) : '')}
    ${row('Plan', plan)}${row('Fulfilment', esc([pl.fulfil, pl.payment].filter(Boolean).join(' · ')))}
-   ${row('Estimate', num(es.total) ? `${peso(es.total)}${num(es.perHead) ? ` (${peso(es.perHead)} per head)` : ''} <span class="mut small">— estimate shown to the customer</span>` : '')}
+   ${row('Estimate', canBill() && num(es.total) ? `${peso(es.total)}${num(es.perHead) ? ` (${peso(es.perHead)} per head)` : ''} <span class="mut small">— estimate shown to the customer</span>` : '')}
    ${row('Notes', p.notes ? esc(p.notes).replace(/\n/g, '<br>') : '')}
   </tbody></table></section>
   ${items.length || pl.chefPick ? `<section class="card"><h2>Menu picked</h2>${pl.chefPick ? '<p>Chef to recommend the menu.</p>' : ''}
@@ -1518,7 +1524,7 @@ async function writeLines(evId, lines) {
   if (lines.length) await db.insert('bill_lines', lines.map((l, i) => ({ event_id: evId, sort: i, label: l.label, items: l.items || null, rate: num(l.rate), qty: l.qty === null || l.qty === '' ? null : num(l.qty), unit: l.unit || null })));
 }
 async function evAndMenu(id) {
-  const [ev] = await db.select('events', { eq: { id } }); const menu = await db.select('event_menu', { eq: { event_id: id }, order: [['sort'], ['course']] }); return [ev, menu];
+  const [ev] = await db.select('events', { eq: { id } }); ev.contract_price = (await contractOf([id]))[id] ?? null; const menu = await db.select('event_menu', { eq: { event_id: id }, order: [['sort'], ['course']] }); return [ev, menu];
 }
 ACT.billCreate = async el => {
   const [ev, menu] = await evAndMenu(el.dataset.id), [set] = await db.select('bill_settings', {});
@@ -1631,7 +1637,7 @@ routes['c/billing'] = async arg => {
   if (!canBill()) return '<div class="card">Billing is for finance, catering managers and the owner.</div>';
   const tab = arg || 'due';
   const evs = await db.select('events', { cols: 'id,ref,title,kind,event_type,event_date,pax,status,client_id,sheet,contract_price', order: [['event_date', false]] });
-  const live = evs.filter(e => e.status !== 'cancelled' || false), M = await moneyOf(live.map(e => e.id));
+  const live = evs.filter(e => e.status !== 'cancelled'), M = await moneyOf(live.map(e => e.id)), CP = await contractOf(live.map(e => e.id)); live.forEach(e => e.contract_price = CP[e.id] ?? null);
   const cids = [...new Set(live.map(e => e.client_id).filter(Boolean))], cl = {}; if (cids.length) (await db.select('clients', { cols: 'id,name', in: { id: cids } })).forEach(c => cl[c.id] = c);
   const t = today(), withBill = live.filter(e => M[e.id]?.status !== 'none');
   const due = withBill.filter(e => num(M[e.id].balance) > 0), over = due.filter(e => M[e.id].due && M[e.id].due < t);
