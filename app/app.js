@@ -238,7 +238,7 @@ routes['c/events'] = async arg => {
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/events/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
    ${ev.length ? `<div class="list">${ev.map(e => `<a class="li" href="#/c/event/${e.id}"><div class="li-date"><b>${esc(fmtD(e.event_date).split(',')[0])}</b><span>${esc(fmtD(e.event_date).split(',').slice(1).join(','))}</span></div>
       <div class="li-main"><b>${esc(evClient(e, cl[e.client_id]))}</b><span class="mut small">${evSub(e, cl[e.client_id]) ? esc(evSub(e, cl[e.client_id])) + ' · ' : ''}${esc(e.ref)} · ${KIND[e.kind]}${e.pax ? ' · ' + e.pax + ' guests' : ''}${e.serve_time ? ' · ' + fmtClock(e.serve_time) : ''}${e.venue ? ' · ' + esc(e.venue) : ''}</span></div>
-      ${['partial', 'paid', 'over'].includes(MM[e.id]?.status) ? payChip(MM[e.id]) : ''} ${chip(EVENT_STATUS[e.status], statusTone(e.status))}<button class="pdf sm" data-act="evPdf" data-id="${e.id}" title="Print the event sheet" style="margin-left:8px">🖨️ PDF</button>${delEvBtn({ ...e, _name: evClient(e, cl[e.client_id]) }, '🗑')}</a>`).join('')}</div>` : '<div class="empty">No events here.</div>'}`;
+      <span class="li-act"><span class="li-st">${['partial', 'paid', 'over'].includes(MM[e.id]?.status) ? payChip(MM[e.id]) : ''}${chip(EVENT_STATUS[e.status], statusTone(e.status))}</span><button class="pdf sm" data-act="evPdf" data-id="${e.id}" title="Print the event sheet">🖨️ PDF</button>${delEvBtn({ ...e, _name: evClient(e, cl[e.client_id]) }, '🗑') || '<span class="x-ph"></span>'}</span></a>`).join('')}</div>` : '<div class="empty">No events here.</div>'}`;
 };
 
 routes['c/event-new'] = async () => {
