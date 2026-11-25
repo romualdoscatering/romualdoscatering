@@ -301,3 +301,13 @@ button.pdf,.btn.pdf{background:linear-gradient(180deg,#e2c77e,#c9a44c);border-co
 .kcard .krow{padding:5px 12px;margin-top:4px}
 .kcard .krow .qty{padding-top:6px;padding-bottom:6px}
 @media (max-width:640px){.kcard{padding:10px}.kcard .krow{padding:5px 8px}}
+.chips{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+table.bill-ed td{vertical-align:top}table.bill-ed input,table.bill-ed select,table.bill-ed textarea{width:100%}
+table.bill-ed td:first-child{min-width:260px}table.bill-ed textarea{margin-top:6px;font-size:13px}
+table.bill-ed .qty{max-width:110px}
+tr.click{cursor:pointer}
+.bad-t{color:#a33}.ok-t{color:#2f7a45}
+table.bill-ed td{vertical-align:top}table.bill-ed input,table.bill-ed select,table.bill-ed textarea{width:100%}
+table.bill-ed td:first-child{min-width:260px}table.bill-ed textarea{margin-top:6px;font-size:13px}
+table.bill-ed .qty{max-width:110px}
+tr.click{cursor:pointer}

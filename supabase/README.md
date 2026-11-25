@@ -16,9 +16,14 @@ The current `/ops` app keeps running until each part is replaced.
 | `migrations/…0600_restaurant_hr.sql` | Daily sales, kitchen dish counts, food cost view, HR hooks |
 | `migrations/…0700_security.sql` | Row-level security on every table, audit triggers, function access |
 | `migrations/…0800_app_helpers.sql` | People & roles for the owner, list views for the staff app |
+| `migrations/…0900_tray_size.sql` | A tray serves 10–12 guests (planned at 10) |
+| `migrations/…1000_website_bookings.sql` | Website inquiries → bookings; one tap makes the event |
+| `migrations/…1100_restaurant_kitchen.sql` | Restaurant menu, daily kitchen stock sheet |
+| `migrations/…1200_pos.sql` | Order-taking POS, cash drawer shifts, daily POS summary |
+| `migrations/20261125000100_billing.sql` | Statements of account per event, payments (void only), payment status for everyone in catering |
 | `seed.sql` | Buffet course shares |
 | `../tools/import_ops_export.py` | Moves events and menus from the current "Romualdo's Ops Data" sheet |
-| `../test/` | Local test: a stand-in for Supabase's auth plus an end-to-end scenario (16 checks) |
+| `../test/` | Local test: a stand-in for Supabase's auth plus an end-to-end scenario (21 checks) |
 
 **Not in this public repo:** `private_seed.sql` (items, the standard dish list with booking counts, draft recipes).
 It is kept privately and loaded after the migrations.

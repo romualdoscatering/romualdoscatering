@@ -90,3 +90,13 @@ as mgr "update recipe_lines set qty=3 where dish_id=find_dish('Chicken Teriyaki'
 [ "$(as mgr "select status from recipes where dish_id=find_dish('Chicken Teriyaki')")" = "draft" ] && echo "  ✓ blocked: manager edit → back to draft" || echo "  ✗ manager edit kept it verified"
 expect_fail coord "update recipe_lines set qty=9 where dish_id=find_dish('Chicken Teriyaki') returning 1"
 expect_fail mgr "update recipes set status='verified', verified_by='${U[chef]}' where dish_id=find_dish('Plain Rice') returning 1"
+echo "== billing: managers bill and record payments; coordinators see only the payment status"
+as mgr "insert into event_bills(event_id) values ('$EV2')" >/dev/null
+as mgr "insert into bill_lines(event_id,label,rate,qty,unit) values ('$EV2','Chicken Teriyaki',1500,3,'tray')" >/dev/null
+as mgr "insert into event_payments(event_id,amount,method,ref) values ('$EV2',2000,'gcash','GC1')" >/dev/null
+echo "  manager sees: $(as mgr "select soa_no||' total '||total||' paid '||paid||' balance '||balance||' '||status from event_money(array['$EV2'::uuid])")"
+echo "  coordinator sees: $(as coord "select coalesce(total::text,'(hidden)')||' · '||status from event_money(array['$EV2'::uuid])")"
+expect_fail coord "insert into event_payments(event_id,amount) values ('$EV2',100) returning 1"
+[ "$(as coord "select count(*) from event_payments")" = "0" ] && echo "  ✓ blocked: coordinator cannot read payments" || echo "  ✗ coordinator read payments"
+expect_fail mgr "update event_payments set amount=1 returning 1"
+expect_fail mgr "delete from event_payments returning 1"

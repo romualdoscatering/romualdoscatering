@@ -132,7 +132,7 @@ function afterRender() {
 /* ================= shell ================= */
 function renderShell(key) {
   const inCat = key.startsWith('c/'), inRes = key.startsWith('r/');
-  const nav = inCat ? [['c/events', 'Events'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes']]
+  const nav = inCat ? [['c/events', 'Events'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes'], ...(can('catering', 'manager', 'finance') ? [['c/billing', 'Billing']] : [])]
     : inRes ? [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']] : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
     <div class="who"><span>Hi, ${esc(who().split(' ')[0])}</span>${isAdmin() ? '<a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
@@ -196,12 +196,13 @@ routes['c/events'] = async arg => {
   if (tab === 'upcoming') ev = ev.filter(e => !['cancelled', 'closed'].includes(e.status));
   const cids = [...new Set(ev.map(e => e.client_id).filter(Boolean))], cl = {};
   if (cids.length) (await db.select('clients', { cols: 'id,name', in: { id: cids } })).forEach(c => cl[c.id] = c);
+  const MM = await moneyOf(ev.map(e => e.id));
   const tabs = [['upcoming', 'Upcoming'], ['past', 'Past'], ['all', 'All']];
   return `<div class="row"><h1>Events</h1><span class="sp"></span>${can('catering', 'coordinator', 'manager') ? '<a class="btn pri" href="#/c/event-new">＋ New event</a>' : ''}</div>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/events/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
    ${ev.length ? `<div class="list">${ev.map(e => `<a class="li" href="#/c/event/${e.id}"><div class="li-date"><b>${esc(fmtD(e.event_date).split(',')[0])}</b><span>${esc(fmtD(e.event_date).split(',').slice(1).join(','))}</span></div>
       <div class="li-main"><b>${esc(evClient(e, cl[e.client_id]))}</b><span class="mut small">${evSub(e, cl[e.client_id]) ? esc(evSub(e, cl[e.client_id])) + ' · ' : ''}${esc(e.ref)} · ${KIND[e.kind]}${e.pax ? ' · ' + e.pax + ' guests' : ''}${e.serve_time ? ' · ' + fmtClock(e.serve_time) : ''}${e.venue ? ' · ' + esc(e.venue) : ''}</span></div>
-      ${chip(EVENT_STATUS[e.status], statusTone(e.status))}<button class="pdf sm" data-act="evPdf" data-id="${e.id}" title="Print the event sheet" style="margin-left:8px">🖨️ PDF</button></a>`).join('')}</div>` : '<div class="empty">No events here.</div>'}`;
+      ${payChip(MM[e.id])} ${chip(EVENT_STATUS[e.status], statusTone(e.status))}<button class="pdf sm" data-act="evPdf" data-id="${e.id}" title="Print the event sheet" style="margin-left:8px">🖨️ PDF</button></a>`).join('')}</div>` : '<div class="empty">No events here.</div>'}`;
 };
 
 routes['c/event-new'] = async () => {
@@ -248,6 +249,7 @@ routes['c/event'] = async id => {
     db.select('event_costing', { eq: { event_id: id } }).then(r => r[0]),
     db.select('event_extra_needs', { eq: { event_id: id } }),
   ]);
+  const B = await billBundle(ev, client);
   const recipeState = {}; const dishIds = [...new Set(menu.map(m => m.dish_id).filter(Boolean))];
   if (dishIds.length) (await db.select('recipes', { cols: 'dish_id,status', in: { dish_id: dishIds } })).forEach(r => recipeState[r.dish_id] = r.status);
   const open = !['done', 'closed', 'cancelled'].includes(ev.status);
@@ -259,7 +261,7 @@ routes['c/event'] = async id => {
   const toBuy = needs.filter(n => num(n.to_buy) > 0);
   const margin = cost && ev.contract_price ? num(ev.contract_price) - num(cost.total_cost) : null;
   return `<div class="row"><a href="#/c/events" class="back">‹ Events</a></div>
-  <div class="row"><h1>${esc(evClient(ev, client))}</h1>${chip(EVENT_STATUS[ev.status], statusTone(ev.status))}<span class="sp"></span><button class="pdf lg" data-act="evPdf" data-id="${ev.id}" title="Print the one-page event sheet: works at any status, for the team's hard copy">🖨️ Print event sheet (PDF)</button></div>
+  <div class="row"><h1>${esc(evClient(ev, client))}</h1>${chip(EVENT_STATUS[ev.status], statusTone(ev.status))}${payChip(B.money)}<span class="sp"></span><button class="pdf lg" data-act="evPdf" data-id="${ev.id}" title="Print the one-page event sheet: works at any status, for the team's hard copy">🖨️ Print event sheet (PDF)</button></div>
   ${evHero(ev, client)}
 
   ${canEdit ? `<details class="card"><summary>Edit details & status</summary><form data-form="editEvent" data-id="${ev.id}" class="mt">
@@ -315,6 +317,7 @@ routes['c/event'] = async id => {
    <details class="mt"><summary>Return leftovers to the store</summary><form data-form="returnLeft" data-id="${ev.id}" class="addline"><input name="item" list="dl-items" placeholder="Item" autocomplete="off"><input name="qty" type="number" step="any" min="0" placeholder="qty" class="qty"><input name="by" placeholder="Returned by" required><button>Return</button></form>${itemDatalist()}</details>
   </section>` : ''}
 
+  ${billCard(ev, B)}
   ${cost ? `<section class="card"><h2>Costing</h2><div class="kpis">
     <div class="kpi"><span>Contract</span><b>${ev.contract_price ? peso(ev.contract_price) : '—'}</b></div>
     <div class="kpi"><span>Ingredients used</span><b>${peso(cost.ingredients_used)}</b></div>
@@ -356,7 +359,7 @@ FORMS.evSheet = async (f, el) => {
   const sheet = { ...(ev?.sheet || {}) }; keys.forEach(k => { if (k in f) { const x = String(f[k] ?? '').trim(); if (x) sheet[k] = x; else delete sheet[k]; } });
   await db.update('events', { sheet }, { id: el.dataset.id }); toast('Event sheet saved'); refresh();
 };
-function sheetHtml(ev, menuRows, client) {
+function sheetHtml(ev, menuRows, client, money) {
   const d = ev.sheet || {}, k = ev.kind, cat = k === 'buffet', st = SHEET_ST[ev.status] || 'Draft', logo = S.logoData || new URL('../assets/logo.png', location.href).href;
   const who = client?.name || ev.title, mobile = d.mobile || client?.phone, email = d.email || client?.email, fulfil = d.fulfil || 'Pick-up', del = fulfil === 'Delivery';
   const name = m => m.dish_id ? S.dishById[m.dish_id]?.name : m.pack_id ? (S.packs.find(p => p.id === m.pack_id)?.name || 'Packed meal set') : m.custom_name;
@@ -416,7 +419,7 @@ footer{margin-top:4mm;text-align:center;font-size:7.2pt;color:var(--lab);letter-
 <div class="bar"><button onclick="window.print()">Save as PDF / Print</button><button class="alt" onclick="window.close()">Close</button><span>Choose <b>Save as PDF</b> as the destination.</span></div>
 <div class="page" id="pg">
 <header><img src="${logo}" alt="Romualdo's"><div class="hd"><div class="tag">Catering Services · Davao City</div><h1>${esc(docTitle)}</h1><div class="who">${esc(who)}</div></div>
-<div class="meta">Ref. ${esc(ev.ref)}<br><span class="status">${esc(st)}</span><br>Issued ${esc(issued)}</div></header>
+<div class="meta">Ref. ${esc(ev.ref)}<br><span class="status">${esc(st)}</span><br>${money && money.status !== 'none' ? `<span class="status" style="border-color:${money.status === 'paid' ? '#2F6B3A;color:#2F6B3A' : '#8A5A00;color:#8A5A00'}">${esc(PAY_ST[money.status][0])}</span><br>` : ''}Issued ${esc(issued)}</div></header>
 <div class="hero">${hero.map(([l, v]) => `<div><span>${esc(l)}</span><b>${esc(v)}</b></div>`).join('')}</div>
 <div class="cols"><div>
 <section><h2>Client${cat ? ' &amp; venue' : ''}<small>Details</small></h2><table class="kv">
@@ -479,7 +482,8 @@ ACT.evPdf = async el => {
     const id = el.dataset.id, [ev] = await db.select('events', { eq: { id } });
     const [menu, client] = await Promise.all([db.select('event_menu', { eq: { event_id: id }, order: [['sort'], ['course']] }), ev.client_id ? db.select('clients', { eq: { id: ev.client_id } }).then(r => r[0]) : null]);
     await loadLogo();
-    w.document.open(); w.document.write(sheetHtml(ev, menu, client)); w.document.close();
+    const money = (await moneyOf([id]))[id];
+    w.document.open(); w.document.write(sheetHtml(ev, menu, client, money)); w.document.close();
   } catch (e) { w.close(); throw e; }
 };
 ACT.rmMenu = async el => { await db.remove('event_menu', { id: el.dataset.id }); refresh(); };
@@ -1437,3 +1441,218 @@ document.addEventListener('input', e => {
   try { S.user = await db.currentUser(); if (S.user) return afterLogin(); } catch (e) { console.error(e); }
   renderLogin();
 })();
+
+/* ================= BILLING (Statement of Account per event + payments) ================= */
+const canBill = () => can('catering', 'manager', 'finance');
+const PAY_ST = { none: ['No bill yet', ''], unpaid: ['Unpaid', 'bad'], partial: ['Partially paid', 'warn'], paid: ['Paid in full', 'ok'], over: ['Overpaid', 'info'] };
+const payChip = m => m && m.status !== 'none' ? chip(PAY_ST[m.status][0], PAY_ST[m.status][1]) : '';
+const PAY_METHODS = [['cash', 'Cash'], ['gcash', 'GCash'], ['bank', 'Bank transfer / deposit'], ['check', 'Check'], ['card', 'Card'], ['other', 'Other']];
+const payMethod = k => (PAY_METHODS.find(x => x[0] === k) || [, k])[1];
+async function moneyOf(ids) { const m = {}; if (ids.length) (await db.rpc('event_money', { p_events: ids })).forEach(r => m[r.event_id] = r); return m; }
+const lineAmt = (l, pax) => Math.round(num(l.rate) * (l.qty === null || l.qty === '' || l.qty === undefined ? num(pax) : num(l.qty)) * 100) / 100;
+function billCalc(bill, lines, pays, pax) {
+  const sub = lines.reduce((a, l) => a + lineAmt(l, pax), 0), disc = num(bill?.discount), total = Math.max(0, Math.round((sub - disc) * 100) / 100);
+  const paid = pays.filter(p => !p.voided_at).reduce((a, p) => a + num(p.amount), 0);
+  return { sub, disc, total, paid, balance: Math.round((total - paid) * 100) / 100 };
+}
+// Starting lines from the event: buffet = one package line (contract ÷ guests per head); trays/packs = one line per menu item
+function linesFromEvent(ev, menu) {
+  const nm = m => m.dish_id ? S.dishById[m.dish_id]?.name : m.pack_id ? (S.packs.find(p => p.id === m.pack_id)?.name || 'Packed meal set') : m.custom_name;
+  if (ev.kind === 'buffet') {
+    const pax = num(ev.pax), c = num(ev.contract_price), items = COURSES.flatMap(c => sortMenu(menu.filter(m => m.course === c))).concat(menu.filter(m => !COURSES.includes(m.course))).map(nm).filter(Boolean).join('\n');
+    return [{ label: ev.sheet?.pkg ? ev.sheet.pkg + ' package' : 'Catering package', items, rate: c && pax ? Math.round(c / pax * 100) / 100 : c, qty: c && !pax ? 1 : null, unit: c && !pax ? '' : 'head' }];
+  }
+  const L = menu.map(m => ({ label: nm(m) || 'Item', items: m.note || '', rate: 0, qty: num(m.qty) || 1, unit: m.course === 'Drinks' || DRINK_RE.test(nm(m) || '') ? '' : ev.kind === 'packs' ? 'pack' : 'tray' }));
+  L.sort((x, y) => (x.unit ? 0 : 1) - (y.unit ? 0 : 1));   // trays / packs first, then drinks
+  if (ev.sheet?.fulfil === 'Delivery') L.push({ label: 'Delivery', items: ev.venue || '', rate: 0, qty: 1, unit: '' });
+  return L.length ? L : [{ label: 'Food trays', items: '', rate: num(ev.contract_price), qty: 1, unit: '' }];
+}
+function billRow(l, i, pax) {
+  const q = l.qty === null || l.qty === undefined ? '' : l.qty;
+  return `<tr data-bl><td><input name="label_${i}" value="${esc(l.label || '')}" placeholder="e.g. Catering package" required><textarea name="items_${i}" rows="2" placeholder="Menu or details (one per line) — optional">${esc(l.items || '')}</textarea></td>
+   <td><input name="rate_${i}" type="number" step="any" min="0" inputmode="decimal" value="${esc(l.rate ?? '')}" class="qty"></td>
+   <td><input name="qty_${i}" type="number" step="any" min="0" inputmode="decimal" value="${esc(q)}" placeholder="${pax ? pax + ' pax' : 'qty'}" class="qty"></td>
+   <td><select name="unit_${i}">${[['', '—'], ['head', 'per head'], ['tray', 'per tray'], ['pack', 'per pack']].map(([v, t]) => opt(v, t, (l.unit || '') === v)).join('')}</select></td>
+   <td class="n" data-blamt>${peso(lineAmt(l, pax))}</td><td><button type="button" class="ghost sm" data-act="billRmRow" title="Remove line">✕</button></td></tr>`;
+}
+function billCard(ev, B) {
+  if (!canBill()) return '';
+  const { bill, lines, pays, client } = B, pax = ev.pax;
+  if (!bill) return `<section class="card" id="billing"><div class="row"><h2>Billing</h2><span class="sp"></span>${payChip(B.money)}</div>
+    <p class="mut">No statement yet. Create one and the lines are filled in from this event${ev.kind === 'buffet' ? (ev.contract_price ? ` (contract ${peso(ev.contract_price)}${ev.pax ? ' ÷ ' + ev.pax + ' guests per head' : ''})` : '') : ' (one line per tray or pack — type the prices)'}. You can change everything after.</p>
+    <div class="row end"><button class="pri" data-act="billCreate" data-id="${ev.id}">Create statement of account</button></div>
+    ${pays.length ? payList(ev, pays) : ''}</section>`;
+  const C = billCalc(bill, lines, pays, pax), overdue = bill.due && bill.due < today() && C.balance > 0;
+  return `<section class="card" id="billing"><div class="row"><h2>Billing</h2>${payChip(B.money)}${overdue ? chip('Overdue', 'bad') : ''}<span class="sp"></span><button class="pdf" data-act="soaPdf" data-id="${ev.id}">🖨️ Statement of Account (PDF)</button></div>
+   <div class="kpis"><div class="kpi"><span>Total</span><b>${peso(C.total)}</b></div><div class="kpi"><span>Paid</span><b>${peso(C.paid)}</b></div><div class="kpi"><span>Balance</span><b class="${C.balance > 0 ? 'bad-t' : 'ok-t'}">${peso(C.balance)}</b></div><div class="kpi"><span>${esc(bill.soa_no)}</span><b style="font-size:15px">${bill.due ? 'Due ' + esc(fmtD(bill.due)) : 'No due date'}</b></div></div>
+   <details class="mt" ${lines.length && C.total ? '' : 'open'}><summary>Edit the statement</summary>
+   <form data-form="saveBill" data-id="${ev.id}" data-pax="${esc(pax ?? '')}" class="mt">
+    <div class="grid"><label>Bill to<input name="bill_to" value="${esc(bill.bill_to || '')}" placeholder="${esc(client?.name || 'Client name')}"></label><label>Address<input name="address" value="${esc(bill.address || '')}"></label>
+     <label>Issued<input name="issued" type="date" value="${esc(bill.issued)}"></label><label>Due<input name="due" type="date" value="${esc(bill.due || '')}"></label></div>
+    <div class="tw"><table class="bill-ed"><thead><tr><th>Description</th><th>Rate ₱</th><th>Qty</th><th>Per</th><th class="n">Amount</th><th></th></tr></thead><tbody>${lines.map((l, i) => billRow(l, i, pax)).join('')}</tbody>
+     <tfoot><tr><td colspan="6"><button type="button" class="ghost sm" data-act="billAddRow">＋ Add line</button> <span class="small mut">Leave Qty blank to use the guest count${pax ? ` (${pax})` : ''}.</span></td></tr>
+     <tr><td colspan="4" class="n">Less discount ₱</td><td class="n"><input name="discount" type="number" step="any" min="0" value="${esc(num(bill.discount) || '')}" class="qty" placeholder="0"></td><td></td></tr>
+     <tr><td colspan="4" class="n"><b>Total</b></td><td class="n"><b data-bltotal>${peso(C.total)}</b></td><td></td></tr></tfoot></table></div>
+    <label>Notes on the statement<textarea name="notes" rows="2" placeholder="e.g. 50% down payment to confirm the date; balance on the event day">${esc(bill.notes || '')}</textarea></label>
+    <div class="row end"><button type="button" class="ghost" data-act="billRefill" data-id="${ev.id}">Refill lines from the event</button><button class="pri">Save statement</button></div></form></details>
+   ${payList(ev, pays, C)}</section>`;
+}
+function payList(ev, pays, C) {
+  const live = pays.filter(p => !p.voided_at), voided = pays.filter(p => p.voided_at);
+  return `<h3 class="mt">Payments received</h3>
+   ${live.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Method</th><th>Reference</th><th class="n">Amount</th><th></th></tr></thead><tbody>
+    ${live.map(p => `<tr><td>${esc(fmtD(p.paid_on))}</td><td>${esc(payMethod(p.method))}</td><td class="small">${esc(p.ref || '')}${p.note ? `<div class="mut">${esc(p.note)}</div>` : ''}</td><td class="n">${peso(p.amount)}</td><td><button class="ghost sm" data-act="payVoid" data-id="${p.id}" title="Void this payment (wrong entry)">Void</button></td></tr>`).join('')}
+    </tbody></table></div>` : '<p class="mut small">None yet.</p>'}
+   ${voided.length ? `<details><summary class="small mut">${voided.length} voided</summary><ul class="small mut">${voided.map(p => `<li>${esc(fmtD(p.paid_on))} · ${peso(p.amount)} · ${esc(payMethod(p.method))} — voided: ${esc(p.void_reason || '')}</li>`).join('')}</ul></details>` : ''}
+   <form data-form="addPay" data-id="${ev.id}" class="addline mt"><input name="paid_on" type="date" value="${today()}" required><input name="amount" type="number" step="any" min="0.01" inputmode="decimal" placeholder="Amount ₱${C && C.balance > 0 ? ' (balance ' + fq(C.balance) + ')' : ''}" required>
+    <select name="method">${PAY_METHODS.map(([v, l]) => opt(v, l)).join('')}</select><input name="ref" placeholder="Ref / OR no. (optional)"><button class="pri">Add payment</button></form>`;
+}
+async function billBundle(ev, client) {
+  if (!canBill()) return { money: (await moneyOf([ev.id]))[ev.id] };
+  const [bill, lines, pays, money] = await Promise.all([db.select('event_bills', { eq: { event_id: ev.id } }).then(r => r[0]), db.select('bill_lines', { eq: { event_id: ev.id }, order: [['sort']] }),
+    db.select('event_payments', { eq: { event_id: ev.id }, order: [['paid_on'], ['created_at']] }), moneyOf([ev.id]).then(m => m[ev.id])]);
+  return { bill, lines, pays, money, client };
+}
+async function writeLines(evId, lines) {
+  await db.remove('bill_lines', { event_id: evId });
+  if (lines.length) await db.insert('bill_lines', lines.map((l, i) => ({ event_id: evId, sort: i, label: l.label, items: l.items || null, rate: num(l.rate), qty: l.qty === null || l.qty === '' ? null : num(l.qty), unit: l.unit || null })));
+}
+async function evAndMenu(id) {
+  const [ev] = await db.select('events', { eq: { id } }); const menu = await db.select('event_menu', { eq: { event_id: id }, order: [['sort'], ['course']] }); return [ev, menu];
+}
+ACT.billCreate = async el => {
+  const [ev, menu] = await evAndMenu(el.dataset.id), [set] = await db.select('bill_settings', {});
+  const due = set?.due_days && ev.event_date ? new Date(new Date(ev.event_date + 'T00:00').getTime() - set.due_days * 864e5 + 8 * 3600e3).toISOString().slice(0, 10) : ev.event_date;
+  await db.insert('event_bills', { event_id: ev.id, due });
+  await writeLines(ev.id, linesFromEvent(ev, menu)); toast('Statement created — check the rates'); refresh();
+};
+ACT.billRefill = async el => {
+  if (!confirm('Replace the lines on this statement with lines from the event (menu and contract price)?')) return;
+  const [ev, menu] = await evAndMenu(el.dataset.id); await writeLines(ev.id, linesFromEvent(ev, menu)); toast('Lines refilled'); refresh();
+};
+ACT.billAddRow = el => { const tb = el.closest('table').querySelector('tbody'), pax = el.closest('form').dataset.pax, i = Date.now() % 1e7;
+  tb.insertAdjacentHTML('beforeend', billRow({ label: '', rate: '', qty: null, unit: '' }, i, pax)); tb.lastElementChild.querySelector('input').focus(); };
+ACT.billRmRow = el => { const f = el.closest('form'); el.closest('tr').remove(); billLive(f); };
+function billLive(f) {
+  if (!f) return; const pax = f.dataset.pax; let sub = 0;
+  f.querySelectorAll('tr[data-bl]').forEach(tr => { const g = n => tr.querySelector(`[name^="${n}_"]`)?.value ?? '', a = lineAmt({ rate: g('rate'), qty: g('qty') === '' ? null : g('qty') }, pax); sub += a; tr.querySelector('[data-blamt]').textContent = peso(a); });
+  const t = f.querySelector('[data-bltotal]'); if (t) t.textContent = peso(Math.max(0, sub - num(f.querySelector('[name=discount]')?.value)));
+}
+document.addEventListener('input', e => { const f = e.target.closest('form[data-form=saveBill]'); if (f) billLive(f); });
+FORMS.saveBill = async (f, el) => {
+  const id = el.dataset.id, lines = [...el.querySelectorAll('tr[data-bl]')].map(tr => { const g = n => tr.querySelector(`[name^="${n}_"]`)?.value ?? '';
+    return { label: g('label').trim(), items: g('items').trim(), rate: g('rate'), qty: g('qty') === '' ? null : g('qty'), unit: g('unit') }; }).filter(l => l.label);
+  await db.update('event_bills', { bill_to: (f.bill_to || '').trim() || null, address: (f.address || '').trim() || null, issued: f.issued || today(), due: f.due || null, discount: num(f.discount), notes: (f.notes || '').trim() || null, updated_at: new Date().toISOString() }, { event_id: id });
+  await writeLines(id, lines); toast('Statement saved'); refresh();
+};
+FORMS.addPay = async (f, el) => {
+  if (!(num(f.amount) > 0)) return toast('Enter the amount received.', true);
+  if (f.method !== 'cash' && !(f.ref || '').trim() && !confirm('No reference number for this ' + payMethod(f.method) + ' payment. Save anyway?')) return;
+  await db.insert('event_payments', { event_id: el.dataset.id, paid_on: f.paid_on || today(), amount: num(f.amount), method: f.method, ref: (f.ref || '').trim() || null });
+  toast('Payment recorded'); refresh();
+};
+ACT.payVoid = async el => {
+  const r = prompt('Why void this payment? (e.g. wrong amount, entered twice)'); if (!r || !r.trim()) return;
+  await db.update('event_payments', { voided_at: new Date().toISOString(), voided_by: S.me.id, void_reason: r.trim() }, { id: el.dataset.id }); toast('Payment voided'); refresh();
+};
+ACT.soaPdf = async el => {
+  const w = window.open('', '_blank'); if (!w) return toast('The browser blocked the PDF window. Allow pop-ups for romualdos.ph and try again.', true);
+  w.document.write('<!DOCTYPE html><title>Preparing PDF…</title><body style="font:15px Montserrat,Arial,sans-serif;color:#1A2C54;display:grid;place-items:center;height:90vh;margin:0">Preparing the statement…</body>');
+  try {
+    const id = el.dataset.id, [ev] = await db.select('events', { eq: { id } }), client = ev.client_id ? (await db.select('clients', { eq: { id: ev.client_id } }))[0] : null;
+    const [B, [set]] = await Promise.all([billBundle(ev, client), db.select('bill_settings', {})]);
+    if (!B.bill) { w.close(); return toast('Create the statement first.', true); }
+    if (!S.logoData) S.logoData = await fetch(new URL('../assets/logo.png', location.href)).then(r => r.blob()).then(b => new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); })).catch(() => '');
+    w.document.open(); w.document.write(soaHtml(ev, B, set || {})); w.document.close();
+  } catch (e) { w.close(); throw e; }
+};
+function soaHtml(ev, B, set) {
+  const { bill, lines, pays, client } = B, C = billCalc(bill, lines, pays, ev.pax), s = ev.sheet || {}, live = pays.filter(p => !p.voided_at);
+  const st = PAY_ST[B.money?.status || 'unpaid'][0], who = bill.bill_to || client?.name || ev.title, logo = S.logoData || new URL('../assets/logo.png', location.href).href;
+  const lf = d => fmtLong(d).replace(/^\w+, /, ''), pr = (l, v) => v ? `<p><b>${l}:</b> ${esc(v)}</p>` : '';
+  const unitTxt = (l, q) => l.unit ? ' ' + l.unit + (q === 1 ? '' : 's') : '';
+  const menuLines = lines.filter(l => (l.items || '').trim() && ev.kind === 'buffet');
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>${esc(`Statement of Account ${bill.soa_no} - ${who}`)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400;1,500&family=Montserrat:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+@page{size:A4;margin:0}*{box-sizing:border-box}html,body{margin:0;padding:0}
+:root{--ink:#14213F;--txt:#1F2433;--lab:#4A5265;--acc:#8A5A00;--rule:#9C9479;--wine:#631B1C}
+body{font-family:Montserrat,Arial,sans-serif;color:var(--txt);font-size:9.6pt;line-height:1.42;-webkit-print-color-adjust:exact;print-color-adjust:exact;background:#ECE8DA}
+h1,h2,.who{font-family:'Playfair Display',Georgia,serif}
+.page{width:210mm;min-height:297mm;margin:0 auto;padding:11mm 13mm 9mm;background:#fff;display:flex;flex-direction:column}
+.bar{display:flex;gap:10px;justify-content:center;padding:12px;background:#F7F4EA;border-bottom:1px solid #E4DFC8}
+.bar button{font:600 13px Montserrat;border:0;border-radius:8px;padding:10px 18px;cursor:pointer;background:#1A2C54;color:#fff}.bar button.alt{background:#fff;color:#1A2C54;border:1px solid #CFC9B0}.bar span{align-self:center;font-size:12px;color:#5B6478}
+.bill-h{display:flex;align-items:center;gap:6mm;padding-bottom:3mm;border-bottom:1pt solid var(--rule)}.bill-h img{height:17mm}.bill-h .meta{margin-left:auto}
+.tag{font-size:7pt;font-weight:600;letter-spacing:.24em;text-transform:uppercase;color:var(--acc);white-space:nowrap}
+h1{font-weight:400;font-style:italic;font-size:22pt;line-height:1.1;margin:.8mm 0 .6mm;color:var(--ink)}.who{font-size:12.5pt;color:var(--ink)}
+.meta{text-align:right;font-size:8pt;color:var(--lab);line-height:1.75;white-space:nowrap}
+.status{display:inline-block;border:.8pt solid var(--wine);color:var(--wine);border-radius:20px;padding:0 2.5mm;font-size:7pt;font-weight:600;letter-spacing:.12em;text-transform:uppercase}
+.addr{text-align:center;font-size:8pt;color:var(--lab);margin:2mm 0 0;line-height:1.6}
+.boxes{display:grid;grid-template-columns:1fr 1fr;gap:5mm;margin:4mm 0}.boxes div{border:.9pt solid var(--ink);border-radius:2mm;padding:3mm 4mm}
+.boxes h3{margin:0 0 1.5mm;font:600 6.8pt Montserrat,Arial,sans-serif;letter-spacing:.22em;text-transform:uppercase;color:var(--acc)}
+.boxes p{margin:.6mm 0;font-size:9.4pt}.boxes b{font-weight:600;color:var(--ink)}
+h2{font-weight:600;font-size:11.5pt;margin:2mm 0 1.5mm;letter-spacing:.02em;border-bottom:.8pt solid var(--rule);padding-bottom:1mm;color:var(--ink)}
+h2 small{font-family:Montserrat,Arial,sans-serif;font-weight:600;font-size:6.5pt;letter-spacing:.24em;text-transform:uppercase;color:var(--acc);margin-left:2mm}
+.am{text-align:center;margin:2mm 0 4mm}.am h2{border:0;text-align:center;font-size:14pt;font-style:italic;font-weight:400;margin:0 0 1mm}
+.am .c{font-size:7.2pt;font-weight:600;letter-spacing:.2em;text-transform:uppercase;color:var(--acc);margin-top:2.6mm}.am .c i{font-style:normal;color:var(--wine);letter-spacing:.06em}.am .d{font-family:'Playfair Display',Georgia,serif;font-style:italic;font-size:11pt;line-height:1.3;color:var(--ink)}
+table.bd{width:100%;border-collapse:collapse;margin-top:1mm}.bd th{font-size:6.8pt;letter-spacing:.16em;text-transform:uppercase;color:var(--lab);font-weight:600;text-align:left;border-bottom:.9pt solid var(--ink);padding:1.2mm 1.5mm}
+.bd td{padding:1.5mm;border-bottom:.6pt solid #CFC8B0;vertical-align:top}.bd .r{text-align:right;white-space:nowrap}.bd td.l{font-weight:600;color:var(--ink)}.bd td.l small{display:block;font-weight:400;color:var(--lab);font-size:7.6pt}
+.bd tfoot td{border:0;padding:1mm 1.5mm}.bd tfoot .tt td{border-top:1.4pt solid var(--ink);font-size:12pt;font-weight:700;color:var(--ink);padding-top:2mm}.bd tfoot .bal td{font-size:11pt;font-weight:700;color:var(--wine)}.bd tfoot .pd td{font-size:8.6pt;color:var(--lab)}
+.pay{margin-top:4mm;border:.8pt dashed var(--rule);border-radius:2mm;padding:2.5mm 4mm;font-size:8.6pt;white-space:pre-wrap}.pay b{color:var(--ink);font-size:7pt;letter-spacing:.18em;text-transform:uppercase;display:block;margin-bottom:.8mm}
+.foot{margin-top:auto;padding-top:5mm}.sign{display:grid;grid-template-columns:1fr 1fr;gap:14mm}.sign div{border-top:.8pt solid var(--ink);padding-top:1.2mm;font-size:7.4pt;color:var(--lab)}.sign b{display:block;color:var(--ink);font-weight:600;font-size:8.6pt}
+footer{margin-top:4mm;text-align:center;font-size:7.2pt;color:var(--lab);letter-spacing:.03em;border-top:.8pt solid var(--rule);padding-top:2mm}
+@media screen{.page{margin:16px auto;box-shadow:0 2px 14px rgba(0,0,0,.12)}}@media print{body{background:#fff}.bar{display:none}}
+</style></head><body>
+<div class="bar"><button onclick="window.print()">Save as PDF / Print</button><button class="alt" onclick="window.close()">Close</button><span>Choose <b>Save as PDF</b> as the destination.</span></div>
+<div class="page" id="pg">
+<div class="bill-h"><img src="${logo}" alt="Romualdo's"><div><div class="tag">Catering Services · Davao City</div><h1>Statement of Account</h1><div class="who">${esc(who)}</div></div>
+<div class="meta">No. ${esc(bill.soa_no)}<br><span class="status">${esc(st)}</span><br>Issued ${esc(lf(bill.issued))}${bill.due ? '<br>Due ' + esc(lf(bill.due)) : ''}</div></div>
+<p class="addr">${esc(set.bill_address || '')}<br>${esc(set.bill_contact || '')}</p>
+<div class="boxes"><div><h3>Bill to</h3>${pr('Name / account', who + (s.contact ? ' – ' + s.contact : ''))}${pr('Address', bill.address)}${pr('Email', s.email || client?.email)}${pr('Mobile / tel.', s.mobile || client?.phone)}</div>
+<div><h3>${ev.kind === 'buffet' ? 'Event' : 'Order'}</h3>${pr(ev.kind === 'buffet' ? 'Date of event' : s.fulfil === 'Delivery' ? 'Delivery date' : 'Pick-up date', ev.event_date ? fmtLong(ev.event_date) : '')}${pr(ev.kind === 'buffet' ? 'Time of event' : 'Ready by', ev.serve_time ? fmtClock(ev.serve_time) : '')}${pr(ev.kind === 'buffet' ? 'Guaranteed pax' : 'Good for', ev.pax ? ev.pax + ' pax' : '')}${pr(ev.kind === 'buffet' ? 'Venue' : s.fulfil === 'Delivery' ? 'Deliver to' : '', ev.venue)}${pr('Reference', ev.ref)}${pr('Food notes', s.allergy)}</div></div>
+${menuLines.length ? `<div class="am"><h2>Approved Menu</h2>${menuLines.map(l => `<div class="c">${esc(l.label)}${num(l.rate) ? ` <i>(${peso(l.rate)}/${esc(l.unit || 'head')})</i>` : ''}</div>${l.items.split('\n').filter(x => x.trim()).map(x => `<div class="d">${esc(x.trim())}</div>`).join('')}`).join('')}</div>` : ''}
+<h2>Breakdown<small>Billing</small></h2>
+<table class="bd"><thead><tr><th>Description</th><th class="r">Rate</th><th class="r">Qty</th><th class="r">Amount</th></tr></thead><tbody>
+${lines.map(l => { const q = l.qty === null ? num(ev.pax) : num(l.qty); return `<tr><td class="l">${esc(l.label)}${l.items && ev.kind !== 'buffet' ? `<small>${esc(l.items.split('\n').filter(Boolean).join(' · '))}</small>` : ''}</td><td class="r">${peso(l.rate)}</td><td class="r">${fq(q)}${esc(unitTxt(l, q))}</td><td class="r">${peso(lineAmt(l, ev.pax))}</td></tr>`; }).join('')}</tbody>
+<tfoot>${C.disc ? `<tr><td colspan="3" class="r">Subtotal</td><td class="r">${peso(C.sub)}</td></tr><tr><td colspan="3" class="r">Less discount</td><td class="r">− ${peso(C.disc)}</td></tr>` : ''}
+<tr class="tt"><td colspan="3">TOTAL</td><td class="r">${peso(C.total)}</td></tr>
+${live.map(p => `<tr class="pd"><td colspan="3" class="r">Less payment received ${esc(lf(p.paid_on))} · ${esc(payMethod(p.method))}${p.ref ? ' · ' + esc(p.ref) : ''}</td><td class="r">− ${peso(p.amount)}</td></tr>`).join('')}
+${live.length ? `<tr class="bal"><td colspan="3" class="r">${C.balance > 0 ? 'BALANCE DUE' : C.balance < 0 ? 'OVERPAID' : 'FULLY PAID'}</td><td class="r">${peso(Math.abs(C.balance))}</td></tr>` : ''}</tfoot></table>
+${set.pay_info ? `<div class="pay"><b>Payment details</b>${esc(set.pay_info)}</div>` : ''}${bill.notes ? `<p style="margin:3mm 0 0;font-size:8.8pt;white-space:pre-wrap">${esc(bill.notes)}</p>` : ''}
+<div class="foot"><div class="sign"><div><b>${esc(s.contact || who)}</b>Received by · signature over printed name · date</div><div><b>${esc(S.me.full_name || "Romualdo's Catering Services")}</b>Prepared by · Romualdo's Catering Services</div></div>
+<footer>Romualdo's Catering Services · ${esc(set.bill_address || '')} · romualdos.ph</footer></div>
+</div><script>
+function fit(){var p=document.getElementById('pg'),H=p.offsetWidth*297/210;p.style.zoom=1;p.style.minHeight='0';var h=p.scrollHeight,z=h>H?Math.max(.55,(H-2)/h):1;p.style.zoom=z;p.style.minHeight=((H-2)/z)+'px';}
+window.addEventListener('load',function(){(document.fonts?document.fonts.ready:Promise.resolve()).then(function(){fit();setTimeout(function(){window.print()},400)})});
+<\/script></body></html>`;
+}
+// Billing overview: who still owes what
+routes['c/billing'] = async arg => {
+  if (!canBill()) return '<div class="card">Billing is for finance, catering managers and the owner.</div>';
+  const tab = arg || 'due';
+  const evs = await db.select('events', { cols: 'id,ref,title,kind,event_type,event_date,pax,status,client_id,sheet,contract_price', order: [['event_date', false]] });
+  const live = evs.filter(e => e.status !== 'cancelled' || false), M = await moneyOf(live.map(e => e.id));
+  const cids = [...new Set(live.map(e => e.client_id).filter(Boolean))], cl = {}; if (cids.length) (await db.select('clients', { cols: 'id,name', in: { id: cids } })).forEach(c => cl[c.id] = c);
+  const t = today(), withBill = live.filter(e => M[e.id]?.status !== 'none');
+  const due = withBill.filter(e => num(M[e.id].balance) > 0), over = due.filter(e => M[e.id].due && M[e.id].due < t);
+  const noBill = live.filter(e => M[e.id]?.status === 'none' && !['inquiry', 'cancelled'].includes(e.status));
+  const sumK = (L, k) => L.reduce((a, e) => a + num(M[e.id][k]), 0);
+  const list = tab === 'due' ? due.sort((a, b) => (M[a.id].due || a.event_date).localeCompare(M[b.id].due || b.event_date)) : tab === 'paid' ? withBill.filter(e => num(M[e.id].balance) <= 0) : tab === 'nobill' ? noBill : live;
+  const [set] = isAdmin() ? await db.select('bill_settings', {}) : [null];
+  const tabs = [['due', `Balance due (${due.length})`], ['nobill', `No statement yet (${noBill.length})`], ['paid', 'Paid'], ['all', 'All']];
+  return `<h1>Billing</h1>
+   <div class="kpis"><div class="kpi"><span>Billed</span><b>${peso(sumK(withBill, 'total'))}</b></div><div class="kpi"><span>Collected</span><b>${peso(sumK(withBill, 'paid'))}</b></div>
+    <div class="kpi"><span>Receivable</span><b class="${sumK(due, 'balance') > 0 ? 'bad-t' : ''}">${peso(sumK(due, 'balance'))}</b></div><div class="kpi"><span>Overdue</span><b class="${over.length ? 'bad-t' : ''}">${over.length ? peso(sumK(over, 'balance')) : '—'}</b></div></div>
+   <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/billing/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
+   ${list.length ? `<div class="tw card" style="padding:6px 12px"><table><thead><tr><th>Event date</th><th>Client</th><th>Statement</th><th class="n">Total</th><th class="n">Paid</th><th class="n">Balance</th><th>Status</th></tr></thead><tbody>
+   ${list.map(e => { const m = M[e.id], od = m.due && m.due < t && num(m.balance) > 0; return `<tr class="click" data-href="#/c/event/${e.id}"><td class="nowrap">${esc(fmtD(e.event_date))}</td><td><a href="#/c/event/${e.id}"><b>${esc(evClient(e, cl[e.client_id]))}</b></a><div class="small mut">${esc(e.ref)} · ${KIND[e.kind]}${e.pax ? ' · ' + e.pax + ' pax' : ''}</div></td>
+     <td class="small">${m.soa_no ? esc(m.soa_no) + (m.due ? `<div class="${od ? 'bad-t' : 'mut'}">due ${esc(fmtD(m.due))}</div>` : '') : `<span class="mut">—</span>${e.contract_price ? `<div class="mut">contract ${peso(e.contract_price)}</div>` : ''}`}</td>
+     <td class="n">${m.status === 'none' ? '' : peso(m.total)}</td><td class="n">${num(m.paid) ? peso(m.paid) : ''}</td><td class="n"><b class="${num(m.balance) > 0 ? 'bad-t' : ''}">${m.status === 'none' ? '' : peso(m.balance)}</b></td><td>${payChip(m) || chip('No statement')}${od ? ' ' + chip('Overdue', 'bad') : ''}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty">Nothing here.</div>'}
+   ${set ? `<details class="card mt"><summary>Statement settings <span class="small mut">— printed on every statement (owner only)</span></summary><form data-form="billSettings" class="mt">
+     <label>Business address<input name="bill_address" value="${esc(set.bill_address)}"></label><label>Contact line<input name="bill_contact" value="${esc(set.bill_contact)}"></label>
+     <label>Payment details (bank / GCash)<textarea name="pay_info" rows="3" placeholder="e.g. BDO Savings · Romualdo's Catering Services · 0000-0000-0000&#10;GCash 0917 000 0000 · J. Domingo">${esc(set.pay_info)}</textarea></label>
+     <label>Default due date<select name="due_days">${[[0, 'On the event day'], [1, '1 day before the event'], [3, '3 days before'], [7, '7 days before']].map(([v, l]) => opt(v, l, num(set.due_days) === v)).join('')}</select></label>
+     <div class="row end"><button class="pri">Save</button></div></form></details>` : ''}`;
+};
+FORMS.billSettings = async f => { await db.update('bill_settings', { bill_address: f.bill_address.trim(), bill_contact: f.bill_contact.trim(), pay_info: (f.pay_info || '').trim(), due_days: num(f.due_days) }, { id: 1 }); toast('Saved'); refresh(); };
+document.addEventListener('click', e => { const tr = e.target.closest('tr.click[data-href]'); if (tr && !e.target.closest('a,button,input,select')) location.hash = tr.dataset.href; });
