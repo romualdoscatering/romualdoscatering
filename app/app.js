@@ -507,11 +507,12 @@ routes['c/requests'] = async arg => {
   const tabs = [['approve', 'To approve'], ['open', 'In progress'], ['draft', 'Drafts'], ['all', 'All']];
   const st = { approve: ['submitted'], open: ['submitted', 'approved', 'ordered'], draft: ['draft'] }[tab];
   const rows = await db.select('pr_overview', { eq: { ws: WS() }, ...(st ? { in: { status: st } } : {}), order: [['created_at', false]], limit: 200 });
-  return `<div class="row"><h1>Purchase requests</h1><span class="sp"></span><button class="pri" data-act="newPR">＋ New request</button></div>
+  return `<div class="row"><h1>Purchase requests</h1><span class="sp"></span>${rows.length > 1 ? '<button class="ghost" data-act="combinePR">🧾 Combine into one list</button>' : ''}<button class="pri" data-act="newPR">＋ New request</button></div>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/${P()}/requests/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
-   ${rows.length ? `<div class="list">${rows.map(p => `<a class="li" href="#/${P()}/pr/${p.id}"><div class="li-main"><b>${esc(p.pr_no)}${p.priority === 'urgent' ? ' ' + chip('urgent', 'bad') : ''}</b>
+   ${rows.length > 1 ? '<p class="small mut">Tick the requests you\'re buying for together, then tap <b>Combine into one list</b>.</p>' : ''}
+   ${rows.length ? `<div class="list">${rows.map(p => `<div class="pick"><label class="pk" title="Include in combined list"><input type="checkbox" data-pr="${p.id}"></label><a class="li" href="#/${P()}/pr/${p.id}"><div class="li-main"><b>${esc(p.pr_no)}${p.priority === 'urgent' ? ' ' + chip('urgent', 'bad') : ''}</b>
      <span class="mut small">${p.event_title ? esc(p.event_ref + ' · ' + p.event_title) + ' · ' : ''}${esc(p.purpose || '')}</span>
-     <span class="mut small">${p.line_count} items · est. ${peso(p.est_total)} · ${esc(p.requested_by_name || '')}${p.needed_by ? ' · needed ' + esc(fmtD(p.needed_by)) : ''}</span></div>${chip(PR_STATUS[p.status], statusTone(p.status))}</a>`).join('')}</div>` : '<div class="empty">No requests here.</div>'}`;
+     <span class="mut small">${p.line_count} items · est. ${peso(p.est_total)} · ${esc(p.requested_by_name || '')}${p.needed_by ? ' · needed ' + esc(fmtD(p.needed_by)) : ''}</span></div>${chip(PR_STATUS[p.status], statusTone(p.status))}</a></div>`).join('')}</div>` : '<div class="empty">No requests here.</div>'}`;
 };
 ACT.newPR = async () => { const r = (await db.insert('purchase_requests', { ws: WS(), purpose: WS() === 'restaurant' ? 'Restaurant restock' : 'Catering store restock', requested_by: S.user.id }))[0]; go(`#/${P()}/pr/${r.id}`); };
 
@@ -566,70 +567,119 @@ ACT.prPreview = async el => {
     const f = document.querySelector(`form[data-id="${id}"]`);
     const typed = l => { const v = f?.elements['q_' + l.id]?.value; return v != null && v !== '' ? num(v) : null; };
     const rows = lines.map(l => ({ ...l, q: typed(l) ?? num(l.approved_qty ?? l.qty) })).filter(l => l.q > 0);
+    await loadLogo();
     w.document.open(); w.document.write(prListHtml(p, rows)); w.document.close();
   } catch (e) { w.close(); throw e; }
 };
-// One-sheet buying list: two columns on paper/tablet, one on phones; shrinks to fit a single A4 page.
-// Tap a line on the phone to tick it off (remembered on that phone for this request).
-function prListHtml(p, rows) {
-  const amt = l => buyRound(l.item_id, l.q) * num(l.est_unit_cost);
+// Printable buying list. One request, or several events merged (evs = [{key:'A', ref, title, date, pax}], rows carry parts:[{ev, q, dish}]).
+// Two columns on paper and tablets, one on phones; printing shrinks it to a single A4 page. Tap a line to tick it off.
+// Several requests (usually one per event) merged into one buying list: same items added up, split shown per event
+ACT.combinePR = async () => {
+  const ids = [...document.querySelectorAll('input[data-pr]:checked')].map(x => x.dataset.pr);
+  if (!ids.length) return toast('Tick the requests to combine first.', true);
+  const w = window.open('', '_blank');
+  if (!w) return toast('The browser blocked the list. Allow pop-ups for romualdos.ph and try again.', true);
+  w.document.write('<!DOCTYPE html><title>Preparing list…</title><body style="font:15px Montserrat,Arial,sans-serif;color:#1A2C54;display:grid;place-items:center;height:90vh;margin:0">Combining the requests…</body>');
+  try {
+    const [prs, lines] = await Promise.all([db.select('pr_overview', { in: { id: ids } }), db.select('pr_lines', { in: { pr_id: ids } })]);
+    const evIds = [...new Set(prs.map(p => p.event_id).filter(Boolean))];
+    const evRows = evIds.length ? await db.select('events', { cols: 'id,event_date,pax,kind', in: { id: evIds } }) : [];
+    const evById = Object.fromEntries(evRows.map(e => [e.id, e]));
+    prs.sort((a, b) => (evById[a.event_id]?.event_date || a.needed_by || '9').localeCompare(evById[b.event_id]?.event_date || b.needed_by || '9') || a.pr_no.localeCompare(b.pr_no));
+    const evs = prs.map((p, i) => { const e = evById[p.event_id];
+      return { key: String.fromCharCode(65 + i), pr: p.id, ref: p.event_ref || p.pr_no, title: p.event_title || p.purpose || p.pr_no,
+        date: e?.event_date || p.needed_by, pax: e?.pax ? `${e.pax} ${e.kind === 'packs' ? 'packs' : 'pax'}` : p.event_ref ? p.pr_no : '' }; });
+    const keyOf = Object.fromEntries(evs.map(e => [e.pr, e.key]));
+    const m = new Map();
+    lines.forEach(l => { const q = num(l.approved_qty ?? l.qty); if (!(q > 0)) return;
+      if (!m.has(l.item_id)) m.set(l.item_id, { id: l.item_id, item_id: l.item_id, q: 0, est_unit_cost: 0, parts: [] });
+      const r = m.get(l.item_id), k = keyOf[l.pr_id], dish = (l.note || '').replace(/^for:\s*/i, '');
+      r.q += q; if (num(l.est_unit_cost)) r.est_unit_cost = num(l.est_unit_cost);
+      const pt = r.parts.find(x => x.ev === k); if (pt) { pt.q += q; if (dish && !pt.dish.includes(dish)) pt.dish = [pt.dish, dish].filter(Boolean).join(', '); } else r.parts.push({ ev: k, q, dish }); });
+    for (const r of m.values()) r.parts.sort((a, b) => a.ev.localeCompare(b.ev));
+    const sts = [...new Set(prs.map(p => p.status))], dates = prs.map(p => p.needed_by).filter(Boolean).sort(), names = [...new Set(prs.map(p => p.requested_by_name).filter(Boolean))];
+    const allEv = prs.every(p => p.event_id), apprs = [...new Set(prs.map(p => p.approved_by_name).filter(Boolean))];
+    const p = { id: 'combo-' + [...ids].sort().join('-').slice(0, 80), ws: prs[0]?.ws, pr_no: prs.length > 1 ? `${prs.length} requests combined` : prs[0]?.pr_no,
+      status: sts.length === 1 ? sts[0] : 'Mixed', needed_by: dates[0], priority: prs.some(p => p.priority === 'urgent') ? 'urgent' : 'normal',
+      requested_by_name: names.join(', '), approved_by_name: apprs.join(', '), purpose: `${prs.length} ${allEv ? 'events' : 'requests'} · ${prs.map(p => p.pr_no.replace(/^PR-\d{4}-/, '#')).join(' ')}` };
+    await loadLogo();
+    w.document.open(); w.document.write(prListHtml(p, [...m.values()], prs.length > 1 ? evs : [])); w.document.close();
+  } catch (e) { w.close(); throw e; }
+};
+function prListHtml(p, rows, evs = []) {
+  const logo = S.logoData || new URL('../assets/logo.png', location.href).href, multi = evs.length > 1;
+  const EVC = ['#1A2C54', '#8C2F39', '#7A5A00', '#2F6B4F', '#5B3F8C'], evc = k => EVC[Math.max(0, evs.findIndex(e => e.key === k))];
+  const amt = l => buyRound(l.item_id, l.q) * num(l.est_unit_cost), short = n => peso(n).replace(/\.00$/, '');
   const groups = new Map();
   [...rows].sort((a, b) => { const ra = shopRank(a.item_id), rb = shopRank(b.item_id);
     return ra - rb || (ra < 4 ? b.q - a.q : 0) || itemName(a.item_id).localeCompare(itemName(b.item_id)); })
     .forEach(l => { const g = shopRank(l.item_id); groups.has(g) || groups.set(g, []); groups.get(g).push(l); });
   const total = rows.reduce((s, l) => s + amt(l), 0), noPrice = rows.filter(l => !num(l.est_unit_cost)).length;
-  const short = n => peso(n).replace(/\.00$/, '');
-  const approved = ['approved', 'ordered', 'received'].includes(p.status);
-  const what = p.event_title ? `${p.event_ref} · ${p.event_title}` : (p.purpose || '');
-  const body = [...groups].map(([g, ls]) => {
-    const sub = ls.reduce((s, l) => s + amt(l), 0);
-    return `<div class="g"><div class="gh"><b>${g === 4 ? 'Wet market · Bankerohan' : esc(SHOP_HEADS[g])}</b><span>${ls.length}${sub ? ' · ' + short(sub) : ''}</span></div>
-    ${ls.map(l => { const sp = packSplit(l.item_id, l.q), c = num(l.est_unit_cost), u = itemUnit(l.item_id), dish = (l.note || '').replace(/^for:\s*/i, '');
-      return `<div class="r" data-k="${l.id || l.item_id}"><i></i><div class="nm"><b>${esc(itemName(l.item_id))}</b>${dish ? `<small>${esc(dish)}</small>` : ''}</div>
-      <div class="q"><b>${fq(buyRound(l.item_id, l.q))} ${esc(u)}</b>${sp ? `<small>${esc(sp)}</small>` : ''}</div>
-      <div class="a">${c ? `<b>${short(amt(l))}</b><small>@${short(c)}/${esc(u)}</small>` : '<small>no price</small>'}</div><div class="w"></div></div>`; }).join('')}</div>`;
-  }).join('');
-  const title = `Purchase List - ${p.pr_no}${p.needed_by ? ' - ' + fmtD(p.needed_by) : ''}`;
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
+  const tag = k => `<em class="ev" style="background:${evc(k)}">${esc(k)}</em>`;
+  const line = l => { const u = itemUnit(l.item_id), sp = packSplit(l.item_id, l.q), c = num(l.est_unit_cost);
+    const dish = multi ? (l.parts || []).map(x => tag(x.ev) + esc(x.dish || '')).join(' ') : esc((l.note || '').replace(/^for:\s*/i, ''));
+    const split = multi && (l.parts || []).length > 1 ? l.parts.map(x => `${x.ev} ${fq(x.q)}`).join(' + ') : sp;
+    return `<div class="r" data-k="${esc(l.id || l.item_id)}"><i></i><div class="nm">${esc(itemName(l.item_id))}${dish ? `<small>${dish}</small>` : ''}</div>
+     <div class="q">${fq(buyRound(l.item_id, l.q))} ${esc(u)}${split ? `<small>${esc(split)}</small>` : ''}</div>
+     <div class="a">${c ? `${short(amt(l))}<small>@ ${short(c)}/${esc(u)}</small>` : '<small>no price</small>'}</div></div>`; };
+  const body = [...groups].map(([g, ls]) => { const sub = ls.reduce((s, l) => s + amt(l), 0);
+    return `<div class="g"><div class="gh">${g < 4 ? 'Protein · ' : ''}${esc(SHOP_HEADS[g])}<span>${ls.length} item${ls.length > 1 ? 's' : ''}${sub ? ' · ' + short(sub) : ''}</span></div>${ls.map(line).join('')}</div>`; }).join('');
+  const info = [['For', multi ? (p.purpose || `${evs.length} events`) : p.event_title ? `${p.event_ref} · ${p.event_title}` : (p.purpose || '—')], ['Needed by', p.needed_by ? fmtD(p.needed_by) : 'Not set'],
+    ['Priority', p.priority === 'urgent' ? 'Urgent' : 'Normal'], ['Requested by', p.requested_by_name || '—'], ['Est. total', peso(total)]];
+  const approved = ['approved', 'ordered', 'received'].includes(p.status) || (p.status === 'Mixed' && p.approved_by_name);
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(`Purchase List - ${p.pr_no}${p.needed_by ? ' - ' + fmtD(p.needed_by) : ''}`)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital@1&family=Montserrat:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-@page{size:A4;margin:8mm}*{box-sizing:border-box}html,body{margin:0}
-body{font:13px/1.25 -apple-system,"Segoe UI",Roboto,Arial,sans-serif;color:#000;background:#E9E6DC;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.bar{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;padding:8px 10px;background:#1A2C54;color:#fff;font-size:12px}
-.bar button{font:600 13px inherit;font-family:inherit;border:0;border-radius:6px;padding:8px 12px;background:#fff;color:#1A2C54}.bar .sp{flex:1}
-.page{background:#fff;padding:10px;margin:0 auto;max-width:194mm}
-.top{display:flex;align-items:baseline;flex-wrap:wrap;gap:2px 10px;border-bottom:2px solid #000;padding-bottom:4px}
-.top h1{font-size:15px;margin:0;letter-spacing:.02em}.top .no{font-weight:700}.top .st{border:1px solid #000;padding:0 5px;font-size:10px;font-weight:700;text-transform:uppercase}
-.top .sp{flex:1}.top .tt{font-size:15px;font-weight:700}
-.sub{display:flex;flex-wrap:wrap;gap:2px 14px;padding:4px 0 6px;font-size:12px;border-bottom:1px solid #000}.sub span{white-space:nowrap}.sub em{font-style:normal;color:#444}.urg{color:#B00000;font-weight:700}
-.cols{column-count:2;column-gap:14px;column-rule:1px solid #bbb;margin-top:6px}
-.g{margin-bottom:6px}.gh{display:flex;justify-content:space-between;background:#1A2C54;color:#fff;padding:2px 5px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;break-after:avoid;break-inside:avoid}
-.r{display:grid;grid-template-columns:14px 1fr auto 62px 0;gap:0 6px;align-items:start;padding:3px 2px;border-bottom:1px solid #ccc;break-inside:avoid;cursor:pointer}
-.r i{width:12px;height:12px;border:1.5px solid #000;margin-top:2px}.r b{font-weight:600}
-.r small{display:block;font-size:10.5px;color:#444;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.nm{min-width:0}.q{text-align:right;white-space:nowrap}.a{text-align:right;white-space:nowrap}.a b{font-weight:500}
-.r.done{background:#EEF6EE}.r.done i{background:#1A7F37;border-color:#1A7F37}.r.done .nm b{text-decoration:line-through;color:#555}
-.end{display:flex;flex-wrap:wrap;gap:4px 16px;align-items:baseline;border-top:2px solid #000;margin-top:4px;padding-top:4px;font-size:12px}
-.end .tt{font-size:15px;font-weight:700}.end .sp{flex:1}.sig{display:none}
-@media (max-width:640px){.cols{column-count:1}body{font-size:15px}.r{padding:7px 2px;grid-template-columns:18px 1fr auto 70px 0}.r i{width:16px;height:16px}.page{padding:8px}}
+@page{size:A4;margin:9mm}*{box-sizing:border-box}html,body{margin:0}
+body{font:400 13px/1.3 Montserrat,Arial,sans-serif;color:#1B1F2A;background:#ECE8DA;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.bar{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;padding:8px 12px;background:#F7F4EA;border-bottom:1px solid #E0DAC4;font-size:12px;color:#4A5265}
+.bar .sp{flex:1}.bar button{font:500 13px Montserrat,Arial;border:0;border-radius:7px;padding:8px 14px;background:#1A2C54;color:#fff}.bar button.alt{background:#fff;color:#1A2C54;border:1px solid #CFC9B0}
+.page{background:#fff;max-width:192mm;margin:14px auto;padding:9mm;box-shadow:0 2px 12px rgba(0,0,0,.1)}
+header{display:flex;align-items:center;gap:4mm;padding-bottom:2.5mm;border-bottom:1.3px solid #1A2C54}header img{height:11mm}
+.hd{flex:1}.tag{font-size:9px;font-weight:500;letter-spacing:.2em;text-transform:uppercase;color:#7A5A00}
+h1{font:italic 400 22px/1.1 'Playfair Display',Georgia,serif;margin:1px 0 0;color:#1A2C54}
+.meta{text-align:right;font-size:11px;line-height:1.5;color:#4A5265}.meta b{display:block;font-weight:600;font-size:14px;color:#1A2C54}
+.st{display:inline-block;border:1px solid #1A2C54;color:#1A2C54;border-radius:20px;padding:0 7px;font-size:9px;font-weight:500;letter-spacing:.1em;text-transform:uppercase}
+.info{display:grid;grid-template-columns:1.4fr 1fr .7fr 1fr 1fr;border:1px solid #B5AE95;border-radius:6px;margin:3mm 0 2.5mm}
+.info div{padding:4px 8px}.info div+div{border-left:1px solid #B5AE95}.info span{display:block;font-size:8.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:#6B7280}
+.info b{font-weight:500}.info .urg{color:#9B1C1C}.info .tot{font-weight:600;color:#1A2C54}
+.evs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:4px 10px;margin:0 0 2.5mm;font-size:11.5px}
+.evs div{display:flex;gap:6px;align-items:baseline}.evs small{display:block;color:#5B6478;font-size:10.5px}
+.ev{display:inline-grid;place-items:center;min-width:15px;height:15px;border-radius:3px;color:#fff;font:normal 500 9.5px/1 Montserrat,Arial;margin-right:3px;vertical-align:1px}
+.cols{column-count:2;column-gap:6mm}
+.g{margin-bottom:3mm;border:1px solid #E3DDCF;border-radius:5px;overflow:hidden;break-inside:avoid-column}
+.gh{display:flex;justify-content:space-between;background:#F3EFE3;border-bottom:1px solid #E0D8C4;padding:5px 8px;font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#14213F;break-after:avoid}
+.gh span{white-space:nowrap;margin-left:8px;letter-spacing:.02em;font-weight:500;text-transform:none;color:#5B6170}
+.r{display:grid;grid-template-columns:13px 1fr auto 64px;gap:0 8px;padding:5px 8px;border-bottom:1px solid #E3DDCF;break-inside:avoid;cursor:pointer}.r:last-child{border-bottom:0}
+.r i{width:11px;height:11px;border:1px solid #8A8577;border-radius:2px;margin-top:3px}
+.nm{min-width:0;color:#1F2433}.q{text-align:right;white-space:nowrap;color:#1F2433}.a{text-align:right;white-space:nowrap;color:#1F2433}
+.r small{display:block;font-size:10.5px;color:#5B6170;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+.nm small .ev{min-width:13px;height:13px;font-size:8.5px}
+.r.done{background:#F1F7F2}.r.done i{background:#2F6B4F;border-color:#2F6B4F}.r.done .nm{text-decoration:line-through;color:#6B7280}
+.end{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;border-top:1.3px solid #1A2C54;margin-top:1mm;padding-top:2mm;font-size:11.5px;color:#4A5265}
+.end .sp{flex:1}.end b{font-weight:600;font-size:16px;color:#1A2C54}
+.sig{display:grid;grid-template-columns:repeat(4,1fr);gap:7mm;margin-top:8mm;break-inside:avoid;font-size:10px;color:#5B6478}.sig div{border-top:1px solid #1A2C54;padding-top:2px}.sig b{display:block;font-weight:500;color:#1B1F2A;font-size:11px;min-height:1.3em}
+@media (max-width:640px){.page{margin:0;padding:12px;box-shadow:none}.cols{column-count:1}body{font-size:15px}.r{padding:9px 10px;grid-template-columns:17px 1fr auto 72px}.r i{width:15px;height:15px}
+ .info{grid-template-columns:1fr 1fr}.info div:nth-child(odd){border-left:0}.info div:nth-child(n+3){border-top:1px solid #B5AE95}.sig{grid-template-columns:1fr 1fr}header{flex-wrap:wrap}header img{height:9mm}.meta{width:100%;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;text-align:left}.meta b{display:inline}.meta br{display:none}.evs{grid-template-columns:1fr}}
 @media print{body{background:#fff}.bar{display:none}}
-body.pp{font-size:11.5px}.pp .page{width:194mm;max-width:none;padding:0;margin:0}
-.pp .cols{column-count:2}.pp .r{grid-template-columns:12px 1fr auto 58px 15mm;padding:2px 1px}.pp .r i{width:11px;height:11px}
-.pp .r .w{border-bottom:1px solid #000;height:12px;align-self:end}.pp .r small{font-size:9.5px}.pp .r.done{background:none}
-.pp .sig{display:flex;gap:10px;margin-top:8px;font-size:10px}.pp .sig div{flex:1;border-top:1px solid #000;padding-top:2px}.pp .sig b{display:block;font-size:11px}
+body.pp{font-size:11.5px}.pp .page{width:192mm;max-width:none;margin:0;padding:0;box-shadow:none}.pp .cols{column-count:2}
+.pp .r{grid-template-columns:11px 1fr auto 66px;padding:3px 6px}.pp .r small{font-size:9.5px}.pp .r.done{background:none}
+.pp .info{grid-template-columns:1.4fr 1fr .7fr 1fr 1fr}.pp .info div{border-top:0!important;border-left:1px solid #B5AE95}.pp .info div:first-child{border-left:0}.pp .sig{grid-template-columns:repeat(4,1fr)}
 </style></head><body>
-<div class="bar"><span>Tap an item to tick it off</span><span class="sp"></span><button onclick="window.print()">Print / PDF</button><button onclick="window.close()">Close</button></div>
+<div class="bar"><span>Tap an item to tick it off</span><span class="sp"></span><button onclick="window.print()">Print / PDF</button><button class="alt" onclick="window.close()">Close</button></div>
 <div class="page" id="pg">
-<div class="top"><h1>ROMUALDO'S ${p.ws === 'restaurant' ? 'RESTAURANT' : 'CATERING'} · PURCHASE LIST</h1><span class="no">${esc(p.pr_no)}</span><span class="st">${esc(PR_STATUS[p.status] || p.status)}</span><span class="sp"></span><span>${rows.length} items · est. <span class="tt">${short(total)}</span></span></div>
-<div class="sub">${what ? `<span><em>For</em> ${esc(what)}</span>` : ''}<span><em>Need by</em> <b>${p.needed_by ? esc(fmtD(p.needed_by)) : '—'}</b></span>${p.priority === 'urgent' ? '<span class="urg">URGENT</span>' : ''}<span><em>By</em> ${esc(p.requested_by_name || '—')}</span></div>
+<header><img src="${logo}" alt="Romualdo's"><div class="hd"><div class="tag">${p.ws === 'restaurant' ? 'Restaurant' : 'Catering'} · Purchasing</div><h1>Purchase List</h1></div>
+<div class="meta"><b>${esc(p.pr_no)}</b><span class="st">${esc(PR_STATUS[p.status] || p.status)}</span><br>${rows.length} items · printed ${esc(new Date().toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }))}</div></header>
+<div class="info">${info.map(([l, v]) => `<div><span>${l}</span><b class="${v === 'Urgent' ? 'urg' : l === 'Est. total' ? 'tot' : ''}">${esc(v)}</b></div>`).join('')}</div>
+${multi ? `<div class="evs">${evs.map(e => `<div>${tag(e.key)}<span>${esc(e.ref)} · ${esc(e.title)}<small>${esc([e.date ? fmtD(e.date) : '', e.pax].filter(Boolean).join(' · '))}</small></span></div>`).join('')}</div>` : ''}
 ${rows.length ? `<div class="cols">${body}</div>` : '<p>No items on this request yet.</p>'}
-<div class="end"><span>${noPrice ? `${noPrice} item${noPrice > 1 ? 's' : ''} without a price, not in total` : 'All items priced'}${p.decision_note ? ` · <b>Note:</b> ${esc(p.decision_note)}` : ''}</span><span class="sp"></span><span>Est. total <span class="tt">${peso(total)}</span></span><span>Actual ₱ ____________</span></div>
-<div class="sig"><div><b>${esc(p.requested_by_name || '')}</b>Requested by</div><div><b>${approved ? esc(p.approved_by_name || '') : '&nbsp;'}</b>Approved by</div><div><b>&nbsp;</b>Purchased by · date</div><div><b>&nbsp;</b>Received by · date</div></div>
+<div class="end"><span>${noPrice ? `${noPrice} item${noPrice > 1 ? 's' : ''} without a price, not in the total` : 'All items priced'}${p.decision_note ? ` · Note: ${esc(p.decision_note)}` : ''}</span><span class="sp"></span><span>Estimated total &nbsp;<b>${peso(total)}</b></span><span>Actual spent ₱ ______________</span></div>
+<div class="sig"><div><b>${esc(p.requested_by_name || '')}</b>Requested by</div><div><b>${approved ? esc(p.approved_by_name || '') : ''}</b>Approved by</div><div><b></b>Purchased by · date</div><div><b></b>Received by · date</div></div>
 </div><script>
-var K='prl-${p.id || p.pr_no}',done={};try{done=JSON.parse(localStorage.getItem(K)||'{}')}catch(e){}
+var K='prl-${esc(p.id || p.pr_no)}',done={};try{done=JSON.parse(localStorage.getItem(K)||'{}')}catch(e){}
 document.querySelectorAll('.r').forEach(function(r){if(done[r.dataset.k])r.classList.add('done');r.onclick=function(){r.classList.toggle('done');done[r.dataset.k]=r.classList.contains('done');try{localStorage.setItem(K,JSON.stringify(done))}catch(e){}}});
-// printing: shrink the sheet so it lands on one A4 page (down to 55% for very long lists)
 var pg=document.getElementById('pg');
-function fit(){document.body.classList.add('pp');pg.style.zoom=1;var H=281*96/25.4,h=pg.scrollHeight;pg.style.zoom=h>H?Math.max(.55,(H-4)/h):1}
+function fit(){document.body.classList.add('pp');pg.style.zoom=1;var H=274*96/25.4,h=pg.scrollHeight;pg.style.zoom=h>H?Math.max(.6,(H-4)/h):1}
 function unfit(){document.body.classList.remove('pp');pg.style.zoom=1}
 window.addEventListener('beforeprint',fit);window.addEventListener('afterprint',unfit);
 try{matchMedia('print').addEventListener('change',function(m){m.matches?fit():unfit()})}catch(e){}
