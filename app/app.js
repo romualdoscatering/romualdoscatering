@@ -60,7 +60,15 @@ document.addEventListener('change', e => {
   const dl = document.getElementById('dl-dishes'); if (dl) dl.innerHTML = dishOptions(course, catSel?.value || '');
   f.dish.value = ''; f.dish.focus();
 });
-function itemIdFromName(name) { const n = (name || '').trim().toLowerCase(); return S.items.find(i => i.name.toLowerCase() === n)?.id || null; }
+// Ingredient names match whatever the spacing, capitals or punctuation ("aji-ginisa" = "Aji Ginisa")
+const normName = s => String(s || '').toLowerCase().replace(/[^a-z0-9ñ]+/g, '');
+function itemIdFromName(name) { const n = normName(name); return n ? S.items.find(i => normName(i.name) === n)?.id || null : null; }
+// One ingredient that contains what was typed (or the other way round) → offered as "Did you mean …?"
+function itemGuess(name) {
+  const n = normName(name); if (n.length < 3) return null;
+  const c = S.items.filter(i => { const m = normName(i.name); return m.includes(n) || (m.length >= 4 && n.includes(m)); });
+  return c.length === 1 ? c[0] : null;
+}
 
 // Shopping order: proteins first (chicken, beef, pork, fish & seafood — biggest quantity first),
 // then the wet market (vegetables, fruit, eggs, rice), then grocery, then everything else — A–Z after proteins
@@ -126,16 +134,18 @@ async function refresh() { const y = scrollY; await route(); window.scrollTo(0, 
 window.addEventListener('hashchange', route);
 function go(h) { if (location.hash === h) refresh(); else location.hash = h; }
 function afterRender() {
+  evBarWatch();
   document.querySelectorAll('[data-show-if]').forEach(el => { const [name, val] = el.dataset.showIf.split('='); const src = document.querySelector(`[name="${name}"]`); const upd = () => el.hidden = src?.value !== val; src?.addEventListener('change', upd); upd(); });
 }
 
 /* ================= shell ================= */
 function renderShell(key) {
+  requestAnimationFrame(fitHeader);
   const inCat = key.startsWith('c/'), inRes = key.startsWith('r/');
   const nav = inCat ? [['c/events', 'Events'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes'], ...(can('catering', 'manager', 'finance') ? [['c/billing', 'Billing']] : [])]
     : inRes ? [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']] : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
-    <div class="who"><span>Hi, ${esc(who().split(' ')[0])}</span>${isAdmin() ? '<a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
+    <div class="who"><span>Hi, ${esc(who().split(' ')[0])}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}${isAdmin() ? '<a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
     ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a></nav>` : ''}`;
 }
 function navOf(key) {
@@ -151,7 +161,26 @@ function renderLogin(msg) {
     <label>Email or username<input name="login" autocomplete="username" autocapitalize="none" required></label>
     <label>Password<input name="password" type="password" autocomplete="current-password" required></label>
     <button class="pri wide">Log in</button>
+    ${installTip()}
     <p class="mut small">Forgot your password or need an account? Ask the owner.</p></form>`;
+}
+/* ---- home-screen app (same as /ops): icon, full-screen launch, install button ---- */
+const STANDALONE = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let INSTALL_EVT = null;
+const canInstall = () => !STANDALONE && (INSTALL_EVT || IOS);
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); INSTALL_EVT = e; if (S.user) renderShell(current); else renderLogin(); });
+window.addEventListener('appinstalled', () => { INSTALL_EVT = null; toast("Romualdo's is on your home screen"); if (S.user) renderShell(current); });
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+function installTip() {
+  if (STANDALONE) return '';
+  if (INSTALL_EVT) return `<button type="button" class="ghost wide" data-act="install">📲 Add the staff app to this phone's home screen</button>`;
+  if (IOS) return `<div class="alert info small">📲 <b>Put the staff app on your home screen:</b> in Safari, tap <b>Share</b> (the square with an arrow), then <b>Add to Home Screen</b>.</div>`;
+  return `<p class="small mut">📲 On Android, open the browser menu <b>⋮</b> and tap <b>Add to Home screen</b> (or <b>Install app</b>).</p>`;
+}
+async function doInstall() {
+  if (!INSTALL_EVT) return toast('In Safari, tap Share (the square with an arrow), then “Add to Home Screen”.');
+  INSTALL_EVT.prompt(); try { await INSTALL_EVT.userChoice; } catch (e) {} INSTALL_EVT = null; if (S.user) renderShell(current); else renderLogin();
 }
 document.addEventListener('submit', async e => {
   if (e.target.id !== 'loginForm') return;
@@ -185,6 +214,10 @@ const evSub = (e, c) => evName(e, c) || e.event_type || '';
 async function contractOf(ids) { const m = {}; if (ids.length && can('catering', 'manager', 'finance')) (await db.select('event_finance', { cols: 'event_id,contract_price', in: { event_id: ids } })).forEach(r => m[r.event_id] = r.contract_price); return m; }
 async function saveContract(id, f) { if (!('contract_price' in f) || !can('catering', 'manager', 'finance')) return; await db.upsert('event_finance', { event_id: id, contract_price: f.contract_price === '' ? null : num(f.contract_price), updated_at: new Date().toISOString() }, 'event_id'); }
 const autoTitle = (client, type) => [client, type].filter(Boolean).join(' · ');
+// Delete (as in /ops): anyone in catering while the client hasn't approved yet; after that only the owner
+const NOT_APPROVED = ['inquiry', 'draft', 'for_client_approval'];
+const canDelEvent = e => isAdmin() || (member('catering') && NOT_APPROVED.includes(e.status));
+const delEvBtn = (e, label, cls = 'x') => canDelEvent(e) ? `<button type="button" class="${cls}" data-act="delEvent" data-id="${e.id}" data-name="${esc(e._name || e.title || '')}" data-ref="${esc(e.ref || '')}" title="Delete this event">${label}</button>` : '';
 async function saveClient(f, current) {
   const name = (f.client_name || '').trim(), phone = (f.client_phone || '').trim() || null, email = (f.client_email || '').trim() || null;
   if (!name) return current?.id || null;
@@ -199,13 +232,13 @@ routes['c/events'] = async arg => {
   if (tab === 'upcoming') ev = ev.filter(e => !['cancelled', 'closed'].includes(e.status));
   const cids = [...new Set(ev.map(e => e.client_id).filter(Boolean))], cl = {};
   if (cids.length) (await db.select('clients', { cols: 'id,name', in: { id: cids } })).forEach(c => cl[c.id] = c);
-  const MM = await moneyOf(ev.map(e => e.id));
+  const MM = canBill() ? await moneyOf(ev.map(e => e.id)) : {};
   const tabs = [['upcoming', 'Upcoming'], ['past', 'Past'], ['all', 'All']];
   return `<div class="row"><h1>Events</h1><span class="sp"></span>${can('catering', 'coordinator', 'manager') ? '<a class="btn pri" href="#/c/event-new">＋ New event</a>' : ''}</div>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/events/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
    ${ev.length ? `<div class="list">${ev.map(e => `<a class="li" href="#/c/event/${e.id}"><div class="li-date"><b>${esc(fmtD(e.event_date).split(',')[0])}</b><span>${esc(fmtD(e.event_date).split(',').slice(1).join(','))}</span></div>
       <div class="li-main"><b>${esc(evClient(e, cl[e.client_id]))}</b><span class="mut small">${evSub(e, cl[e.client_id]) ? esc(evSub(e, cl[e.client_id])) + ' · ' : ''}${esc(e.ref)} · ${KIND[e.kind]}${e.pax ? ' · ' + e.pax + ' guests' : ''}${e.serve_time ? ' · ' + fmtClock(e.serve_time) : ''}${e.venue ? ' · ' + esc(e.venue) : ''}</span></div>
-      ${payChip(MM[e.id])} ${chip(EVENT_STATUS[e.status], statusTone(e.status))}<button class="pdf sm" data-act="evPdf" data-id="${e.id}" title="Print the event sheet" style="margin-left:8px">🖨️ PDF</button></a>`).join('')}</div>` : '<div class="empty">No events here.</div>'}`;
+      ${['partial', 'paid', 'over'].includes(MM[e.id]?.status) ? payChip(MM[e.id]) : ''} ${chip(EVENT_STATUS[e.status], statusTone(e.status))}<button class="pdf sm" data-act="evPdf" data-id="${e.id}" title="Print the event sheet" style="margin-left:8px">🖨️ PDF</button>${delEvBtn({ ...e, _name: evClient(e, cl[e.client_id]) }, '🗑')}</a>`).join('')}</div>` : '<div class="empty">No events here.</div>'}`;
 };
 
 routes['c/event-new'] = async () => {
@@ -241,6 +274,91 @@ FORMS.newEvent = async f => {
   toast(`Event ${ev.ref} created — now add the menu.`); go('#/c/event/' + ev.id);
 };
 
+/* ================= who changed an event, live refresh, no silent overwrites (same as /ops Event sheets) ================= */
+const whenFull = t => t ? new Date(t).toLocaleString('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+const clockOf = t => new Date(t || Date.now()).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' });
+const NAMES = {};
+async function namesOf(ids) {
+  const want = [...new Set(ids.filter(x => x && !(x in NAMES)))];
+  if (want.length) (await db.select('profiles', { cols: 'id,full_name', in: { id: want } }).catch(() => [])).forEach(p => NAMES[p.id] = p.full_name);
+  return NAMES;
+}
+const nameOf = id => id === S.me?.id ? 'You' : (NAMES[id] || 'Someone');
+function changedLine(ev) {
+  const t = ev.updated_at && ev.updated_at !== ev.created_at ? `Last changed by <b>${esc(nameOf(ev.updated_by))}</b> · ${esc(whenFull(ev.updated_at))}` : '';
+  const c = ev.created_at ? `${t ? ' <span class="mut">· ' : ''}created by ${esc(nameOf(ev.created_by))}, ${esc(whenFull(ev.created_at))}${t ? '</span>' : ''}` : '';
+  return t || c ? `<div class="small mut changed">✎ ${t}${c}</div>` : '';
+}
+// What each form was showing when the page opened: a save only stops if someone else changed that same part since.
+const DETAIL_KEYS = [['status', 'Status'], ['client_id', 'Client'], ['title', 'Event name'], ['kind', 'Order type'], ['event_type', 'Occasion'], ['event_date', 'Date'], ['serve_time', 'Serving time'], ['pax', 'Guests'], ['venue', 'Venue']];
+const SHEET_LABELS = { contact: 'Contact person', mobile: 'Mobile', email: 'Email', source: 'How they found us', call: 'Call time', pull: 'Pull-out time', coord: 'Venue coordinator', pkg: 'Package', motif: 'Motif', setup: 'Table setup', staff: 'Service staff', equip: 'Equipment', fulfil: 'Pick-up or delivery', allergy: 'Allergies', special: 'Special requests', approvedOn: 'Approved on', preparedBy: 'Prepared by' };
+const EVW = { id: null, at: null, snap: null, dirty: false, busy: false, off: false, told: null };
+function watchEvent(ev) {
+  EVW.id = ev.id; EVW.at = ev.updated_at || null; EVW.dirty = false; EVW.told = null; EVW.off = !('updated_at' in ev);
+  EVW.snap = { details: Object.fromEntries(DETAIL_KEYS.map(([k]) => [k, ev[k] ?? null])), sheet: ev.sheet || {} };
+}
+function changedParts(ev, part) {
+  if (!EVW.snap || EVW.id !== ev.id) return [];
+  if (part === 'details') return DETAIL_KEYS.filter(([k]) => String(ev[k] ?? '') !== String(EVW.snap.details[k] ?? '')).map(([, l]) => l);
+  const a = EVW.snap.sheet, b = ev.sheet || {};
+  return [...new Set([...Object.keys(a), ...Object.keys(b)])].filter(k => JSON.stringify(a[k] ?? null) !== JSON.stringify(b[k] ?? null)).map(k => SHEET_LABELS[k] || k);
+}
+async function overwriteCheck(form, ev, part) {
+  if (form.dataset.force === '1' || !ev) return false;
+  const diff = changedParts(ev, part); if (!diff.length) return false;
+  await namesOf([ev.updated_by]);
+  form.querySelector('.conflict')?.remove();
+  form.insertAdjacentHTML('afterbegin', `<div class="alert bad conflict"><b>⚠ ${esc(nameOf(ev.updated_by))} changed this event${ev.updated_at ? ' at ' + esc(clockOf(ev.updated_at)) : ''} while you were editing</b> (${esc(diff.join(', '))}).
+    Your typing is still in the boxes below but has <b>not been saved</b>.
+    <div class="row mt"><button type="button" class="pri" data-act="keepMine">Save mine (replace theirs)</button><button type="button" class="ghost" data-act="showTheirs">Show their version</button></div></div>`);
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  toast('Not saved: someone else changed this event — choose which version to keep.', true);
+  return true;
+}
+// typing in any form on the event page counts as unsaved work
+document.addEventListener('input', e => { if (current === 'c/event' && e.target.closest('#main form[data-form]')) EVW.dirty = true; });
+window.addEventListener('beforeunload', e => { if (current === 'c/event' && EVW.dirty) { e.preventDefault(); e.returnValue = ''; } });
+// re-render the page but keep the open sections open
+async function refreshKeep() {
+  const open = [...document.querySelectorAll('#main details')].map(d => d.open);
+  await refresh();
+  document.querySelectorAll('#main details').forEach((d, i) => { if (open[i]) d.open = true; });
+}
+async function eventFreshCheck() {
+  if (current !== 'c/event' || !EVW.id || EVW.off || EVW.busy || document.visibilityState !== 'visible') return;
+  EVW.busy = true;
+  try {
+    const [r] = await db.select('events', { cols: 'updated_at,updated_by', eq: { id: EVW.id } });
+    if (!r || !r.updated_at || r.updated_at === EVW.at || r.updated_at === EVW.told) return;
+    if (r.updated_by === S.me?.id) { EVW.at = r.updated_at; return; }
+    await namesOf([r.updated_by]);
+    if (!EVW.dirty) { await refreshKeep(); toast(`This event was just updated by ${nameOf(r.updated_by)}`); return; }
+    EVW.told = r.updated_at;   // they're typing: don't wipe it, just tell them
+    const box = document.getElementById('evlive');
+    if (box) box.innerHTML = `<div class="alert warn"><b>${esc(nameOf(r.updated_by))} just changed this event (${esc(clockOf(r.updated_at))}).</b> What you've typed is kept. When you save, you'll be asked which version to keep if you both changed the same part.
+      <div class="row mt"><button type="button" class="ghost" data-act="showTheirs">Show the latest (drops what I typed)</button></div></div>`;
+  } catch (e) { if (/updated_at|column/i.test(e.message || '')) EVW.off = true; }
+  finally { EVW.busy = false; }
+}
+setInterval(eventFreshCheck, 20000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') eventFreshCheck(); });
+
+/* client name bar that stays at the top while scrolling the event page (like /ops) */
+function evBar(ev, client) {
+  const meta = [ev.event_type || KIND[ev.kind], fmtD(ev.event_date), ev.serve_time ? fmtClock(ev.serve_time) : '', ev.pax ? ev.pax + ' guests' : '', ev.venue].filter(Boolean).map(esc).join(' · ');
+  return `<div class="evbar" id="evbar" aria-hidden="true"><div><b>${esc(evClient(ev, client))}</b><span>${meta}</span></div></div>`;
+}
+function fitHeader() { const h = document.getElementById('top'); if (h) document.documentElement.style.setProperty('--hdrH', h.offsetHeight + 'px'); }
+window.addEventListener('resize', fitHeader);
+let evBarObs = null;
+function evBarWatch() {
+  evBarObs?.disconnect(); evBarObs = null;
+  const bar = document.getElementById('evbar'), head = document.getElementById('evhead'); if (!bar || !head) return;
+  fitHeader();
+  evBarObs = new IntersectionObserver(([x]) => bar.classList.toggle('show', !x.isIntersecting && x.boundingClientRect.top < 200), { rootMargin: `-${document.getElementById('top')?.offsetHeight || 0}px 0px 0px 0px` });
+  evBarObs.observe(head);
+}
+
 routes['c/event'] = async id => {
   const [ev] = await db.select('events', { eq: { id } }); if (!ev) return '<div class="card">Event not found.</div>';
   const [menu, client, warnings, needs, prs, pick, cost, extras] = await Promise.all([
@@ -255,6 +373,8 @@ routes['c/event'] = async id => {
   ]);
   ev.contract_price = (await contractOf([ev.id]))[ev.id] ?? null;
   const B = await billBundle(ev, client);
+  const names = await namesOf([ev.updated_by, ev.created_by]);
+  watchEvent(ev, names);
   const recipeState = {}; const dishIds = [...new Set(menu.map(m => m.dish_id).filter(Boolean))];
   if (dishIds.length) (await db.select('recipes', { cols: 'dish_id,status', in: { dish_id: dishIds } })).forEach(r => recipeState[r.dish_id] = r.status);
   const open = !['done', 'closed', 'cancelled'].includes(ev.status);
@@ -265,9 +385,11 @@ routes['c/event'] = async id => {
   const lineChip = m => m.custom_name && !m.dish_id && !m.pack_id ? chip('off-menu', 'warn') : m.dish_id ? (recipeState[m.dish_id] === 'verified' ? '' : chip(recipeState[m.dish_id] ? 'recipe draft' : 'no recipe', 'warn')) : '';
   const toBuy = needs.filter(n => num(n.to_buy) > 0);
   const margin = cost && ev.contract_price ? num(ev.contract_price) - num(cost.total_cost) : null;
-  return `<div class="row"><a href="#/c/events" class="back">‹ Events</a></div>
-  <div class="row"><h1>${esc(evClient(ev, client))}</h1>${chip(EVENT_STATUS[ev.status], statusTone(ev.status))}${payChip(B.money)}<span class="sp"></span><button class="pdf lg" data-act="evPdf" data-id="${ev.id}" title="Print the one-page event sheet: works at any status, for the team's hard copy">🖨️ Print event sheet (PDF)</button></div>
+  return `${evBar(ev, client)}<div class="row"><a href="#/c/events" class="back">‹ Events</a></div>
+  <div id="evlive"></div>
+  <div class="row" id="evhead"><h1>${esc(evClient(ev, client))}</h1>${chip(EVENT_STATUS[ev.status], statusTone(ev.status))}<span class="sp"></span><button class="pdf lg" data-act="evPdf" data-id="${ev.id}" title="Print the one-page event sheet: works at any status, for the team's hard copy">🖨️ Print event sheet (PDF)</button>${delEvBtn({ ...ev, _name: evClient(ev, client) }, 'Delete', 'ghost')}</div>
   ${evHero(ev, client)}
+  ${changedLine(ev, names)}
 
   ${canEdit ? `<details class="card"><summary>Edit details & status</summary><form data-form="editEvent" data-id="${ev.id}" class="mt">
     <div class="grid">
@@ -333,7 +455,8 @@ routes['c/event'] = async id => {
     <p class="small mut">Ingredients used = stock issued to the event minus leftovers returned, at purchase prices.</p></section>` : ''}`;
 };
 FORMS.editEvent = async (f, el) => {
-  const [ev] = await db.select('events', { cols: 'client_id', eq: { id: el.dataset.id } });
+  const [ev] = await db.select('events', { eq: { id: el.dataset.id } });
+  if (await overwriteCheck(el, ev, 'details')) return;
   const cur = ev?.client_id ? (await db.select('clients', { eq: { id: ev.client_id } }))[0] : null;
   const client_id = await saveClient(f, cur), cname = (f.client_name || cur?.name || '').trim();
   await db.update('events', { status: f.status, client_id, title: (f.title || '').trim() || autoTitle(cname, f.event_type), kind: f.kind, event_type: f.event_type || null, event_date: f.event_date, serve_time: f.serve_time || null,
@@ -360,7 +483,8 @@ function sheetForm(ev, client) {
    <div class="row end"><button type="button" class="pdf" data-act="evPdf" data-id="${ev.id}">🖨️ Print PDF</button><button class="pri">Save</button></div></form></details>`;
 }
 FORMS.evSheet = async (f, el) => {
-  const [ev] = await db.select('events', { cols: 'sheet', eq: { id: el.dataset.id } });
+  const [ev] = await db.select('events', { eq: { id: el.dataset.id } });
+  if (await overwriteCheck(el, ev, 'sheet')) return;
   const keys = ['contact', 'mobile', 'email', 'source', 'call', 'pull', 'coord', 'pkg', 'motif', 'setup', 'staff', 'equip', 'fulfil', 'allergy', 'special', 'approvedOn', 'preparedBy'];
   const sheet = { ...(ev?.sheet || {}) }; keys.forEach(k => { if (k in f) { const x = String(f[k] ?? '').trim(); if (x) sheet[k] = x; else delete sheet[k]; } });
   await db.update('events', { sheet }, { id: el.dataset.id }); toast('Event sheet saved'); refresh();
@@ -437,13 +561,18 @@ ${notes.some(x => x[1]) ? `<section><h2>Notes<small>Please note</small></h2><tab
 </div><div>${menuHtml}</div></div>
 <div class="foot"><p class="ack">By signing below, the client confirms the ${cat ? 'event details and menu' : 'order details'} above.${d.approvedOn ? ` Approved on ${esc(fmtLong(d.approvedOn).replace(/^\w+, /, ''))}.` : ''}</p>
 <div class="sign"><div><b>${esc(who)}</b>Client signature over printed name · Date</div><div><b>${esc(d.preparedBy || S.me.full_name || "Romualdo's Catering Services")}</b>Prepared by · Romualdo's Catering Services</div></div>
-<footer>Romualdo's Catering Services · 13 Juna Avenue, Juna Subdivision, Davao City · 0945 542 5300 · romualdoscatering@gmail.com · romualdos.ph</footer></div>
+<footer>${esc(contactLine())}</footer></div>
 </div><script>
 function fit(){var p=document.getElementById('pg'),H=p.offsetWidth*297/210;p.style.zoom=1;p.style.minHeight='0';var h=p.scrollHeight,z=h>H?Math.max(.55,(H-2)/h):1;p.style.zoom=z;p.style.minHeight=((H-2)/z)+'px';}
 window.addEventListener('load',function(){(document.fonts?document.fonts.ready:Promise.resolve()).then(function(){fit();setTimeout(function(){window.print()},400)})});
 <\/script></body></html>`;
 }
 
+// Business contact line for PDF footers — the details live in config.js (window.ROM_CONTACT)
+function contactLine() {
+  const c = window.ROM_CONTACT || {};
+  return [c.name || "Romualdo's Catering Services", c.address, c.phone, c.email, c.web].filter(Boolean).join(' · ');
+}
 function evHero(ev, client) {
   const s = ev.sheet || {}, cat = ev.kind === "buffet", del = s.fulfil === "Delivery", sub = evName(ev, client);
   const cells = [[cat ? 'Date' : del ? 'Delivery' : 'Pick-up', fmtD(ev.event_date)], [cat ? 'Serving' : 'Ready by', ev.serve_time ? fmtClock(ev.serve_time) : '—'],
@@ -477,6 +606,15 @@ FORMS.returnLeft = async (f, el) => {
   toast('Leftovers returned to the catering store'); refresh();
 };
 const ACT = {};
+ACT.install = () => doInstall();
+ACT.delEvent = async el => {
+  const what = [el.dataset.name, el.dataset.ref].filter(Boolean).join(' · ');
+  if (!confirm(`Delete this event?\n\n${what}\n\nIts menu and draft purchase requests are deleted too. This can't be undone.`)) return;
+  try { const ref = await db.rpc('delete_event', { p_event: el.dataset.id }); EVW.dirty = false; toast(`${ref || 'Event'} deleted`); go('#/c/events'); }
+  catch (err) { toast(/delete_event|function/i.test(err.message) && /not find|exist/i.test(err.message) ? 'Deleting needs the latest database update — ask the owner to run it.' : err.message, true); }
+};
+ACT.keepMine = el => { const f = el.closest('form'); f.dataset.force = '1'; f.requestSubmit(); };
+ACT.showTheirs = () => { EVW.dirty = false; refreshKeep(); toast('Showing the latest saved version'); };
 async function loadLogo() {
   if (!S.logoData) S.logoData = await fetch(new URL('../assets/logo.png', location.href)).then(r => r.blob()).then(b => new Promise(ok => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.readAsDataURL(b); })).catch(() => '');
 }
@@ -488,8 +626,7 @@ ACT.evPdf = async el => {
     const id = el.dataset.id, [ev] = await db.select('events', { eq: { id } });
     const [menu, client] = await Promise.all([db.select('event_menu', { eq: { event_id: id }, order: [['sort'], ['course']] }), ev.client_id ? db.select('clients', { eq: { id: ev.client_id } }).then(r => r[0]) : null]);
     await loadLogo();
-    const money = (await moneyOf([id]))[id];
-    w.document.open(); w.document.write(sheetHtml(ev, menu, client, money)); w.document.close();
+    w.document.open(); w.document.write(sheetHtml(ev, menu, client)); w.document.close();
   } catch (e) { w.close(); throw e; }
 };
 ACT.rmMenu = async el => { await db.remove('event_menu', { id: el.dataset.id }); refresh(); };
@@ -882,7 +1019,7 @@ routes['c/recipe'] = async id => {
    <div class="row end"><button class="ghost">Save quantities</button>${r.status !== 'verified' ? `<button type="button" class="pri" data-act="verify" data-id="${id}">Mark verified</button>` : ''}</div>
    <p class="small mut">${r.status === 'verified' ? 'A manager\'s change puts this recipe back to draft until a chef verifies it again.' : 'Check each quantity against how the kitchen really cooks this dish, then mark it verified so it can be used for purchase requests.'}</p>` : ''}
   </form>
-  ${edit ? `<details class="card"><summary>Ingredient not on the list? Add a new item</summary><form data-form="newItem" class="mt"><div class="grid">
+  ${edit ? `<details class="card" id="newItemBox"><summary>Ingredient not on the list? Add a new item</summary><form data-form="newItem" data-dish="${id}" class="mt"><p class="small mut" id="newItemNote" hidden></p><div class="grid">
     <label>Name<input name="name" required></label><label>Category<input name="category" list="dl-cats" required></label>
     <label>Unit used in recipes<input name="stock_unit" list="dl-units" value="kg" required></label><label>Unit bought in<input name="purchase_unit" list="dl-units" value="kg" required></label>
     <label>How many recipe units in one bought unit<input name="units_per_purchase" type="number" step="any" min="0.001" value="1"></label><label>Last price per recipe unit ₱<input name="last_cost" type="number" step="any" min="0"></label></div>
@@ -895,23 +1032,56 @@ FORMS.saveRecipe = async (f, el) => {
   for (const [k, v] of Object.entries(f).filter(([k]) => k.startsWith('q_'))) if (num(v) > 0) await db.update('recipe_lines', { qty: num(v) }, { dish_id: el.dataset.id, item_id: k.slice(2) });
   toast('Saved'); refresh();
 };
-FORMS.newItem = async f => {
-  if (itemIdFromName(f.name)) return toast('An item with that name exists already.', true);
-  await db.insert('items', { name: f.name.trim(), category: f.category.trim(), stock_unit: f.stock_unit.trim(), purchase_unit: f.purchase_unit.trim(), units_per_purchase: num(f.units_per_purchase) || 1, last_cost: num(f.last_cost) });
-  await loadMaster(); toast('Item added'); refresh();
+FORMS.newItem = async (f, el) => {
+  const name = f.name.trim().replace(/\s+/g, ' ');
+  if (itemIdFromName(name)) return toast('An item with that name exists already.', true);
+  const row = { name, category: f.category.trim(), stock_unit: f.stock_unit.trim(), purchase_unit: f.purchase_unit.trim(), units_per_purchase: num(f.units_per_purchase) || 1, last_cost: num(f.last_cost) };
+  let id;
+  try { id = (await db.insert('items', row))[0]?.id; }
+  catch (err) {   // same name as an item that was switched off earlier → switch it back on with these details
+    if (!/duplicate|unique/i.test(err.message || '')) throw err;
+    const [old] = await db.select('items', { cols: 'id,active', eq: { name } });
+    if (!old) throw new Error('An item with that name exists already.');
+    id = (await db.update('items', { ...row, active: true }, { id: old.id }))[0]?.id;
+  }
+  const qty = num(el?.dataset.qty);
+  if (id && el?.dataset.dish && qty > 0) { await db.upsert('recipe_lines', { dish_id: el.dataset.dish, item_id: id, qty }, 'dish_id,item_id'); delete el.dataset.qty; }
+  await loadMaster(); toast(qty > 0 ? `${name} added to the list and to this recipe` : `${name} added to the ingredient list`); refresh();
 };
 ACT.addIng = async el => {
-  const f = formData(el.closest('form')); const item = itemIdFromName(f.new_item);
-  if (!item) return toast('Pick an ingredient from the list, or add it as a new item below.', true); if (!(num(f.new_qty) > 0)) return toast('Enter a quantity.', true);
+  const f = formData(el.closest('form')), typed = (f.new_item || '').trim();
+  if (!typed) return toast('Type or pick an ingredient.', true);
+  if (!(num(f.new_qty) > 0)) return toast('Enter a quantity.', true);
+  let item = itemIdFromName(typed);
+  if (!item) { const g = itemGuess(typed); if (g && confirm(`"${typed}" isn't on the ingredient list.\n\nDid you mean "${g.name}" (${g.stock_unit})?`)) item = g.id; }
+  if (!item) {   // a new ingredient: open the new-item form with the name filled in; saving it also adds it to this recipe
+    const box = document.getElementById('newItemBox'), nf = box?.querySelector('form'); if (!nf) return;
+    box.open = true; nf.name.value = typed; nf.dataset.qty = num(f.new_qty);
+    const note = document.getElementById('newItemNote'); note.hidden = false;
+    note.innerHTML = `<b>${esc(typed)}</b> is a new ingredient. Fill in its category, unit and price, then tap <b>Add item</b> — it will be added to this recipe (${fq(num(f.new_qty))}).`;
+    box.scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(() => nf.category.focus(), 350);
+    return;
+  }
   await db.upsert('recipe_lines', { dish_id: el.dataset.id, item_id: item, qty: num(f.new_qty) }, 'dish_id,item_id'); refresh();
 };
 ACT.editIng = async el => { const r = document.getElementById('ie_' + el.dataset.item); if (r) r.hidden = !r.hidden; };
 ACT.saveIng = async el => {
   const f = formData(el.closest('form')), id = el.dataset.item, dish = el.dataset.dish, it = S.itemsById[id];
-  const swap = (f['e_swap_' + id] || '').trim(), name = (f['e_name_' + id] || '').trim(), unit = (f['e_unit_' + id] || '').trim(), cost = f['e_cost_' + id];
+  let swap = (f['e_swap_' + id] || '').trim(), name = (f['e_name_' + id] || '').trim().replace(/\s+/g, ' ');
+  const unit = (f['e_unit_' + id] || '').trim(), cost = f['e_cost_' + id];
+  if (swap && (normName(swap) === normName(it?.name) || normName(swap) === normName(name))) swap = '';   // same ingredient: just save the edits
+  let to = null;
   if (swap) {
-    const to = itemIdFromName(swap); if (!to) return toast('Pick the replacement from the list, or add it as a new item below.', true);
-    if (to === id) return toast('That is the same ingredient.', true);
+    to = itemIdFromName(swap);
+    if (!to) { const g = itemGuess(swap); if (g && g.id !== id && confirm(`"${swap}" isn't on the ingredient list.\n\nReplace with "${g.name}" (${g.stock_unit}) in this recipe?`)) to = g.id; }
+    if (!to) {   // not an ingredient yet: most likely they meant to rename this one
+      if (!confirm(`There's no ingredient called "${swap}".\n\nRename "${it?.name || 'this ingredient'}" to "${swap}" instead?\n(Unit and price changes are saved too. The new name shows in every recipe.)`))
+        return toast('Nothing saved. To only change the name, unit or price, leave "Replace with" empty.', true);
+      name = swap;
+    }
+    if (to === id) to = null;
+  }
+  if (to) {
     const qty = num(f['q_' + id]) || num((await db.select('recipe_lines', { eq: { dish_id: dish, item_id: id } }))[0]?.qty);
     await db.upsert('recipe_lines', { dish_id: dish, item_id: to, qty }, 'dish_id,item_id');
     await db.remove('recipe_lines', { dish_id: dish, item_id: id });
@@ -1534,12 +1704,12 @@ function billRow(l, i, pax) {
 function billCard(ev, B) {
   if (!canBill()) return '';
   const { bill, lines, pays, client } = B, pax = ev.pax;
-  if (!bill) return `<section class="card" id="billing"><div class="row"><h2>Billing</h2><span class="sp"></span>${payChip(B.money)}</div>
+  if (!bill) return `<section class="card" id="billing"><div class="row"><h2>Billing &amp; payment</h2><span class="sp"></span>${payChip(B.money)}</div>
     <p class="mut">No statement yet. Create one and the lines are filled in from this event${ev.kind === 'buffet' ? (ev.contract_price ? ` (contract ${peso(ev.contract_price)}${ev.pax ? ' ÷ ' + ev.pax + ' guests per head' : ''})` : '') : ' (one line per tray or pack — type the prices)'}. You can change everything after.</p>
     <div class="row end"><button class="pri" data-act="billCreate" data-id="${ev.id}">Create statement of account</button></div>
     ${pays.length ? payList(ev, pays) : ''}</section>`;
   const C = billCalc(bill, lines, pays, pax), overdue = bill.due && bill.due < today() && C.balance > 0;
-  return `<section class="card" id="billing"><div class="row"><h2>Billing</h2>${payChip(B.money)}${overdue ? chip('Overdue', 'bad') : ''}<span class="sp"></span><button class="pdf" data-act="soaPdf" data-id="${ev.id}">🖨️ Statement of Account (PDF)</button></div>
+  return `<section class="card" id="billing"><div class="row"><h2>Billing &amp; payment</h2>${payChip(B.money)}${overdue ? chip('Overdue', 'bad') : ''}<span class="sp"></span><button class="pdf" data-act="soaPdf" data-id="${ev.id}">🖨️ Statement of Account (PDF)</button></div>
    <div class="kpis"><div class="kpi"><span>Total</span><b>${peso(C.total)}</b></div><div class="kpi"><span>Paid</span><b>${peso(C.paid)}</b></div><div class="kpi"><span>Balance</span><b class="${C.balance > 0 ? 'bad-t' : 'ok-t'}">${peso(C.balance)}</b></div><div class="kpi"><span>${esc(bill.soa_no)}</span><b style="font-size:15px">${bill.due ? 'Due ' + esc(fmtD(bill.due)) : 'No due date'}</b></div></div>
    <details class="mt" ${lines.length && C.total ? '' : 'open'}><summary>Edit the statement</summary>
    <form data-form="saveBill" data-id="${ev.id}" data-pax="${esc(pax ?? '')}" class="mt">
@@ -1564,7 +1734,7 @@ function payList(ev, pays, C) {
     <select name="method">${PAY_METHODS.map(([v, l]) => opt(v, l)).join('')}</select><input name="ref" placeholder="Ref / OR no. (optional)"><button class="pri">Add payment</button></form>`;
 }
 async function billBundle(ev, client) {
-  if (!canBill()) return { money: (await moneyOf([ev.id]))[ev.id] };
+  if (!canBill()) return {};
   const [bill, lines, pays, money] = await Promise.all([db.select('event_bills', { eq: { event_id: ev.id } }).then(r => r[0]), db.select('bill_lines', { eq: { event_id: ev.id }, order: [['sort']] }),
     db.select('event_payments', { eq: { event_id: ev.id }, order: [['paid_on'], ['created_at']] }), moneyOf([ev.id]).then(m => m[ev.id])]);
   return { bill, lines, pays, money, client };
