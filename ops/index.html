@@ -2,10 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cut">
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="../favicon.ico" sizes="any">
-<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#14213f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Romualdo's Ops">
 <title>Romualdo's Operations — Purchasing, Stock & Requisitions</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet">
@@ -13,7 +19,7 @@
 :root{--bg:#f5f2ea;--card:#fff;--ink:#14213f;--mut:#5b6170;--line:#e3ddcf;--acc:#14213f;--navy:#14213f;--navy2:#1d2c52;--gold:#c9a44c;--gold2:#e2c77e;--r:#0f766e;--rbg:#e3f4f1;--c:#a0410f;--cbg:#fdecdf;--bad:#b42318;--badbg:#fdecea;--warn:#8a5300;--warnbg:#fff3d9;--ok:#1d7a3a;--okbg:#e6f4ea;--info:#3756a6;--infobg:#e9eefb;color-scheme:light}
 *{box-sizing:border-box}
 body{margin:0;font:14px/1.45 Inter,system-ui,-apple-system,sans-serif;background:var(--bg);color:#1f2433}
-header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,var(--navy) 0%,#111c37 100%);color:#fff;border-bottom:2px solid var(--gold);box-shadow:0 4px 18px #14213f26}
+header{padding-top:env(safe-area-inset-top);position:sticky;top:0;z-index:5;background:linear-gradient(180deg,var(--navy) 0%,#111c37 100%);color:#fff;border-bottom:2px solid var(--gold);box-shadow:0 4px 18px #14213f26}
 .top{display:flex;align-items:center;gap:12px;padding:12px 16px 6px;max-width:1150px;margin:auto}
 .brand{font-family:'Playfair Display',Fraunces,Georgia,serif;font-size:22px;line-height:1.05;letter-spacing:.01em;color:#fff}
 .brand small{display:block;font:600 9.5px Inter,sans-serif;color:var(--gold2);letter-spacing:.24em;text-transform:uppercase;margin-top:3px}
@@ -395,7 +401,7 @@ function render() {
   $('#nav').innerHTML = navHtml(tab, waitPR);
   c.className = 'conn' + (S.syncErr ? ' err' : S.lastSync ? ' live' : '');
   c.querySelector('span').textContent = S.syncErr ? 'Offline — retrying' : S.syncing && !S.lastSync ? 'Loading…' : S.lastSync ? 'Synced ' + new Date(S.lastSync).toLocaleTimeString('en-PH', {hour: 'numeric', minute: '2-digit'}) : 'Connecting…';
-  $('#who').innerHTML = `<span><b>${esc(S.me.name || S.me.username)}</b> · ${esc(S.me.role)}</span><button data-act2="refresh" title="Get the latest records">↻</button><button data-act2="logout">Log out</button>`;
+  $('#who').innerHTML = `<span><b>${esc(S.me.name || S.me.username)}</b> · ${esc(S.me.role)}</span>${!STANDALONE && (INSTALL_EVT || IOS) ? '<button data-act2="install" title="Add Romualdo\'s Ops to the home screen">📲 Get the app</button>' : ''}<button data-act2="refresh" title="Get the latest records">↻</button><button data-act2="logout">Log out</button>`;
   let banner = '';
   if (S.syncErr) banner = `<div class="banner">${esc(S.syncErr)} — what you see may be out of date.</div>`;
   else if (!S.lastSync) banner = `<div class="banner" style="background:var(--infobg);color:var(--info)">Loading records…</div>`;
@@ -3044,6 +3050,21 @@ const TOKEN_KEY = 'rcs_ops_token';
 function saveToken(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch (e) {} try { t ? sessionStorage.setItem('rcs_token', t) : sessionStorage.removeItem('rcs_token'); } catch (e) {} }
 function readToken() { try { return sessionStorage.getItem('rcs_token') || localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
 function endSession(msg) { S.webPulled = false; opsDraftWrite(); opsDraftRestored = false; S.token = ''; S.me = null; S.isAdmin = false; S.canBill = false; S.lastSync = 0; S.loginMsg = msg || ''; CACHE.clear(); VER = 0; AFTER = 0; saveToken(''); closeModal(); rebuild(); render(); }
+/* ---- home-screen app (install) ---- */
+const STANDALONE = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+const IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+let INSTALL_EVT = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); INSTALL_EVT = e; render(); });
+window.addEventListener('appinstalled', () => { INSTALL_EVT = null; toast("Romualdo's Ops is on your home screen"); render(); });
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+function installTip() {
+  if (STANDALONE) return '';
+  if (INSTALL_EVT) return `<button type="button" class="pdf" style="width:100%;margin-top:12px" onclick="doInstall()">📲 Add Romualdo's Ops to this phone's home screen</button>`;
+  if (IOS) return `<div class="alert info" style="display:block;margin-top:12px;font-size:13px;line-height:1.5">📲 <b>Put Ops on your home screen:</b> in Safari, tap the <b>Share</b> button (the square with an arrow), then <b>Add to Home Screen</b>.</div>`;
+  return `<p class="small mut" style="text-align:center;margin-top:12px">📲 On Android, open the browser menu <b>⋮</b> and tap <b>Add to Home screen</b> (or <b>Install app</b>).</p>`;
+}
+async function doInstall() { if (!INSTALL_EVT) return; INSTALL_EVT.prompt(); try { await INSTALL_EVT.userChoice; } catch (e) {} INSTALL_EVT = null; render(); }
+window.doInstall = doInstall;
 function loginView() {
   return `<div class="card login"><h2>Staff login</h2>
    <p class="lede" style="text-align:center">Use the same username and password as the inquiry dashboard.</p>
@@ -3051,6 +3072,7 @@ function loginView() {
    <form id="loginForm"><label>Username<input id="lg-u" autocomplete="username" autocapitalize="none" required></label>
    <label style="margin-top:10px">Password<input id="lg-p" type="password" autocomplete="current-password" required></label>
    <button class="pri" style="width:100%;margin-top:14px" ${S.loggingIn ? 'disabled' : ''}>${S.loggingIn ? 'Checking…' : 'Log in'}</button></form>
+   ${installTip()}
    <p class="small mut" style="text-align:center;margin-top:14px">Forgot your password or need an account? Ask the owner. Accounts are managed in the staff logins file.</p></div>`;
 }
 document.addEventListener('submit', async e => {
@@ -3064,6 +3086,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest('[data-act2]'); if (!b) return;
   if (b.dataset.act2 === 'logout') { api('logout').catch(() => {}); endSession('You have logged out.'); }
   if (b.dataset.act2 === 'refresh') { toast('Refreshing…'); sync(true); }
+  if (b.dataset.act2 === 'install') { if (INSTALL_EVT) doInstall(); else toast('In Safari, tap Share (the square with an arrow), then “Add to Home Screen”.'); }
 });
 setInterval(() => { if (document.visibilityState === 'visible') sync(); }, 20000);
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') sync(); });
