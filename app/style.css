@@ -293,3 +293,4 @@ header#top .bar{flex-wrap:nowrap}
 .ev-hero span{display:block;font-size:10.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#8a5a00}
 .ev-hero b{display:block;font-family:'Playfair Display',Georgia,serif;font-weight:500;font-size:17px;color:var(--navy);margin-top:2px;overflow-wrap:anywhere}
 @media (max-width:760px){.ev-hero{grid-template-columns:repeat(2,1fr)}.ev-hero div:nth-child(odd){border-left:0}.ev-hero div{border-top:1px solid #e3ddcf}.ev-hero div:nth-child(-n+2){border-top:0}.ev-hero div:last-child{grid-column:1/-1}}
+button.pdf,.btn.pdf{background:linear-gradient(180deg,#e2c77e,#c9a44c);border-color:#b58f35;color:#14213f;font-weight:700;box-shadow:0 2px 8px #c9a44c55}button.pdf:hover,.btn.pdf:hover{background:linear-gradient(180deg,#ecd593,#d2ae55);border-color:#9c7a2b}button.pdf.lg{font-size:15px;padding:11px 18px}button.pdf.sm{padding:5px 10px;font-size:12.5px;box-shadow:none}

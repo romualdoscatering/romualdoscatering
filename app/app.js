@@ -201,7 +201,7 @@ routes['c/events'] = async arg => {
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/events/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
    ${ev.length ? `<div class="list">${ev.map(e => `<a class="li" href="#/c/event/${e.id}"><div class="li-date"><b>${esc(fmtD(e.event_date).split(',')[0])}</b><span>${esc(fmtD(e.event_date).split(',').slice(1).join(','))}</span></div>
       <div class="li-main"><b>${esc(evClient(e, cl[e.client_id]))}</b><span class="mut small">${evSub(e, cl[e.client_id]) ? esc(evSub(e, cl[e.client_id])) + ' · ' : ''}${esc(e.ref)} · ${KIND[e.kind]}${e.pax ? ' · ' + e.pax + ' guests' : ''}${e.serve_time ? ' · ' + fmtClock(e.serve_time) : ''}${e.venue ? ' · ' + esc(e.venue) : ''}</span></div>
-      ${chip(EVENT_STATUS[e.status], statusTone(e.status))}</a>`).join('')}</div>` : '<div class="empty">No events here.</div>'}`;
+      ${chip(EVENT_STATUS[e.status], statusTone(e.status))}<button class="pdf sm" data-act="evPdf" data-id="${e.id}" title="Print the event sheet" style="margin-left:8px">🖨️ PDF</button></a>`).join('')}</div>` : '<div class="empty">No events here.</div>'}`;
 };
 
 routes['c/event-new'] = async () => {
@@ -259,7 +259,7 @@ routes['c/event'] = async id => {
   const toBuy = needs.filter(n => num(n.to_buy) > 0);
   const margin = cost && ev.contract_price ? num(ev.contract_price) - num(cost.total_cost) : null;
   return `<div class="row"><a href="#/c/events" class="back">‹ Events</a></div>
-  <div class="row"><h1>${esc(evClient(ev, client))}</h1>${chip(EVENT_STATUS[ev.status], statusTone(ev.status))}<span class="sp"></span><button class="pri" data-act="evPdf" data-id="${ev.id}" title="One-page event sheet for the kitchen and the client">📄 Event sheet PDF</button></div>
+  <div class="row"><h1>${esc(evClient(ev, client))}</h1>${chip(EVENT_STATUS[ev.status], statusTone(ev.status))}<span class="sp"></span><button class="pdf lg" data-act="evPdf" data-id="${ev.id}" title="Print the one-page event sheet: works at any status, for the team's hard copy">🖨️ Print event sheet (PDF)</button></div>
   ${evHero(ev, client)}
 
   ${canEdit ? `<details class="card"><summary>Edit details & status</summary><form data-form="editEvent" data-id="${ev.id}" class="mt">
@@ -348,7 +348,7 @@ function sheetForm(ev, client) {
    <h3>Notes</h3><div class="grid">${ta('allergy', 'Allergies / dietary needs')}${ta('special', 'Special requests')}</div>
    <h3>Approval</h3><div class="grid">${inp('approvedOn', 'Approved by the client on', '', 'date')}<label>Prepared by<input name="preparedBy" value="${esc(s.preparedBy || S.me.full_name)}"></label></div>
    <p class="small mut">The status on the PDF follows the event status (set it under Edit details).</p>
-   <div class="row end"><button type="button" class="ghost" data-act="evPdf" data-id="${ev.id}">📄 PDF</button><button class="pri">Save</button></div></form></details>`;
+   <div class="row end"><button type="button" class="pdf" data-act="evPdf" data-id="${ev.id}">🖨️ Print PDF</button><button class="pri">Save</button></div></form></details>`;
 }
 FORMS.evSheet = async (f, el) => {
   const [ev] = await db.select('events', { cols: 'sheet', eq: { id: el.dataset.id } });
@@ -824,7 +824,7 @@ routes['c/inquiry'] = async id => {
   ${items.length || pl.chefPick ? `<section class="card"><h2>Menu picked</h2>${pl.chefPick ? '<p>Chef to recommend the menu.</p>' : ''}
    ${items.map(i => `<div class="mline"><span class="mut small" style="min-width:120px">${esc(COURSE_OF[i.cat] || i.cat || '')}</span><span>${esc(i.dish)}</span>${i.tier === 'request' ? chip('special request', 'warn') : ''}<span class="sp"></span>${i.qty ? `<b>${esc(i.qty)}${pl.kind === 'tray' ? ' tray' + (num(i.qty) > 1 ? 's' : '') : ''}</b>` : ''}</div>`).join('')}</section>` : ''}
   ${canAct ? `<section class="card"><div class="row"><h2>Next step</h2></div>
-   <div class="row">${b.event_id ? `<a class="btn pri" href="#/c/event/${b.event_id}">Open the event</a>` : `<button class="pri" data-act="bkEvent" data-id="${b.id}">Create event from this inquiry</button>`}
+   <div class="row">${b.event_id ? `<a class="btn pri" href="#/c/event/${b.event_id}">Open the event</a> <button class="pdf" data-act="evPdf" data-id="${b.event_id}">🖨️ Print event sheet (PDF)</button>` : `<button class="pri" data-act="bkEvent" data-id="${b.id}">Create event from this inquiry</button>`}
     <span class="sp"></span><label class="inline">Status <select data-bkstatus="${b.id}">${Object.entries(BK_STATUS).map(([v, l]) => opt(v, l, v === b.status)).join('')}</select></label></div>
    <p class="small mut">${b.event_id ? 'The event was made from this inquiry. Set the status to Won once the client confirms.' : 'Makes an event (status: Inquiry) with the customer, date, guests and the dishes they picked. Unknown dishes are kept as off-menu for the chef.'}</p></section>` : ''}`;
 };
