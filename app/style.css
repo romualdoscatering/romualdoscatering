@@ -454,3 +454,15 @@ header#top{padding-top:env(safe-area-inset-top)}
 .rtable input.price{width:82px;margin:0 2px}.rtable input.qty{margin:0}
 .rhead{align-items:center;gap:10px}.rhead h2{margin:0}.rhead select{width:auto;margin:0;padding:6px 10px}
 @media (max-width:700px){.addrow{grid-template-columns:1fr 1fr}.addrow .an,.addrow .ncat{grid-column:1/-1}.addrow button{grid-column:1/-1}.addrow .ncat:not([hidden])+button{grid-row:auto;grid-column:1/-1}}
+/* Recipes → Clean-up */
+details.cu>summary{display:flex;align-items:center;gap:10px;cursor:pointer;list-style:none}details.cu>summary::-webkit-details-marker{display:none}
+details.cu>summary h2{margin:0;font-size:20px}
+.cu-list{display:flex;flex-direction:column;gap:10px}
+.cu-pair{display:grid;grid-template-columns:1fr auto 1fr auto;gap:10px;align-items:stretch;padding:10px;border:1px solid #ebe4cf;border-radius:12px;background:#fdfbf5}
+.cu-side{display:flex;flex-direction:column;gap:4px;padding:10px 12px;background:#fff;border:1px solid #efe9d8;border-radius:10px}
+.cu-side small{color:var(--mut);font-size:12px;line-height:1.4}.cu-side button{align-self:flex-start;margin-top:auto}
+.cu-vs{align-self:center;font-size:12px;color:var(--mut);font-style:italic}
+.cu-pair>.x{align-self:center;font-size:12px;white-space:nowrap;width:auto;padding:6px 8px}
+.cu-tags{display:flex;flex-wrap:wrap;gap:6px}
+button.sm{padding:6px 12px;font-size:13px}
+@media (max-width:760px){.cu-pair{grid-template-columns:1fr}.cu-vs{text-align:center}}

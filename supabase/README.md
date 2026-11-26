@@ -24,6 +24,7 @@ The current `/ops` app keeps running until each part is replaced.
 | `migrations/20261125000200_finance_privacy.sql` | Contract prices move to `event_finance`; money, costing and payment status only for finance, managers and the owner |
 | `migrations/20261126000100_event_changes.sql` | Who last changed each event and when (menu changes count); `delete_event`: anyone in catering deletes events not yet approved, the owner any — never once stock, orders or payments hang on it |
 | `migrations/20261126000200_pr_delete.sql` | `delete_prs`: delete purchase requests — the requester before approval, managers/owner also once approved; never once an order is placed |
+| `migrations/20261126000300_menu_cleanup.sql` | Recipes → Clean-up: merge duplicate dishes/ingredients (history moves, old dish name kept as alias), delete unused ones, archive dishes taken off the menu |
 | `seed.sql` | Buffet course shares |
 | `../tools/import_ops_export.py` | Moves events and menus from the current "Romualdo's Ops Data" sheet |
 | `../test/` | Local test: a stand-in for Supabase's auth plus an end-to-end scenario (26 checks) |

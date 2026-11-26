@@ -954,6 +954,81 @@ function dishGroups(list) {
   [...list].sort((a, b) => rank(a) - rank(b) || (a.course === 'Main' ? a.category.localeCompare(b.category) : 0) || a.name.localeCompare(b.name)).forEach(d => { const k = key(d); g.has(k) || g.set(k, []); g.get(k).push(d); });
   return [...g];
 }
+/* ================= Recipes → Clean-up: duplicates, unused and archived dishes and ingredients ================= */
+// Spelling key that treats common variants as the same: Kalamansi/Calamansi, Lechon/Litson, double letters, plurals
+const looseKey = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9 ]+/g, ' ')
+  .replace(/\b(the|and|at|sa|na|ng|with|w)\b/g, ' ').replace(/k/g, 'c').replace(/ph/g, 'f').replace(/z/g, 's').replace(/(.)\1+/g, '$1')
+  .split(/\s+/).filter(Boolean).map(w => w.length > 3 ? w.replace(/(es|s)$/, '') : w);
+function likelyPairs(list, name) {   // pairs of rows whose names are the same, or one is the other plus extra words
+  const keys = list.map(x => ({ x, w: looseKey(name(x)) })).filter(k => k.w.length), out = [];
+  for (let i = 0; i < keys.length; i++) for (let j = i + 1; j < keys.length; j++) {
+    const a = keys[i], b = keys[j], A = new Set(a.w), B = new Set(b.w), common = [...A].filter(w => B.has(w)).length;
+    const same = a.w.join(' ') === b.w.join(' '), sub = common >= 2 && common === Math.min(A.size, B.size), close = common / Math.max(A.size, B.size) >= .75 && common >= 2;
+    if (same || sub || close) out.push([a.x, b.x, same]);
+  }
+  return out.sort((p, q) => (q[2] - p[2]) || name(p[0]).localeCompare(name(q[0])));
+}
+const CLEAN_SKIP = () => { try { return JSON.parse(localStorage.getItem('rom-clean-skip') || '[]'); } catch (e) { return []; } };
+async function cleanupHtml() {
+  if (!canEditMenu()) return '<div class="card">Clean-up is for managers and chefs.</div>';
+  const [rs, rl, rm, oldItems] = await Promise.all([db.select('recipes', { cols: 'dish_id,status' }), db.select('recipe_lines', { cols: 'dish_id,item_id' }),
+    db.select('restaurant_menu', { cols: 'dish_id,on_pos,price' }).catch(() => []), db.select('items', { cols: 'id,name,category,stock_unit', eq: { active: false }, order: [['name']] })]);
+  const rec = Object.fromEntries(rs.map(r => [r.dish_id, r])), nLines = {}, uses = {}, pos = Object.fromEntries(rm.map(r => [r.dish_id, r]));
+  rl.forEach(l => { nLines[l.dish_id] = (nLines[l.dish_id] || 0) + 1; uses[l.item_id] = (uses[l.item_id] || 0) + 1; });
+  const skip = new Set(CLEAN_SKIP()), pk = (a, b) => [a.id, b.id].sort().join('|');
+  const live = S.dishes.filter(d => d.active), archived = S.dishes.filter(d => !d.active);
+  const where = d => [d.sold_as?.includes('restaurant') && pos[d.id]?.on_pos ? `POS ₱${fq(pos[d.id].price ?? 0)}` : d.sold_as?.includes('restaurant') ? 'restaurant' : '', cateringDish(d) ? (d.tray_price ? `catering tray ${peso(d.tray_price).replace('.00', '')}` : 'catering') : '',
+    `chosen ${d.times_booked}×`, rec[d.id] ? `recipe: ${nLines[d.id] || 0} ingredients${rec[d.id].status === 'verified' ? ' ✓' : ''}` : 'no recipe'].filter(Boolean).join(' · ');
+  const dPairs = likelyPairs(live, d => d.name).filter(([a, b]) => !skip.has(pk(a, b)));
+  const iPairs = likelyPairs(S.items, i => i.name).filter(([a, b]) => !skip.has(pk(a, b)));
+  const unusedDish = live.filter(d => !d.times_booked && !rec[d.id] && !pos[d.id] && !d.sold_as?.includes('restaurant'));   // restaurant dishes are on the POS menu
+  const unusedItem = S.items.filter(i => !uses[i.id]);
+  const noPrice = S.items.filter(i => uses[i.id] && !num(i.last_cost)), noCat = S.items.filter(i => /^others?$/i.test(i.category || ''));
+  const dishCard = (d, other) => `<div class="cu-side"><a href="#/c/recipe/${d.id}"><b>${esc(d.name)}</b></a><small>${esc(d.category)} · ${esc(d.course)} · ${esc(where(d))}</small>
+    <button type="button" class="ghost sm" data-act="mergeDish" data-from="${other.id}" data-into="${d.id}" data-fname="${esc(other.name)}" data-iname="${esc(d.name)}">Keep this one</button></div>`;
+  const itemCard = (i, other) => `<div class="cu-side"><b>${esc(i.name)}</b><small>${esc(i.category)} · per ${esc(i.stock_unit)} · ${num(i.last_cost) ? peso(i.last_cost) : 'no price'} · in ${uses[i.id] || 0} recipe${uses[i.id] === 1 ? '' : 's'}</small>
+    ${normName(i.stock_unit) === normName(other.stock_unit) ? `<button type="button" class="ghost sm" data-act="mergeItem" data-from="${other.id}" data-into="${i.id}" data-fname="${esc(other.name)}" data-iname="${esc(i.name)}">Keep this one</button>` : '<small class="warn-t">different unit — set the same unit first</small>'}</div>`;
+  const sec = (title, n, help, body, open) => `<details class="card cu"${open ? ' open' : ''}><summary><h2>${title}</h2><span class="chip ${n ? 'warn' : 'ok'}">${n || '✓ none'}</span></summary><p class="small mut">${help}</p>${n ? body : ''}</details>`;
+  return `${sec('Possible duplicate dishes', dPairs.length, 'Same dish under two names, often one from the catering tray menu and one from the restaurant menu. <b>Keep this one</b> moves events, POS sales, kitchen counts, the recipe and the menu listing to the dish you keep, and the other name keeps working. If they really are different dishes, tap <b>Not the same</b>.',
+      `<div class="cu-list">${dPairs.map(([a, b]) => `<div class="cu-pair">${dishCard(a, b)}<span class="cu-vs">or</span>${dishCard(b, a)}<button type="button" class="x" data-act="cleanSkip" data-k="${pk(a, b)}" title="They're different dishes">Not the same</button></div>`).join('')}</div>`, true)}
+   ${sec('Possible duplicate ingredients', iPairs.length, 'Two spellings of one ingredient (Kalamansi / Calamansi) split the shopping list and the stock count. Merging moves recipes, stock, requests and orders to the one kept; amounts in the same recipe are added together. Both must use the same unit.',
+      `<div class="cu-list">${iPairs.map(([a, b]) => `<div class="cu-pair">${itemCard(a, b)}<span class="cu-vs">or</span>${itemCard(b, a)}<button type="button" class="x" data-act="cleanSkip" data-k="${pk(a, b)}" title="They're different ingredients">Not the same</button></div>`).join('')}</div>`, true)}
+   ${sec('Dishes never used', unusedDish.length, 'Catering dishes never on an event and with no recipe: usually typos or old menu items. (Restaurant dishes are managed from the POS menu.) <b>Delete</b> removes them for good; <b>Archive</b> just hides them.',
+      `<div class="list">${unusedDish.map(d => `<div class="li"><div class="li-main"><a href="#/c/recipe/${d.id}"><b>${esc(d.name)}</b></a><span class="mut small">${esc(d.category)} · ${esc(d.course)}</span></div><button type="button" class="ghost sm" data-act="archDish" data-id="${d.id}" data-on="1">Archive</button><button type="button" class="ghost sm danger" data-act="delDish" data-id="${d.id}" data-name="${esc(d.name)}">Delete</button></div>`).join('')}</div>`)}
+   ${sec('Ingredients not in any recipe', unusedItem.length, 'Not used by any recipe. Some are fine (bought for the store only). Delete works only if it was never bought or counted; otherwise it is archived instead.',
+      `<div class="list">${unusedItem.map(i => `<div class="li"><div class="li-main"><b>${esc(i.name)}</b><span class="mut small">${esc(i.category)} · per ${esc(i.stock_unit)}${num(i.last_cost) ? ' · ' + peso(i.last_cost) : ''}</span></div><button type="button" class="ghost sm danger" data-act="delItem" data-id="${i.id}" data-name="${esc(i.name)}">Delete</button></div>`).join('')}</div>`)}
+   ${sec('Ingredients with no price', noPrice.length, 'Used in recipes but priced at ₱0, so recipe costs and purchase estimates come out low. Open a recipe that uses them and type the price in the table.',
+      `<div class="cu-tags">${noPrice.map(i => `<span class="chip">${esc(i.name)} · ${esc(i.stock_unit)}</span>`).join('')}</div>`)}
+   ${sec('Ingredients with no category', noCat.length, 'Category "Other" puts them at the end of purchase lists instead of with the market or grocery items. Set it with ✎ on any recipe that uses them.',
+      `<div class="cu-tags">${noCat.map(i => `<span class="chip">${esc(i.name)}</span>`).join('')}</div>`)}
+   ${sec('Archived (off the menu)', archived.length + oldItems.length, 'Dishes and ingredients taken off the menu. Their history stays; restore them if they come back.',
+      `<div class="list">${archived.map(d => `<div class="li"><div class="li-main"><b>${esc(d.name)}</b><span class="mut small">dish · ${esc(d.category)}</span></div><button type="button" class="ghost sm" data-act="archDish" data-id="${d.id}" data-on="0">Restore</button></div>`).join('')}
+       ${oldItems.map(i => `<div class="li"><div class="li-main"><b>${esc(i.name)}</b><span class="mut small">ingredient · ${esc(i.category)} · ${esc(i.stock_unit)}</span></div><button type="button" class="ghost sm" data-act="restoreItem" data-id="${i.id}">Restore</button></div>`).join('')}</div>`)}`;
+}
+const canEditMenu = () => canAny('chef', 'manager');
+const needsUpdate = err => /merge_dishes|delete_dish|archive_dish|merge_items|delete_item|function/i.test(err.message || '') && /find|exist|schema cache/i.test(err.message || '');
+async function cleanRun(fn, args, ok) {
+  try { const r = await db.rpc(fn, args); await loadMaster(); toast(ok(r)); refresh(); }
+  catch (err) { toast(needsUpdate(err) ? 'Clean-up needs the latest database update — ask the owner to run it.' : err.message, true); }
+}
+ACT.mergeDish = el => { if (confirm(`Keep "${el.dataset.iname}" and merge "${el.dataset.fname}" into it?\n\nEvents, POS sales, kitchen counts, the recipe and the menu listing move to "${el.dataset.iname}". "${el.dataset.fname}" still works when typed. This can't be undone.`))
+  cleanRun('merge_dishes', { p_from: el.dataset.from, p_into: el.dataset.into }, n => `Merged into ${n}`); };
+ACT.mergeItem = el => { if (confirm(`Keep "${el.dataset.iname}" and merge "${el.dataset.fname}" into it?\n\nRecipes, stock, requests and orders move to "${el.dataset.iname}"; amounts in the same recipe are added together. This can't be undone.`))
+  cleanRun('merge_items', { p_from: el.dataset.from, p_into: el.dataset.into }, n => `Merged into ${n}`); };
+ACT.delDish = el => { if (confirm(`Delete "${el.dataset.name}" for good?`)) cleanRun('delete_dish', { p_dish: el.dataset.id }, n => `${n} deleted`); };
+ACT.archDish = el => cleanRun('archive_dish', { p_dish: el.dataset.id, p_archive: el.dataset.on === '1' }, () => el.dataset.on === '1' ? 'Archived — off the POS and new menus' : 'Restored');
+ACT.delItem = async el => {
+  if (!confirm(`Delete "${el.dataset.name}" from the ingredient list?`)) return;
+  try { await db.rpc('delete_item', { p_item: el.dataset.id }); await loadMaster(); toast(`${el.dataset.name} deleted`); refresh(); }
+  catch (err) {
+    if (needsUpdate(err)) return toast('Clean-up needs the latest database update — ask the owner to run it.', true);
+    if (/history/i.test(err.message) && confirm(`${err.message}\n\nArchive "${el.dataset.name}" now?`)) { await db.update('items', { active: false }, { id: el.dataset.id }); await loadMaster(); toast('Archived'); refresh(); }
+    else if (!/history/i.test(err.message)) toast(err.message, true);
+  }
+};
+ACT.restoreItem = async el => { await db.update('items', { active: true }, { id: el.dataset.id }); await loadMaster(); toast('Restored'); refresh(); };
+ACT.cleanSkip = el => { const s = CLEAN_SKIP(); s.push(el.dataset.k); try { localStorage.setItem('rom-clean-skip', JSON.stringify(s)); } catch (e) {} refresh(); };
+
 routes['c/recipes'] = async arg => {
   const tab = arg || 'standard';
   const [rs, rl] = await Promise.all([db.select('recipes', { cols: 'dish_id,status,batch_serves' }), db.select('recipe_lines', { cols: 'dish_id,item_id,qty' })]);
@@ -961,13 +1036,13 @@ routes['c/recipes'] = async arg => {
   const costOf = {}; rl.forEach(l => costOf[l.dish_id] = (costOf[l.dish_id] || 0) + num(l.qty) * num(S.itemsById[l.item_id]?.last_cost));
   const costTag = d => { const r = recipes[d.id]; if (!r || !costOf[d.id]) return ''; const c = costOf[d.id], pct = d.tray_price && num(r.batch_serves) > 1 ? Math.round(c / num(d.tray_price) * 100) : null;
     return ` · cost ${peso(c)}${pct !== null ? ` · <span class="${pct > 45 ? 'bad-t' : pct > 35 ? 'warn-t' : 'ok-t'}">${pct}%</span>` : ''}`; };
-  const tabs = [['standard', 'Standard list'], ['draft', 'Draft recipes'], ['verified', 'Verified'], ['none', 'No recipe'], ['all', 'All dishes']];
-  const list = S.dishes.filter(d => tab === 'all' || (tab === 'standard' ? d.standard : tab === 'none' ? !recipes[d.id] && d.standard : recipes[d.id]?.status === tab));
+  const tabs = [['standard', 'Standard list'], ['draft', 'Draft recipes'], ['verified', 'Verified'], ['none', 'No recipe'], ['all', 'All dishes'], ...(canEditMenu() ? [['cleanup', '🧹 Clean-up']] : [])];
+  const list = S.dishes.filter(d => d.active).filter(d => tab === 'all' || (tab === 'standard' ? d.standard : tab === 'none' ? !recipes[d.id] && d.standard : recipes[d.id]?.status === tab));
   return `<h1>Dishes & recipes</h1><p class="lede">A dish's recipe lists what to buy for one batch: one large tray (10–12 guests, planned at 10), or one guest for rice, drinks and fruit. Only <b>verified</b> recipes are used for purchase requests.</p>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/recipes/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
-   <input class="search" placeholder="Search dishes…" data-filter=".dgroup .li">
+   ${tab === 'cleanup' ? await cleanupHtml() : `<input class="search" placeholder="Search dishes…" data-filter=".dgroup .li">
    ${(g => g.length > 2 ? `<div class="jump">${g.map(([head], i) => `<button type="button" data-jump="g${i}">${esc(head.replace('Main · ', ''))}</button>`).join('')}</div>` : '')(dishGroups(list))}
-   ${dishGroups(list).map(([head, ds], i) => `<section class="dgroup" data-group id="g${i}"><h3>${esc(head)} <span class="cnt">${ds.length}</span></h3><div class="list">${ds.map(d => `<a class="li" href="#/c/recipe/${d.id}"><div class="li-main"><b>${esc(d.name)}</b><span class="mut small">chosen ${d.times_booked}×${d.tray_price ? ' · tray ' + peso(d.tray_price) : ''}${costTag(d)}</span></div>${recipes[d.id] ? chip(recipes[d.id].status === 'verified' ? 'Verified' : 'Draft', recipes[d.id].status === 'verified' ? 'ok' : 'warn') : chip('No recipe', 'mut')}</a>`).join('')}</div></section>`).join('') || '<div class="empty">None.</div>'}`;
+   ${dishGroups(list).map(([head, ds], i) => `<section class="dgroup" data-group id="g${i}"><h3>${esc(head)} <span class="cnt">${ds.length}</span></h3><div class="list">${ds.map(d => `<a class="li" href="#/c/recipe/${d.id}"><div class="li-main"><b>${esc(d.name)}</b><span class="mut small">chosen ${d.times_booked}×${d.tray_price ? ' · tray ' + peso(d.tray_price) : ''}${costTag(d)}</span></div>${recipes[d.id] ? chip(recipes[d.id].status === 'verified' ? 'Verified' : 'Draft', recipes[d.id].status === 'verified' ? 'ok' : 'warn') : chip('No recipe', 'mut')}</a>`).join('')}</div></section>`).join('') || '<div class="empty">None.</div>'}`}`;
 };
 // Recipe order, the way recipes are written: main item (protein, or the pasta/noodles/rice the dish is built on),
 // then supporting ingredients, then sauces, seasonings and oil — salt and pepper last
@@ -1014,7 +1089,7 @@ routes['c/recipe'] = async id => {
   const serves = r ? num(r.batch_serves) : 10, trayP = d.tray_price && serves > 1 ? num(d.tray_price) : 0;
   const DISH_CATS = [...new Set(['Chicken', 'Pork', 'Beef', 'Seafood', 'Vegetables', 'Pasta & noodles', 'Salads', 'Soup', 'Rice', 'Desserts', 'Drinks', ...Object.values(S.dishById).map(x => x.category)])];
   return `<div class="row"><a href="#/c/recipes" class="back">‹ Dishes</a></div>
-  <div class="row"><h1>${esc(d.name)}</h1>${r ? chip(r.status === 'verified' ? 'Verified' : 'Draft', r.status === 'verified' ? 'ok' : 'warn') : chip('No recipe yet', 'mut')}<span class="sp"></span>${canEditDish() ? `<button type="button" class="ghost" data-act="toggleDishEdit">✎ Edit dish</button>` : ''}</div>
+  <div class="row"><h1>${esc(d.name)}</h1>${r ? chip(r.status === 'verified' ? 'Verified' : 'Draft', r.status === 'verified' ? 'ok' : 'warn') : chip('No recipe yet', 'mut')}${d.active ? '' : ' ' + chip('Archived', 'bad')}<span class="sp"></span>${canEditDish() ? `<button type="button" class="ghost" data-act="toggleDishEdit">✎ Edit dish</button>` : ''}</div>
   <p class="lede">${esc(d.category)} · ${esc(d.course)} · chosen ${d.times_booked}× ${d.tray_price ? '· tray price ' + peso(d.tray_price) : ''}</p>
   ${canEditDish() ? `<form class="card" data-form="editDish" data-id="${id}" id="dishEdit" hidden><h2>Dish details</h2><div class="grid">
     <label>Dish name<input name="name" value="${esc(d.name)}" required></label>
@@ -1023,7 +1098,7 @@ routes['c/recipe'] = async id => {
     <label>Tray price ₱<input name="tray_price" type="number" step="any" min="0" value="${d.tray_price ?? ''}" placeholder="not sold by the tray"></label></div>
     <datalist id="dl-dishcats">${DISH_CATS.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
     <p class="small mut">The new name shows everywhere this dish is used: event menus, the POS, Kitchen stocks and purchase requests.</p>
-    <div class="row end"><button type="button" class="ghost" data-act="toggleDishEdit">Cancel</button><button class="pri">Save dish</button></div></form>` : ''}
+    <div class="row end">${canEditMenu() ? `<button type="button" class="ghost danger" data-act="archDish" data-id="${id}" data-on="${d.active ? 1 : 0}" title="${d.active ? 'Hide from the POS and new event menus; history is kept' : ''}">${d.active ? 'Take off the menu' : 'Put back on the menu'}</button><span class="sp"></span>` : ''}<button type="button" class="ghost" data-act="toggleDishEdit">Cancel</button><button class="pri">Save dish</button></div></form>` : ''}
   ${!edit && !r ? '<div class="card">No recipe yet. A chef can add it.</div>' : `
   <form class="card" data-form="${edit ? 'saveRecipe' : 'none'}" data-id="${id}">
    <div class="row rhead"><h2>Ingredients for</h2>${edit ? batchSel(serves) : `<b>${serves === 1 ? 'one guest' : serves === 10 ? 'one tray (10–12 guests)' : `one batch (${fq(serves)} guests)`}</b>`}</div>
