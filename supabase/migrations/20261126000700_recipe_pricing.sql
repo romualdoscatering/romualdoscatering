@@ -2,7 +2,7 @@
 -- 1. Chefs list every ingredient first and fill in quantities after: a recipe line may have no quantity yet (0).
 --    A recipe can only be marked verified (and so used for purchase requests) once every quantity is filled in.
 -- 2. Dishes get a menu tier: standard, premium or both (on both menu selections).
---    Pre-filled from the "Romualdo's Catering 2026" draft menu selections; change it on the dish page.
+--    Pre-filled from the 2026 draft menu selections, the Casa Vieja ₱500 menu (standard) and the ₱700 menu (premium); change it on the dish page.
 
 alter table recipe_lines drop constraint if exists recipe_lines_qty_check;
 alter table recipe_lines add constraint recipe_lines_qty_check check (qty >= 0);
@@ -33,7 +33,13 @@ declare
     'Fish Fillet with Tartare Sauce','Fish Fillet with Lemon Butter','Sweet & Sour Fish','Tuna Bicol Express','Garlic Butter Shrimp','Bangus Sisig',
     'Cabbage and Carrot Slaw','Creamy Cucumber','Buttered Veggies','Chopsuey','Buttered Veggies with Toge',
     'Alfredo','Filipino Spaghetti','Aglio Olio','Bam-i','Pancit Bam-i','Silky Sotanghon','Pancit Canton','Bihon Guisado','Palabok',
-    'Mango Tapioca','Buko Gulaman','Cathedral Window Jelly','Mini Classic Turon','Maja Blanca with Caramel','Brownies','Cheesy Mamon','Banana Cupcakes','Fruit Salad'];
+    'Mango Tapioca','Buko Gulaman','Cathedral Window Jelly','Mini Classic Turon','Maja Blanca with Caramel','Brownies','Cheesy Mamon','Banana Cupcakes','Fruit Salad',
+    -- Casa Vieja Exclusive ₱500/head (regular)
+    'Mixed Greens with Wine Vinaigrette','Chopped Asian Salad','Shiitake Mushroom Soup','Creamy Corn Soup','Seafood Chowder',
+    'Rosemary Chicken','Cordon Bleu with Pepper Gravy','Thai Chicken Curry','Pininyahang Manok','Adobong Pula',
+    'Beef Brocolli','Beef Broccoli','Stir-Fried Beef with Vegetables','Pork Steak a la Bistek','Sweet and Sour Pork','Grilled Pork',
+    'Seafood & Tomato Pasta','Baked Spaghetti','Carbonara','Seafood Pancit Canton','Pink Lemonade','Lemongrass Tea',
+    'Mango Sago','Mango Lychee Cream','Buko Pandan','Fresh Fruits and Cream','Moist Brownies'];
   prem text[] := array['Pancit Molo','Creamy Chicken Tinola','Cream of Mushroom Soup','Potato Leek Soup','Squash Soup','Cream of Corn Soup','Cream of Asparagus Soup','Carrot and Celery Soup',
     'Kinilaw na Malasugue','Pomelo Salad','Chicken Potato Salad','Chicken Macaroni Salad','Green Salad with Dressing','Tofu Squares','Embutido','Fresh Lumpia','Fried Lumpia','Lumpia Shanghai','Shrimp Potato Salad','Caesar''s Salad','Caesar Salad',
     'Chicken Cordon Bleu','Baked Chicken with Mushrooms','Grilled Chicken with Vegetables','Chicken Parmigiana','Crusty Chicken with Potatoes','Spicy Sweet Chicken Lollies','Chicken Sultanas','Chicken Pandan','Steamed Chicken',
@@ -42,7 +48,14 @@ declare
     'Fish Fillet with Tartare Sauce','Baked Fish in Herbed Tomatoes','Fish Fillet Sweet and Sour','Pan-Grilled Tuna Steak','Shrimp Tempura','Fish Fillet Parmigiana','Seafood Curry','Rellenong Bangus','Tuna Belly in Olive Oil','Baked Salmon with Garlic Cream',
     'Broccoli with Oyster Sauce','Mixed Vegetables','Four Seasons','Buttered Florets','Seafood Chopsuey with Quail Egg',
     'Silky Sotanghon','Pancit Bam-i','Crispy Canton','Beef Lasagna','Chicken Fettuccine','Baked Macaroni','Tuna and Olive Pasta','Garden Fresh Pasta','Pasta with Three Sauces',
-    'Assorted Pastries','Fresh Fruits in Cups','Mango Pandan Salad','Mango Tapioca','Watermelon Balls with Lychee','Coffee Jelly','Crema Española','Leche Flan','Banana Walnut Cupcakes','Lemon or Chocolate Cupcakes'];
+    'Assorted Pastries','Fresh Fruits in Cups','Mango Pandan Salad','Mango Tapioca','Watermelon Balls with Lychee','Coffee Jelly','Crema Española','Leche Flan','Banana Walnut Cupcakes','Lemon or Chocolate Cupcakes',
+    -- ₱700/head menu (regular-to-premium)
+    'Minestrone Soup','Grilled Chicken Salad with Vinaigrette','Rosemary Chicken','Beef Salpicao','Pork BBQ Ribs','Fish Fingers','Truffle Pasta',
+    'Shrimp Sinigang','Bangus Sinigang','Fried Lumpiang Ubod','Garlic Fried Chicken','Shank and Tripe Kare-Kare','Pork BBQ','Sweet & Sour Tuna','Sotanghon Guisado',
+    'Egg Drop Soup','Chopped Asian Salad','Salted Egg Chicken','Chinese Beef Steak','Triple Chili Bicol Express','Cajun Seafood','Shrimp Aglio Olio',
+    'Shiitake Mushroom Soup','Apple and Roasted Grape Salad','Buttermilk Chicken','Three-Cheese Caldereta','Salt & Pepper Ribs','Pompano in Soy Ginger','Vodka Penne',
+    'Balbacua','Classic Balbacua','Assorted Filipino Ensaladas','Chicken Lumpia Shanghai','Bistek Tagalog','Grilled Liempo','Kinilaw na Malasugue',
+    'Sans Rival','Baked Blueberry Cheesecake','Assorted Baked Bars','Assorted Mini Cupcakes','Buko Salad'];
   n text; d uuid; s int := 0; p int := 0;
 begin
   foreach n in array std loop d := find_dish(n); if d is not null then update dishes set tier = 'standard' where id = d and tier is null; s := s + 1; end if; end loop;

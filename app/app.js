@@ -1275,9 +1275,11 @@ function recipeS(lines, serves, priceOf = id => num(S.itemsById[id]?.last_cost))
 
 /* ---- Recipes → Costing tab: every dish with a recipe at house prices, filters, price-change simulator, package check ---- */
 const PACKAGES = [
+  { k: 'cv500', tier: 'standard', price: 500, slots: ['Salad / soup', 'Chicken', 'Beef / pork', 'Pasta / noodles', 'Rice', 'Dessert'], note: 'Casa Vieja · + drinks' },
   { k: 's450', tier: 'standard', price: 450, slots: ['Soup', 'Chicken', 'Veggies / noodles', 'Rice', 'Dessert'], note: '+ softdrinks · min. 100 pax' },
   { k: 's550', tier: 'standard', price: 550, slots: ['Soup', 'Appetizer', 'Chicken', '2nd viand', 'Veggie', 'Pasta / noodle', 'Rice', 'Dessert'], note: 'min. 50 pax' },
   { k: 's650', tier: 'standard', price: 650, slots: ['Soup', 'Appetizer', 'Chicken', 'Pork', 'Beef / fish', 'Veggies', 'Pasta / noodle', 'Rice', 'Dessert'], note: 'min. 50 pax' },
+  { k: 'm700', tier: 'premium', price: 700, slots: ['Soup', 'Salad / appetizer', 'Chicken', 'Beef', 'Pork', 'Fish / seafood', 'Pasta / noodles', 'Rice', 'Dessert'], note: 'regular-to-premium set menu' },
   { k: 'p750', tier: 'premium', price: 750, slots: ['Soup', 'Chicken', '2nd viand', 'Veggies', 'Rice', 'Dessert'], note: '+ softdrinks · min. 50 pax' },
   { k: 'p850', tier: 'premium', price: 850, slots: ['Soup', 'Appetizer', 'Chicken', 'Beef', 'Pork / fish', 'Pasta / noodle', 'Rice', 'Dessert'], note: '+ softdrinks · min. 50 pax' },
   { k: 'p990', tier: 'premium', price: 990, slots: ['Soup', 'Assorted appetizers', 'Chicken', 'Pork', 'Beef / fish', 'Veggies', 'Pasta / noodle', 'Rice', 'Dessert'], note: '2–3 desserts · min. 50 pax' },
