@@ -1009,36 +1009,96 @@ routes['c/recipe'] = async id => {
   const noMain = !lines.some(l => recipeRank(l.item_id) === 0);
   const rank0 = recipeRank; const recipeRankD = itemId => noMain && named(itemId) ? 0 : rank0(itemId);
   lines.sort((a, b) => recipeRankD(a.item_id) - recipeRankD(b.item_id) || (isToTaste(a.item_id) - isToTaste(b.item_id)) || num(b.qty) - num(a.qty) || itemName(a.item_id).localeCompare(itemName(b.item_id)));
-  let lastG = -1; const head = itemId => { const g = recipeRankD(itemId); if (g === lastG) return ''; lastG = g; return `<tr class="grp"><td colspan="4">${g === 1 && !lines.some(l => recipeRankD(l.item_id) === 0) ? 'Ingredients' : RECIPE_HEADS[g]}</td></tr>`; };
+  let lastG = -1; const head = itemId => { const g = recipeRankD(itemId); if (g === lastG) return ''; lastG = g; return `<tr class="grp"><td colspan="5">${g === 1 && !lines.some(l => recipeRankD(l.item_id) === 0) ? 'Ingredients' : RECIPE_HEADS[g]}</td></tr>`; };
+  const batchSel = (cur) => `<select name="serves" data-recipeserves="${id}" aria-label="One batch is for">${opt('10', 'one large tray (10–12 guests)', String(cur) === '10')}${opt('1', 'one guest (rice, drinks, fruit)', String(cur) === '1')}${cur && !['1', '10'].includes(String(cur)) ? opt(String(cur), `one batch (${fq(cur)} guests)`, true) : ''}</select>`;
+  const serves = r ? num(r.batch_serves) : 10, trayP = d.tray_price && serves > 1 ? num(d.tray_price) : 0;
+  const DISH_CATS = [...new Set(['Chicken', 'Pork', 'Beef', 'Seafood', 'Vegetables', 'Pasta & noodles', 'Salads', 'Soup', 'Rice', 'Desserts', 'Drinks', ...Object.values(S.dishById).map(x => x.category)])];
   return `<div class="row"><a href="#/c/recipes" class="back">‹ Dishes</a></div>
-  <div class="row"><h1>${esc(d.name)}</h1>${r ? chip(r.status === 'verified' ? 'Verified' : 'Draft', r.status === 'verified' ? 'ok' : 'warn') : chip('No recipe', 'mut')}</div>
+  <div class="row"><h1>${esc(d.name)}</h1>${r ? chip(r.status === 'verified' ? 'Verified' : 'Draft', r.status === 'verified' ? 'ok' : 'warn') : chip('No recipe yet', 'mut')}<span class="sp"></span>${canEditDish() ? `<button type="button" class="ghost" data-act="toggleDishEdit">✎ Edit dish</button>` : ''}</div>
   <p class="lede">${esc(d.category)} · ${esc(d.course)} · chosen ${d.times_booked}× ${d.tray_price ? '· tray price ' + peso(d.tray_price) : ''}</p>
-  ${!r ? (edit ? `<form class="card" data-form="startRecipe" data-id="${id}"><p>No recipe yet.</p><label>One batch is for<select name="serves">${opt('10', 'one large tray (10–12 guests)')}${opt('1', 'one guest (rice, drinks, fruit)')}</select></label><div class="row end"><button class="pri">Start recipe</button></div></form>` : '<div class="card">No recipe yet. A chef can add it.</div>') : `
+  ${canEditDish() ? `<form class="card" data-form="editDish" data-id="${id}" id="dishEdit" hidden><h2>Dish details</h2><div class="grid">
+    <label>Dish name<input name="name" value="${esc(d.name)}" required></label>
+    <label>Category<input name="category" list="dl-dishcats" value="${esc(d.category)}" required></label>
+    <label>Course on the event sheet<select name="course">${COURSES.map(c => opt(c, c, c === d.course)).join('')}</select></label>
+    <label>Tray price ₱<input name="tray_price" type="number" step="any" min="0" value="${d.tray_price ?? ''}" placeholder="not sold by the tray"></label></div>
+    <datalist id="dl-dishcats">${DISH_CATS.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+    <p class="small mut">The new name shows everywhere this dish is used: event menus, the POS, Kitchen stocks and purchase requests.</p>
+    <div class="row end"><button type="button" class="ghost" data-act="toggleDishEdit">Cancel</button><button class="pri">Save dish</button></div></form>` : ''}
+  ${!edit && !r ? '<div class="card">No recipe yet. A chef can add it.</div>' : `
   <form class="card" data-form="${edit ? 'saveRecipe' : 'none'}" data-id="${id}">
-   <div class="row"><h2>Ingredients for ${num(r.batch_serves) === 1 ? 'one guest' : (num(r.batch_serves) === 10 ? 'one tray (10–12 guests)' : `one batch (${fq(r.batch_serves)} guests)`)}</h2></div>
-   ${r.method ? `<p class="small mut">${esc(r.method)}</p>` : ''}
-   <div class="tw"><table><thead><tr><th>Ingredient</th><th class="n">Qty</th><th class="n">Cost</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>
-   ${lines.map(l => { const it = S.itemsById[l.item_id] || {}; return `${head(l.item_id)}<tr><td>${esc(itemName(l.item_id))}${num(it.last_cost) ? `<div class="small mut">${peso(it.last_cost)} per ${esc(it.stock_unit)}</div>` : ''}</td><td class="n">${edit ? `<input name="q_${l.item_id}" type="number" step="any" min="0" value="${num(l.qty)}" class="qty">` : fq(l.qty)} ${esc(itemUnit(l.item_id))}</td><td class="n" data-linecost="${l.item_id}" data-price="${num(it.last_cost)}">${num(it.last_cost) ? peso(num(l.qty) * num(it.last_cost)) : '<span class="mut small">no price</span>'}</td>${edit ? `<td class="nowrap"><button type="button" class="x" title="Edit" data-act="editIng" data-item="${l.item_id}">✎</button><button type="button" class="x" title="Remove" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>
-   ${edit ? `<tr class="ing-edit" id="ie_${l.item_id}" hidden><td colspan="4"><div class="grid">
-     <label>Replace with another ingredient (this recipe only)<input name="e_swap_${l.item_id}" list="dl-items" placeholder="leave empty to keep ${esc(it.name || '')}" autocomplete="off"></label>
+   <div class="row rhead"><h2>Ingredients for</h2>${edit ? batchSel(serves) : `<b>${serves === 1 ? 'one guest' : serves === 10 ? 'one tray (10–12 guests)' : `one batch (${fq(serves)} guests)`}</b>`}</div>
+   ${r?.method ? `<p class="small mut">${esc(r.method)}</p>` : ''}
+   ${lines.length ? `<div class="tw"><table class="rtable"><thead><tr><th>Ingredient</th><th class="n">Qty</th><th class="n">Price per unit</th><th class="n">Cost</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>
+   ${lines.map(l => { const it = S.itemsById[l.item_id] || {}, u = esc(itemUnit(l.item_id)); return `${head(l.item_id)}<tr><td>${esc(itemName(l.item_id))}</td>
+     <td class="n nowrap">${edit ? `<input name="q_${l.item_id}" type="number" step="any" min="0" value="${num(l.qty)}" class="qty">` : fq(l.qty)} ${u}</td>
+     <td class="n nowrap">${edit ? `₱<input name="p_${l.item_id}" type="number" step="any" min="0" value="${num(it.last_cost) || ''}" placeholder="—" class="qty price" title="Price per ${u}: changes it for every recipe using ${esc(it.name || '')}"> /${u}` : num(it.last_cost) ? `${peso(it.last_cost)} /${u}` : '<span class="mut small">no price</span>'}</td>
+     <td class="n" data-linecost="${l.item_id}" data-price="${num(it.last_cost)}">${num(it.last_cost) ? peso(num(l.qty) * num(it.last_cost)) : '<span class="mut small">—</span>'}</td>${edit ? `<td class="nowrap"><button type="button" class="x" title="Rename, change unit, or replace" data-act="editIng" data-item="${l.item_id}">✎</button><button type="button" class="x" title="Remove" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>
+   ${edit ? `<tr class="ing-edit" id="ie_${l.item_id}" hidden><td colspan="5"><div class="grid">
      <label>Ingredient name<input name="e_name_${l.item_id}" value="${esc(it.name || '')}"></label>
      <label>Unit used in recipes<input name="e_unit_${l.item_id}" list="dl-units" value="${esc(it.stock_unit || '')}"></label>
-     <label>Price per unit ₱<input name="e_cost_${l.item_id}" type="number" step="any" min="0" value="${num(it.last_cost) || ''}"></label></div>
+     <label>Price per unit ₱<input name="e_cost_${l.item_id}" type="number" step="any" min="0" value="${num(it.last_cost) || ''}"></label>
+     <label>Or replace with another ingredient (this recipe only)<input name="e_swap_${l.item_id}" list="dl-items" placeholder="leave empty to keep ${esc(it.name || '')}" autocomplete="off"></label></div>
      <p class="small mut">Name, unit and price belong to the ingredient, so they change in every recipe that uses it. Price is updated again automatically when goods are received.</p>
      <div class="row end"><button type="button" class="ghost" data-act="editIng" data-item="${l.item_id}">Cancel</button><button type="button" class="pri" data-act="saveIng" data-dish="${id}" data-item="${l.item_id}">Save ingredient</button></div></td></tr>` : ''}`; }).join('')}
-   </tbody><tfoot><tr><td colspan="4" id="recipeTotal" data-tray="${d.tray_price && num(r.batch_serves) > 1 ? num(d.tray_price) : 0}" data-serves="${num(r.batch_serves)}">${recipeTotalText(cost, d.tray_price && num(r.batch_serves) > 1 ? num(d.tray_price) : 0, num(r.batch_serves))}</td></tr></tfoot></table></div>
-   ${edit ? `<div class="addline mt"><input name="new_item" list="dl-items" placeholder="Add ingredient" autocomplete="off"><input name="new_qty" type="number" step="any" min="0" placeholder="qty" class="qty"><button type="button" data-act="addIng" data-id="${id}">Add</button></div>${itemDatalist()}
-   <div class="row end"><button class="ghost">Save quantities</button>${r.status !== 'verified' ? `<button type="button" class="pri" data-act="verify" data-id="${id}">Mark verified</button>` : ''}</div>
-   <p class="small mut">${r.status === 'verified' ? 'A manager\'s change puts this recipe back to draft until a chef verifies it again.' : 'Check each quantity against how the kitchen really cooks this dish, then mark it verified so it can be used for purchase requests.'}</p>` : ''}
-  </form>
-  ${edit ? `<details class="card" id="newItemBox"><summary>Ingredient not on the list? Add a new item</summary><form data-form="newItem" data-dish="${id}" class="mt"><p class="small mut" id="newItemNote" hidden></p><div class="grid">
-    <label>Name<input name="name" required></label><label>Category<input name="category" list="dl-cats" required></label>
-    <label>Unit used in recipes<input name="stock_unit" list="dl-units" value="kg" required></label><label>Unit bought in<input name="purchase_unit" list="dl-units" value="kg" required></label>
-    <label>How many recipe units in one bought unit<input name="units_per_purchase" type="number" step="any" min="0.001" value="1"></label><label>Last price per recipe unit ₱<input name="last_cost" type="number" step="any" min="0"></label></div>
-    <datalist id="dl-cats">${[...new Set(S.items.map(i => i.category))].map(c => `<option value="${esc(c)}">`).join('')}</datalist>
-    <datalist id="dl-units">${['kg', 'g', 'L', 'pc', 'pack', 'can', 'bundle', 'bottle', 'tray', 'sack', 'box'].map(u => `<option value="${u}">`).join('')}</datalist>
-    <div class="row end"><button class="pri">Add item</button></div></form></details>` : ''}`}`;
+   </tbody><tfoot><tr><td colspan="5" id="recipeTotal" data-tray="${trayP}" data-serves="${serves}">${recipeTotalText(cost, trayP, serves)}</td></tr></tfoot></table></div>` : `<p class="mut">No ingredients yet${edit ? ' — add the first one below. The recipe is saved as you go.' : '.'}</p>`}
+   ${edit ? `<div class="addrow mt" id="addRow"><label class="an">Ingredient<input name="new_item" list="dl-items" placeholder="Type or pick an ingredient" autocomplete="off" data-newitem></label>
+     <label>Qty<input name="new_qty" type="number" step="any" min="0" placeholder="0" class="qty"></label>
+     <label>Unit<input name="new_unit" list="dl-units" placeholder="kg" class="qty"></label>
+     <label>Price per unit ₱<input name="new_price" type="number" step="any" min="0" placeholder="0.00" class="qty"></label>
+     <label class="ncat" hidden>Category (new ingredient)<input name="new_cat" list="dl-cats" placeholder="e.g. Vegetables"></label>
+     <button type="button" class="pri" data-act="addIng" data-id="${id}">＋ Add</button></div>
+     <p class="small mut" id="addHint">Pick an ingredient and its unit and last price fill in. A new name is added to the ingredient list too.</p>
+     ${itemDatalist()}<datalist id="dl-cats">${[...new Set(S.items.map(i => i.category))].sort().map(c => `<option value="${esc(c)}">`).join('')}</datalist>
+     <datalist id="dl-units">${['kg', 'g', 'L', 'ml', 'pc', 'pack', 'can', 'bundle', 'bottle', 'tray', 'sack', 'box'].map(u => `<option value="${u}">`).join('')}</datalist>
+     ${r && lines.length ? `<div class="row end mt">${r.status !== 'verified' ? `<button type="button" class="pri" data-act="verify" data-id="${id}">Mark verified</button>` : ''}</div>
+     <p class="small mut">Every change saves by itself. ${r.status === 'verified' ? 'A manager\'s change puts this recipe back to draft until a chef verifies it again.' : 'Check each quantity against how the kitchen really cooks this dish, then mark it verified so it can be used for purchase requests.'}</p>` : ''}` : ''}
+  </form>`}`;
 };
+// The recipe row is made the first time something is added — no separate "Start recipe" step
+async function ensureRecipe(dishId) {
+  const [r] = await db.select('recipes', { cols: 'dish_id', eq: { dish_id: dishId } }); if (r) return;
+  await db.insert('recipes', { dish_id: dishId, batch_serves: num(document.querySelector(`[data-recipeserves="${dishId}"]`)?.value) || 10, status: 'draft' });
+}
+document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.closest('#addRow') && e.target.tagName === 'INPUT') { e.preventDefault(); e.target.closest('#addRow').querySelector('[data-act=addIng]').click(); } });
+const canEditDish = () => canAny('chef', 'manager', 'coordinator');
+ACT.toggleDishEdit = () => { const f = document.getElementById('dishEdit'); if (f) { f.hidden = !f.hidden; if (!f.hidden) f.name.focus(); } };
+FORMS.editDish = async (f, el) => {
+  const name = f.name.trim().replace(/\s+/g, ' '), id = el.dataset.id;
+  const clash = Object.values(S.dishById).find(x => x.id !== id && normName(x.name) === normName(name)); if (clash) return toast(`Another dish is already called "${clash.name}".`, true);
+  await db.update('dishes', { name, category: f.category.trim() || 'Others', course: f.course, tray_price: f.tray_price === '' ? null : num(f.tray_price) }, { id });
+  await loadMaster(); toast('Dish saved'); refresh();
+};
+// Batch size: saved straight away (makes the recipe if there isn't one yet)
+document.addEventListener('change', async e => {
+  const d = e.target.dataset?.recipeserves; if (!d) return;
+  try { const [r] = await db.select('recipes', { cols: 'dish_id', eq: { dish_id: d } });
+    if (r) await db.update('recipes', { batch_serves: num(e.target.value) }, { dish_id: d }); else await ensureRecipe(d);
+    toast('Saved'); refresh(); } catch (err) { toast(err.message, true); }
+});
+// Picking an ingredient in the add row fills in its unit and last price; a new name asks for a category
+document.addEventListener('input', e => {
+  if (!e.target.matches('[data-newitem]')) return;
+  const row = e.target.closest('#addRow'), id = itemIdFromName(e.target.value), it = id && S.itemsById[id], typed = e.target.value.trim();
+  const u = row.querySelector('[name=new_unit]'), p = row.querySelector('[name=new_price]'), cat = row.querySelector('.ncat'), hint = $('#addHint');
+  if (it) { u.value = it.stock_unit || ''; u.readOnly = true; p.value = num(it.last_cost) || ''; cat.hidden = true;
+    hint.innerHTML = `<b>${esc(it.name)}</b> · priced per ${esc(it.stock_unit)}. Changing the price here updates it for every recipe. To change its unit, use ✎ after adding.`; }
+  else { if (u.readOnly) { u.value = ''; p.value = ''; } u.readOnly = false; cat.hidden = !typed;
+    hint.innerHTML = typed ? `<b>${esc(typed)}</b> is new — it will be added to the ingredient list with this unit and price.` : 'Pick an ingredient and its unit and last price fill in. A new name is added to the ingredient list too.'; }
+});
+// Price typed in the table: live cost now, saved to the ingredient (all recipes) when they leave the box
+document.addEventListener('input', e => {
+  const m = /^p_(.+)$/.exec(e.target.name || ''); if (!m || !e.target.closest('form[data-form="saveRecipe"]')) return;
+  const cell = document.querySelector(`[data-linecost="${m[1]}"]`); if (!cell) return; cell.dataset.price = num(e.target.value);
+  const q = document.querySelector(`[name="q_${m[1]}"]`); cell.textContent = num(e.target.value) ? peso(num(q?.value) * num(e.target.value)) : '—';
+  let total = 0; document.querySelectorAll('[data-linecost]').forEach(c => { const qq = document.querySelector(`[name="q_${c.dataset.linecost}"]`); total += num(qq?.value) * num(c.dataset.price); });
+  const t = $('#recipeTotal'); if (t) t.innerHTML = recipeTotalText(total, num(t.dataset.tray), num(t.dataset.serves));
+});
+document.addEventListener('change', async e => {
+  const m = /^p_(.+)$/.exec(e.target.name || ''); if (!m || !e.target.closest('form[data-form="saveRecipe"]')) return;
+  if (e.target.value === '' || num(e.target.value) < 0) return toast('Enter a price of 0 or more.', true);
+  try { await db.update('items', { last_cost: num(e.target.value) }, { id: m[1] }); S.itemsById[m[1]] && (S.itemsById[m[1]].last_cost = num(e.target.value)); toast(`Price saved for ${itemName(m[1])} (all recipes)`); }
+  catch (err) { toast(err.message, true); }
+});
 FORMS.startRecipe = async (f, el) => { await db.insert('recipes', { dish_id: el.dataset.id, batch_serves: num(f.serves), status: 'draft' }); refresh(); };
 FORMS.saveRecipe = async (f, el) => {
   for (const [k, v] of Object.entries(f).filter(([k]) => k.startsWith('q_'))) if (num(v) > 0) await db.update('recipe_lines', { qty: num(v) }, { dish_id: el.dataset.id, item_id: k.slice(2) });
@@ -1061,20 +1121,30 @@ FORMS.newItem = async (f, el) => {
   await loadMaster(); toast(qty > 0 ? `${name} added to the list and to this recipe` : `${name} added to the ingredient list`); refresh();
 };
 ACT.addIng = async el => {
-  const f = formData(el.closest('form')), typed = (f.new_item || '').trim();
+  const f = formData(el.closest('form')), typed = (f.new_item || '').trim().replace(/\s+/g, ' '), dish = el.dataset.id, qty = num(f.new_qty);
   if (!typed) return toast('Type or pick an ingredient.', true);
-  if (!(num(f.new_qty) > 0)) return toast('Enter a quantity.', true);
+  if (!(qty > 0)) return toast('Enter a quantity.', true);
   let item = itemIdFromName(typed);
-  if (!item) { const g = itemGuess(typed); if (g && confirm(`"${typed}" isn't on the ingredient list.\n\nDid you mean "${g.name}" (${g.stock_unit})?`)) item = g.id; }
-  if (!item) {   // a new ingredient: open the new-item form with the name filled in; saving it also adds it to this recipe
-    const box = document.getElementById('newItemBox'), nf = box?.querySelector('form'); if (!nf) return;
-    box.open = true; nf.name.value = typed; nf.dataset.qty = num(f.new_qty);
-    const note = document.getElementById('newItemNote'); note.hidden = false;
-    note.innerHTML = `<b>${esc(typed)}</b> is a new ingredient. Fill in its category, unit and price, then tap <b>Add item</b> — it will be added to this recipe (${fq(num(f.new_qty))}).`;
-    box.scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(() => nf.category.focus(), 350);
-    return;
+  if (!item) { const g = itemGuess(typed); if (g && confirm(`"${typed}" isn't on the ingredient list.\n\nDid you mean "${g.name}" (${g.stock_unit})?\n\nOK = use ${g.name} · Cancel = add "${typed}" as a new ingredient`)) item = g.id; }
+  const price = f.new_price === '' || f.new_price == null ? null : num(f.new_price);
+  if (price !== null && price < 0) return toast('Price cannot be negative.', true);
+  if (!item) {   // new ingredient, made right here with the unit and price typed
+    const unit = (f.new_unit || '').trim(); if (!unit) return toast(`Enter the unit for ${typed} (kg, g, L, pc…).`, true);
+    const row = { name: typed, category: (f.new_cat || '').trim() || 'Others', stock_unit: unit, purchase_unit: unit, units_per_purchase: 1, last_cost: price || 0 };
+    try { item = (await db.insert('items', row))[0]?.id; }
+    catch (err) {
+      if (!/duplicate|unique/i.test(err.message || '')) throw err;   // switched off earlier → back on with these details
+      const [old] = await db.select('items', { cols: 'id', eq: { name: typed } }); if (!old) throw err;
+      item = (await db.update('items', { ...row, active: true }, { id: old.id }))[0]?.id || old.id;
+    }
+    await loadMaster();
+  } else if (price !== null && price !== num(S.itemsById[item]?.last_cost)) {
+    await db.update('items', { last_cost: price }, { id: item }); await loadMaster();
   }
-  await db.upsert('recipe_lines', { dish_id: el.dataset.id, item_id: item, qty: num(f.new_qty) }, 'dish_id,item_id'); refresh();
+  await ensureRecipe(dish);
+  await db.upsert('recipe_lines', { dish_id: dish, item_id: item, qty }, 'dish_id,item_id');
+  toast(`${itemName(item)} added`); await refresh();
+  document.querySelector('[data-newitem]')?.focus();
 };
 ACT.editIng = async el => { const r = document.getElementById('ie_' + el.dataset.item); if (r) r.hidden = !r.hidden; };
 ACT.saveIng = async el => {

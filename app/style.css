@@ -446,3 +446,11 @@ header#top{padding-top:env(safe-area-inset-top)}
 .pos3 .p-meta{padding:6px 16px}.pos3 .p-meta input{padding:5px 8px}
 .pos3 .p-lines{min-height:120px}
 .pos3 .p-sum>div.ps-cash{padding:8px 12px;border-radius:10px;margin-top:8px}.pos3 .p-sum>div.ps-total{margin-top:4px;padding-top:6px}
+/* recipe page: one add row (ingredient · qty · unit · price), prices editable in the table */
+.addrow{display:grid;grid-template-columns:minmax(200px,2.4fr) .8fr .8fr 1fr auto;gap:10px;align-items:end;padding:12px;background:#faf7ee;border:1px solid #ebe4cf;border-radius:12px}
+.addrow label{margin:0}.addrow .ncat{grid-column:1/-2}.addrow .ncat:not([hidden])+button{grid-row:1;grid-column:5}
+.addrow input[readonly]{background:#f1ede1;color:#5b6170}
+.addrow button{height:44px;white-space:nowrap}
+.rtable input.price{width:82px;margin:0 2px}.rtable input.qty{margin:0}
+.rhead{align-items:center;gap:10px}.rhead h2{margin:0}.rhead select{width:auto;margin:0;padding:6px 10px}
+@media (max-width:700px){.addrow{grid-template-columns:1fr 1fr}.addrow .an,.addrow .ncat{grid-column:1/-1}.addrow button{grid-column:1/-1}.addrow .ncat:not([hidden])+button{grid-row:auto;grid-column:1/-1}}
