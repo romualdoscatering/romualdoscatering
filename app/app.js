@@ -2239,7 +2239,7 @@ ACT.account = async () => {
   if (!pw) return; if (pw.length < 8) return toast('Use at least 8 characters.', true);
   await db.changePassword(pw); toast('Password changed');
 };
-ACT.logout = async () => { await db.signOut(); S.user = null; S.me = null; location.hash = ''; renderLogin('You have logged out.'); };
+ACT.logout = async () => { if (!confirm('Log out of the staff app?\n\nYou stay signed in until you log out, so you only need this on a shared or lost phone.')) return; S.user = null; await db.signOut(); S.user = null; S.me = null; location.hash = ''; renderLogin('You have logged out.'); };
 ACT.reload = () => refresh();
 
 /* ================= events wiring ================= */
@@ -2277,9 +2277,29 @@ document.addEventListener('input', e => {
 /* ================= start ================= */
 (async () => {
   if (!window.ROM_SUPABASE?.url && !window.ROM_TEST_API) { $('#main').innerHTML = '<div class="card">The app is not connected yet (config.js).</div>'; return; }
-  try { S.user = await db.currentUser(); if (S.user) return afterLogin(); } catch (e) { console.error(e); }
+  try { S.user = await db.currentUser(); if (S.user) return await afterLogin(); }
+  catch (e) { console.error(e); if (S.user && (db.isNetErr(e) || !navigator.onLine)) return offlineStart(); }
   renderLogin();
 })();
+/* ---- Staying signed in, seamlessly ----
+   Opening the app with no signal keeps the saved login and retries by itself instead of asking for the password. */
+function offlineStart() {
+  $('#top').innerHTML = `<div class="bar"><span class="brand"><img src="../assets/logo.png" alt="Romualdo's"><em>Staff</em></span></div>`;
+  $('#main').innerHTML = `<div class="card login"><h1>Waiting for internet…</h1><p>You're still signed in. The app will open by itself as soon as the phone is back online.</p><button class="pri wide" data-act="retryStart">Try again</button></div>`;
+}
+ACT.retryStart = async () => { try { S.user = await db.currentUser(); if (S.user) await afterLogin(); else renderLogin(); } catch (e) { toast('Still no internet. Check the Wi-Fi or data.', true); } };
+window.addEventListener('online', () => { setNet(); if (S.user && !S.me) ACT.retryStart(); });
+window.addEventListener('offline', setNet);
+function setNet() {
+  let b = document.getElementById('netbar');
+  if (navigator.onLine) { b?.remove(); return; }
+  if (!b) { b = document.createElement('div'); b.id = 'netbar'; b.className = 'netbar'; document.body.appendChild(b); }
+  b.textContent = 'No internet — changes won’t save until you’re back online.';
+}
+setNet();
+db.onSignedOut(() => { if (S.user) { S.user = null; S.me = null; renderLogin('You were signed out. Please log in again.'); } });
+// Phone woke up / app came back to the screen: renew the login quietly
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && S.user) db.wake(); });
 
 /* ================= BILLING (Statement of Account per event + payments) ================= */
 const canBill = () => can('catering', 'manager', 'finance');
