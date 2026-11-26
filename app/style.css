@@ -477,3 +477,12 @@ button.sm{padding:6px 12px;font-size:13px}
 .cu-acts .lnk.bad-t{color:var(--bad)}
 /* Brand lockup: sit "Catering" on the wordmark's baseline (the logo's R swash hangs below it) and keep the divider short */
 .brand em{line-height:1;padding-top:2px;padding-bottom:2px;position:relative;top:-.18em}
+/* Record what was bought */
+.buyrep h2{margin:0}.buyrep.pend{border:1.5px solid #e2c77e}
+.brt input.qty{width:80px;margin:0}.brt input.price{width:84px}
+.brt td:first-child input[type=checkbox]{width:22px;height:22px;accent-color:#1d7a3a}
+.brt tr .nb{display:none;color:var(--bad);font-weight:600}
+.brt tr.off td{color:#8a8f9c}.brt tr.off .nb{display:block}.brt tr.off input.qty{opacity:.45}
+.brt tr.off td:nth-child(2){text-decoration:line-through;text-decoration-color:#b4231888}
+.brt tr.off .small{text-decoration:none}
+.buyrep .lnk{border:0;background:transparent;color:var(--mut);font-weight:600;font-size:13px;cursor:pointer;padding:4px 0}

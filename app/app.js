@@ -134,6 +134,7 @@ async function refresh() { const y = scrollY; await route(); window.scrollTo(0, 
 window.addEventListener('hashchange', route);
 function go(h) { if (location.hash === h) refresh(); else location.hash = h; }
 function afterRender() {
+  document.querySelectorAll('form[data-form="buyReport"]').forEach(brTotals);
   evBarWatch();
   document.querySelectorAll('[data-show-if]').forEach(el => { const [name, val] = el.dataset.showIf.split('='); const src = document.querySelector(`[name="${name}"]`); const upd = () => el.hidden = src?.value !== val; src?.addEventListener('change', upd); upd(); });
 }
@@ -643,13 +644,16 @@ routes['c/requests'] = async arg => {
   const tab = arg || (can(WS(), 'manager') ? 'approve' : 'open');
   const tabs = [['approve', 'To approve'], ['open', 'In progress'], ['draft', 'Drafts'], ['all', 'All']];
   const st = { approve: ['submitted'], open: ['submitted', 'approved', 'ordered'], draft: ['draft'] }[tab];
-  const rows = await db.select('pr_overview', { eq: { ws: WS() }, ...(st ? { in: { status: st } } : {}), order: [['created_at', false]], limit: 200 });
+  let rows = await db.select('pr_overview', { eq: { ws: WS() }, ...(st ? { in: { status: st } } : {}), order: [['created_at', false]], limit: 200 });
+  const waitRep = new Set((await db.select('purchase_reports', { cols: 'pr_id', eq: { ws: WS(), status: 'submitted' } }).catch(() => [])).map(r => r.pr_id));
+  if (tab === 'approve' && waitRep.size) { const have = new Set(rows.map(r => r.id)), more = [...waitRep].filter(x => !have.has(x));
+    if (more.length) rows = [...rows, ...await db.select('pr_overview', { in: { id: more } })]; }
   return `<div class="row"><h1>Purchase requests</h1><span class="sp"></span>${rows.length ? '<button class="ghost" data-act="delPRs" title="Delete the ticked requests">🗑 Delete ticked</button>' : ''}${rows.length > 1 ? '<button class="ghost" data-act="combinePR">🧾 Combine into one list</button>' : ''}<button class="pri" data-act="newPR">＋ New request</button></div>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/${P()}/requests/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
    ${rows.length ? `<p class="small mut">Tick requests to <b>combine</b> them into one buying list, or to <b>delete</b> ones made by mistake, duplicated, or replaced by a revised order.</p>` : ''}
    ${rows.length ? `<div class="list">${rows.map(p => `<div class="pick"><label class="pk" title="Tick to combine or delete"><input type="checkbox" data-pr="${p.id}" data-no="${esc(p.pr_no)}"></label><a class="li" href="#/${P()}/pr/${p.id}"><div class="li-main"><b>${esc(p.pr_no)}${p.priority === 'urgent' ? ' ' + chip('urgent', 'bad') : ''}</b>
      <span class="mut small">${esc([p.event_title ? p.event_ref + ' · ' + p.event_title : '', prPurpose(p)].filter(Boolean).join(' · '))}</span>
-     <span class="mut small">${p.line_count} items · est. ${peso(p.est_total)} · ${esc(p.requested_by_name || '')}${p.needed_by ? ' · needed ' + esc(fmtD(p.needed_by)) : ''}</span></div>${chip(PR_STATUS[p.status], statusTone(p.status))}</a></div>`).join('')}</div>` : '<div class="empty">No requests here.</div>'}`;
+     <span class="mut small">${p.line_count} items · est. ${peso(p.est_total)} · ${esc(p.requested_by_name || '')}${p.needed_by ? ' · needed ' + esc(fmtD(p.needed_by)) : ''}</span></div>${waitRep.has(p.id) ? chip('🛒 Bought — to check', 'warn') : chip(PR_STATUS[p.status], statusTone(p.status))}</a></div>`).join('')}</div>` : '<div class="empty">No requests here.</div>'}`;
 };
 // "Auto from EV-… · client · type" repeats the event already shown — only show a purpose that adds something
 const prPurpose = p => p.event_title && /^auto from/i.test(p.purpose || '') ? '' : (p.purpose || '');
@@ -665,6 +669,69 @@ ACT.delPRs = async () => { const t = [...document.querySelectorAll('input[data-p
 ACT.delPR = async el => { if (await deletePRs([el.dataset.id], [el.dataset.no])) go(`#/${P()}/requests`); };
 ACT.newPR = async () => { const r = (await db.insert('purchase_requests', { ws: WS(), purpose: WS() === 'restaurant' ? 'Restaurant restock' : 'Catering store restock', requested_by: S.user.id }))[0]; go(`#/${P()}/pr/${r.id}`); };
 
+/* ---- "Record what was bought": one form on the request → approval → stock ---- */
+function buyReportForm(p, toBuy, remaining) {
+  let ticks = null; try { const t = JSON.parse(localStorage.getItem('prl-' + p.id) || 'null'); if (t && Object.values(t).some(Boolean)) ticks = t; } catch (e) {}
+  const row = l => { const on = ticks ? !!ticks[l.id] : true, u = esc(itemUnit(l.item_id)), q = remaining(l), c = num(l.est_unit_cost);
+    return `<tr class="br${on ? '' : ' off'}" data-br="${l.id}"><td><input type="checkbox" name="b_${l.id}" ${on ? 'checked' : ''} aria-label="Bought"></td>
+     <td>${esc(itemName(l.item_id))}${l.note ? `<div class="small mut">${esc(l.note.replace(/^for:\s*/i, ''))}</div>` : ''}<div class="small nb">Not bought — won't go into stock</div></td>
+     <td class="n nowrap"><input name="bq_${l.id}" type="number" step="any" min="0" value="${q}" class="qty"> ${u}<div class="small mut">asked ${fq(q)}</div></td>
+     <td class="n nowrap">₱<input name="bc_${l.id}" type="number" step="any" min="0" value="${c || ''}" placeholder="0" class="qty price"><div class="small mut">per ${u}</div></td>
+     <td class="n" data-bamt>${peso(q * c)}</td></tr>`; };
+  return `<form class="card buyrep" data-form="buyReport" data-id="${p.id}"><div class="row"><h2>🛒 Record what was bought</h2></div>
+   <p class="small mut">Everything is ticked as bought. <b>Untick what you couldn't buy</b>, and change the quantity or price where it was different. A manager or storekeeper checks it, and only then do the bought items go into stock.${ticks ? ' <b>Ticks from the purchase list on this phone were used.</b>' : ''}</p>
+   <div class="tw"><table class="brt"><thead><tr><th></th><th>Item</th><th class="n">Bought</th><th class="n">Price paid</th><th class="n">Amount</th></tr></thead><tbody>
+   ${shopRows(toBuy, l => l.item_id, l => remaining(l), 5, row)}</tbody>
+   <tfoot><tr><td colspan="5"><span id="brSum"></span></td></tr></tfoot></table></div>
+   <div class="grid mt"><label>Where bought<input name="supplier" placeholder="e.g. Bankerohan market, S&R"></label><label>OR / receipt no.<input name="or_no" placeholder="optional"></label><label>Note<input name="note" placeholder="optional — e.g. no fresh scallops, bought frozen"></label></div>
+   <div class="row end"><button class="pri">Submit for approval</button></div></form>`;
+}
+function brTotals(f) {
+  let tot = 0, nb = 0, n = 0;
+  f.querySelectorAll('tr[data-br]').forEach(tr => { const id = tr.dataset.br, on = f.elements['b_' + id].checked, a = num(f.elements['bq_' + id].value) * num(f.elements['bc_' + id].value);
+    tr.classList.toggle('off', !on); tr.querySelector('[data-bamt]').textContent = on ? peso(a) : '—'; n++; if (on) tot += a; else nb++; });
+  const s = f.querySelector('#brSum'); if (s) s.innerHTML = `<b>${n - nb} of ${n} bought · ${peso(tot)}</b>${nb ? ` · <span class="bad-t">${nb} not bought</span> (stays on this request as still to buy)` : ''}`;
+}
+document.addEventListener('input', e => { const f = e.target.closest('form[data-form="buyReport"]'); if (f) brTotals(f); });
+document.addEventListener('change', e => { const f = e.target.closest('form[data-form="buyReport"]'); if (f) brTotals(f); });
+FORMS.buyReport = async (f, el) => {
+  const ids = [...el.querySelectorAll('tr[data-br]')].map(tr => tr.dataset.br);
+  const lines = ids.map(id => ({ pr_line_id: id, bought: !!el.elements['b_' + id].checked, qty: num(f['bq_' + id]), unit_cost: num(f['bc_' + id]) }));
+  if (lines.some(l => l.bought && !(l.qty > 0))) return toast('Enter how much was bought for each ticked item, or untick it.', true);
+  const nb = lines.filter(l => !l.bought).length;
+  if (!confirm(`Submit for approval?\n\n${lines.length - nb} bought${nb ? `, ${nb} not bought` : ''}. Stock changes only after a manager or storekeeper approves.`)) return;
+  try { await db.rpc('submit_purchase_report', { p_pr: el.dataset.id, p_lines: lines, p_supplier: f.supplier, p_or_no: f.or_no, p_note: f.note });
+    try { localStorage.removeItem('prl-' + el.dataset.id); } catch (e) {}
+    toast('Sent for approval'); refresh(); }
+  catch (err) { toast(err.message, true); }
+};
+function reportCard(r, ls, prLines, p) {
+  const byId = Object.fromEntries(prLines.map(l => [l.id, l])), me = S.user.id;
+  const approver = can(p.ws, 'manager', 'storekeeper') && (r.submitted_by !== me || isAdmin());
+  const nb = ls.filter(x => !x.bought), tot = ls.reduce((a, x) => a + (x.bought ? num(x.qty) * num(x.unit_cost) : 0), 0);
+  const rows = ls.map(x => ({ ...x, item_id: byId[x.pr_line_id]?.item_id, est: num(byId[x.pr_line_id]?.est_unit_cost), note: byId[x.pr_line_id]?.note }));
+  return `<section class="card buyrep pend"><div class="row"><h2>🛒 Bought — waiting for approval</h2><span class="sp"></span>${chip('To check', 'warn')}</div>
+   <p class="small mut">Recorded by <b>${esc(nameOf(r.submitted_by))}</b> · ${esc(fmtT(r.submitted_at))}${r.supplier_text ? ' · ' + esc(r.supplier_text) : ''}${r.or_no ? ' · OR ' + esc(r.or_no) : ''}${r.note ? `<br>“${esc(r.note)}”` : ''}</p>
+   <div class="tw"><table class="brt"><thead><tr><th>Item</th><th class="n">Bought</th><th class="n">Price paid</th><th class="n">Amount</th></tr></thead><tbody>
+   ${shopRows(rows, x => x.item_id, x => x.qty, 4, x => `<tr class="${x.bought ? '' : 'off'}"><td>${esc(itemName(x.item_id))}${x.bought ? '' : '<div class="small bad-t">Not bought</div>'}</td>
+     <td class="n">${x.bought ? `${fq(x.qty)} ${esc(itemUnit(x.item_id))}` : '—'}</td><td class="n">${x.bought ? `${peso(x.unit_cost)}${x.est && Math.abs(num(x.unit_cost) - x.est) > 0.009 ? `<div class="small ${num(x.unit_cost) > x.est ? 'bad-t' : 'ok-t'}">est. ${peso(x.est)}</div>` : ''}` : ''}</td><td class="n">${x.bought ? peso(num(x.qty) * num(x.unit_cost)) : ''}</td></tr>`)}
+   </tbody><tfoot><tr><td colspan="4"><b>${ls.length - nb.length} of ${ls.length} bought · ${peso(tot)}</b>${nb.length ? ` · <span class="bad-t">${nb.length} not bought</span>` : ''}</td></tr></tfoot></table></div>
+   ${approver ? `<div class="grid mt"><label>Note (optional, or reason for rejecting)<input id="repNote"></label></div>
+     ${nb.length ? `<label class="tick mt"><input type="checkbox" id="repClose"> The ${nb.length} unbought item${nb.length > 1 ? 's' : ''} won't be bought — close this request</label>` : ''}
+     <div class="row end mt"><button type="button" class="ghost danger" data-act="decideReport" data-id="${r.id}" data-ok="0">Reject</button><button type="button" class="pri" data-act="decideReport" data-id="${r.id}" data-ok="1">Approve — add to stock</button></div>`
+     : `<p class="alert info">${r.submitted_by === me ? 'You recorded these purchases, so a manager or storekeeper will check and approve them.' : 'Waiting for a manager or storekeeper to check and approve.'}</p>`}
+   ${r.submitted_by === me || can(p.ws, 'manager') ? `<div class="row end"><button type="button" class="lnk" data-act="withdrawReport" data-id="${r.id}">Withdraw to fix it</button></div>` : ''}</section>`;
+}
+ACT.decideReport = async el => {
+  const ok = el.dataset.ok === '1', note = document.getElementById('repNote')?.value || '', close = !!document.getElementById('repClose')?.checked;
+  if (!ok && !note.trim()) return toast('Write the reason for rejecting, so the buyer can fix it.', true);
+  if (ok && !confirm('Approve these purchases? The bought items go into stock at the prices paid.')) return;
+  try { const r = await db.rpc('decide_purchase_report', { p_report: el.dataset.id, p_approve: ok, p_note: note, p_close: close });
+    toast(ok ? `Added to stock${r.request_status === 'received' ? ' · request complete' : ' · unbought items are still to buy'}` : 'Rejected — the buyer can fix it and submit again'); await loadMaster(); refresh(); }
+  catch (err) { toast(err.message, true); }
+};
+ACT.withdrawReport = async el => { if (!confirm('Withdraw this purchase report? You can fix it and submit it again.')) return;
+  try { await db.rpc('withdraw_purchase_report', { p_report: el.dataset.id }); toast('Withdrawn'); refresh(); } catch (err) { toast(err.message, true); } };
 routes['c/pr'] = async id => {
   const [p] = await db.select('pr_overview', { eq: { id } }); if (!p) return '<div class="card">Request not found.</div>';
   const [lines, orders] = await Promise.all([db.select('pr_lines', { eq: { pr_id: id } }), db.select('po_overview', { eq: { pr_id: id }, order: [['ordered_at']] })]);
@@ -676,6 +743,15 @@ routes['c/pr'] = async id => {
   if (orders.length) { const pl = await db.select('po_lines', { in: { po_id: orders.filter(o => o.status !== 'cancelled').map(o => o.id) } }); pl.forEach(x => ordered[x.pr_line_id] = (ordered[x.pr_line_id] || 0) + num(x.qty)); }
   const remaining = l => Math.max(num(l.approved_qty) - (ordered[l.id] || 0), 0);
   const advances = buyer ? await db.select('cash_advances', { eq: { ws: p.ws, status: 'open' }, order: [['released_at', false]] }) : [];
+  // purchase reports ("Record what was bought")
+  let reports = [], rLines = [], repOff = false;
+  try { reports = await db.select('purchase_reports', { eq: { pr_id: id }, order: [['submitted_at', false]] });
+    if (reports.length) rLines = await db.select('purchase_report_lines', { in: { report_id: reports.map(r => r.id) } }); }
+  catch (e) { repOff = true; }
+  await namesOf(reports.flatMap(r => [r.submitted_by, r.decided_by]));
+  const pending = reports.find(r => r.status === 'submitted');
+  const canReport = ['approved', 'ordered'].includes(p.status) && can(p.ws, 'purchaser', 'manager', 'finance', 'storekeeper', 'chef', 'coordinator');
+  const toBuy = lines.filter(l => remaining(l) > 0);
   const total = lines.reduce((s, l) => s + num(l.approved_qty ?? l.qty) * num(l.est_unit_cost), 0);
   return `<div class="row"><a href="#/${P()}/requests" class="back">‹ Requests</a></div>
   <div class="row"><h1>${esc(p.pr_no)}</h1>${chip(PR_STATUS[p.status], statusTone(p.status))}<span class="sp"></span>${lines.length ? `<button type="button" class="ghost" data-act="prPreview" data-id="${id}">🧾 Preview list</button>` : ''}${prCanDel(p) ? `<button type="button" class="ghost danger" data-act="delPR" data-id="${id}" data-no="${esc(p.pr_no)}" title="Delete this request (mistake, duplicate, or revised order)">🗑 Delete</button>` : ''}</div>
@@ -698,11 +774,15 @@ routes['c/pr'] = async id => {
      <div class="row end"><button type="button" class="danger" data-act="rejectPR" data-id="${id}">Reject</button><button class="pri">Approve</button></div>` : ''}
    ${p.status === 'submitted' && can(p.ws, 'manager') && mine && !isAdmin() ? '<p class="alert warn">You filed this request, so another manager or the owner must approve it.</p>' : ''}
   </form>
-  ${buyer && lines.some(l => remaining(l) > 0) ? `<form class="card" id="orderForm" data-form="createPO" data-id="${id}"><h2>Create an order</h2>
-    <p class="small mut">One order per supplier or market run. Tick the lines bought there (above).</p>
+  ${pending ? reportCard(pending, rLines.filter(x => x.report_id === pending.id), lines, p) : ''}
+  ${canReport && !pending && toBuy.length ? (repOff ? '<div class="alert warn">Recording purchases needs the latest database update — ask the owner to run it.</div>' : buyReportForm(p, toBuy, remaining)) : ''}
+  ${buyer && lines.some(l => remaining(l) > 0) ? `<details class="card"><summary><b>Ordering from a supplier for delivery instead?</b> <span class="small mut">Create an order, then receive it in Orders &amp; receiving</span></summary><form class="mt" id="orderForm" data-form="createPO" data-id="${id}">
+    <p class="small mut">One order per supplier. Tick the lines in the "Still to order" column above.</p>
     <div class="grid"><label>Supplier / stall<input name="supplier" required placeholder="e.g. Agdao market — stall 12"></label>
     <label>Cash advance used<select name="advance">${opt('', 'None / paid directly')}${advances.map(a => opt(a.id, `${peso(a.amount)} · ${fmtT(a.released_at)}`)).join('')}</select></label></div>
-    <div class="row end"><button class="pri">Create order</button></div></form>` : ''}
+    <div class="row end"><button class="pri">Create order</button></div></form></details>` : ''}
+  ${reports.filter(r => r.status !== 'submitted').length ? `<section class="card"><h2>Purchase reports</h2><div class="list">${reports.filter(r => r.status !== 'submitted').map(r => { const ls = rLines.filter(x => x.report_id === r.id), nb = ls.filter(x => !x.bought).length;
+    return `<div class="li"><div class="li-main"><b>${esc(nameOf(r.submitted_by))} · ${esc(fmtT(r.submitted_at))}</b><span class="mut small">${ls.filter(x => x.bought).length} bought${nb ? ` · ${nb} not bought` : ''} · ${peso(ls.reduce((a, x) => a + num(x.qty) * num(x.unit_cost), 0))}${r.or_no ? ' · OR ' + esc(r.or_no) : ''} · ${r.status === 'approved' ? 'approved' : 'rejected'} by ${esc(nameOf(r.decided_by))}${r.decision_note ? ' — “' + esc(r.decision_note) + '”' : ''}</span></div>${chip(r.status === 'approved' ? 'In stock' : 'Rejected', r.status === 'approved' ? 'ok' : 'bad')}</div>`; }).join('')}</div></section>` : ''}
   ${orders.length ? `<section class="card"><h2>Orders</h2><div class="list">${orders.map(o => `<a class="li" href="#/${P()}/po/${o.id}"><div class="li-main"><b>${esc(o.po_no)}</b><span class="mut small">${esc(o.supplier || '')} · ${o.line_count} items · by ${esc(o.buyer_name || '')}</span></div>${chip(PO_STATUS[o.status], statusTone(o.status))}</a>`).join('')}</div></section>` : ''}`;
 };
 // Printable purchase list — opens in a new tab, grouped the way the buyer shops (proteins → market → grocery)
