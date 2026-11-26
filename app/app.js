@@ -968,6 +968,13 @@ function likelyPairs(list, name) {   // pairs of rows whose names are the same, 
   }
   return out.sort((p, q) => (q[2] - p[2]) || name(p[0]).localeCompare(name(q[0])));
 }
+// Pairs → groups: Beef Broccoli / Beef with Brocolli / Beef with Broccoli are one card, not three
+function likelyGroups(list, name, skip) {
+  const par = new Map(list.map(x => [x.id, x.id])), find = a => par.get(a) === a ? a : (par.set(a, find(par.get(a))), par.get(a));
+  likelyPairs(list, name).filter(([a, b]) => !skip.has([a.id, b.id].sort().join('|'))).forEach(([a, b]) => par.set(find(a.id), find(b.id)));
+  const g = new Map(); list.forEach(x => { const r = find(x.id); g.has(r) || g.set(r, []); g.get(r).push(x); });
+  return [...g.values()].filter(x => x.length > 1);
+}
 const CLEAN_SKIP = () => { try { return JSON.parse(localStorage.getItem('rom-clean-skip') || '[]'); } catch (e) { return []; } };
 async function cleanupHtml() {
   if (!canEditMenu()) return '<div class="card">Clean-up is for managers and chefs.</div>';
@@ -979,20 +986,26 @@ async function cleanupHtml() {
   const live = S.dishes.filter(d => d.active), archived = S.dishes.filter(d => !d.active);
   const where = d => [d.sold_as?.includes('restaurant') && pos[d.id]?.on_pos ? `POS ₱${fq(pos[d.id].price ?? 0)}` : d.sold_as?.includes('restaurant') ? 'restaurant' : '', cateringDish(d) ? (d.tray_price ? `catering tray ${peso(d.tray_price).replace('.00', '')}` : 'catering') : '',
     `chosen ${d.times_booked}×`, rec[d.id] ? `recipe: ${nLines[d.id] || 0} ingredients${rec[d.id].status === 'verified' ? ' ✓' : ''}` : 'no recipe'].filter(Boolean).join(' · ');
-  const dPairs = likelyPairs(live, d => d.name).filter(([a, b]) => !skip.has(pk(a, b)));
-  const iPairs = likelyPairs(S.items, i => i.name).filter(([a, b]) => !skip.has(pk(a, b)));
+  // the one to keep: most used, has a recipe, a price, on the POS — then the shorter, plainer name
+  const dScore = d => d.times_booked * 100 + (nLines[d.id] || 0) * 10 + (rec[d.id]?.status === 'verified' ? 50 : 0) + (pos[d.id] ? 40 : 0) + (d.tray_price ? 20 : 0) - d.name.length / 100;
+  const iScore = i => (uses[i.id] || 0) * 10 + (num(i.last_cost) ? 5 : 0) + (/^others?$/i.test(i.category) ? 0 : 2) - i.name.length / 100;
+  const dGroups = likelyGroups(live, d => d.name, skip).map(g => g.sort((a, b) => dScore(b) - dScore(a))).sort((a, b) => a[0].name.localeCompare(b[0].name));
+  const iGroups = likelyGroups(S.items, i => i.name, skip).map(g => g.sort((a, b) => iScore(b) - iScore(a))).sort((a, b) => a[0].name.localeCompare(b[0].name));
+  const gIds = g => g.map(x => x.id).join(','), gNames = g => g.map(x => x.name).join('|');
   const unusedDish = live.filter(d => !d.times_booked && !rec[d.id] && !pos[d.id] && !d.sold_as?.includes('restaurant'));   // restaurant dishes are on the POS menu
   const unusedItem = S.items.filter(i => !uses[i.id]);
   const noPrice = S.items.filter(i => uses[i.id] && !num(i.last_cost)), noCat = S.items.filter(i => /^others?$/i.test(i.category || ''));
-  const dishCard = (d, other) => `<div class="cu-side"><a href="#/c/recipe/${d.id}"><b>${esc(d.name)}</b></a><small>${esc(d.category)} · ${esc(d.course)} · ${esc(where(d))}</small>
-    <button type="button" class="ghost sm" data-act="mergeDish" data-from="${other.id}" data-into="${d.id}" data-fname="${esc(other.name)}" data-iname="${esc(d.name)}">Keep this one</button></div>`;
-  const itemCard = (i, other) => `<div class="cu-side"><b>${esc(i.name)}</b><small>${esc(i.category)} · per ${esc(i.stock_unit)} · ${num(i.last_cost) ? peso(i.last_cost) : 'no price'} · in ${uses[i.id] || 0} recipe${uses[i.id] === 1 ? '' : 's'}</small>
-    ${normName(i.stock_unit) === normName(other.stock_unit) ? `<button type="button" class="ghost sm" data-act="mergeItem" data-from="${other.id}" data-into="${i.id}" data-fname="${esc(other.name)}" data-iname="${esc(i.name)}">Keep this one</button>` : '<small class="warn-t">different unit — set the same unit first</small>'}</div>`;
+  const dishCard = (d, g, i) => `<div class="cu-side${i === 0 ? ' best' : ''}">${i === 0 ? '<em class="cu-best">Suggested</em>' : ''}<a href="#/c/recipe/${d.id}"><b>${esc(d.name)}</b></a><small>${esc(d.category)} · ${esc(d.course)} · ${esc(where(d))}</small>
+    <button type="button" class="${i === 0 ? 'pri' : 'ghost'} sm" data-act="mergeDish" data-into="${d.id}" data-ids="${gIds(g)}" data-names="${esc(gNames(g))}">Keep this one</button></div>`;
+  const itemCard = (it, g, i) => { const odd = g.some(o => normName(o.stock_unit) !== normName(it.stock_unit));
+    return `<div class="cu-side${i === 0 ? ' best' : ''}">${i === 0 ? '<em class="cu-best">Suggested</em>' : ''}<b>${esc(it.name)}</b><small>${esc(it.category)} · per ${esc(it.stock_unit)} · ${num(it.last_cost) ? peso(it.last_cost) : 'no price'} · in ${uses[it.id] || 0} recipe${uses[it.id] === 1 ? '' : 's'}</small>
+    ${odd ? '<small class="warn-t">Units differ in this group — set them all to the same unit first (✎ on a recipe page)</small>' : `<button type="button" class="${i === 0 ? 'pri' : 'ghost'} sm" data-act="mergeItem" data-into="${it.id}" data-ids="${gIds(g)}" data-names="${esc(gNames(g))}">Keep this one</button>`}</div>`; };
+  const groupBox = (g, card) => `<div class="cu-group"><div class="cu-row">${g.map((x, i) => card(x, g, i)).join('')}</div><button type="button" class="x cu-skip" data-act="cleanSkip" data-k="${esc(g.map((a, i) => g.slice(i + 1).map(b => [a.id, b.id].sort().join('|'))).flat().join(','))}" title="They're different">Not the same</button></div>`;
   const sec = (title, n, help, body, open) => `<details class="card cu"${open ? ' open' : ''}><summary><h2>${title}</h2><span class="chip ${n ? 'warn' : 'ok'}">${n || '✓ none'}</span></summary><p class="small mut">${help}</p>${n ? body : ''}</details>`;
-  return `${sec('Possible duplicate dishes', dPairs.length, 'Same dish under two names, often one from the catering tray menu and one from the restaurant menu. <b>Keep this one</b> moves events, POS sales, kitchen counts, the recipe and the menu listing to the dish you keep, and the other name keeps working. If they really are different dishes, tap <b>Not the same</b>.',
-      `<div class="cu-list">${dPairs.map(([a, b]) => `<div class="cu-pair">${dishCard(a, b)}<span class="cu-vs">or</span>${dishCard(b, a)}<button type="button" class="x" data-act="cleanSkip" data-k="${pk(a, b)}" title="They're different dishes">Not the same</button></div>`).join('')}</div>`, true)}
-   ${sec('Possible duplicate ingredients', iPairs.length, 'Two spellings of one ingredient (Kalamansi / Calamansi) split the shopping list and the stock count. Merging moves recipes, stock, requests and orders to the one kept; amounts in the same recipe are added together. Both must use the same unit.',
-      `<div class="cu-list">${iPairs.map(([a, b]) => `<div class="cu-pair">${itemCard(a, b)}<span class="cu-vs">or</span>${itemCard(b, a)}<button type="button" class="x" data-act="cleanSkip" data-k="${pk(a, b)}" title="They're different ingredients">Not the same</button></div>`).join('')}</div>`, true)}
+  return `${sec('Possible duplicate dishes', dGroups.length, 'Same dish under two names, often one from the catering tray menu and one from the restaurant menu. <b>Keep this one</b> moves events, POS sales, kitchen counts, the recipe and the menu listing to the dish you keep, and the other name keeps working. If they really are different dishes, tap <b>Not the same</b>. The <b>Suggested</b> one is the most used (events, recipe, POS, tray price).',
+      `<div class="cu-list">${dGroups.map(g => groupBox(g, dishCard)).join('')}</div>`, true)}
+   ${sec('Possible duplicate ingredients', iGroups.length, 'Two spellings of one ingredient (Kalamansi / Calamansi) split the shopping list and the stock count. Merging moves recipes, stock, requests and orders to the one kept; amounts in the same recipe are added together. Both must use the same unit.',
+      `<div class="cu-list">${iGroups.map(g => groupBox(g, itemCard)).join('')}</div>`, true)}
    ${sec('Dishes never used', unusedDish.length, 'Catering dishes never on an event and with no recipe: usually typos or old menu items. (Restaurant dishes are managed from the POS menu.) <b>Delete</b> removes them for good; <b>Archive</b> just hides them.',
       `<div class="list">${unusedDish.map(d => `<div class="li"><div class="li-main"><a href="#/c/recipe/${d.id}"><b>${esc(d.name)}</b></a><span class="mut small">${esc(d.category)} · ${esc(d.course)}</span></div><button type="button" class="ghost sm" data-act="archDish" data-id="${d.id}" data-on="1">Archive</button><button type="button" class="ghost sm danger" data-act="delDish" data-id="${d.id}" data-name="${esc(d.name)}">Delete</button></div>`).join('')}</div>`)}
    ${sec('Ingredients not in any recipe', unusedItem.length, 'Not used by any recipe. Some are fine (bought for the store only). Delete works only if it was never bought or counted; otherwise it is archived instead.',
@@ -1011,10 +1024,17 @@ async function cleanRun(fn, args, ok) {
   try { const r = await db.rpc(fn, args); await loadMaster(); toast(ok(r)); refresh(); }
   catch (err) { toast(needsUpdate(err) ? 'Clean-up needs the latest database update — ask the owner to run it.' : err.message, true); }
 }
-ACT.mergeDish = el => { if (confirm(`Keep "${el.dataset.iname}" and merge "${el.dataset.fname}" into it?\n\nEvents, POS sales, kitchen counts, the recipe and the menu listing move to "${el.dataset.iname}". "${el.dataset.fname}" still works when typed. This can't be undone.`))
-  cleanRun('merge_dishes', { p_from: el.dataset.from, p_into: el.dataset.into }, n => `Merged into ${n}`); };
-ACT.mergeItem = el => { if (confirm(`Keep "${el.dataset.iname}" and merge "${el.dataset.fname}" into it?\n\nRecipes, stock, requests and orders move to "${el.dataset.iname}"; amounts in the same recipe are added together. This can't be undone.`))
-  cleanRun('merge_items', { p_from: el.dataset.from, p_into: el.dataset.into }, n => `Merged into ${n}`); };
+async function mergeGroup(el, fn, what) {
+  const ids = el.dataset.ids.split(','), names = el.dataset.names.split('|'), into = el.dataset.into, keep = names[ids.indexOf(into)];
+  const others = ids.map((id, i) => [id, names[i]]).filter(([id]) => id !== into);
+  if (!confirm(`Keep "${keep}" and merge ${others.map(o => `"${o[1]}"`).join(', ')} into it?\n\n${what(keep)}\n\nThis can't be undone.`)) return;
+  let n = 0;
+  try { for (const [id] of others) { await db.rpc(fn, { p_from: id, p_into: into }); n++; } toast(`${n} merged into ${keep}`); }
+  catch (err) { toast(needsUpdate(err) ? 'Clean-up needs the latest database update — ask the owner to run it.' : (n ? `${n} merged; then: ` : '') + err.message, true); }
+  await loadMaster(); refresh();
+}
+ACT.mergeDish = el => mergeGroup(el, 'merge_dishes', k => `Events, POS sales, kitchen counts, recipes and menu listings move to "${k}". The other names still work when typed.`);
+ACT.mergeItem = el => mergeGroup(el, 'merge_items', k => `Recipes, stock, requests and orders move to "${k}"; amounts in the same recipe are added together.`);
 ACT.delDish = el => { if (confirm(`Delete "${el.dataset.name}" for good?`)) cleanRun('delete_dish', { p_dish: el.dataset.id }, n => `${n} deleted`); };
 ACT.archDish = el => cleanRun('archive_dish', { p_dish: el.dataset.id, p_archive: el.dataset.on === '1' }, () => el.dataset.on === '1' ? 'Archived — off the POS and new menus' : 'Restored');
 ACT.delItem = async el => {
@@ -1027,7 +1047,7 @@ ACT.delItem = async el => {
   }
 };
 ACT.restoreItem = async el => { await db.update('items', { active: true }, { id: el.dataset.id }); await loadMaster(); toast('Restored'); refresh(); };
-ACT.cleanSkip = el => { const s = CLEAN_SKIP(); s.push(el.dataset.k); try { localStorage.setItem('rom-clean-skip', JSON.stringify(s)); } catch (e) {} refresh(); };
+ACT.cleanSkip = el => { const s = CLEAN_SKIP(); s.push(...el.dataset.k.split(',')); try { localStorage.setItem('rom-clean-skip', JSON.stringify(s)); } catch (e) {} refresh(); };
 
 routes['c/recipes'] = async arg => {
   const tab = arg || 'standard';

@@ -466,3 +466,9 @@ details.cu>summary h2{margin:0;font-size:20px}
 .cu-tags{display:flex;flex-wrap:wrap;gap:6px}
 button.sm{padding:6px 12px;font-size:13px}
 @media (max-width:760px){.cu-pair{grid-template-columns:1fr}.cu-vs{text-align:center}}
+.cu-group{display:flex;gap:10px;align-items:center;padding:10px;border:1px solid #ebe4cf;border-radius:12px;background:#fdfbf5}
+.cu-row{flex:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.cu-side{position:relative}.cu-side.best{border-color:#e2c77e;box-shadow:0 0 0 1px #e2c77e inset}
+.cu-best{position:absolute;top:-9px;right:10px;font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:#e2c77e;color:#14213f;border-radius:999px;padding:1px 8px}
+.cu-skip{white-space:nowrap;width:auto;padding:6px 8px;font-size:12px}
+@media (max-width:760px){.cu-group{flex-direction:column;align-items:stretch}}
