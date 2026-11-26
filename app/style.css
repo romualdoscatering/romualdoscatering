@@ -486,3 +486,6 @@ button.sm{padding:6px 12px;font-size:13px}
 .brt tr.off td:nth-child(2){text-decoration:line-through;text-decoration-color:#b4231888}
 .brt tr.off .small{text-decoration:none}
 .buyrep .lnk{border:0;background:transparent;color:var(--mut);font-weight:600;font-size:13px;cursor:pointer;padding:4px 0}
+.verbar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;background:#14213f;color:#fff;border-radius:12px;box-shadow:0 8px 24px #0005;font-size:14px;max-width:calc(100vw - 24px)}
+.verbar button{border:0;border-radius:8px;padding:8px 14px;background:#e2c77e;color:#14213f;font-weight:700;cursor:pointer;white-space:nowrap}
+body.pos-mode .verbar{bottom:auto;top:10px}

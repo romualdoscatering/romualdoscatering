@@ -2211,3 +2211,27 @@ routes['c/billing'] = async arg => {
 };
 FORMS.billSettings = async f => { await db.update('bill_settings', { bill_address: f.bill_address.trim(), bill_contact: f.bill_contact.trim(), pay_info: (f.pay_info || '').trim(), due_days: num(f.due_days) }, { id: 1 }); toast('Saved'); refresh(); };
 document.addEventListener('click', e => { const tr = e.target.closest('tr.click[data-href]'); if (tr && !e.target.closest('a,button,input,select')) location.hash = tr.dataset.href; });
+
+/* ---- New version published? Show a bar to reload, so nobody keeps working on an old copy after an update ---- */
+const MY_VER = new URL(import.meta.url).searchParams.get('v') || '';
+let verShown = false;
+async function checkVersion() {
+  if (verShown || !MY_VER || document.visibilityState !== 'visible') return;
+  try {
+    const html = await (await fetch('./index.html?check=' + Date.now(), { cache: 'no-store' })).text();
+    const live = (html.match(/app\.js\?v=(\d+)/) || [])[1];
+    if (live && live !== MY_VER) {
+      verShown = true;
+      const bar = document.createElement('div'); bar.className = 'verbar';
+      bar.innerHTML = '<span>✨ A new version of the app is ready.</span><button type="button">Update now</button>';
+      bar.querySelector('button').onclick = () => {
+        if (typeof EVW !== 'undefined' && EVW.dirty && !confirm('You have unsaved typing on this page. Update anyway?')) return;
+        location.reload();
+      };
+      document.body.appendChild(bar);
+    }
+  } catch (e) {}
+}
+setInterval(checkVersion, 3 * 60 * 1000);
+document.addEventListener('visibilitychange', checkVersion);
+setTimeout(checkVersion, 15000);
