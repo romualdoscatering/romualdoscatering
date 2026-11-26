@@ -26,6 +26,7 @@ The current `/ops` app keeps running until each part is replaced.
 | `migrations/20261126000200_pr_delete.sql` | `delete_prs`: delete purchase requests — the requester before approval, managers/owner also once approved; never once an order is placed |
 | `migrations/20261126000300_menu_cleanup.sql` | Recipes → Clean-up: merge duplicate dishes/ingredients (history moves, old dish name kept as alias), delete unused ones, archive dishes taken off the menu |
 | `migrations/20261126000500_purchase_reports.sql` | Record what was bought on the request itself (all ticked; untick what wasn't bought, adjust qty/price) → a manager or storekeeper approves → bought items enter stock via order + receiving; unbought stay "still to buy" |
+| `migrations/20261126000700_recipe_pricing.sql` | Recipe ingredients can be listed without a quantity (filled in later; verifying needs every quantity) · dishes get a Standard / Premium package-menu tier, pre-filled from the 2026 menu draft |
 | `seed.sql` | Buffet course shares |
 | `../tools/import_ops_export.py` | Moves events and menus from the current "Romualdo's Ops Data" sheet |
 | `../test/` | Local test: a stand-in for Supabase's auth plus an end-to-end scenario (26 checks) |

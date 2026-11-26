@@ -36,7 +36,8 @@ const who = () => S.me?.full_name || S.me?.username || '';
 async function loadMaster() {
   const [items, dishes, aliases, packs] = await Promise.all([
     db.select('items', { cols: 'id,name,category,stock_unit,purchase_unit,units_per_purchase,last_cost,waste_pct,active', eq: { active: true }, order: [['category'], ['name']] }),
-    db.select('dishes', { cols: 'id,name,category,course,tray_price,tray_serves,standard,times_booked,active,sold_as', order: [['times_booked', false], ['name']] }),
+    db.select('dishes', { cols: 'id,name,category,course,tray_price,tray_serves,standard,times_booked,active,sold_as,tier', order: [['times_booked', false], ['name']] })
+      .catch(() => db.select('dishes', { cols: 'id,name,category,course,tray_price,tray_serves,standard,times_booked,active,sold_as', order: [['times_booked', false], ['name']] })),
     db.select('dish_aliases', { cols: 'alias,dish_id' }),
     db.select('pack_sets', { cols: 'id,name,price,active', eq: { active: true }, order: [['name']] }),
   ]);
@@ -134,7 +135,7 @@ async function refresh() { const y = scrollY; await route(); window.scrollTo(0, 
 window.addEventListener('hashchange', route);
 function go(h) { if (location.hash === h) refresh(); else location.hash = h; }
 function afterRender() {
-  recalcCosting(); KFILT = 'all'; recalcCostTab();
+  recalcCosting(); recalcCostTab();
   document.querySelectorAll('form[data-form="buyReport"]').forEach(brTotals);
   evBarWatch();
   document.querySelectorAll('[data-show-if]').forEach(el => { const [name, val] = el.dataset.showIf.split('='); const src = document.querySelector(`[name="${name}"]`); const upd = () => el.hidden = src?.value !== val; src?.addEventListener('change', upd); upd(); });
@@ -1171,7 +1172,7 @@ const isToTaste = itemId => /^(salt|black pepper|whole peppercorns)/i.test(S.ite
 // Recipe cost line: total, per guest, share of tray price (with a warning colour when the margin is thin)
 function recipeTotalText(cost, tray, serves) {
   const pct = tray ? Math.round(cost / tray * 100) : null;
-  return `Ingredient cost per batch <b>${peso(cost)}</b> · ${peso(cost / (serves || 1))} per guest${pct !== null ? ` · <span class="${pct > 45 ? 'bad-t' : pct > 35 ? 'warn-t' : 'ok-t'}">${pct}% of the tray price</span>` : ''}`;
+  return `Ingredient cost per batch <b>${peso(cost)}</b> · ${peso(cost / (serves || 1))} per guest${pct !== null ? ` · <span class="${fcTone(pct)}">${pct}% of the tray price</span>` : ''}`;
 }
 // Live recompute while quantities are typed; each change is saved on its own
 document.addEventListener('input', e => {
@@ -1183,8 +1184,8 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', async e => {
   const m = /^q_(.+)$/.exec(e.target.name || ''); const form = e.target.closest('form[data-form="saveRecipe"]'); if (!m || !form) return;
-  if (!(num(e.target.value) > 0)) return toast('Quantity must be more than 0 (use ✕ to remove an ingredient).', true);
-  try { await db.update('recipe_lines', { qty: num(e.target.value) }, { dish_id: form.dataset.id, item_id: m[1] }); toast('Saved'); } catch (err) { toast(err.message, true); }
+  if (num(e.target.value) < 0) return toast('Quantity cannot be negative (use ✕ to remove an ingredient).', true);
+  try { await db.update('recipe_lines', { qty: num(e.target.value) }, { dish_id: form.dataset.id, item_id: m[1] }); toast(num(e.target.value) ? 'Saved' : 'Saved — quantity still to fill in'); } catch (err) { toast(qtyErr(err), true); }
 });
 routes['c/recipe'] = async id => {
   const d = S.dishById[id]; if (!d) return '<div class="card">Dish not found.</div>';
@@ -1203,12 +1204,13 @@ routes['c/recipe'] = async id => {
   const DISH_CATS = [...new Set(['Chicken', 'Pork', 'Beef', 'Seafood', 'Vegetables', 'Pasta & noodles', 'Salads', 'Soup', 'Rice', 'Desserts', 'Drinks', ...Object.values(S.dishById).map(x => x.category)])];
   return `<div class="row"><a href="#/c/recipes" class="back">‹ Dishes</a></div>
   <div class="row"><h1>${esc(d.name)}</h1>${r ? chip(r.status === 'verified' ? 'Verified' : 'Draft', r.status === 'verified' ? 'ok' : 'warn') : chip('No recipe yet', 'mut')}${d.active ? '' : ' ' + chip('Archived', 'bad')}<span class="sp"></span>${canEditDish() ? `<button type="button" class="ghost" data-act="toggleDishEdit">✎ Edit dish</button>` : ''}</div>
-  <p class="lede">${esc(d.category)} · ${esc(d.course)} · chosen ${d.times_booked}× ${d.tray_price ? '· tray price ' + peso(d.tray_price) : ''}</p>
+  <p class="lede">${esc(d.category)} · ${esc(d.course)}${d.tier ? ` · ${TIER_LBL[d.tier]}` : ''} · chosen ${d.times_booked}× ${d.tray_price ? '· tray price ' + peso(d.tray_price) : ''}</p>
   ${canEditDish() ? `<form class="card" data-form="editDish" data-id="${id}" id="dishEdit" hidden><h2>Dish details</h2><div class="grid">
     <label>Dish name<input name="name" value="${esc(d.name)}" required data-cap></label>
     <label>Category<input name="category" list="dl-dishcats" value="${esc(d.category)}" required></label>
     <label>Course on the event sheet<select name="course">${COURSES.map(c => opt(c, c, c === d.course)).join('')}</select></label>
-    <label>Tray price ₱<input name="tray_price" type="number" step="any" min="0" value="${d.tray_price ?? ''}" placeholder="not sold by the tray"></label></div>
+    <label>Tray price ₱<input name="tray_price" type="number" step="any" min="0" value="${d.tray_price ?? ''}" placeholder="not sold by the tray"></label>
+    ${'tier' in d ? `<label>Package menu<select name="tier">${opt('', '— not on a package menu', !d.tier)}${opt('standard', 'Standard selection', d.tier === 'standard')}${opt('premium', 'Premium selection', d.tier === 'premium')}${opt('both', 'Both selections', d.tier === 'both')}</select></label>` : ''}</div>
     <datalist id="dl-dishcats">${DISH_CATS.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
     <p class="small mut">The new name shows everywhere this dish is used: event menus, the POS, Kitchen stocks and purchase requests.</p>
     <div class="row end">${canEditMenu() ? `<button type="button" class="ghost danger" data-act="archDish" data-id="${id}" data-on="${d.active ? 1 : 0}" title="${d.active ? 'Hide from the POS and new event menus; history is kept' : ''}">${d.active ? 'Take off the menu' : 'Put back on the menu'}</button><button type="button" class="ghost danger" data-act="delDish" data-id="${id}" data-name="${esc(d.name)}">Delete dish</button><span class="sp"></span>` : ''}<button type="button" class="ghost" data-act="toggleDishEdit">Cancel</button><button class="pri">Save dish</button></div></form>` : ''}
@@ -1217,9 +1219,9 @@ routes['c/recipe'] = async id => {
    <div class="row rhead"><h2>Ingredients for</h2>${edit ? batchSel(serves) : `<b>${serves === 1 ? 'one guest' : serves === 10 ? 'one tray (10–12 guests)' : `one batch (${fq(serves)} guests)`}</b>`}</div>
    ${lines.length ? `<div class="tw"><table class="rtable"><thead><tr><th>Ingredient</th><th class="n">Qty</th><th class="n">Price per unit</th><th class="n">Cost</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>
    ${lines.map(l => { const it = S.itemsById[l.item_id] || {}, u = esc(itemUnit(l.item_id)); return `${head(l.item_id)}<tr><td>${esc(itemName(l.item_id))}</td>
-     <td class="n nowrap">${edit ? `<input name="q_${l.item_id}" type="number" step="any" min="0" value="${num(l.qty)}" class="qty">` : fq(l.qty)} ${u}</td>
+     <td class="n nowrap">${edit ? `<input name="q_${l.item_id}" type="number" step="any" min="0" value="${num(l.qty) || ''}" placeholder="qty?" class="qty${num(l.qty) ? '' : ' need'}">` : num(l.qty) ? fq(l.qty) : '<span class="warn-t small">qty?</span>'} ${u}</td>
      <td class="n nowrap">${edit ? `₱<input name="p_${l.item_id}" type="number" step="any" min="0" value="${num(it.last_cost) || ''}" placeholder="—" class="qty price" title="Price per ${u}: changes it for every recipe using ${esc(it.name || '')}"> /${u}` : num(it.last_cost) ? `${peso(it.last_cost)} /${u}` : '<span class="mut small">no price</span>'}</td>
-     <td class="n" data-linecost="${l.item_id}" data-price="${num(it.last_cost)}" data-qty="${num(l.qty)}">${num(it.last_cost) ? peso(num(l.qty) * num(it.last_cost)) : '<span class="mut small">—</span>'}</td>${edit ? `<td class="nowrap"><button type="button" class="x" title="Rename, change unit, or replace" data-act="editIng" data-item="${l.item_id}">✎</button><button type="button" class="x" title="Remove" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>
+     <td class="n" data-linecost="${l.item_id}" data-price="${num(it.last_cost)}" data-qty="${num(l.qty)}">${num(it.last_cost) && num(l.qty) ? peso(num(l.qty) * num(it.last_cost)) : '<span class="mut small">—</span>'}</td>${edit ? `<td class="nowrap"><button type="button" class="x" title="Rename, change unit, or replace" data-act="editIng" data-item="${l.item_id}">✎</button><button type="button" class="x" title="Remove" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>
    ${edit ? `<tr class="ing-edit" id="ie_${l.item_id}" hidden><td colspan="5"><div class="grid">
      <label>Ingredient name<input name="e_name_${l.item_id}" value="${esc(it.name || '')}" data-cap></label>
      <label>Unit used in recipes<input name="e_unit_${l.item_id}" list="dl-units" value="${esc(it.stock_unit || '')}"></label>
@@ -1229,7 +1231,7 @@ routes['c/recipe'] = async id => {
      <div class="row end"><button type="button" class="ghost" data-act="editIng" data-item="${l.item_id}">Cancel</button><button type="button" class="pri" data-act="saveIng" data-dish="${id}" data-item="${l.item_id}">Save ingredient</button></div></td></tr>` : ''}`; }).join('')}
    </tbody><tfoot><tr><td colspan="5" id="recipeTotal" data-tray="${trayP}" data-serves="${serves}">${recipeTotalText(cost, trayP, serves)}</td></tr></tfoot></table></div>` : `<p class="mut">No ingredients yet${edit ? ' — add the first one below. The recipe is saved as you go.' : '.'}</p>`}
    ${edit ? `<div class="addrow mt" id="addRow"><label class="an">Ingredient<input name="new_item" list="dl-items" placeholder="Type or pick an ingredient" autocomplete="off" data-newitem></label>
-     <label>Qty<input name="new_qty" type="number" step="any" min="0" placeholder="0" class="qty"></label>
+     <label>Qty <span class="mut">(can wait)</span><input name="new_qty" type="number" step="any" min="0" placeholder="later" class="qty"></label>
      <label>Unit<input name="new_unit" list="dl-units" placeholder="kg" class="qty"></label>
      <label>Price per unit ₱<input name="new_price" type="number" step="any" min="0" placeholder="0.00" class="qty"></label>
      <label class="ncat" hidden>Category (new ingredient)<input name="new_cat" list="dl-cats" placeholder="e.g. Vegetables"></label>
@@ -1246,111 +1248,209 @@ routes['c/recipe'] = async id => {
   ${lines.length ? costingCard(d, r, lines, serves, edit) : ''}
   ${edit || r?.method ? `<section class="card"><h2>Method &amp; notes</h2>${edit ? `<textarea id="recipeMethod" data-dish="${id}" rows="5" placeholder="Prep and cooking steps, yields, plating, what to watch out for…">${esc(r?.method || '')}</textarea><p class="small mut">Saves when you click away. Printed on the recipe card.</p>` : `<p class="pre">${esc(r.method)}</p>`}</section>` : ''}`}`;
 };
-/* ---- Recipes → Costing: every dish with a recipe, food cost %, suggested price, price-change simulator ---- */
+/* ---- House pricing (Romualdo's) ----
+   S = ingredient cost for one large tray (10–12 guests, planned at 10)
+   Tray price        = S × 3
+   Buffet per head   = (tray price − 35% of S) ÷ 10
+   Restaurant serving (3–4 guests ≈ ⅓ of a tray) = tray price ÷ 3
+   Shown inside the app only (chef, manager, finance). Change the numbers here and every screen follows. */
+const HOUSE = { markup: 3, pax: 10, buffetLess: 0.35, servingsPerTray: 3 };
+const FC_TARGET = 100 / HOUSE.markup;                       // 33.3% food cost on a tray
+const fcTone = pct => pct > FC_TARGET + 10 ? 'bad-t' : pct > FC_TARGET + 2 ? 'warn-t' : 'ok-t';
+const roundUp = (n, step) => n > 0 ? Math.ceil(n / step - 1e-9) * step : 0;
+const roundUp10 = n => roundUp(n, 10);
+const pesoR = n => n ? peso(n).replace('.00', '') : '—';
+const TIER_LBL = { standard: 'Standard', premium: 'Premium', both: 'Standard + Premium' };
+const tierChip = t => t ? `<span class="tier t-${t}">${t === 'both' ? 'Std + Prem' : TIER_LBL[t]}</span>` : '';
+const qtyErr = err => /qty_check|violates check/i.test(err?.message || '') ? 'The database update for blank quantities isn\'t installed yet (20261126000700). Enter a quantity for now.' : err?.message || String(err);
+function housePrices(S) {
+  const tray = S * HOUSE.markup, head = (tray - HOUSE.buffetLess * S) / HOUSE.pax, serving = tray / HOUSE.servingsPerTray;
+  return { S, tray, head, serving, trayR: roundUp(tray, 10), headR: roundUp(head, 1), servingR: roundUp(serving, 5) };
+}
+// cost of a recipe scaled to one tray of 10, from its lines (qty 0 = not filled in yet)
+function recipeS(lines, serves, priceOf = id => num(S.itemsById[id]?.last_cost)) {
+  const cost = lines.reduce((a, l) => a + num(l.qty) * priceOf(l.item_id), 0);
+  return cost * HOUSE.pax / (num(serves) || HOUSE.pax);
+}
+
+/* ---- Recipes → Costing tab: every dish with a recipe at house prices, filters, price-change simulator, package check ---- */
+const PACKAGES = [
+  { k: 's450', tier: 'standard', price: 450, slots: ['Soup', 'Chicken', 'Veggies / noodles', 'Rice', 'Dessert'], note: '+ softdrinks · min. 100 pax' },
+  { k: 's550', tier: 'standard', price: 550, slots: ['Soup', 'Appetizer', 'Chicken', '2nd viand', 'Veggie', 'Pasta / noodle', 'Rice', 'Dessert'], note: 'min. 50 pax' },
+  { k: 's650', tier: 'standard', price: 650, slots: ['Soup', 'Appetizer', 'Chicken', 'Pork', 'Beef / fish', 'Veggies', 'Pasta / noodle', 'Rice', 'Dessert'], note: 'min. 50 pax' },
+  { k: 'p750', tier: 'premium', price: 750, slots: ['Soup', 'Chicken', '2nd viand', 'Veggies', 'Rice', 'Dessert'], note: '+ softdrinks · min. 50 pax' },
+  { k: 'p850', tier: 'premium', price: 850, slots: ['Soup', 'Appetizer', 'Chicken', 'Beef', 'Pork / fish', 'Pasta / noodle', 'Rice', 'Dessert'], note: '+ softdrinks · min. 50 pax' },
+  { k: 'p990', tier: 'premium', price: 990, slots: ['Soup', 'Assorted appetizers', 'Chicken', 'Pork', 'Beef / fish', 'Veggies', 'Pasta / noodle', 'Rice', 'Dessert'], note: '2–3 desserts · min. 50 pax' },
+];
+let COST_ROWS = [], KSORT = ['name', true], KFILT = 'all';
 function costingTab(recipes, rl) {
   const by = {}; rl.forEach(l => (by[l.dish_id] = by[l.dish_id] || []).push(l));
-  const rows = S.dishes.filter(d => d.active && recipes[d.id] && by[d.id]).map(d => {
-    const r = recipes[d.id], serves = num(r.batch_serves) || 1, ls = by[d.id];
-    return { d, serves, ls, status: r.status, price: serves > 1 ? num(d.tray_price) : 0, missing: ls.filter(l => !num(S.itemsById[l.item_id]?.last_cost)).length };
+  COST_ROWS = S.dishes.filter(d => d.active && recipes[d.id] && by[d.id]).map(d => {
+    const r = recipes[d.id], ls = by[d.id];
+    return { d, serves: num(r.batch_serves) || HOUSE.pax, ls, status: r.status, now: num(d.tray_price),
+      missing: ls.filter(l => !num(S.itemsById[l.item_id]?.last_cost)).length, noQty: ls.filter(l => !num(l.qty)).length };
   });
   const usedItems = [...new Set(rl.map(l => l.item_id))].filter(i => S.itemsById[i]).sort((a, b) => itemName(a).localeCompare(itemName(b)));
-  COST_ROWS = rows;
+  const hasTier = S.dishes.some(d => 'tier' in d);
   return `<div class="card ctools">
-    <div class="ct-row"><label>Target food cost<span><input id="ktTarget" type="number" min="5" max="90" value="${TARGET_FC()}"> %</span></label>
-     <label>All ingredient prices<span><input id="ktInfl" type="number" step="1" value="0"> % change</span></label>
+    <p class="small mut hf1"><b>House formula</b> · tray = ingredient cost (10–12 pax) × ${HOUSE.markup} · buffet per head = (tray − ${HOUSE.buffetLess * 100}% of the cost) ÷ ${HOUSE.pax} · restaurant serving (3–4 pax) = tray ÷ ${HOUSE.servingsPerTray}. Rounded up: tray and serving to ₱10/₱5, per head to ₱1.</p>
+    <div class="ct-row"><label>All ingredient prices<span><input id="ktInfl" type="number" step="1" value="0"> % change</span></label>
      <label class="wide">One ingredient's new price<span><input id="ktItem" list="dl-citems" placeholder="e.g. Pork kasim" autocomplete="off"> ₱<input id="ktPrice" type="number" step="any" min="0" placeholder="new price"></span></label></div>
     <datalist id="dl-citems">${usedItems.map(i => `<option value="${esc(itemName(i))}">`).join('')}</datalist>
-    <div class="ct-row filt"><span class="mut small">Show</span>${[['all', 'All'], ['over', 'Over target'], ['missing', 'Missing prices'], ['noprice', 'No tray price'], ['affected', 'Affected by the price change']].map(([k, l], i) => `<button type="button" class="chipbtn${i ? '' : ' on'}" data-kfilt="${k}">${l}</button>`).join('')}<span class="sp"></span><span id="ktSum" class="small"></span></div>
+    <div class="ct-row filt"><span class="mut small">Show</span>${[['all', 'All'], ...(hasTier ? [['standard', 'Standard'], ['premium', 'Premium'], ['untiered', 'Not on a package']] : []), ['under', 'Priced below formula'], ['incomplete', 'Missing price / qty'], ['affected', 'Affected by the price change']].map(([k, l]) => `<button type="button" class="chipbtn${k === KFILT ? ' on' : ''}" data-kfilt="${k}">${l}</button>`).join('')}<span class="sp"></span><span id="ktSum" class="small"></span></div>
    </div>
-   <div class="card tw"><table class="ktable"><thead><tr>${[['name', 'Dish'], ['cost', 'Cost / batch'], ['guest', 'Per guest'], ['price', 'Tray price'], ['fc', 'Food cost'], ['sug', 'Suggested'], ['new', 'After change']].map(([k, l], i) => `<th class="${i ? 'n' : ''}" data-ksort="${k}">${l}</th>`).join('')}</tr></thead><tbody id="ktBody"></tbody></table></div>`;
+   <div class="card tw"><table class="ktable"><thead><tr>${[['name', 'Dish'], ['S', 'Cost · 10 pax'], ['tray', 'Tray ×3'], ['head', 'Buffet / head'], ['serving', 'Restaurant serving'], ['now', 'Tray price now'], ['new', 'After change']].map(([k, l], i) => `<th class="${i ? 'n' : ''}" data-ksort="${k}">${l}</th>`).join('')}</tr></thead><tbody id="ktBody"></tbody></table></div>
+   ${packageCheck()}`;
 }
-let COST_ROWS = [], KSORT = ['fc', false], KFILT = 'all';
+function costRowsCalc() {
+  const infl = num($('#ktInfl')?.value), itemId = itemIdFromName($('#ktItem')?.value || ''), np = ($('#ktPrice')?.value ?? '') === '' ? null : num($('#ktPrice').value);
+  const sim = !!(infl || (itemId && np !== null));
+  return { sim, rows: COST_ROWS.map(x => {
+    const Sv = recipeS(x.ls, x.serves), nS = recipeS(x.ls, x.serves, id => id === itemId && np !== null ? np : num(S.itemsById[id]?.last_cost)) * (1 + infl / 100);
+    const h = housePrices(Sv), nh = housePrices(nS);
+    return { ...x, S: Sv, h, nh, tray: h.trayR, head: h.headR, serving: h.servingR, fcNow: x.now && Sv ? Sv / x.now * 100 : null, affected: sim && Math.abs(nS - Sv) > 0.005 };
+  }) };
+}
 function recalcCostTab() {
   const body = $('#ktBody'); if (!body) return;
-  const target = Math.min(90, Math.max(5, num($('#ktTarget').value) || 35)), infl = num($('#ktInfl').value);
-  const itemId = itemIdFromName($('#ktItem').value), newP = $('#ktPrice').value === '' ? null : num($('#ktPrice').value);
-  const sim = infl || (itemId && newP !== null);
-  const rows = COST_ROWS.map(x => {
-    const cost = x.ls.reduce((a, l) => a + num(l.qty) * num(S.itemsById[l.item_id]?.last_cost), 0);
-    const newCost = x.ls.reduce((a, l) => a + num(l.qty) * (l.item_id === itemId && newP !== null ? newP : num(S.itemsById[l.item_id]?.last_cost)), 0) * (1 + infl / 100);
-    const fc = x.price ? cost / x.price * 100 : null, nfc = x.price ? newCost / x.price * 100 : null;
-    return { ...x, cost, newCost, fc, nfc, guest: cost / x.serves, sug: cost ? roundUp10(cost / (target / 100)) : 0, affected: sim && Math.abs(newCost - cost) > 0.005 };
-  }).filter(x => KFILT === 'all' || (KFILT === 'over' && x.fc !== null && x.fc > target) || (KFILT === 'missing' && x.missing) || (KFILT === 'noprice' && x.serves > 1 && !x.price) || (KFILT === 'affected' && x.affected));
-  const [k, asc] = KSORT, val = x => k === 'name' ? x.d.name : k === 'new' ? x.nfc ?? -1 : k === 'price' ? x.price : x[k] ?? -1;
+  const { sim, rows: all } = costRowsCalc();
+  const rows = all.filter(x => KFILT === 'all' || (KFILT === 'standard' && ['standard', 'both'].includes(x.d.tier)) || (KFILT === 'premium' && ['premium', 'both'].includes(x.d.tier)) || (KFILT === 'untiered' && !x.d.tier)
+    || (KFILT === 'under' && x.now && x.tray > x.now) || (KFILT === 'incomplete' && (x.missing || x.noQty)) || (KFILT === 'affected' && x.affected));
+  const [k, asc] = KSORT, val = x => k === 'name' ? x.d.name : k === 'new' ? x.nh.trayR : x[k] ?? -1;
   rows.sort((a, b) => { const A = val(a), B = val(b); return (typeof A === 'string' ? A.localeCompare(B) : A - B) * (asc ? 1 : -1); });
   document.querySelectorAll('[data-ksort]').forEach(th => th.classList.toggle('sorted', th.dataset.ksort === k));
-  body.innerHTML = rows.map(x => `<tr${x.affected ? ' class="aff"' : ''}><td><a href="#/c/recipe/${x.d.id}">${esc(x.d.name)}</a><div class="small mut">${x.serves > 1 ? 'per tray' : 'per guest'}${x.status === 'verified' ? ' · ✓ verified' : ' · draft'}${x.missing ? ` · <span class="warn-t">${x.missing} no price</span>` : ''}</div></td>
-    <td class="n">${peso(x.cost)}</td><td class="n">${x.serves > 1 ? peso(x.guest) : '—'}</td><td class="n">${x.price ? peso(x.price).replace('.00', '') : '<span class="mut">—</span>'}</td>
-    <td class="n">${x.fc === null ? '<span class="mut">—</span>' : `<b class="${fcTone(x.fc, target)}">${x.fc.toFixed(1)}%</b>`}</td>
-    <td class="n">${x.sug ? peso(x.sug).replace('.00', '') : '—'}${x.price && x.sug > x.price ? ' <span class="warn-t">▲</span>' : ''}</td>
-    <td class="n">${sim ? (x.affected ? `${peso(x.newCost)}${x.nfc !== null ? `<div class="small ${fcTone(x.nfc, target)}">${x.nfc.toFixed(1)}%</div>` : ''}` : '<span class="mut">same</span>') : '<span class="mut">—</span>'}</td></tr>`).join('') || '<tr><td colspan="7" class="mut">No dishes here.</td></tr>';
-  const priced = rows.filter(x => x.fc !== null), avg = priced.length ? priced.reduce((a, x) => a + x.fc, 0) / priced.length : null, over = priced.filter(x => x.fc > target).length;
-  $('#ktSum').innerHTML = `${rows.length} dishes${avg !== null ? ` · average food cost <b class="${fcTone(avg, target)}">${avg.toFixed(1)}%</b> · <b>${over}</b> over ${target}%` : ''}${sim ? ` · <b>${rows.filter(x => x.affected).length}</b> affected` : ''}`;
+  body.innerHTML = rows.map(x => `<tr${x.affected ? ' class="aff"' : ''}><td><a href="#/c/recipe/${x.d.id}">${esc(x.d.name)}</a> ${tierChip(x.d.tier)}<div class="small mut">${x.status === 'verified' ? '✓ verified' : 'draft'}${x.missing ? ` · <span class="warn-t">${x.missing} without price</span>` : ''}${x.noQty ? ` · <span class="warn-t">${x.noQty} without qty</span>` : ''}</div></td>
+    <td class="n">${peso(x.S)}</td><td class="n"><b>${pesoR(x.tray)}</b></td><td class="n">${pesoR(x.head)}</td><td class="n">${pesoR(x.serving)}</td>
+    <td class="n">${x.now ? `${pesoR(x.now)}<div class="small ${fcTone(x.fcNow)}">${x.fcNow.toFixed(0)}% food cost${x.tray > x.now ? ' ▲' : ''}</div>` : '<span class="mut">—</span>'}</td>
+    <td class="n">${sim ? (x.affected ? `tray ${pesoR(x.nh.trayR)}<div class="small mut">head ${pesoR(x.nh.headR)}</div>` : '<span class="mut">same</span>') : '<span class="mut">—</span>'}</td></tr>`).join('') || '<tr><td colspan="7" class="mut">No dishes here.</td></tr>';
+  const under = rows.filter(x => x.now && x.tray > x.now).length, inc = rows.filter(x => x.missing || x.noQty).length;
+  $('#ktSum').innerHTML = `${rows.length} dishes · <b>${under}</b> priced below the formula${inc ? ` · <b class="warn-t">${inc}</b> incomplete` : ''}${sim ? ` · <b>${rows.filter(x => x.affected).length}</b> affected` : ''}`;
+  recalcPackage(all);
+}
+// Package check: pick a dish per course and compare with the package price
+const pkgPicks = () => { try { return JSON.parse(localStorage.getItem('rom-pkg-picks') || '{}'); } catch (e) { return {}; } };
+function packageCheck() {
+  const cur = (() => { try { return localStorage.getItem('rom-pkg') || 's650'; } catch (e) { return 's650'; } })(), P = PACKAGES.find(x => x.k === cur) || PACKAGES[2], picks = pkgPicks()[P.k] || [];
+  return `<section class="card pkg" id="pkg"><div class="row"><h2>Package check</h2><select id="pkgSel">${PACKAGES.map(x => opt(x.k, `${TIER_LBL[x.tier]} ₱${x.price} per head`, x.k === P.k)).join('')}</select><span class="small mut">${esc(P.note)}</span></div>
+   <p class="small mut">Pick one dish per course. Only dishes with a recipe can be priced.</p>
+   <datalist id="dl-pkgdish">${COST_ROWS.map(x => `<option value="${esc(x.d.name)}">${x.d.tier ? TIER_LBL[x.d.tier] : ''}</option>`).join('')}</datalist>
+   <table class="pkt"><thead><tr><th>Course</th><th>Dish</th><th class="n">Buffet / head</th><th class="n">Ingredients / head</th></tr></thead><tbody>
+   ${P.slots.map((sl, i) => `<tr><td>${esc(sl)}</td><td><input data-pkslot="${i}" list="dl-pkgdish" value="${esc(picks[i] || '')}" placeholder="pick a dish" autocomplete="off"></td><td class="n" id="pkh${i}">—</td><td class="n" id="pkc${i}">—</td></tr>`).join('')}
+   </tbody><tfoot><tr><td colspan="2">Total</td><td class="n" id="pkH">—</td><td class="n" id="pkC">—</td></tr></tfoot></table>
+   <div id="pkOut" class="pkout"></div></section>`;
+}
+function recalcPackage(all) {
+  const box = $('#pkg'); if (!box) return;
+  all = all || costRowsCalc().rows;
+  const P = PACKAGES.find(x => x.k === $('#pkgSel').value), byName = Object.fromEntries(all.map(x => [normName(x.d.name), x]));
+  let H = 0, C = 0, n = 0, off = [];
+  box.querySelectorAll('[data-pkslot]').forEach(inp => {
+    const i = inp.dataset.pkslot, x = byName[normName(inp.value)];
+    $('#pkh' + i).textContent = x ? pesoR(x.head) : '—'; $('#pkc' + i).textContent = x ? peso(x.S / HOUSE.pax) : '—';
+    if (x) { H += x.head; C += x.S / HOUSE.pax; n++; if (x.d.tier && !(x.d.tier === P.tier || x.d.tier === 'both')) off.push(x.d.name); }
+  });
+  $('#pkH').textContent = n ? pesoR(H) : '—'; $('#pkC').textContent = n ? peso(C) : '—';
+  if (!n) { $('#pkOut').innerHTML = '<p class="small mut">Pick dishes to see if the package price covers them.</p>'; return; }
+  const gap = P.price - H, fc = C / P.price * 100;
+  $('#pkOut').innerHTML = `<div class="kpis kp3"><div><span>Package price</span><b>${pesoR(P.price)}</b><small>${n} of ${P.slots.length} courses picked</small></div>
+    <div><span>Dishes at buffet prices</span><b class="${gap < 0 ? 'bad-t' : 'ok-t'}">${pesoR(H)}</b><small>${gap < 0 ? `${pesoR(-gap)} more than the package` : `${pesoR(gap)} left for service &amp; setup`}</small></div>
+    <div><span>Food cost per head</span><b class="${fcTone(fc)}">${fc.toFixed(0)}%</b><small>${peso(C)} of ${pesoR(P.price)}, if each guest eats a full tray portion of every dish</small></div></div>
+    ${off.length ? `<p class="small warn-t">Not on the ${TIER_LBL[P.tier]} list: ${off.map(esc).join(', ')}</p>` : ''}`;
 }
 document.addEventListener('input', e => {
-  if (!e.target.closest('.ctools')) return;
-  if (e.target.id === 'ktTarget') { try { localStorage.setItem('rom-target-fc', e.target.value); } catch (er) {} }
-  recalcCostTab();
+  if (e.target.closest('.ctools')) recalcCostTab();
+  if (e.target.dataset?.pkslot !== undefined) {
+    const k = $('#pkgSel').value, all = pkgPicks(); all[k] = [...document.querySelectorAll('[data-pkslot]')].map(i => i.value);
+    try { localStorage.setItem('rom-pkg-picks', JSON.stringify(all)); } catch (er) {}
+    recalcPackage();
+  }
+});
+document.addEventListener('change', e => {
+  if (e.target.id !== 'pkgSel') return;
+  try { localStorage.setItem('rom-pkg', e.target.value); } catch (er) {}
+  $('#pkg').outerHTML = packageCheck(); recalcPackage();
 });
 document.addEventListener('click', e => {
   const th = e.target.closest('[data-ksort]'); if (th) { KSORT = [th.dataset.ksort, KSORT[0] === th.dataset.ksort ? !KSORT[1] : th.dataset.ksort === 'name']; return recalcCostTab(); }
   const f = e.target.closest('[data-kfilt]'); if (f) { KFILT = f.dataset.kfilt; document.querySelectorAll('[data-kfilt]').forEach(b => b.classList.toggle('on', b === f)); recalcCostTab(); }
 });
-/* ---- Costing on the recipe page: food cost %, suggested price, what-ifs ---- */
-const TARGET_FC = () => { try { return num(localStorage.getItem('rom-target-fc')) || 35; } catch (e) { return 35; } };
-const fcTone = (pct, target) => pct > target + 10 ? 'bad-t' : pct > target ? 'warn-t' : 'ok-t';
-const roundUp10 = n => Math.ceil(n / 10) * 10;
+
+/* ---- Costing on the recipe page: house prices, what-ifs, and a check for swapped quantity/price ---- */
 function costingCard(d, r, lines, serves, edit) {
-  const batchLbl = serves === 1 ? 'one guest' : serves === 10 ? 'one tray (10–12 guests)' : `one batch (${fq(serves)} guests)`;
-  const noPrice = lines.filter(l => !num(S.itemsById[l.item_id]?.last_cost));
-  return `<section class="card costing" id="costing" data-dish="${d.id}" data-serves="${serves}">
-   <div class="row"><h2>Costing</h2><span class="small mut">for ${batchLbl}</span><span class="sp"></span><button type="button" class="ghost sm" data-act="recipeCard" data-id="${d.id}">🖨 Recipe card</button></div>
+  return `<section class="card costing" id="costing" data-dish="${d.id}" data-serves="${serves}" data-now="${num(d.tray_price)}">
+   <div class="row"><h2>Costing</h2><span class="small mut">house formula · inside the app only</span><span class="sp"></span><button type="button" class="ghost sm" data-act="recipeCard" data-id="${d.id}">🖨 Recipe card</button></div>
    <div class="kpis">
-    <div><span>Ingredient cost</span><b id="cBatch">—</b><small id="cGuest"></small></div>
-    <div><span>${serves > 1 ? 'Tray price' : 'Price per guest'}</span><b class="inl">₱<input id="cPrice" type="number" step="any" min="0" value="${serves > 1 && d.tray_price ? num(d.tray_price) : ''}" placeholder="—"></b><small>${d.tray_price && serves > 1 ? 'type another to test it' : 'type a price to test it'}</small></div>
-    <div><span>Food cost</span><b id="cFc">—</b><small id="cGp"></small></div>
-    <div><span>Suggested price</span><b id="cSug">—</b><small>at <input id="cTarget" type="number" min="5" max="90" step="1" value="${TARGET_FC()}">% food cost</small></div>
+    <div><span>Ingredient cost · 10–12 pax</span><b id="hS">—</b><small id="hSg"></small></div>
+    <div><span>Tray price</span><b id="hTray">—</b><small id="hTrayNow"></small></div>
+    <div><span>Buffet · per head</span><b id="hHead">—</b><small>(tray − ${HOUSE.buffetLess * 100}% of cost) ÷ ${HOUSE.pax}</small></div>
+    <div><span>Restaurant serving · 3–4 pax</span><b id="hServ">—</b><small>tray ÷ ${HOUSE.servingsPerTray}</small></div>
    </div>
-   ${edit && serves > 1 ? `<div class="row end"><button type="button" class="lnk" data-act="useSuggested" data-id="${d.id}" id="cUse" hidden>Use the suggested price as the tray price</button></div>` : ''}
-   ${noPrice.length ? `<p class="alert warn small">Cost is incomplete: no price yet for ${noPrice.map(l => `<b>${esc(itemName(l.item_id))}</b>`).join(', ')}. Type it in the table above.</p>` : ''}
+   <div id="hWarn"></div>
+   ${edit && canEditDish() ? `<div class="row end"><button type="button" class="lnk" data-act="useSuggested" data-id="${d.id}" id="cUse" hidden></button></div>` : ''}
    <div class="cgrid">
     <div><h3>Biggest costs</h3><div id="cDrivers" class="drivers"></div></div>
     <div><h3>What if…</h3>
+     <label class="wi">We charge ₱<input id="cPrice" type="number" step="any" min="0" value="${num(d.tray_price) || ''}" placeholder="tray"> per tray</label><p class="small" id="cPriceOut"></p>
      <label class="wi">Ingredient prices go up <input id="cInfl" type="number" step="1" value="0"> %</label><p class="small" id="cInflOut"></p>
-     <label class="wi">Make <input id="cScale" type="number" step="any" min="0" value="1"> ${serves > 1 ? 'trays' : 'guests'}</label><p class="small" id="cScaleOut"></p>
+     <label class="wi">Make <input id="cScale" type="number" step="any" min="0" value="1"> trays</label><p class="small" id="cScaleOut"></p>
      <details class="small"><summary>Quantities for that amount</summary><div id="cScaled" class="scaled"></div></details>
     </div>
    </div></section>`;
 }
+const isBulkUnit = u => /^(kg|l|liters?|litres?)$/i.test((u || '').trim());
 function recalcCosting() {
   const box = document.getElementById('costing'); if (!box) return;
-  const serves = num(box.dataset.serves) || 1, rows = [...document.querySelectorAll('[data-linecost]')].map(c => {
+  const serves = num(box.dataset.serves) || HOUSE.pax, now = num(box.dataset.now), toTray = HOUSE.pax / serves;
+  const rows = [...document.querySelectorAll('[data-linecost]')].map(c => {
     const id = c.dataset.linecost, q = document.querySelector(`[name="q_${id}"]`), pr = document.querySelector(`[name="p_${id}"]`);
     const qty = q ? num(q.value) : num(c.dataset.qty), price = pr ? num(pr.value) : num(c.dataset.price);
+    q?.classList.toggle('need', !qty);
+    c.innerHTML = qty && price ? peso(qty * price) : '<span class="mut small">—</span>';
+    lineCheck(c, id, qty, price, serves, !!q);
     return { id, qty, price, cost: qty * price };
   });
-  const cost = rows.reduce((a, x) => a + x.cost, 0), price = num($('#cPrice').value), target = Math.min(90, Math.max(5, num($('#cTarget').value) || 35));
-  $('#cBatch').textContent = peso(cost); $('#cGuest').textContent = serves > 1 ? `${peso(cost / serves)} per guest` : '';
-  const fc = price ? cost / price * 100 : null;
-  $('#cFc').innerHTML = fc === null ? '—' : `<span class="${fcTone(fc, target)}">${fc.toFixed(1)}%</span>`;
-  $('#cGp').textContent = price ? `profit ${peso(price - cost)} ${serves > 1 ? 'per tray' : 'per guest'}` : 'enter a price';
-  const sug = cost ? roundUp10(cost / (target / 100)) : 0;
-  $('#cSug').textContent = sug ? peso(sug).replace('.00', '') : '—';
-  const use = $('#cUse'); if (use) use.hidden = !sug || Math.abs(sug - price) < 1;
+  const cost = rows.reduce((a, x) => a + x.cost, 0), Sv = cost * toTray, h = housePrices(Sv);
+  const noQty = rows.filter(x => !x.qty), noPrice = rows.filter(x => x.qty && !x.price);
+  $('#hS').textContent = peso(Sv); $('#hSg').textContent = `${peso(Sv / HOUSE.pax)} per guest${serves !== HOUSE.pax ? ` · recipe is for ${fq(serves)}` : ''}`;
+  $('#hTray').textContent = pesoR(h.trayR); $('#hHead').textContent = pesoR(h.headR); $('#hServ').textContent = pesoR(h.servingR);
+  $('#hTrayNow').innerHTML = now ? `cost × ${HOUSE.markup} · now ${pesoR(now)} <span class="${fcTone(Sv / now * 100)}">(${(Sv / now * 100).toFixed(0)}% food cost)</span>` : `cost × ${HOUSE.markup} · no tray price set yet`;
+  $('#hWarn').innerHTML = [noQty.length ? `<b>${noQty.length}</b> ingredient${noQty.length > 1 ? 's' : ''} still without a quantity (${noQty.map(x => esc(itemName(x.id))).join(', ')}): the prices above leave ${noQty.length > 1 ? 'them' : 'it'} out.` : '',
+    noPrice.length ? `No price yet for ${noPrice.map(x => `<b>${esc(itemName(x.id))}</b>`).join(', ')}.` : ''].filter(Boolean).map(t => `<p class="alert warn small">${t}</p>`).join('');
+  const use = $('#cUse'); if (use) { use.hidden = !h.trayR || Math.abs(h.trayR - now) < 1 || noQty.length > 0; use.dataset.v = h.trayR; use.textContent = `Set the tray price to ${pesoR(h.trayR)}`; }
   const tot = cost || 1;
-  $('#cDrivers').innerHTML = [...rows].sort((a, b) => b.cost - a.cost).slice(0, 5).filter(x => x.cost > 0).map(x => `<div class="drv"><span>${esc(itemName(x.id))}</span><i><em style="width:${Math.max(2, x.cost / tot * 100)}%"></em></i><b>${Math.round(x.cost / tot * 100)}%</b><small>${peso(x.cost)}</small></div>`).join('') || '<p class="small mut">Add prices to see what drives the cost.</p>';
-  const infl = num($('#cInfl').value), nc = cost * (1 + infl / 100);
-  $('#cInflOut').innerHTML = infl ? `Cost becomes <b>${peso(nc)}</b>${price ? ` · food cost <b class="${fcTone(nc / price * 100, target)}">${(nc / price * 100).toFixed(1)}%</b> at ${peso(price).replace('.00', '')}` : ''} · to stay at ${target}%, charge <b>${peso(roundUp10(nc / (target / 100))).replace('.00', '')}</b>` : '<span class="mut">Type a % to see the effect of a price increase.</span>';
-  const sc = num($('#cScale').value) || 0;
-  $('#cScaleOut').innerHTML = sc ? `Ingredients cost <b>${peso(cost * sc)}</b>${price ? ` · sales ${peso(price * sc)} · profit <b>${peso((price - cost) * sc)}</b>` : ''}` : '';
-  $('#cScaled').innerHTML = rows.map(x => `<div><span>${esc(itemName(x.id))}</span><b>${fq(+(x.qty * sc).toFixed(3))} ${esc(itemUnit(x.id))}</b></div>`).join('');
+  $('#cDrivers').innerHTML = [...rows].sort((a, b) => b.cost - a.cost).slice(0, 5).filter(x => x.cost > 0).map(x => `<div class="drv"><span>${esc(itemName(x.id))}</span><i><em style="width:${Math.max(2, x.cost / tot * 100)}%"></em></i><b>${Math.round(x.cost / tot * 100)}%</b><small>${peso(x.cost * toTray)}</small></div>`).join('') || '<p class="small mut">Add quantities and prices to see what drives the cost.</p>';
+  const price = num($('#cPrice').value);
+  $('#cPriceOut').innerHTML = price && Sv ? `Food cost <b class="${fcTone(Sv / price * 100)}">${(Sv / price * 100).toFixed(1)}%</b> · profit <b>${peso(price - Sv)}</b> per tray · buffet per head would be <b>${pesoR(roundUp((price - HOUSE.buffetLess * Sv) / HOUSE.pax, 1))}</b>` : '<span class="mut">Type a tray price to test it.</span>';
+  const infl = num($('#cInfl').value), nh = housePrices(Sv * (1 + infl / 100));
+  $('#cInflOut').innerHTML = infl ? `Cost becomes <b>${peso(nh.S)}</b> · tray <b>${pesoR(nh.trayR)}</b> · per head <b>${pesoR(nh.headR)}</b> · serving <b>${pesoR(nh.servingR)}</b>` : '<span class="mut">Type a % to see the effect of a price increase.</span>';
+  const sc = num($('#cScale').value) || 0, sell = price || h.trayR;
+  $('#cScaleOut').innerHTML = sc ? `Ingredients cost <b>${peso(Sv * sc)}</b> · sales ${peso(sell * sc)} · profit <b>${peso((sell - Sv) * sc)}</b>` : '';
+  $('#cScaled').innerHTML = rows.map(x => `<div><span>${esc(itemName(x.id))}</span><b>${x.qty ? `${fq(+(x.qty * toTray * sc).toFixed(3))} ${esc(itemUnit(x.id))}` : '<span class="warn-t">qty?</span>'}</b></div>`).join('');
 }
-document.addEventListener('input', e => {
-  if (e.target.id === 'cTarget') { try { localStorage.setItem('rom-target-fc', e.target.value); } catch (er) {} }
-  if (e.target.closest('#costing') || e.target.closest('form[data-form="saveRecipe"]')) recalcCosting();
-});
+// Catch quantity/price typed the wrong way round (250 kg at ₱0.25/kg instead of 0.25 kg at ₱250/kg) before it reaches the ingredient list
+function lineCheck(cell, id, qty, price, serves, editable) {
+  const td = cell.closest('tr')?.querySelector('td'); if (!td) return;
+  let el = td.querySelector('.lchk'); const u = itemUnit(id), perGuest = qty / (serves || 1);
+  let msg = '';
+  if (isBulkUnit(u) && qty && perGuest > 1.5) {
+    msg = price && price < 5
+      ? `Looks swapped: ${fq(qty)} ${esc(u)} at ₱${fq(price)}/${esc(u)}. ${editable ? `<button type="button" data-act="fixLine" data-item="${id}" data-mode="swap">Make it ${fq(price)} ${esc(u)} at ₱${fq(qty)}/${esc(u)}</button>` : ''}`
+      : `${fq(qty)} ${esc(u)} for ${fq(serves)} guest${serves > 1 ? 's' : ''} is a lot. Grams? ${editable ? `<button type="button" data-act="fixLine" data-item="${id}" data-mode="g">Make it ${fq(qty / 1000)} ${esc(u)}</button>` : ''}`;
+  } else if (isBulkUnit(u) && price && price < 5) msg = `₱${fq(price)} per ${esc(u)} looks low — the price is for a whole ${esc(u)}.`;
+  if (!msg) { el?.remove(); return; }
+  if (!el) { el = document.createElement('div'); el.className = 'lchk small'; td.appendChild(el); }
+  if (el.dataset.m !== msg) { el.innerHTML = '⚠ ' + msg; el.dataset.m = msg; }
+}
+ACT.fixLine = el => {
+  const id = el.dataset.item, q = document.querySelector(`[name="q_${id}"]`), p = document.querySelector(`[name="p_${id}"]`); if (!q) return;
+  const qty = num(q.value), price = num(p?.value);
+  if (el.dataset.mode === 'swap' && p) { q.value = price; p.value = qty; p.dispatchEvent(new Event('input', { bubbles: true })); p.dispatchEvent(new Event('change', { bubbles: true })); }
+  else q.value = +(qty / 1000).toFixed(4);
+  q.dispatchEvent(new Event('input', { bubbles: true })); q.dispatchEvent(new Event('change', { bubbles: true }));
+};
+document.addEventListener('input', e => { if (e.target.closest('#costing') || e.target.closest('form[data-form="saveRecipe"]')) recalcCosting(); });
 ACT.useSuggested = async el => {
-  const v = num(($('#cSug').textContent || '').replace(/[^\d.]/g, ''));
+  const v = num(el.dataset.v);
   if (!v || !confirm(`Set the tray price of this dish to ${peso(v)}?\n\nThis is the price shown on the catering menu and used for new event costing.`)) return;
   try { await db.update('dishes', { tray_price: v }, { id: el.dataset.id }); await loadMaster(); toast('Tray price updated'); refresh(); } catch (err) { toast(err.message, true); }
 };
@@ -1404,7 +1504,9 @@ ACT.toggleDishEdit = () => { const f = document.getElementById('dishEdit'); if (
 FORMS.editDish = async (f, el) => {
   const name = f.name.trim().replace(/\s+/g, ' '), id = el.dataset.id;
   const clash = Object.values(S.dishById).find(x => x.id !== id && normName(x.name) === normName(name)); if (clash) return toast(`Another dish is already called "${clash.name}".`, true);
-  await db.update('dishes', { name, category: f.category.trim() || 'Others', course: f.course, tray_price: f.tray_price === '' ? null : num(f.tray_price) }, { id });
+  const patch = { name, category: f.category.trim() || 'Others', course: f.course, tray_price: f.tray_price === '' ? null : num(f.tray_price) };
+  if ('tier' in (S.dishById[id] || {})) patch.tier = f.tier || null;
+  await db.update('dishes', patch, { id });
   await loadMaster(); toast('Dish saved'); refresh();
 };
 // Batch size: saved straight away (makes the recipe if there isn't one yet)
@@ -1440,7 +1542,7 @@ document.addEventListener('change', async e => {
 });
 FORMS.startRecipe = async (f, el) => { await db.insert('recipes', { dish_id: el.dataset.id, batch_serves: num(f.serves), status: 'draft' }); refresh(); };
 FORMS.saveRecipe = async (f, el) => {
-  for (const [k, v] of Object.entries(f).filter(([k]) => k.startsWith('q_'))) if (num(v) > 0) await db.update('recipe_lines', { qty: num(v) }, { dish_id: el.dataset.id, item_id: k.slice(2) });
+  for (const [k, v] of Object.entries(f).filter(([k]) => k.startsWith('q_'))) if (v !== '' && num(v) >= 0) await db.update('recipe_lines', { qty: num(v) }, { dish_id: el.dataset.id, item_id: k.slice(2) });
   toast('Saved'); refresh();
 };
 FORMS.newItem = async (f, el) => {
@@ -1462,7 +1564,7 @@ FORMS.newItem = async (f, el) => {
 ACT.addIng = async el => {
   const f = formData(el.closest('form')), typed = (f.new_item || '').trim().replace(/\s+/g, ' '), dish = el.dataset.id, qty = num(f.new_qty);
   if (!typed) return toast('Type or pick an ingredient.', true);
-  if (!(qty > 0)) return toast('Enter a quantity.', true);
+  if (qty < 0) return toast('Quantity cannot be negative.', true);
   let item = itemIdFromName(typed);
   if (!item) { const g = itemGuess(typed); if (g && confirm(`"${typed}" isn't on the ingredient list.\n\nDid you mean "${g.name}" (${g.stock_unit})?\n\nOK = use ${g.name} · Cancel = add "${typed}" as a new ingredient`)) item = g.id; }
   const price = f.new_price === '' || f.new_price == null ? null : num(f.new_price);
@@ -1481,8 +1583,8 @@ ACT.addIng = async el => {
     await db.update('items', { last_cost: price }, { id: item }); await loadMaster();
   }
   await ensureRecipe(dish);
-  await db.upsert('recipe_lines', { dish_id: dish, item_id: item, qty }, 'dish_id,item_id');
-  toast(`${itemName(item)} added`); await refresh();
+  try { await db.upsert('recipe_lines', { dish_id: dish, item_id: item, qty }, 'dish_id,item_id'); } catch (err) { return toast(qtyErr(err), true); }
+  toast(qty ? `${itemName(item)} added` : `${itemName(item)} listed — fill in the quantity later`); await refresh();
   document.querySelector('[data-newitem]')?.focus();
 };
 ACT.editIng = async el => { const r = document.getElementById('ie_' + el.dataset.item); if (r) r.hidden = !r.hidden; };
@@ -1517,7 +1619,10 @@ ACT.saveIng = async el => {
   await loadMaster(); toast('Ingredient saved'); refresh();
 };
 ACT.rmIng = async el => { await db.remove('recipe_lines', { dish_id: el.dataset.dish, item_id: el.dataset.item }); refresh(); };
-ACT.verify = async el => { const f = formData(el.closest('form')); await FORMS.saveRecipe(f, el.closest('form')); await db.rpc('verify_recipe', { p_dish: el.dataset.id }); toast('Recipe verified — it will now be used for purchase requests'); refresh(); };
+ACT.verify = async el => { const f = formData(el.closest('form'));
+  const blank = Object.entries(f).filter(([k, v]) => k.startsWith('q_') && !(num(v) > 0)).map(([k]) => itemName(k.slice(2)));
+  if (blank.length) return toast(`Fill in the quantity for ${blank.join(', ')} before verifying.`, true);
+  await FORMS.saveRecipe(f, el.closest('form')); await db.rpc('verify_recipe', { p_dish: el.dataset.id }); toast('Recipe verified — it will now be used for purchase requests'); refresh(); };
 
 
 /* ================= INQUIRIES (from the website) ================= */

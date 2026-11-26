@@ -555,3 +555,17 @@ label.wi input{width:70px;margin:0;padding:4px 8px;text-align:center}
 .ktable td{vertical-align:top;padding:8px 10px}.ktable tr.aff{background:#fff8ea}
 .kpis b span{font-size:inherit;font-weight:inherit}
 .costing .row.end{justify-content:flex-end;margin:-2px 0 4px}.costing .lnk{background:none;border:0;padding:2px 0;color:#8a5a00;font-weight:600;font-size:13px;text-decoration:underline;cursor:pointer;box-shadow:none}
+/* ---- House pricing, blank quantities, swap check, tiers, package check ---- */
+input.qty.need{background:#fff8e6;border-color:#e8c46a}
+.lchk{color:#9a5b00;margin-top:3px;line-height:1.35}.lchk button{margin:3px 0 0;padding:3px 9px;font-size:12px;border-radius:8px;background:#14213f;color:#fff;border:0;cursor:pointer;display:inline-block}
+.tier{display:inline-block;font-size:10.5px;font-weight:700;letter-spacing:.04em;padding:1px 7px;border-radius:999px;vertical-align:1px;margin-left:4px}
+.tier.t-standard{background:#eef2f8;color:#2b4470}.tier.t-premium{background:#fbf0d9;color:#8a5a00}.tier.t-both{background:#eef5ee;color:#2f6b3a}
+.hf1{margin:0 0 10px;line-height:1.5}
+.pkg .row{gap:10px;align-items:center}.pkg h2{margin:0}.pkg select{width:auto;margin:0}
+.pkt{width:100%;border-collapse:collapse;margin-top:8px}.pkt th{font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#6b7280;text-align:left;padding:6px 8px;border-bottom:1px solid #e6dfcc}
+.pkt td{padding:4px 8px;border-bottom:1px solid #f0ebdd;font-size:13.5px}.pkt td input{margin:0;padding:5px 8px;width:100%}.pkt .n{text-align:right;white-space:nowrap}
+.pkt tfoot td{font-weight:700;border-top:1.5px solid #14213f;border-bottom:0}
+.kpis.kp3{grid-template-columns:repeat(3,1fr)}.pkout{margin-top:10px}
+.costing .kpis span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:760px){.kpis.kp3{grid-template-columns:1fr}}
+.ctools input#ktPrice{width:100px}
