@@ -996,11 +996,13 @@ async function cleanupHtml() {
   const unusedItem = S.items.filter(i => !uses[i.id]);
   const noPrice = S.items.filter(i => uses[i.id] && !num(i.last_cost)), noCat = S.items.filter(i => /^others?$/i.test(i.category || ''));
   const dishCard = (d, g, i) => `<div class="cu-side${i === 0 ? ' best' : ''}">${i === 0 ? '<em class="cu-best">Suggested</em>' : ''}<a href="#/c/recipe/${d.id}"><b>${esc(d.name)}</b></a><small>${esc(d.category)} · ${esc(d.course)} · ${esc(where(d))}</small>
-    <button type="button" class="${i === 0 ? 'pri' : 'ghost'} sm" data-act="mergeDish" data-into="${d.id}" data-ids="${gIds(g)}" data-names="${esc(gNames(g))}">Keep this one</button></div>`;
+    <div class="cu-acts"><button type="button" class="${i === 0 ? 'pri' : 'ghost'} sm" data-act="mergeDish" data-into="${d.id}" data-ids="${gIds(g)}" data-names="${esc(gNames(g))}" title="Merge the others into this one">Keep this one</button>
+    <button type="button" class="lnk" data-act="cleanSkip" data-k="${esc(g.filter(o => o.id !== d.id).map(o => [d.id, o.id].sort().join('|')).join(','))}" title="This dish is different from the others">Not a duplicate</button><button type="button" class="lnk bad-t" data-act="delDish" data-id="${d.id}" data-name="${esc(d.name)}" title="Delete this dish">Delete</button></div></div>`;
   const itemCard = (it, g, i) => { const odd = g.some(o => normName(o.stock_unit) !== normName(it.stock_unit));
     return `<div class="cu-side${i === 0 ? ' best' : ''}">${i === 0 ? '<em class="cu-best">Suggested</em>' : ''}<b>${esc(it.name)}</b><small>${esc(it.category)} · per ${esc(it.stock_unit)} · ${num(it.last_cost) ? peso(it.last_cost) : 'no price'} · in ${uses[it.id] || 0} recipe${uses[it.id] === 1 ? '' : 's'}</small>
-    ${odd ? '<small class="warn-t">Units differ in this group — set them all to the same unit first (✎ on a recipe page)</small>' : `<button type="button" class="${i === 0 ? 'pri' : 'ghost'} sm" data-act="mergeItem" data-into="${it.id}" data-ids="${gIds(g)}" data-names="${esc(gNames(g))}">Keep this one</button>`}</div>`; };
-  const groupBox = (g, card) => `<div class="cu-group"><div class="cu-row">${g.map((x, i) => card(x, g, i)).join('')}</div><button type="button" class="x cu-skip" data-act="cleanSkip" data-k="${esc(g.map((a, i) => g.slice(i + 1).map(b => [a.id, b.id].sort().join('|'))).flat().join(','))}" title="They're different">Not the same</button></div>`;
+    <div class="cu-acts">${odd ? '<small class="warn-t">Units differ in this group — set them all to the same unit first (✎ on a recipe page)</small>' : `<button type="button" class="${i === 0 ? 'pri' : 'ghost'} sm" data-act="mergeItem" data-into="${it.id}" data-ids="${gIds(g)}" data-names="${esc(gNames(g))}" title="Merge the others into this one">Keep this one</button>`}
+    <button type="button" class="lnk" data-act="cleanSkip" data-k="${esc(g.filter(o => o.id !== it.id).map(o => [it.id, o.id].sort().join('|')).join(','))}" title="This ingredient is different from the others">Not a duplicate</button><button type="button" class="lnk bad-t" data-act="delItem" data-id="${it.id}" data-name="${esc(it.name)}" title="Delete this ingredient">Delete</button></div></div>`; };
+  const groupBox = (g, card) => `<div class="cu-group"><div class="cu-row">${g.map((x, i) => card(x, g, i)).join('')}</div><button type="button" class="x cu-skip" title="None of these are the same" data-act="cleanSkip" data-k="${esc(g.map((a, i) => g.slice(i + 1).map(b => [a.id, b.id].sort().join('|'))).flat().join(','))}" title="They're different">None are the same</button></div>`;
   const sec = (title, n, help, body, open) => `<details class="card cu"${open ? ' open' : ''}><summary><h2>${title}</h2><span class="chip ${n ? 'warn' : 'ok'}">${n || '✓ none'}</span></summary><p class="small mut">${help}</p>${n ? body : ''}</details>`;
   return `${sec('Possible duplicate dishes', dGroups.length, 'Same dish under two names, often one from the catering tray menu and one from the restaurant menu. <b>Keep this one</b> moves events, POS sales, kitchen counts, the recipe and the menu listing to the dish you keep, and the other name keeps working. If they really are different dishes, tap <b>Not the same</b>. The <b>Suggested</b> one is the most used (events, recipe, POS, tray price).',
       `<div class="cu-list">${dGroups.map(g => groupBox(g, dishCard)).join('')}</div>`, true)}
@@ -1035,7 +1037,16 @@ async function mergeGroup(el, fn, what) {
 }
 ACT.mergeDish = el => mergeGroup(el, 'merge_dishes', k => `Events, POS sales, kitchen counts, recipes and menu listings move to "${k}". The other names still work when typed.`);
 ACT.mergeItem = el => mergeGroup(el, 'merge_items', k => `Recipes, stock, requests and orders move to "${k}"; amounts in the same recipe are added together.`);
-ACT.delDish = el => { if (confirm(`Delete "${el.dataset.name}" for good?`)) cleanRun('delete_dish', { p_dish: el.dataset.id }, n => `${n} deleted`); };
+ACT.delDish = async el => {
+  if (!confirm(`Delete "${el.dataset.name}" for good?`)) return;
+  try { await db.rpc('delete_dish', { p_dish: el.dataset.id }); await loadMaster(); toast(`${el.dataset.name} deleted`); current === 'c/recipe' ? go('#/c/recipes') : refresh(); }
+  catch (err) {
+    if (needsUpdate(err)) return toast('Clean-up needs the latest database update — ask the owner to run it.', true);
+    if (/archive it instead/i.test(err.message) && confirm(`"${el.dataset.name}" can't be deleted: it's on the restaurant menu or was used on events, POS sales or kitchen counts.\n\nTake it off the menu (archive) instead? Its history is kept.`)) {
+      await db.rpc('archive_dish', { p_dish: el.dataset.id, p_archive: true }); await loadMaster(); toast(`${el.dataset.name} archived`); refresh(); }
+    else if (!/archive it instead/i.test(err.message)) toast(err.message, true);
+  }
+};
 ACT.archDish = el => cleanRun('archive_dish', { p_dish: el.dataset.id, p_archive: el.dataset.on === '1' }, () => el.dataset.on === '1' ? 'Archived — off the POS and new menus' : 'Restored');
 ACT.delItem = async el => {
   if (!confirm(`Delete "${el.dataset.name}" from the ingredient list?`)) return;
@@ -1118,7 +1129,7 @@ routes['c/recipe'] = async id => {
     <label>Tray price ₱<input name="tray_price" type="number" step="any" min="0" value="${d.tray_price ?? ''}" placeholder="not sold by the tray"></label></div>
     <datalist id="dl-dishcats">${DISH_CATS.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
     <p class="small mut">The new name shows everywhere this dish is used: event menus, the POS, Kitchen stocks and purchase requests.</p>
-    <div class="row end">${canEditMenu() ? `<button type="button" class="ghost danger" data-act="archDish" data-id="${id}" data-on="${d.active ? 1 : 0}" title="${d.active ? 'Hide from the POS and new event menus; history is kept' : ''}">${d.active ? 'Take off the menu' : 'Put back on the menu'}</button><span class="sp"></span>` : ''}<button type="button" class="ghost" data-act="toggleDishEdit">Cancel</button><button class="pri">Save dish</button></div></form>` : ''}
+    <div class="row end">${canEditMenu() ? `<button type="button" class="ghost danger" data-act="archDish" data-id="${id}" data-on="${d.active ? 1 : 0}" title="${d.active ? 'Hide from the POS and new event menus; history is kept' : ''}">${d.active ? 'Take off the menu' : 'Put back on the menu'}</button><button type="button" class="ghost danger" data-act="delDish" data-id="${id}" data-name="${esc(d.name)}">Delete dish</button><span class="sp"></span>` : ''}<button type="button" class="ghost" data-act="toggleDishEdit">Cancel</button><button class="pri">Save dish</button></div></form>` : ''}
   ${!edit && !r ? '<div class="card">No recipe yet. A chef can add it.</div>' : `
   <form class="card" data-form="${edit ? 'saveRecipe' : 'none'}" data-id="${id}">
    <div class="row rhead"><h2>Ingredients for</h2>${edit ? batchSel(serves) : `<b>${serves === 1 ? 'one guest' : serves === 10 ? 'one tray (10–12 guests)' : `one batch (${fq(serves)} guests)`}</b>`}</div>

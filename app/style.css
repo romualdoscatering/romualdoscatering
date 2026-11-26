@@ -472,3 +472,6 @@ button.sm{padding:6px 12px;font-size:13px}
 .cu-best{position:absolute;top:-9px;right:10px;font-style:normal;font-size:10.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:#e2c77e;color:#14213f;border-radius:999px;padding:1px 8px}
 .cu-skip{white-space:nowrap;width:auto;padding:6px 8px;font-size:12px}
 @media (max-width:760px){.cu-group{flex-direction:column;align-items:stretch}}
+.cu-acts{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin-top:auto}
+.cu-acts .lnk{border:0;background:transparent;padding:4px 0;font-size:12.5px;font-weight:600;color:var(--mut);cursor:pointer}.cu-acts .lnk:hover{text-decoration:underline}
+.cu-acts .lnk.bad-t{color:var(--bad)}
