@@ -644,13 +644,25 @@ routes['c/requests'] = async arg => {
   const tabs = [['approve', 'To approve'], ['open', 'In progress'], ['draft', 'Drafts'], ['all', 'All']];
   const st = { approve: ['submitted'], open: ['submitted', 'approved', 'ordered'], draft: ['draft'] }[tab];
   const rows = await db.select('pr_overview', { eq: { ws: WS() }, ...(st ? { in: { status: st } } : {}), order: [['created_at', false]], limit: 200 });
-  return `<div class="row"><h1>Purchase requests</h1><span class="sp"></span>${rows.length > 1 ? '<button class="ghost" data-act="combinePR">🧾 Combine into one list</button>' : ''}<button class="pri" data-act="newPR">＋ New request</button></div>
+  return `<div class="row"><h1>Purchase requests</h1><span class="sp"></span>${rows.length ? '<button class="ghost" data-act="delPRs" title="Delete the ticked requests">🗑 Delete ticked</button>' : ''}${rows.length > 1 ? '<button class="ghost" data-act="combinePR">🧾 Combine into one list</button>' : ''}<button class="pri" data-act="newPR">＋ New request</button></div>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/${P()}/requests/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
-   ${rows.length > 1 ? '<p class="small mut">Tick the requests you\'re buying for together, then tap <b>Combine into one list</b>.</p>' : ''}
-   ${rows.length ? `<div class="list">${rows.map(p => `<div class="pick"><label class="pk" title="Include in combined list"><input type="checkbox" data-pr="${p.id}"></label><a class="li" href="#/${P()}/pr/${p.id}"><div class="li-main"><b>${esc(p.pr_no)}${p.priority === 'urgent' ? ' ' + chip('urgent', 'bad') : ''}</b>
-     <span class="mut small">${p.event_title ? esc(p.event_ref + ' · ' + p.event_title) + ' · ' : ''}${esc(p.purpose || '')}</span>
+   ${rows.length ? `<p class="small mut">Tick requests to <b>combine</b> them into one buying list, or to <b>delete</b> ones made by mistake, duplicated, or replaced by a revised order.</p>` : ''}
+   ${rows.length ? `<div class="list">${rows.map(p => `<div class="pick"><label class="pk" title="Tick to combine or delete"><input type="checkbox" data-pr="${p.id}" data-no="${esc(p.pr_no)}"></label><a class="li" href="#/${P()}/pr/${p.id}"><div class="li-main"><b>${esc(p.pr_no)}${p.priority === 'urgent' ? ' ' + chip('urgent', 'bad') : ''}</b>
+     <span class="mut small">${esc([p.event_title ? p.event_ref + ' · ' + p.event_title : '', prPurpose(p)].filter(Boolean).join(' · '))}</span>
      <span class="mut small">${p.line_count} items · est. ${peso(p.est_total)} · ${esc(p.requested_by_name || '')}${p.needed_by ? ' · needed ' + esc(fmtD(p.needed_by)) : ''}</span></div>${chip(PR_STATUS[p.status], statusTone(p.status))}</a></div>`).join('')}</div>` : '<div class="empty">No requests here.</div>'}`;
 };
+// "Auto from EV-… · client · type" repeats the event already shown — only show a purpose that adds something
+const prPurpose = p => p.event_title && /^auto from/i.test(p.purpose || '') ? '' : (p.purpose || '');
+const prCanDel = p => !['ordered', 'received'].includes(p.status) && (isAdmin() || can(p.ws, 'manager') || (p.requested_by === S.user.id && p.status !== 'approved'));
+async function deletePRs(ids, nos) {
+  if (!ids.length) return toast('Tick the requests to delete first.', true);
+  const what = nos.length === 1 ? nos[0] : `${nos.length} requests (${nos.join(', ')})`;
+  if (!confirm(`Delete ${what}?\n\nUse this for requests made by mistake, duplicates, or ones replaced by a revised event or client order. This can't be undone.`)) return false;
+  try { const n = await db.rpc('delete_prs', { p_ids: ids }); toast(`${n} request${n === 1 ? '' : 's'} deleted`); return true; }
+  catch (err) { toast(/delete_prs/.test(err.message) ? 'Deleting needs the latest database update — ask the owner to run it.' : err.message, true); return false; }
+}
+ACT.delPRs = async () => { const t = [...document.querySelectorAll('input[data-pr]:checked')]; if (await deletePRs(t.map(x => x.dataset.pr), t.map(x => x.dataset.no))) refresh(); };
+ACT.delPR = async el => { if (await deletePRs([el.dataset.id], [el.dataset.no])) go(`#/${P()}/requests`); };
 ACT.newPR = async () => { const r = (await db.insert('purchase_requests', { ws: WS(), purpose: WS() === 'restaurant' ? 'Restaurant restock' : 'Catering store restock', requested_by: S.user.id }))[0]; go(`#/${P()}/pr/${r.id}`); };
 
 routes['c/pr'] = async id => {
@@ -666,8 +678,8 @@ routes['c/pr'] = async id => {
   const advances = buyer ? await db.select('cash_advances', { eq: { ws: p.ws, status: 'open' }, order: [['released_at', false]] }) : [];
   const total = lines.reduce((s, l) => s + num(l.approved_qty ?? l.qty) * num(l.est_unit_cost), 0);
   return `<div class="row"><a href="#/${P()}/requests" class="back">‹ Requests</a></div>
-  <div class="row"><h1>${esc(p.pr_no)}</h1>${chip(PR_STATUS[p.status], statusTone(p.status))}<span class="sp"></span>${lines.length ? `<button type="button" class="ghost" data-act="prPreview" data-id="${id}">🧾 Preview list</button>` : ''}</div>
-  <p class="lede">${p.event_id ? `<a href="#/c/event/${p.event_id}">${esc(p.event_ref + ' · ' + p.event_title)}</a> · ` : ''}${esc(p.purpose || '')}<br><span class="small mut">Requested by ${esc(p.requested_by_name || '')} · ${esc(fmtT(p.created_at))}${p.needed_by ? ' · needed by ' + esc(fmtD(p.needed_by)) : ''}${p.approved_by_name ? ` · ${p.status === 'rejected' ? 'rejected' : 'approved'} by ${esc(p.approved_by_name)} ${esc(fmtT(p.approved_at))}` : ''}</span></p>
+  <div class="row"><h1>${esc(p.pr_no)}</h1>${chip(PR_STATUS[p.status], statusTone(p.status))}<span class="sp"></span>${lines.length ? `<button type="button" class="ghost" data-act="prPreview" data-id="${id}">🧾 Preview list</button>` : ''}${prCanDel(p) ? `<button type="button" class="ghost danger" data-act="delPR" data-id="${id}" data-no="${esc(p.pr_no)}" title="Delete this request (mistake, duplicate, or revised order)">🗑 Delete</button>` : ''}</div>
+  <p class="lede">${p.event_id ? `<a href="#/c/event/${p.event_id}">${esc(p.event_ref + ' · ' + p.event_title)}</a>${prPurpose(p) ? ' · ' : ''}` : ''}${esc(prPurpose(p))}<br><span class="small mut">Requested by ${esc(p.requested_by_name || '')} · ${esc(fmtT(p.created_at))}${p.needed_by ? ' · needed by ' + esc(fmtD(p.needed_by)) : ''}${p.approved_by_name ? ` · ${p.status === 'rejected' ? 'rejected' : 'approved'} by ${esc(p.approved_by_name)} ${esc(fmtT(p.approved_at))}` : ''}</span></p>
   ${p.decision_note ? `<div class="alert ${p.status === 'rejected' ? 'bad' : 'info'}">${esc(p.decision_note)}</div>` : ''}
   <form class="card" data-form="${approver ? 'approvePR' : editable ? 'saveDraft' : 'none'}" data-id="${id}">
    <div class="tw"><table><thead><tr><th>Item</th><th class="n">Requested</th>${p.status !== 'draft' ? '<th class="n">Approved</th>' : ''}${buyer ? '<th class="n">Still to order</th>' : ''}<th class="n">Est. price</th><th class="n">In store then</th>${editable ? '<th></th>' : ''}</tr></thead><tbody>
