@@ -134,6 +134,7 @@ async function refresh() { const y = scrollY; await route(); window.scrollTo(0, 
 window.addEventListener('hashchange', route);
 function go(h) { if (location.hash === h) refresh(); else location.hash = h; }
 function afterRender() {
+  recalcCosting(); KFILT = 'all'; recalcCostTab();
   document.querySelectorAll('form[data-form="buyReport"]').forEach(brTotals);
   evBarWatch();
   document.querySelectorAll('[data-show-if]').forEach(el => { const [name, val] = el.dataset.showIf.split('='); const src = document.querySelector(`[name="${name}"]`); const upd = () => el.hidden = src?.value !== val; src?.addEventListener('change', upd); upd(); });
@@ -1148,11 +1149,11 @@ routes['c/recipes'] = async arg => {
   const costOf = {}; rl.forEach(l => costOf[l.dish_id] = (costOf[l.dish_id] || 0) + num(l.qty) * num(S.itemsById[l.item_id]?.last_cost));
   const costTag = d => { const r = recipes[d.id]; if (!r || !costOf[d.id]) return ''; const c = costOf[d.id], pct = d.tray_price && num(r.batch_serves) > 1 ? Math.round(c / num(d.tray_price) * 100) : null;
     return ` · cost ${peso(c)}${pct !== null ? ` · <span class="${pct > 45 ? 'bad-t' : pct > 35 ? 'warn-t' : 'ok-t'}">${pct}%</span>` : ''}`; };
-  const tabs = [['standard', 'Standard list'], ['draft', 'Draft recipes'], ['verified', 'Verified'], ['none', 'No recipe'], ['all', 'All dishes'], ...(canEditMenu() ? [['cleanup', '🧹 Clean-up']] : [])];
+  const tabs = [['standard', 'Standard list'], ['draft', 'Draft recipes'], ['verified', 'Verified'], ['none', 'No recipe'], ['all', 'All dishes'], ...(canAny('chef', 'manager', 'finance') ? [['costing', '💰 Costing']] : []), ...(canEditMenu() ? [['cleanup', '🧹 Clean-up']] : [])];
   const list = S.dishes.filter(d => d.active).filter(d => tab === 'all' || (tab === 'standard' ? d.standard : tab === 'none' ? !recipes[d.id] && d.standard : recipes[d.id]?.status === tab));
   return `<h1>Dishes & recipes</h1><p class="lede">A dish's recipe lists what to buy for one batch: one large tray (10–12 guests, planned at 10), or one guest for rice, drinks and fruit. Only <b>verified</b> recipes are used for purchase requests.</p>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/recipes/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
-   ${tab === 'cleanup' ? await cleanupHtml() : `<input class="search" placeholder="Search dishes…" data-filter=".dgroup .li">
+   ${tab === 'cleanup' ? await cleanupHtml() : tab === 'costing' ? costingTab(recipes, rl) : `<input class="search" placeholder="Search dishes…" data-filter=".dgroup .li">
    ${(g => g.length > 2 ? `<div class="jump">${g.map(([head], i) => `<button type="button" data-jump="g${i}">${esc(head.replace('Main · ', ''))}</button>`).join('')}</div>` : '')(dishGroups(list))}
    ${dishGroups(list).map(([head, ds], i) => `<section class="dgroup" data-group id="g${i}"><h3>${esc(head)} <span class="cnt">${ds.length}</span></h3><div class="list">${ds.map(d => `<a class="li" href="#/c/recipe/${d.id}"><div class="li-main"><b>${esc(d.name)}</b><span class="mut small">chosen ${d.times_booked}×${d.tray_price ? ' · tray ' + peso(d.tray_price) : ''}${costTag(d)}</span></div>${recipes[d.id] ? chip(recipes[d.id].status === 'verified' ? 'Verified' : 'Draft', recipes[d.id].status === 'verified' ? 'ok' : 'warn') : chip('No recipe', 'mut')}</a>`).join('')}</div></section>`).join('') || '<div class="empty">None.</div>'}`}`;
 };
@@ -1214,12 +1215,11 @@ routes['c/recipe'] = async id => {
   ${!edit && !r ? '<div class="card">No recipe yet. A chef can add it.</div>' : `
   <form class="card" data-form="${edit ? 'saveRecipe' : 'none'}" data-id="${id}">
    <div class="row rhead"><h2>Ingredients for</h2>${edit ? batchSel(serves) : `<b>${serves === 1 ? 'one guest' : serves === 10 ? 'one tray (10–12 guests)' : `one batch (${fq(serves)} guests)`}</b>`}</div>
-   ${r?.method ? `<p class="small mut">${esc(r.method)}</p>` : ''}
    ${lines.length ? `<div class="tw"><table class="rtable"><thead><tr><th>Ingredient</th><th class="n">Qty</th><th class="n">Price per unit</th><th class="n">Cost</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>
    ${lines.map(l => { const it = S.itemsById[l.item_id] || {}, u = esc(itemUnit(l.item_id)); return `${head(l.item_id)}<tr><td>${esc(itemName(l.item_id))}</td>
      <td class="n nowrap">${edit ? `<input name="q_${l.item_id}" type="number" step="any" min="0" value="${num(l.qty)}" class="qty">` : fq(l.qty)} ${u}</td>
      <td class="n nowrap">${edit ? `₱<input name="p_${l.item_id}" type="number" step="any" min="0" value="${num(it.last_cost) || ''}" placeholder="—" class="qty price" title="Price per ${u}: changes it for every recipe using ${esc(it.name || '')}"> /${u}` : num(it.last_cost) ? `${peso(it.last_cost)} /${u}` : '<span class="mut small">no price</span>'}</td>
-     <td class="n" data-linecost="${l.item_id}" data-price="${num(it.last_cost)}">${num(it.last_cost) ? peso(num(l.qty) * num(it.last_cost)) : '<span class="mut small">—</span>'}</td>${edit ? `<td class="nowrap"><button type="button" class="x" title="Rename, change unit, or replace" data-act="editIng" data-item="${l.item_id}">✎</button><button type="button" class="x" title="Remove" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>
+     <td class="n" data-linecost="${l.item_id}" data-price="${num(it.last_cost)}" data-qty="${num(l.qty)}">${num(it.last_cost) ? peso(num(l.qty) * num(it.last_cost)) : '<span class="mut small">—</span>'}</td>${edit ? `<td class="nowrap"><button type="button" class="x" title="Rename, change unit, or replace" data-act="editIng" data-item="${l.item_id}">✎</button><button type="button" class="x" title="Remove" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>
    ${edit ? `<tr class="ing-edit" id="ie_${l.item_id}" hidden><td colspan="5"><div class="grid">
      <label>Ingredient name<input name="e_name_${l.item_id}" value="${esc(it.name || '')}"></label>
      <label>Unit used in recipes<input name="e_unit_${l.item_id}" list="dl-units" value="${esc(it.stock_unit || '')}"></label>
@@ -1238,8 +1238,160 @@ routes['c/recipe'] = async id => {
      ${itemDatalist()}<datalist id="dl-cats">${[...new Set(S.items.map(i => i.category))].sort().map(c => `<option value="${esc(c)}">`).join('')}</datalist>
      <datalist id="dl-units">${['kg', 'g', 'L', 'ml', 'pc', 'pack', 'can', 'bundle', 'bottle', 'tray', 'sack', 'box'].map(u => `<option value="${u}">`).join('')}</datalist>
      ${r && lines.length ? `<div class="row end mt">${r.status !== 'verified' ? `<button type="button" class="pri" data-act="verify" data-id="${id}">Mark verified</button>` : ''}</div>
-     <p class="small mut">Every change saves by itself. ${r.status === 'verified' ? 'A manager\'s change puts this recipe back to draft until a chef verifies it again.' : 'Check each quantity against how the kitchen really cooks this dish, then mark it verified so it can be used for purchase requests.'}</p>` : ''}` : ''}
-  </form>`}`;
+     <p class="small mut">Every change saves by itself. ${r.status === 'verified' ? 'A manager\'s change puts this recipe back to draft until a chef verifies it again.' : 'Check each quantity against how the kitchen really cooks this dish, then mark it verified so it can be used for purchase requests.'}</p>` : ''}
+     <details class="copyr mt"><summary>Copy ingredients from another dish</summary><div class="addline mt"><input id="copyFrom" list="dl-recipes" placeholder="Dish with a recipe, e.g. Tuna Bicol Express" autocomplete="off"><button type="button" data-act="copyRecipe" data-id="${id}">Copy</button></div>
+       <p class="small mut">Adds the other recipe's ingredients that aren't here yet (quantities you already have stay). Good for variants of the same dish.</p>
+       <datalist id="dl-recipes">${S.dishes.filter(x => x.id !== id && x.active).map(x => `<option value="${esc(x.name)}">`).join('')}</datalist></details>` : ''}
+  </form>
+  ${lines.length ? costingCard(d, r, lines, serves, edit) : ''}
+  ${edit || r?.method ? `<section class="card"><h2>Method &amp; notes</h2>${edit ? `<textarea id="recipeMethod" data-dish="${id}" rows="5" placeholder="Prep and cooking steps, yields, plating, what to watch out for…">${esc(r?.method || '')}</textarea><p class="small mut">Saves when you click away. Printed on the recipe card.</p>` : `<p class="pre">${esc(r.method)}</p>`}</section>` : ''}`}`;
+};
+/* ---- Recipes → Costing: every dish with a recipe, food cost %, suggested price, price-change simulator ---- */
+function costingTab(recipes, rl) {
+  const by = {}; rl.forEach(l => (by[l.dish_id] = by[l.dish_id] || []).push(l));
+  const rows = S.dishes.filter(d => d.active && recipes[d.id] && by[d.id]).map(d => {
+    const r = recipes[d.id], serves = num(r.batch_serves) || 1, ls = by[d.id];
+    return { d, serves, ls, status: r.status, price: serves > 1 ? num(d.tray_price) : 0, missing: ls.filter(l => !num(S.itemsById[l.item_id]?.last_cost)).length };
+  });
+  const usedItems = [...new Set(rl.map(l => l.item_id))].filter(i => S.itemsById[i]).sort((a, b) => itemName(a).localeCompare(itemName(b)));
+  COST_ROWS = rows;
+  return `<div class="card ctools">
+    <div class="ct-row"><label>Target food cost<span><input id="ktTarget" type="number" min="5" max="90" value="${TARGET_FC()}"> %</span></label>
+     <label>All ingredient prices<span><input id="ktInfl" type="number" step="1" value="0"> % change</span></label>
+     <label class="wide">One ingredient's new price<span><input id="ktItem" list="dl-citems" placeholder="e.g. Pork kasim" autocomplete="off"> ₱<input id="ktPrice" type="number" step="any" min="0" placeholder="new price"></span></label></div>
+    <datalist id="dl-citems">${usedItems.map(i => `<option value="${esc(itemName(i))}">`).join('')}</datalist>
+    <div class="ct-row filt"><span class="mut small">Show</span>${[['all', 'All'], ['over', 'Over target'], ['missing', 'Missing prices'], ['noprice', 'No tray price'], ['affected', 'Affected by the price change']].map(([k, l], i) => `<button type="button" class="chipbtn${i ? '' : ' on'}" data-kfilt="${k}">${l}</button>`).join('')}<span class="sp"></span><span id="ktSum" class="small"></span></div>
+   </div>
+   <div class="card tw"><table class="ktable"><thead><tr>${[['name', 'Dish'], ['cost', 'Cost / batch'], ['guest', 'Per guest'], ['price', 'Tray price'], ['fc', 'Food cost'], ['sug', 'Suggested'], ['new', 'After change']].map(([k, l], i) => `<th class="${i ? 'n' : ''}" data-ksort="${k}">${l}</th>`).join('')}</tr></thead><tbody id="ktBody"></tbody></table></div>`;
+}
+let COST_ROWS = [], KSORT = ['fc', false], KFILT = 'all';
+function recalcCostTab() {
+  const body = $('#ktBody'); if (!body) return;
+  const target = Math.min(90, Math.max(5, num($('#ktTarget').value) || 35)), infl = num($('#ktInfl').value);
+  const itemId = itemIdFromName($('#ktItem').value), newP = $('#ktPrice').value === '' ? null : num($('#ktPrice').value);
+  const sim = infl || (itemId && newP !== null);
+  const rows = COST_ROWS.map(x => {
+    const cost = x.ls.reduce((a, l) => a + num(l.qty) * num(S.itemsById[l.item_id]?.last_cost), 0);
+    const newCost = x.ls.reduce((a, l) => a + num(l.qty) * (l.item_id === itemId && newP !== null ? newP : num(S.itemsById[l.item_id]?.last_cost)), 0) * (1 + infl / 100);
+    const fc = x.price ? cost / x.price * 100 : null, nfc = x.price ? newCost / x.price * 100 : null;
+    return { ...x, cost, newCost, fc, nfc, guest: cost / x.serves, sug: cost ? roundUp10(cost / (target / 100)) : 0, affected: sim && Math.abs(newCost - cost) > 0.005 };
+  }).filter(x => KFILT === 'all' || (KFILT === 'over' && x.fc !== null && x.fc > target) || (KFILT === 'missing' && x.missing) || (KFILT === 'noprice' && x.serves > 1 && !x.price) || (KFILT === 'affected' && x.affected));
+  const [k, asc] = KSORT, val = x => k === 'name' ? x.d.name : k === 'new' ? x.nfc ?? -1 : k === 'price' ? x.price : x[k] ?? -1;
+  rows.sort((a, b) => { const A = val(a), B = val(b); return (typeof A === 'string' ? A.localeCompare(B) : A - B) * (asc ? 1 : -1); });
+  document.querySelectorAll('[data-ksort]').forEach(th => th.classList.toggle('sorted', th.dataset.ksort === k));
+  body.innerHTML = rows.map(x => `<tr${x.affected ? ' class="aff"' : ''}><td><a href="#/c/recipe/${x.d.id}">${esc(x.d.name)}</a><div class="small mut">${x.serves > 1 ? 'per tray' : 'per guest'}${x.status === 'verified' ? ' · ✓ verified' : ' · draft'}${x.missing ? ` · <span class="warn-t">${x.missing} no price</span>` : ''}</div></td>
+    <td class="n">${peso(x.cost)}</td><td class="n">${x.serves > 1 ? peso(x.guest) : '—'}</td><td class="n">${x.price ? peso(x.price).replace('.00', '') : '<span class="mut">—</span>'}</td>
+    <td class="n">${x.fc === null ? '<span class="mut">—</span>' : `<b class="${fcTone(x.fc, target)}">${x.fc.toFixed(1)}%</b>`}</td>
+    <td class="n">${x.sug ? peso(x.sug).replace('.00', '') : '—'}${x.price && x.sug > x.price ? ' <span class="warn-t">▲</span>' : ''}</td>
+    <td class="n">${sim ? (x.affected ? `${peso(x.newCost)}${x.nfc !== null ? `<div class="small ${fcTone(x.nfc, target)}">${x.nfc.toFixed(1)}%</div>` : ''}` : '<span class="mut">same</span>') : '<span class="mut">—</span>'}</td></tr>`).join('') || '<tr><td colspan="7" class="mut">No dishes here.</td></tr>';
+  const priced = rows.filter(x => x.fc !== null), avg = priced.length ? priced.reduce((a, x) => a + x.fc, 0) / priced.length : null, over = priced.filter(x => x.fc > target).length;
+  $('#ktSum').innerHTML = `${rows.length} dishes${avg !== null ? ` · average food cost <b class="${fcTone(avg, target)}">${avg.toFixed(1)}%</b> · <b>${over}</b> over ${target}%` : ''}${sim ? ` · <b>${rows.filter(x => x.affected).length}</b> affected` : ''}`;
+}
+document.addEventListener('input', e => {
+  if (!e.target.closest('.ctools')) return;
+  if (e.target.id === 'ktTarget') { try { localStorage.setItem('rom-target-fc', e.target.value); } catch (er) {} }
+  recalcCostTab();
+});
+document.addEventListener('click', e => {
+  const th = e.target.closest('[data-ksort]'); if (th) { KSORT = [th.dataset.ksort, KSORT[0] === th.dataset.ksort ? !KSORT[1] : th.dataset.ksort === 'name']; return recalcCostTab(); }
+  const f = e.target.closest('[data-kfilt]'); if (f) { KFILT = f.dataset.kfilt; document.querySelectorAll('[data-kfilt]').forEach(b => b.classList.toggle('on', b === f)); recalcCostTab(); }
+});
+/* ---- Costing on the recipe page: food cost %, suggested price, what-ifs ---- */
+const TARGET_FC = () => { try { return num(localStorage.getItem('rom-target-fc')) || 35; } catch (e) { return 35; } };
+const fcTone = (pct, target) => pct > target + 10 ? 'bad-t' : pct > target ? 'warn-t' : 'ok-t';
+const roundUp10 = n => Math.ceil(n / 10) * 10;
+function costingCard(d, r, lines, serves, edit) {
+  const batchLbl = serves === 1 ? 'one guest' : serves === 10 ? 'one tray (10–12 guests)' : `one batch (${fq(serves)} guests)`;
+  const noPrice = lines.filter(l => !num(S.itemsById[l.item_id]?.last_cost));
+  return `<section class="card costing" id="costing" data-dish="${d.id}" data-serves="${serves}">
+   <div class="row"><h2>Costing</h2><span class="small mut">for ${batchLbl}</span><span class="sp"></span><button type="button" class="ghost sm" data-act="recipeCard" data-id="${d.id}">🖨 Recipe card</button></div>
+   <div class="kpis">
+    <div><span>Ingredient cost</span><b id="cBatch">—</b><small id="cGuest"></small></div>
+    <div><span>${serves > 1 ? 'Tray price' : 'Price per guest'}</span><b class="inl">₱<input id="cPrice" type="number" step="any" min="0" value="${serves > 1 && d.tray_price ? num(d.tray_price) : ''}" placeholder="—"></b><small>${d.tray_price && serves > 1 ? 'type another to test it' : 'type a price to test it'}</small></div>
+    <div><span>Food cost</span><b id="cFc">—</b><small id="cGp"></small></div>
+    <div><span>Suggested price</span><b id="cSug">—</b><small>at <input id="cTarget" type="number" min="5" max="90" step="1" value="${TARGET_FC()}">% food cost</small></div>
+   </div>
+   ${edit && serves > 1 ? `<div class="row end"><button type="button" class="lnk" data-act="useSuggested" data-id="${d.id}" id="cUse" hidden>Use the suggested price as the tray price</button></div>` : ''}
+   ${noPrice.length ? `<p class="alert warn small">Cost is incomplete: no price yet for ${noPrice.map(l => `<b>${esc(itemName(l.item_id))}</b>`).join(', ')}. Type it in the table above.</p>` : ''}
+   <div class="cgrid">
+    <div><h3>Biggest costs</h3><div id="cDrivers" class="drivers"></div></div>
+    <div><h3>What if…</h3>
+     <label class="wi">Ingredient prices go up <input id="cInfl" type="number" step="1" value="0"> %</label><p class="small" id="cInflOut"></p>
+     <label class="wi">Make <input id="cScale" type="number" step="any" min="0" value="1"> ${serves > 1 ? 'trays' : 'guests'}</label><p class="small" id="cScaleOut"></p>
+     <details class="small"><summary>Quantities for that amount</summary><div id="cScaled" class="scaled"></div></details>
+    </div>
+   </div></section>`;
+}
+function recalcCosting() {
+  const box = document.getElementById('costing'); if (!box) return;
+  const serves = num(box.dataset.serves) || 1, rows = [...document.querySelectorAll('[data-linecost]')].map(c => {
+    const id = c.dataset.linecost, q = document.querySelector(`[name="q_${id}"]`), pr = document.querySelector(`[name="p_${id}"]`);
+    const qty = q ? num(q.value) : num(c.dataset.qty), price = pr ? num(pr.value) : num(c.dataset.price);
+    return { id, qty, price, cost: qty * price };
+  });
+  const cost = rows.reduce((a, x) => a + x.cost, 0), price = num($('#cPrice').value), target = Math.min(90, Math.max(5, num($('#cTarget').value) || 35));
+  $('#cBatch').textContent = peso(cost); $('#cGuest').textContent = serves > 1 ? `${peso(cost / serves)} per guest` : '';
+  const fc = price ? cost / price * 100 : null;
+  $('#cFc').innerHTML = fc === null ? '—' : `<span class="${fcTone(fc, target)}">${fc.toFixed(1)}%</span>`;
+  $('#cGp').textContent = price ? `profit ${peso(price - cost)} ${serves > 1 ? 'per tray' : 'per guest'}` : 'enter a price';
+  const sug = cost ? roundUp10(cost / (target / 100)) : 0;
+  $('#cSug').textContent = sug ? peso(sug).replace('.00', '') : '—';
+  const use = $('#cUse'); if (use) use.hidden = !sug || Math.abs(sug - price) < 1;
+  const tot = cost || 1;
+  $('#cDrivers').innerHTML = [...rows].sort((a, b) => b.cost - a.cost).slice(0, 5).filter(x => x.cost > 0).map(x => `<div class="drv"><span>${esc(itemName(x.id))}</span><i><em style="width:${Math.max(2, x.cost / tot * 100)}%"></em></i><b>${Math.round(x.cost / tot * 100)}%</b><small>${peso(x.cost)}</small></div>`).join('') || '<p class="small mut">Add prices to see what drives the cost.</p>';
+  const infl = num($('#cInfl').value), nc = cost * (1 + infl / 100);
+  $('#cInflOut').innerHTML = infl ? `Cost becomes <b>${peso(nc)}</b>${price ? ` · food cost <b class="${fcTone(nc / price * 100, target)}">${(nc / price * 100).toFixed(1)}%</b> at ${peso(price).replace('.00', '')}` : ''} · to stay at ${target}%, charge <b>${peso(roundUp10(nc / (target / 100))).replace('.00', '')}</b>` : '<span class="mut">Type a % to see the effect of a price increase.</span>';
+  const sc = num($('#cScale').value) || 0;
+  $('#cScaleOut').innerHTML = sc ? `Ingredients cost <b>${peso(cost * sc)}</b>${price ? ` · sales ${peso(price * sc)} · profit <b>${peso((price - cost) * sc)}</b>` : ''}` : '';
+  $('#cScaled').innerHTML = rows.map(x => `<div><span>${esc(itemName(x.id))}</span><b>${fq(+(x.qty * sc).toFixed(3))} ${esc(itemUnit(x.id))}</b></div>`).join('');
+}
+document.addEventListener('input', e => {
+  if (e.target.id === 'cTarget') { try { localStorage.setItem('rom-target-fc', e.target.value); } catch (er) {} }
+  if (e.target.closest('#costing') || e.target.closest('form[data-form="saveRecipe"]')) recalcCosting();
+});
+ACT.useSuggested = async el => {
+  const v = num(($('#cSug').textContent || '').replace(/[^\d.]/g, ''));
+  if (!v || !confirm(`Set the tray price of this dish to ${peso(v)}?\n\nThis is the price shown on the catering menu and used for new event costing.`)) return;
+  try { await db.update('dishes', { tray_price: v }, { id: el.dataset.id }); await loadMaster(); toast('Tray price updated'); refresh(); } catch (err) { toast(err.message, true); }
+};
+// Method & notes: saved when they leave the box
+document.addEventListener('change', async e => {
+  if (e.target.id !== 'recipeMethod') return;
+  const id = e.target.dataset.dish;
+  try { await ensureRecipe(id); await db.update('recipes', { method: e.target.value.trim() || null }, { dish_id: id }); toast('Method saved'); } catch (err) { toast(err.message, true); }
+});
+ACT.copyRecipe = async el => {
+  const name = ($('#copyFrom')?.value || '').trim(), src = S.dishes.find(x => normName(x.name) === normName(name));
+  if (!src) return toast('Pick a dish from the list.', true);
+  const [from, mine] = await Promise.all([db.select('recipe_lines', { eq: { dish_id: src.id } }), db.select('recipe_lines', { cols: 'item_id', eq: { dish_id: el.dataset.id } })]);
+  if (!from.length) return toast(`${src.name} has no recipe to copy.`, true);
+  const have = new Set(mine.map(x => x.item_id)), add = from.filter(x => !have.has(x.item_id));
+  if (!add.length) return toast('All of those ingredients are already here.');
+  const [srcR] = await db.select('recipes', { cols: 'batch_serves', eq: { dish_id: src.id } });
+  const [r] = await db.select('recipes', { cols: 'dish_id', eq: { dish_id: el.dataset.id } });
+  if (!r) await db.insert('recipes', { dish_id: el.dataset.id, batch_serves: num(srcR?.batch_serves) || 10, status: 'draft' });
+  await db.insert('recipe_lines', add.map(x => ({ dish_id: el.dataset.id, item_id: x.item_id, qty: x.qty })));
+  toast(`${add.length} ingredient${add.length > 1 ? 's' : ''} copied from ${src.name} — adjust the quantities`); refresh();
+};
+// Printable recipe card (kitchen copy): ingredients at the chosen amount, method, cost summary
+ACT.recipeCard = el => {
+  const d = S.dishById[el.dataset.id], box = $('#costing'), serves = num(box.dataset.serves) || 1, sc = num($('#cScale').value) || 1;
+  const rows = [...document.querySelectorAll('[data-linecost]')].map(c => { const id = c.dataset.linecost, q = document.querySelector(`[name="q_${id}"]`), pr = document.querySelector(`[name="p_${id}"]`);
+    return { id, qty: (q ? num(q.value) : num(c.dataset.qty)) * sc, price: pr ? num(pr.value) : num(c.dataset.price) }; });
+  const cost = rows.reduce((a, x) => a + x.qty * x.price, 0), price = num($('#cPrice').value) * sc, method = $('#recipeMethod')?.value ?? document.querySelector('.card .pre')?.textContent ?? '';
+  const amt = serves > 1 ? `${fq(sc)} tray${sc === 1 ? '' : 's'} (${fq(sc * serves)} guests)` : `${fq(sc)} guest${sc === 1 ? '' : 's'}`;
+  const w = window.open('', '_blank'); if (!w) return toast('Allow pop-ups to print the recipe card.', true);
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Recipe - ${esc(d.name)}</title><style>
+   @page{size:A5;margin:10mm}body{font:11pt/1.4 Montserrat,Arial,sans-serif;color:#1b1f2a;margin:0}h1{font:italic 22pt 'Playfair Display',Georgia,serif;color:#14213f;margin:0}
+   .m{color:#5b6170;font-size:9.5pt;margin:2px 0 10px}table{width:100%;border-collapse:collapse}td{padding:4px 0;border-bottom:.6pt solid #ddd}td.n{text-align:right;white-space:nowrap}
+   h2{font-size:9pt;letter-spacing:.14em;text-transform:uppercase;color:#8a5a00;margin:14px 0 4px}.pre{white-space:pre-wrap}.c{display:flex;gap:16px;font-size:9.5pt;color:#5b6170;margin-top:12px;border-top:1pt solid #14213f;padding-top:6px}
+   .bar{margin-bottom:8px}@media print{.bar{display:none}}</style></head><body>
+   <div class="bar"><button onclick="print()">Print</button></div>
+   <h1>${esc(d.name)}</h1><div class="m">${esc(d.category)} · ${esc(d.course)} · for ${amt}</div>
+   <h2>Ingredients</h2><table>${rows.map(x => `<tr><td>${esc(itemName(x.id))}</td><td class="n">${fq(+x.qty.toFixed(3))} ${esc(itemUnit(x.id))}</td></tr>`).join('')}</table>
+   ${method.trim() ? `<h2>Method</h2><div class="pre">${esc(method)}</div>` : ''}
+   <div class="c"><span>Ingredient cost ${peso(cost)}</span>${price ? `<span>Price ${peso(price)}</span><span>Food cost ${(cost / price * 100).toFixed(1)}%</span>` : ''}<span>Printed ${esc(new Date().toLocaleDateString('en-PH'))}</span></div></body></html>`);
+  w.document.close();
 };
 // The recipe row is made the first time something is added — no separate "Start recipe" step
 async function ensureRecipe(dishId) {
