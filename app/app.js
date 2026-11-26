@@ -1254,7 +1254,10 @@ routes['c/recipe'] = async id => {
    Buffet per head   = (tray price − 35% of S) ÷ 10
    Restaurant serving (3–4 guests ≈ ⅓ of a tray) = tray price ÷ 3
    Shown inside the app only (chef, manager, finance). Change the numbers here and every screen follows. */
-const HOUSE = { markup: 3, pax: 10, buffetLess: 0.35, servingsPerTray: 3 };
+const HOUSE = { markup: 3, pax: 10, servingsPerTray: 3, get buffetLess() { return buffetLessPct() / 100; } };
+// Buffet deduction: 35% by default, up to 50% for volume events (kept per device)
+const buffetLessPct = () => { try { const v = num(localStorage.getItem('rom-buffet-less')); return v >= 35 && v <= 50 ? v : 35; } catch (e) { return 35; } };
+const portionPct = () => { try { const v = num(localStorage.getItem('rom-buffet-portion')); return v >= 20 && v <= 100 ? v : 60; } catch (e) { return 60; } };
 const FC_TARGET = 100 / HOUSE.markup;                       // 33.3% food cost on a tray
 const fcTone = pct => pct > FC_TARGET + 10 ? 'bad-t' : pct > FC_TARGET + 2 ? 'warn-t' : 'ok-t';
 const roundUp = (n, step) => n > 0 ? Math.ceil(n / step - 1e-9) * step : 0;
@@ -1295,8 +1298,9 @@ function costingTab(recipes, rl) {
   const usedItems = [...new Set(rl.map(l => l.item_id))].filter(i => S.itemsById[i]).sort((a, b) => itemName(a).localeCompare(itemName(b)));
   const hasTier = S.dishes.some(d => 'tier' in d);
   return `<div class="card ctools">
-    <p class="small mut hf1"><b>House formula</b> · tray = ingredient cost (10–12 pax) × ${HOUSE.markup} · buffet per head = (tray − ${HOUSE.buffetLess * 100}% of the cost) ÷ ${HOUSE.pax} · restaurant serving (3–4 pax) = tray ÷ ${HOUSE.servingsPerTray}. Rounded up: tray and serving to ₱10/₱5, per head to ₱1.</p>
-    <div class="ct-row"><label>All ingredient prices<span><input id="ktInfl" type="number" step="1" value="0"> % change</span></label>
+    <p class="small mut hf1"><b>House formula</b> · tray = ingredient cost (10–12 pax) × ${HOUSE.markup} · buffet per head = (tray − 35 to 50% of the cost) ÷ ${HOUSE.pax} · restaurant serving (3–4 pax) = tray ÷ ${HOUSE.servingsPerTray}. Rounded up: tray and serving to ₱10/₱5, per head to ₱1.</p>
+    <div class="ct-row"><label>Buffet deduction<span><input id="ktLess" type="number" min="35" max="50" step="1" value="${buffetLessPct()}"> % of cost (35–50)</span></label>
+     <label>All ingredient prices<span><input id="ktInfl" type="number" step="1" value="0"> % change</span></label>
      <label class="wide">One ingredient's new price<span><input id="ktItem" list="dl-citems" placeholder="e.g. Pork kasim" autocomplete="off"> ₱<input id="ktPrice" type="number" step="any" min="0" placeholder="new price"></span></label></div>
     <datalist id="dl-citems">${usedItems.map(i => `<option value="${esc(itemName(i))}">`).join('')}</datalist>
     <div class="ct-row filt"><span class="mut small">Show</span>${[['all', 'All'], ...(hasTier ? [['standard', 'Standard'], ['premium', 'Premium'], ['untiered', 'Not on a package']] : []), ['under', 'Priced below formula'], ['incomplete', 'Missing price / qty'], ['affected', 'Affected by the price change']].map(([k, l]) => `<button type="button" class="chipbtn${k === KFILT ? ' on' : ''}" data-kfilt="${k}">${l}</button>`).join('')}<span class="sp"></span><span id="ktSum" class="small"></span></div>
@@ -1334,9 +1338,9 @@ const pkgPicks = () => { try { return JSON.parse(localStorage.getItem('rom-pkg-p
 function packageCheck() {
   const cur = (() => { try { return localStorage.getItem('rom-pkg') || 's650'; } catch (e) { return 's650'; } })(), P = PACKAGES.find(x => x.k === cur) || PACKAGES[2], picks = pkgPicks()[P.k] || [];
   return `<section class="card pkg" id="pkg"><div class="row"><h2>Package check</h2><select id="pkgSel">${PACKAGES.map(x => opt(x.k, `${TIER_LBL[x.tier]} ₱${x.price} per head`, x.k === P.k)).join('')}</select><span class="small mut">${esc(P.note)}</span></div>
-   <p class="small mut">Pick one dish per course. Only dishes with a recipe can be priced.</p>
+   <p class="small mut">Pick one dish per course. Only dishes with a recipe can be priced. With several dishes on the table, each guest takes about <input id="pkPortion" type="number" min="20" max="100" step="5" value="${portionPct()}">% of a tray portion of each dish.</p>
    <datalist id="dl-pkgdish">${COST_ROWS.map(x => `<option value="${esc(x.d.name)}">${x.d.tier ? TIER_LBL[x.d.tier] : ''}</option>`).join('')}</datalist>
-   <table class="pkt"><thead><tr><th>Course</th><th>Dish</th><th class="n">Buffet / head</th><th class="n">Ingredients / head</th></tr></thead><tbody>
+   <table class="pkt"><thead><tr><th>Course</th><th>Dish</th><th class="n">Buffet price share</th><th class="n">Ingredients / head</th></tr></thead><tbody>
    ${P.slots.map((sl, i) => `<tr><td>${esc(sl)}</td><td><input data-pkslot="${i}" list="dl-pkgdish" value="${esc(picks[i] || '')}" placeholder="pick a dish" autocomplete="off"></td><td class="n" id="pkh${i}">—</td><td class="n" id="pkc${i}">—</td></tr>`).join('')}
    </tbody><tfoot><tr><td colspan="2">Total</td><td class="n" id="pkH">—</td><td class="n" id="pkC">—</td></tr></tfoot></table>
    <div id="pkOut" class="pkout"></div></section>`;
@@ -1349,18 +1353,23 @@ function recalcPackage(all) {
   box.querySelectorAll('[data-pkslot]').forEach(inp => {
     const i = inp.dataset.pkslot, x = byName[normName(inp.value)];
     $('#pkh' + i).textContent = x ? pesoR(x.head) : '—'; $('#pkc' + i).textContent = x ? peso(x.S / HOUSE.pax) : '—';
-    if (x) { H += x.head; C += x.S / HOUSE.pax; n++; if (x.d.tier && !(x.d.tier === P.tier || x.d.tier === 'both')) off.push(x.d.name); }
+    const sh = portionPct() / 100;
+    if (x) { $('#pkh' + i).textContent = pesoR(roundUp(x.head * sh, 1)); $('#pkc' + i).textContent = peso(x.S / HOUSE.pax * sh); H += x.head * sh; C += x.S / HOUSE.pax * sh; n++; if (x.d.tier && !(x.d.tier === P.tier || x.d.tier === 'both')) off.push(x.d.name); }
   });
-  $('#pkH').textContent = n ? pesoR(H) : '—'; $('#pkC').textContent = n ? peso(C) : '—';
+  H = roundUp(H, 1); $('#pkH').textContent = n ? pesoR(H) : '—'; $('#pkC').textContent = n ? peso(C) : '—';
   if (!n) { $('#pkOut').innerHTML = '<p class="small mut">Pick dishes to see if the package price covers them.</p>'; return; }
   const gap = P.price - H, fc = C / P.price * 100;
   $('#pkOut').innerHTML = `<div class="kpis kp3"><div><span>Package price</span><b>${pesoR(P.price)}</b><small>${n} of ${P.slots.length} courses picked</small></div>
     <div><span>Dishes at buffet prices</span><b class="${gap < 0 ? 'bad-t' : 'ok-t'}">${pesoR(H)}</b><small>${gap < 0 ? `${pesoR(-gap)} more than the package` : `${pesoR(gap)} left for service &amp; setup`}</small></div>
-    <div><span>Food cost per head</span><b class="${fcTone(fc)}">${fc.toFixed(0)}%</b><small>${peso(C)} of ${pesoR(P.price)}, if each guest eats a full tray portion of every dish</small></div></div>
+    <div><span>Food cost per head</span><b class="${fcTone(fc)}">${fc.toFixed(0)}%</b><small>${peso(C)} of ${pesoR(P.price)} at ${portionPct()}% portions</small></div></div>
     ${off.length ? `<p class="small warn-t">Not on the ${TIER_LBL[P.tier]} list: ${off.map(esc).join(', ')}</p>` : ''}`;
 }
 document.addEventListener('input', e => {
-  if (e.target.closest('.ctools')) recalcCostTab();
+  if (e.target.id === 'ktLess' || e.target.id === 'cLess' || e.target.id === 'pkPortion') {
+    const v = num(e.target.value), [key, lo, hi] = e.target.id === 'pkPortion' ? ['rom-buffet-portion', 20, 100] : ['rom-buffet-less', 35, 50];
+    if (v >= lo && v <= hi) try { localStorage.setItem(key, v); } catch (er) {}
+  }
+  if (e.target.closest('.ctools') || e.target.id === 'pkPortion') recalcCostTab();
   if (e.target.dataset?.pkslot !== undefined) {
     const k = $('#pkgSel').value, all = pkgPicks(); all[k] = [...document.querySelectorAll('[data-pkslot]')].map(i => i.value);
     try { localStorage.setItem('rom-pkg-picks', JSON.stringify(all)); } catch (er) {}
@@ -1384,7 +1393,7 @@ function costingCard(d, r, lines, serves, edit) {
    <div class="kpis">
     <div><span>Ingredient cost · 10–12 pax</span><b id="hS">—</b><small id="hSg"></small></div>
     <div><span>Tray price</span><b id="hTray">—</b><small id="hTrayNow"></small></div>
-    <div><span>Buffet · per head</span><b id="hHead">—</b><small>(tray − ${HOUSE.buffetLess * 100}% of cost) ÷ ${HOUSE.pax}</small></div>
+    <div><span>Buffet · per head</span><b id="hHead">—</b><small>(tray − <input id="cLess" type="number" min="35" max="50" step="1" value="${buffetLessPct()}">% of cost) ÷ ${HOUSE.pax}</small></div>
     <div><span>Restaurant serving · 3–4 pax</span><b id="hServ">—</b><small>tray ÷ ${HOUSE.servingsPerTray}</small></div>
    </div>
    <div id="hWarn"></div>

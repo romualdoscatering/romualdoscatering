@@ -569,3 +569,4 @@ input.qty.need{background:#fff8e6;border-color:#e8c46a}
 .costing .kpis span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:760px){.kpis.kp3{grid-template-columns:1fr}}
 .ctools input#ktPrice{width:100px}
+#pkPortion,#cLess{display:inline-block;width:56px;margin:0 2px;padding:2px 4px;font-size:12px;text-align:center}
