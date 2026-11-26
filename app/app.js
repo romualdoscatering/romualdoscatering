@@ -1205,7 +1205,7 @@ routes['c/recipe'] = async id => {
   <div class="row"><h1>${esc(d.name)}</h1>${r ? chip(r.status === 'verified' ? 'Verified' : 'Draft', r.status === 'verified' ? 'ok' : 'warn') : chip('No recipe yet', 'mut')}${d.active ? '' : ' ' + chip('Archived', 'bad')}<span class="sp"></span>${canEditDish() ? `<button type="button" class="ghost" data-act="toggleDishEdit">✎ Edit dish</button>` : ''}</div>
   <p class="lede">${esc(d.category)} · ${esc(d.course)} · chosen ${d.times_booked}× ${d.tray_price ? '· tray price ' + peso(d.tray_price) : ''}</p>
   ${canEditDish() ? `<form class="card" data-form="editDish" data-id="${id}" id="dishEdit" hidden><h2>Dish details</h2><div class="grid">
-    <label>Dish name<input name="name" value="${esc(d.name)}" required></label>
+    <label>Dish name<input name="name" value="${esc(d.name)}" required data-cap></label>
     <label>Category<input name="category" list="dl-dishcats" value="${esc(d.category)}" required></label>
     <label>Course on the event sheet<select name="course">${COURSES.map(c => opt(c, c, c === d.course)).join('')}</select></label>
     <label>Tray price ₱<input name="tray_price" type="number" step="any" min="0" value="${d.tray_price ?? ''}" placeholder="not sold by the tray"></label></div>
@@ -1221,7 +1221,7 @@ routes['c/recipe'] = async id => {
      <td class="n nowrap">${edit ? `₱<input name="p_${l.item_id}" type="number" step="any" min="0" value="${num(it.last_cost) || ''}" placeholder="—" class="qty price" title="Price per ${u}: changes it for every recipe using ${esc(it.name || '')}"> /${u}` : num(it.last_cost) ? `${peso(it.last_cost)} /${u}` : '<span class="mut small">no price</span>'}</td>
      <td class="n" data-linecost="${l.item_id}" data-price="${num(it.last_cost)}" data-qty="${num(l.qty)}">${num(it.last_cost) ? peso(num(l.qty) * num(it.last_cost)) : '<span class="mut small">—</span>'}</td>${edit ? `<td class="nowrap"><button type="button" class="x" title="Rename, change unit, or replace" data-act="editIng" data-item="${l.item_id}">✎</button><button type="button" class="x" title="Remove" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>
    ${edit ? `<tr class="ing-edit" id="ie_${l.item_id}" hidden><td colspan="5"><div class="grid">
-     <label>Ingredient name<input name="e_name_${l.item_id}" value="${esc(it.name || '')}"></label>
+     <label>Ingredient name<input name="e_name_${l.item_id}" value="${esc(it.name || '')}" data-cap></label>
      <label>Unit used in recipes<input name="e_unit_${l.item_id}" list="dl-units" value="${esc(it.stock_unit || '')}"></label>
      <label>Price per unit ₱<input name="e_cost_${l.item_id}" type="number" step="any" min="0" value="${num(it.last_cost) || ''}"></label>
      <label>Or replace with another ingredient (this recipe only)<input name="e_swap_${l.item_id}" list="dl-items" placeholder="leave empty to keep ${esc(it.name || '')}" autocomplete="off"></label></div>
@@ -2136,6 +2136,18 @@ document.addEventListener('click', async e => {
   e.preventDefault(); if (el.disabled) return; el.disabled = true;
   try { await ACT[el.dataset.act](el); } catch (err) { console.error(err); toast(err.message, true); } finally { el.disabled = false; }
 });
+// Names start with a capital letter: "ox" → "Ox" as it is typed (ingredients, dishes, categories, sections).
+// Units (kg, pc, L…) are left as typed.
+const CAP_SEL = 'input[list]:not([list="dl-units"]), input[data-cap]';
+const cap1 = s => s.replace(/^(\s*)(\p{Ll})/u, (_, sp, c) => sp + c.toUpperCase());
+document.addEventListener('input', e => {
+  const t = e.target; if (!t.matches?.(CAP_SEL) || (e.inputType && !e.inputType.startsWith('insert'))) return;
+  const v = t.value, c = cap1(v); if (c === v) return;
+  const a = t.selectionStart, b = t.selectionEnd; t.value = c; try { t.setSelectionRange(a, b); } catch (err) {}
+});
+// phone keyboards: start these fields with Shift on
+new MutationObserver(() => document.querySelectorAll(CAP_SEL).forEach(i => { if (!i.hasAttribute('autocapitalize')) i.setAttribute('autocapitalize', 'sentences'); }))
+  .observe(document.body, { childList: true, subtree: true });
 document.addEventListener('click', e => { const j = e.target.closest('[data-jump]'); if (j) document.getElementById(j.dataset.jump)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
 document.addEventListener('input', e => {
   const t = e.target.dataset?.filter; if (!t) return; const q = e.target.value.toLowerCase();
