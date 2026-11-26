@@ -489,3 +489,39 @@ button.sm{padding:6px 12px;font-size:13px}
 .verbar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:12px;padding:10px 12px 10px 16px;background:#14213f;color:#fff;border-radius:12px;box-shadow:0 8px 24px #0005;font-size:14px;max-width:calc(100vw - 24px)}
 .verbar button{border:0;border-radius:8px;padding:8px 14px;background:#e2c77e;color:#14213f;font-weight:700;cursor:pointer;white-space:nowrap}
 body.pos-mode .verbar{bottom:auto;top:10px}
+/* Record what was bought — lean rows */
+.buyrep{padding:18px 20px}.buyrep h2{font-size:22px;margin:0 0 2px}.buyrep>p.small{margin:0 0 10px}
+.brt{font-size:14px}.brt th{padding:6px 8px;font-size:10.5px}
+.brt td{padding:6px 8px;vertical-align:middle;border-bottom:1px solid #efe9d8}
+.brt tr.grp td{padding:5px 8px;font-size:10.5px;letter-spacing:.12em;background:#f6f2e7}
+.brt td.ck{width:28px;padding-right:0}.brt td.ck input{width:18px;height:18px;margin:0;display:block}
+.brt td.nm{line-height:1.25}.brt td.nm .t{display:block}.brt td.nm .d{display:block;font-size:11.5px;color:#7a8090;max-width:360px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.brt input.qty{width:68px;height:32px;padding:4px 8px;margin:0 4px 0 0;font-size:14px;text-align:right;border-radius:7px}
+.brt td .u{font-size:12px;color:#7a8090}.brt td .u:first-child{margin-right:3px}
+.brt input.chg{border-color:#e2a33b;background:#fff8ea}
+.brt td.amt{width:96px;font-weight:600;white-space:nowrap}
+.brt tr .nb{display:none;font-size:11px;font-weight:700;color:var(--bad);text-transform:uppercase;letter-spacing:.06em}
+.brt tr.off td{color:#9aa0ac}.brt tr.off .nb{display:inline}.brt tr.off td.nm .t{text-decoration:line-through}.brt tr.off td.nm .d{display:none}
+.brt tr.off input.qty{opacity:.4}
+.brt tfoot td{padding:10px 8px;border:0}
+.brsum{display:flex;justify-content:space-between;align-items:baseline;font-size:14px}.brsum b{font-size:18px;color:#14213f}
+.brf{display:grid;grid-template-columns:1.2fr 1fr 1.4fr auto;gap:8px;margin-top:10px}
+.brf input{margin:0;height:40px}.brf button{height:40px;white-space:nowrap}
+@media (max-width:760px){.brf{grid-template-columns:1fr 1fr}.brf input[name=note],.brf button{grid-column:1/-1}.brt td.nm .d{max-width:150px}.brt input.qty{width:58px}}
+/* request table folded once approved; supplier-order tick list */
+details.prfold>summary{cursor:pointer;display:flex;gap:10px;align-items:baseline}details.prfold>summary .mut{font-size:13px}
+.otick{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:4px 14px;margin:6px 0 10px;font-size:13.5px}
+.brt input.qty{width:80px;-moz-appearance:textfield;appearance:textfield}
+.brt input.qty::-webkit-outer-spin-button,.brt input.qty::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.brt td .u{display:inline-block;min-width:24px;text-align:left}.brt td .u:first-child{min-width:0}
+@media (max-width:640px){
+ .buyrep{padding:14px 12px}.buyrep .tw{overflow:visible}
+ .brt,.brt tbody,.brt tfoot{display:block;width:100%}.brt thead{display:none}
+ .brt tr.grp{display:block}.brt tr.grp td{display:block}
+ .brt tr.br{display:grid;grid-template-columns:26px 1fr auto;grid-template-areas:"ck nm amt" "ck q p";align-items:center;gap:4px 8px;padding:8px 2px;border-bottom:1px solid #efe9d8}
+ .brt tr.br td{border:0;padding:0}
+ .brt tr.br td.ck{grid-area:ck;align-self:start;padding-top:2px}.brt tr.br td.nm{grid-area:nm;min-width:0}.brt tr.br td.amt{grid-area:amt;width:auto}
+ .brt tr.br td:nth-child(3){grid-area:q;text-align:left}.brt tr.br td:nth-child(4){grid-area:p;text-align:right}
+ .brt td.nm .d{max-width:100%}.brt input.qty{width:76px;height:34px}
+ .brt tfoot tr,.brt tfoot td{display:block;padding:10px 2px}
+}

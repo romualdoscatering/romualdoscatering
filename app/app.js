@@ -673,24 +673,25 @@ ACT.newPR = async () => { const r = (await db.insert('purchase_requests', { ws: 
 function buyReportForm(p, toBuy, remaining) {
   let ticks = null; try { const t = JSON.parse(localStorage.getItem('prl-' + p.id) || 'null'); if (t && Object.values(t).some(Boolean)) ticks = t; } catch (e) {}
   const row = l => { const on = ticks ? !!ticks[l.id] : true, u = esc(itemUnit(l.item_id)), q = remaining(l), c = num(l.est_unit_cost);
-    return `<tr class="br${on ? '' : ' off'}" data-br="${l.id}"><td><input type="checkbox" name="b_${l.id}" ${on ? 'checked' : ''} aria-label="Bought"></td>
-     <td>${esc(itemName(l.item_id))}${l.note ? `<div class="small mut">${esc(l.note.replace(/^for:\s*/i, ''))}</div>` : ''}<div class="small nb">Not bought — won't go into stock</div></td>
-     <td class="n nowrap"><input name="bq_${l.id}" type="number" step="any" min="0" value="${q}" class="qty"> ${u}<div class="small mut">asked ${fq(q)}</div></td>
-     <td class="n nowrap">₱<input name="bc_${l.id}" type="number" step="any" min="0" value="${c || ''}" placeholder="0" class="qty price"><div class="small mut">per ${u}</div></td>
-     <td class="n" data-bamt>${peso(q * c)}</td></tr>`; };
-  return `<form class="card buyrep" data-form="buyReport" data-id="${p.id}"><div class="row"><h2>🛒 Record what was bought</h2></div>
-   <p class="small mut">Everything is ticked as bought. <b>Untick what you couldn't buy</b>, and change the quantity or price where it was different. A manager or storekeeper checks it, and only then do the bought items go into stock.${ticks ? ' <b>Ticks from the purchase list on this phone were used.</b>' : ''}</p>
-   <div class="tw"><table class="brt"><thead><tr><th></th><th>Item</th><th class="n">Bought</th><th class="n">Price paid</th><th class="n">Amount</th></tr></thead><tbody>
+    return `<tr class="br${on ? '' : ' off'}" data-br="${l.id}"><td class="ck"><input type="checkbox" name="b_${l.id}" ${on ? 'checked' : ''} aria-label="Bought"></td>
+     <td class="nm"><span class="t">${esc(itemName(l.item_id))}</span>${l.note ? `<span class="d">${esc(l.note.replace(/^for:\s*/i, ''))}</span>` : ''}<span class="nb">not bought</span></td>
+     <td class="n nowrap"><input name="bq_${l.id}" data-asked="${q}" type="number" step="any" min="0" value="${q}" class="qty" title="Asked ${fq(q)} ${u}"><span class="u">${u}</span></td>
+     <td class="n nowrap"><span class="u">₱</span><input name="bc_${l.id}" data-est="${c}" type="number" step="any" min="0" value="${c || ''}" placeholder="0" class="qty" title="Estimated ${peso(c)} per ${u}"><span class="u">/${u}</span></td>
+     <td class="n amt" data-bamt>${peso(q * c)}</td></tr>`; };
+  return `<form class="card buyrep" data-form="buyReport" data-id="${p.id}"><h2>🛒 Record what was bought</h2>
+   <p class="small mut">Untick what you couldn't buy; fix quantities or prices that differ. Stock updates after a manager or storekeeper approves.${ticks ? ' <b>Pre-ticked from your purchase list.</b>' : ''}</p>
+   <div class="tw"><table class="brt"><thead><tr><th></th><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>
    ${shopRows(toBuy, l => l.item_id, l => remaining(l), 5, row)}</tbody>
-   <tfoot><tr><td colspan="5"><span id="brSum"></span></td></tr></tfoot></table></div>
-   <div class="grid mt"><label>Where bought<input name="supplier" placeholder="e.g. Bankerohan market, S&R"></label><label>OR / receipt no.<input name="or_no" placeholder="optional"></label><label>Note<input name="note" placeholder="optional — e.g. no fresh scallops, bought frozen"></label></div>
-   <div class="row end"><button class="pri">Submit for approval</button></div></form>`;
+   <tfoot><tr><td colspan="5"><div id="brSum" class="brsum"></div></td></tr></tfoot></table></div>
+   <div class="brf"><input name="supplier" placeholder="Where bought (e.g. Bankerohan)"><input name="or_no" placeholder="OR / receipt no."><input name="note" placeholder="Note (optional)"><button class="pri">Submit for approval</button></div></form>`;
 }
 function brTotals(f) {
   let tot = 0, nb = 0, n = 0;
   f.querySelectorAll('tr[data-br]').forEach(tr => { const id = tr.dataset.br, on = f.elements['b_' + id].checked, a = num(f.elements['bq_' + id].value) * num(f.elements['bc_' + id].value);
-    tr.classList.toggle('off', !on); tr.querySelector('[data-bamt]').textContent = on ? peso(a) : '—'; n++; if (on) tot += a; else nb++; });
-  const s = f.querySelector('#brSum'); if (s) s.innerHTML = `<b>${n - nb} of ${n} bought · ${peso(tot)}</b>${nb ? ` · <span class="bad-t">${nb} not bought</span> (stays on this request as still to buy)` : ''}`;
+    tr.classList.toggle('off', !on); tr.querySelector('[data-bamt]').textContent = on ? peso(a) : '—'; n++; if (on) tot += a; else nb++;
+    const q = f.elements['bq_' + id], c = f.elements['bc_' + id];
+    q.classList.toggle('chg', num(q.value) !== num(q.dataset.asked)); c.classList.toggle('chg', num(c.value) !== num(c.dataset.est)); });
+  const s = f.querySelector('#brSum'); if (s) s.innerHTML = `<span>${n - nb} of ${n} bought${nb ? ` · <span class="bad-t">${nb} not bought</span>` : ''}</span><b>${peso(tot)}</b>`;
 }
 document.addEventListener('input', e => { const f = e.target.closest('form[data-form="buyReport"]'); if (f) brTotals(f); });
 document.addEventListener('change', e => { const f = e.target.closest('form[data-form="buyReport"]'); if (f) brTotals(f); });
@@ -757,12 +758,11 @@ routes['c/pr'] = async id => {
   <div class="row"><h1>${esc(p.pr_no)}</h1>${chip(PR_STATUS[p.status], statusTone(p.status))}<span class="sp"></span>${lines.length ? `<button type="button" class="ghost" data-act="prPreview" data-id="${id}">🧾 Preview list</button>` : ''}${prCanDel(p) ? `<button type="button" class="ghost danger" data-act="delPR" data-id="${id}" data-no="${esc(p.pr_no)}" title="Delete this request (mistake, duplicate, or revised order)">🗑 Delete</button>` : ''}</div>
   <p class="lede">${p.event_id ? `<a href="#/c/event/${p.event_id}">${esc(p.event_ref + ' · ' + p.event_title)}</a>${prPurpose(p) ? ' · ' : ''}` : ''}${esc(prPurpose(p))}<br><span class="small mut">Requested by ${esc(p.requested_by_name || '')} · ${esc(fmtT(p.created_at))}${p.needed_by ? ' · needed by ' + esc(fmtD(p.needed_by)) : ''}${p.approved_by_name ? ` · ${p.status === 'rejected' ? 'rejected' : 'approved'} by ${esc(p.approved_by_name)} ${esc(fmtT(p.approved_at))}` : ''}</span></p>
   ${p.decision_note ? `<div class="alert ${p.status === 'rejected' ? 'bad' : 'info'}">${esc(p.decision_note)}</div>` : ''}
-  <form class="card" data-form="${approver ? 'approvePR' : editable ? 'saveDraft' : 'none'}" data-id="${id}">
-   <div class="tw"><table><thead><tr><th>Item</th><th class="n">Requested</th>${p.status !== 'draft' ? '<th class="n">Approved</th>' : ''}${buyer ? '<th class="n">Still to order</th>' : ''}<th class="n">Est. price</th><th class="n">In store then</th>${editable ? '<th></th>' : ''}</tr></thead><tbody>
+  ${(fold => `${fold ? `<details class="card prfold"><summary><b>Requested items</b> <span class="mut">${lines.length} items · est. ${peso(total)}</span></summary>` : ''}<form class="${fold ? 'mt' : 'card'}" data-form="${approver ? 'approvePR' : editable ? 'saveDraft' : 'none'}" data-id="${id}">
+   <div class="tw"><table class="prt"><thead><tr><th>Item</th><th class="n">Requested</th>${p.status !== 'draft' ? '<th class="n">Approved</th>' : ''}<th class="n">Est. price</th><th class="n">In store then</th>${editable ? '<th></th>' : ''}</tr></thead><tbody>
    ${shopRows(lines, l => l.item_id, l => l.approved_qty ?? l.qty, 7, l => `<tr><td>${esc(itemName(l.item_id))}${l.note ? `<div class="small mut">${esc(l.note)}</div>` : ''}</td>
      <td class="n">${editable ? `<input name="q_${l.id}" type="number" step="any" min="0" value="${num(l.qty)}" class="qty">` : fq(l.qty)} ${esc(itemUnit(l.item_id))}${packSplit(l.item_id, l.qty) ? `<div class="small mut">${esc(packSplit(l.item_id, l.qty))}</div>` : ''}</td>
      ${p.status !== 'draft' ? `<td class="n">${approver ? `<input name="a_${l.id}" type="number" step="any" min="0" max="${num(l.qty)}" value="${num(l.qty)}" class="qty">` : l.approved_qty != null ? buyCell(l.item_id, l.approved_qty) : '—'}</td>` : ''}
-     ${buyer ? `<td class="n">${remaining(l) > 0 ? `<label class="tick"><input type="checkbox" name="o_${l.id}" checked form="orderForm"> ${fq(remaining(l))}</label>` : '<span class="mut">ordered</span>'}</td>` : ''}
      <td class="n">${num(l.est_unit_cost) ? peso(l.est_unit_cost) : '<span class="mut small">—</span>'}</td><td class="n mut">${l.on_hand_then != null ? fq(l.on_hand_then) : ''}</td>
      ${editable ? `<td><button type="button" class="x" data-act="rmLine" data-id="${l.id}">✕</button></td>` : ''}</tr>`)}
    </tbody><tfoot><tr><td colspan="9">Estimated total ${peso(total)} <span class="small mut">(items without a price yet count as ₱0)</span></td></tr></tfoot></table></div>
@@ -773,11 +773,12 @@ routes['c/pr'] = async id => {
    ${approver ? `<label class="mt">Note to the buyer, or reason for rejecting<input name="note"></label>
      <div class="row end"><button type="button" class="danger" data-act="rejectPR" data-id="${id}">Reject</button><button class="pri">Approve</button></div>` : ''}
    ${p.status === 'submitted' && can(p.ws, 'manager') && mine && !isAdmin() ? '<p class="alert warn">You filed this request, so another manager or the owner must approve it.</p>' : ''}
-  </form>
+  </form>${fold ? '</details>' : ''}`)(['approved', 'ordered', 'received'].includes(p.status) && !approver && !editable)}
   ${pending ? reportCard(pending, rLines.filter(x => x.report_id === pending.id), lines, p) : ''}
   ${canReport && !pending && toBuy.length ? (repOff ? '<div class="alert warn">Recording purchases needs the latest database update — ask the owner to run it.</div>' : buyReportForm(p, toBuy, remaining)) : ''}
   ${buyer && lines.some(l => remaining(l) > 0) ? `<details class="card"><summary><b>Ordering from a supplier for delivery instead?</b> <span class="small mut">Create an order, then receive it in Orders &amp; receiving</span></summary><form class="mt" id="orderForm" data-form="createPO" data-id="${id}">
-    <p class="small mut">One order per supplier. Tick the lines in the "Still to order" column above.</p>
+    <p class="small mut">One order per supplier. Tick what this supplier delivers.</p>
+    <div class="otick">${lines.filter(l => remaining(l) > 0).map(l => `<label class="tick"><input type="checkbox" name="o_${l.id}" checked> ${esc(itemName(l.item_id))} <span class="mut">${fq(remaining(l))} ${esc(itemUnit(l.item_id))}</span></label>`).join('')}</div>
     <div class="grid"><label>Supplier / stall<input name="supplier" required placeholder="e.g. Agdao market — stall 12"></label>
     <label>Cash advance used<select name="advance">${opt('', 'None / paid directly')}${advances.map(a => opt(a.id, `${peso(a.amount)} · ${fmtT(a.released_at)}`)).join('')}</select></label></div>
     <div class="row end"><button class="pri">Create order</button></div></form></details>` : ''}
