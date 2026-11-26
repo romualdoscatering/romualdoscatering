@@ -475,3 +475,5 @@ button.sm{padding:6px 12px;font-size:13px}
 .cu-acts{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin-top:auto}
 .cu-acts .lnk{border:0;background:transparent;padding:4px 0;font-size:12.5px;font-weight:600;color:var(--mut);cursor:pointer}.cu-acts .lnk:hover{text-decoration:underline}
 .cu-acts .lnk.bad-t{color:var(--bad)}
+/* Brand lockup: sit "Catering" on the wordmark's baseline (the logo's R swash hangs below it) and keep the divider short */
+.brand em{line-height:1;padding-top:2px;padding-bottom:2px;position:relative;top:-.18em}
