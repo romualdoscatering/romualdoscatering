@@ -1171,7 +1171,7 @@ function recipeRank(itemId) {
 const isToTaste = itemId => /^(salt|black pepper|whole peppercorns)/i.test(S.itemsById[itemId]?.name || '') ? 1 : 0;
 // Recipe cost line: total, per guest, share of tray price (with a warning colour when the margin is thin)
 function recipeTotalText(cost, tray, serves) {
-  const pct = tray ? Math.round(cost / tray * 100) : null;
+  const pct = tray > HOUSE.trayCost ? Math.round(cost / (tray - HOUSE.trayCost) * 100) : null;   // food part of the tray price
   return `Ingredient cost per batch <b>${peso(cost)}</b> · ${peso(cost / (serves || 1))} per guest${pct !== null ? ` · <span class="${fcTone(pct)}">${pct}% of the tray price</span>` : ''}`;
 }
 // Live recompute while quantities are typed; each change is saved on its own
@@ -1254,7 +1254,8 @@ routes['c/recipe'] = async id => {
    Buffet per head   = (tray price − 35% of S) ÷ 10
    Restaurant serving (3–4 guests ≈ ⅓ of a tray) = tray price ÷ 3
    Shown inside the app only (chef, manager, finance). Change the numbers here and every screen follows. */
-const HOUSE = { markup: 3, pax: 10, servingsPerTray: 3, get buffetLess() { return buffetLessPct() / 100; } };
+// trayCost: the large disposable tray, added on top of every tray price (not to buffet or restaurant prices)
+const HOUSE = { markup: 3, pax: 10, servingsPerTray: 3, trayCost: 45, get buffetLess() { return buffetLessPct() / 100; } };
 // Buffet deduction: 35% by default, up to 50% for volume events (kept per device)
 const buffetLessPct = () => { try { const v = num(localStorage.getItem('rom-buffet-less')); return v >= 35 && v <= 50 ? v : 35; } catch (e) { return 35; } };
 const portionPct = () => { try { const v = num(localStorage.getItem('rom-buffet-portion')); return v >= 20 && v <= 100 ? v : 60; } catch (e) { return 60; } };
@@ -1268,7 +1269,7 @@ const tierChip = t => t ? `<span class="tier t-${t}">${t === 'both' ? 'Std + Pre
 const qtyErr = err => /qty_check|violates check/i.test(err?.message || '') ? 'The database update for blank quantities isn\'t installed yet (20261126000700). Enter a quantity for now.' : err?.message || String(err);
 function housePrices(S) {
   const tray = S * HOUSE.markup, head = (tray - HOUSE.buffetLess * S) / HOUSE.pax, serving = tray / HOUSE.servingsPerTray;
-  return { S, tray, head, serving, trayR: roundUp(tray, 10), headR: roundUp(head, 1), servingR: roundUp(serving, 5) };
+  return { S, tray, head, serving, trayR: roundUp(tray, 10) + HOUSE.trayCost, headR: roundUp(head, 1), servingR: roundUp(serving, 5) };
 }
 // cost of a recipe scaled to one tray of 10, from its lines (qty 0 = not filled in yet)
 function recipeS(lines, serves, priceOf = id => num(S.itemsById[id]?.last_cost)) {
@@ -1298,7 +1299,7 @@ function costingTab(recipes, rl) {
   const usedItems = [...new Set(rl.map(l => l.item_id))].filter(i => S.itemsById[i]).sort((a, b) => itemName(a).localeCompare(itemName(b)));
   const hasTier = S.dishes.some(d => 'tier' in d);
   return `<div class="card ctools">
-    <p class="small mut hf1"><b>House formula</b> · tray = ingredient cost (10–12 pax) × ${HOUSE.markup} · buffet per head = (tray − 35 to 50% of the cost) ÷ ${HOUSE.pax} · restaurant serving (3–4 pax) = tray ÷ ${HOUSE.servingsPerTray}. Rounded up: tray and serving to ₱10/₱5, per head to ₱1.</p>
+    <p class="small mut hf1"><b>House formula</b> · tray = ingredient cost (10–12 pax) × ${HOUSE.markup} + ₱${HOUSE.trayCost} large tray · buffet per head = (tray − 35 to 50% of the cost) ÷ ${HOUSE.pax} · restaurant serving (3–4 pax) = tray ÷ ${HOUSE.servingsPerTray}, both without the ₱${HOUSE.trayCost} tray. Rounded up: food part of the tray to ₱10, serving to ₱5, per head to ₱1.</p>
     <div class="ct-row"><label>Buffet deduction<span><input id="ktLess" type="number" min="35" max="50" step="1" value="${buffetLessPct()}"> % of cost (35–50)</span></label>
      <label>All ingredient prices<span><input id="ktInfl" type="number" step="1" value="0"> % change</span></label>
      <label class="wide">One ingredient's new price<span><input id="ktItem" list="dl-citems" placeholder="e.g. Pork kasim" autocomplete="off"> ₱<input id="ktPrice" type="number" step="any" min="0" placeholder="new price"></span></label></div>
@@ -1314,7 +1315,7 @@ function costRowsCalc() {
   return { sim, rows: COST_ROWS.map(x => {
     const Sv = recipeS(x.ls, x.serves), nS = recipeS(x.ls, x.serves, id => id === itemId && np !== null ? np : num(S.itemsById[id]?.last_cost)) * (1 + infl / 100);
     const h = housePrices(Sv), nh = housePrices(nS);
-    return { ...x, S: Sv, h, nh, tray: h.trayR, head: h.headR, serving: h.servingR, fcNow: x.now && Sv ? Sv / x.now * 100 : null, affected: sim && Math.abs(nS - Sv) > 0.005 };
+    return { ...x, S: Sv, h, nh, tray: h.trayR, head: h.headR, serving: h.servingR, fcNow: x.now > HOUSE.trayCost && Sv ? Sv / (x.now - HOUSE.trayCost) * 100 : null, affected: sim && Math.abs(nS - Sv) > 0.005 };
   }) };
 }
 function recalcCostTab() {
@@ -1424,18 +1425,20 @@ function recalcCosting() {
   const noQty = rows.filter(x => !x.qty), noPrice = rows.filter(x => x.qty && !x.price);
   $('#hS').textContent = peso(Sv); $('#hSg').textContent = `${peso(Sv / HOUSE.pax)} per guest${serves !== HOUSE.pax ? ` · recipe is for ${fq(serves)}` : ''}`;
   $('#hTray').textContent = pesoR(h.trayR); $('#hHead').textContent = pesoR(h.headR); $('#hServ').textContent = pesoR(h.servingR);
-  $('#hTrayNow').innerHTML = now ? `cost × ${HOUSE.markup} · now ${pesoR(now)} <span class="${fcTone(Sv / now * 100)}">(${(Sv / now * 100).toFixed(0)}% food cost)</span>` : `cost × ${HOUSE.markup} · no tray price set yet`;
+  const T = HOUSE.trayCost, fcOf = pr => pr > T ? Sv / (pr - T) * 100 : null, fcNow = fcOf(now);
+  $('#hTrayNow').innerHTML = now ? `cost × ${HOUSE.markup} + ₱${T} tray · now ${pesoR(now)}${fcNow !== null ? ` <span class="${fcTone(fcNow)}">(${fcNow.toFixed(0)}% food cost)</span>` : ''}` : `cost × ${HOUSE.markup} + ₱${T} tray · no tray price set yet`;
   $('#hWarn').innerHTML = [noQty.length ? `<b>${noQty.length}</b> ingredient${noQty.length > 1 ? 's' : ''} still without a quantity (${noQty.map(x => esc(itemName(x.id))).join(', ')}): the prices above leave ${noQty.length > 1 ? 'them' : 'it'} out.` : '',
     noPrice.length ? `No price yet for ${noPrice.map(x => `<b>${esc(itemName(x.id))}</b>`).join(', ')}.` : ''].filter(Boolean).map(t => `<p class="alert warn small">${t}</p>`).join('');
   const use = $('#cUse'); if (use) { use.hidden = !h.trayR || Math.abs(h.trayR - now) < 1 || noQty.length > 0; use.dataset.v = h.trayR; use.textContent = `Set the tray price to ${pesoR(h.trayR)}`; }
   const tot = cost || 1;
   $('#cDrivers').innerHTML = [...rows].sort((a, b) => b.cost - a.cost).slice(0, 5).filter(x => x.cost > 0).map(x => `<div class="drv"><span>${esc(itemName(x.id))}</span><i><em style="width:${Math.max(2, x.cost / tot * 100)}%"></em></i><b>${Math.round(x.cost / tot * 100)}%</b><small>${peso(x.cost * toTray)}</small></div>`).join('') || '<p class="small mut">Add quantities and prices to see what drives the cost.</p>';
   const price = num($('#cPrice').value);
-  $('#cPriceOut').innerHTML = price && Sv ? `Food cost <b class="${fcTone(Sv / price * 100)}">${(Sv / price * 100).toFixed(1)}%</b> · profit <b>${peso(price - Sv)}</b> per tray · buffet per head would be <b>${pesoR(roundUp((price - HOUSE.buffetLess * Sv) / HOUSE.pax, 1))}</b>` : '<span class="mut">Type a tray price to test it.</span>';
+  const fcP = fcOf(price);
+  $('#cPriceOut').innerHTML = price && Sv && fcP !== null ? `Food cost <b class="${fcTone(fcP)}">${fcP.toFixed(1)}%</b> · profit <b>${peso(price - T - Sv)}</b> per tray after the ₱${T} tray · buffet per head would be <b>${pesoR(roundUp((price - T - HOUSE.buffetLess * Sv) / HOUSE.pax, 1))}</b>` : '<span class="mut">Type a tray price to test it.</span>';
   const infl = num($('#cInfl').value), nh = housePrices(Sv * (1 + infl / 100));
   $('#cInflOut').innerHTML = infl ? `Cost becomes <b>${peso(nh.S)}</b> · tray <b>${pesoR(nh.trayR)}</b> · per head <b>${pesoR(nh.headR)}</b> · serving <b>${pesoR(nh.servingR)}</b>` : '<span class="mut">Type a % to see the effect of a price increase.</span>';
   const sc = num($('#cScale').value) || 0, sell = price || h.trayR;
-  $('#cScaleOut').innerHTML = sc ? `Ingredients cost <b>${peso(Sv * sc)}</b> · sales ${peso(sell * sc)} · profit <b>${peso((sell - Sv) * sc)}</b>` : '';
+  $('#cScaleOut').innerHTML = sc ? `Ingredients cost <b>${peso(Sv * sc)}</b> + trays ${peso(T * sc)} · sales ${peso(sell * sc)} · profit <b>${peso((sell - T - Sv) * sc)}</b>` : '';
   $('#cScaled').innerHTML = rows.map(x => `<div><span>${esc(itemName(x.id))}</span><b>${x.qty ? `${fq(+(x.qty * toTray * sc).toFixed(3))} ${esc(itemUnit(x.id))}` : '<span class="warn-t">qty?</span>'}</b></div>`).join('');
 }
 // Catch quantity/price typed the wrong way round (250 kg at ₱0.25/kg instead of 0.25 kg at ₱250/kg) before it reaches the ingredient list
