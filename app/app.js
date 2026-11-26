@@ -1503,7 +1503,7 @@ FORMS.addKDish = async f => {
 // Tap dishes → tap cash notes → Charge. Each tile shows the portions left from today's kitchen count.
 // Prices, service charge and Senior/PWD discounts are worked out by the database; paying adds the dishes to the kitchen's Sold.
 // The BIR invoice still comes from the registered POS — the slip printed here says so.
-const POS = { order: null, menu: [], sec: 'All', q: '', t: null, busy: false, settings: null, shift: null, tab: undefined, cash: 0, left: {}, drawer: false, search: false };
+const POS = { order: null, menu: [], sec: 'All', q: '', t: null, busy: false, settings: null, shift: null, tab: undefined, cash: 0, left: {}, drawer: false, search: false, ver: 0, saved: 0 };   // ver/saved: edits made vs. edits stored
 const KIND_L = { dine_in: 'Dine-in', take_out: 'Take-out', delivery: 'Delivery' };
 const KIND_I = { dine_in: '🍽', take_out: '🛍', delivery: '🛵' };
 const PROT_C = { Chicken: '#e8a33d', Pork: '#d9577a', Beef: '#c2412d', 'Fish & Seafood': '#3b8fd9', 'Veggies and Produce': '#46a35a', 'Noodles & Pasta': '#9b6ad8', Rice: '#b8ab8a', Others: '#7d8597' };
@@ -1524,8 +1524,8 @@ routes['r/pos'] = async arg => {
     db.rpc('kitchen_sheet', { p_date: today() }).catch(() => [])]);
   POS.menu = menu.map(m => ({ ...m, name: S.dishById[m.dish_id]?.name || '?' })); POS.settings = st; POS.shift = shift && !shift.closed_at ? shift : null; POS.open = open;
   POS.left = Object.fromEntries(sheet.map(r => [r.dish_id, num(r.ending)]));      // portions left per counted dish
-  if (arg && arg !== 'new') { const [o] = await db.select('pos_orders', { eq: { id: arg } }); POS.order = o && o.status === 'open' ? { ...o, lines: await db.select('pos_lines', { eq: { order_id: arg }, order: [['created_at']] }) } : posBlank(); POS.cash = 0; }
-  else if (arg === 'new' || !POS.order || (POS.order.id && !open.some(o => o.id === POS.order.id))) { POS.order = posBlank(); POS.cash = 0; }
+  if (arg && arg !== 'new') { const [o] = await db.select('pos_orders', { eq: { id: arg } }); POS.order = o && o.status === 'open' ? { ...o, lines: await db.select('pos_lines', { eq: { order_id: arg }, order: [['created_at']] }) } : posBlank(); POS.cash = 0; POS.saved = POS.ver; }
+  else if (arg === 'new' || !POS.order || (POS.order.id && !open.some(o => o.id === POS.order.id))) { POS.order = posBlank(); POS.cash = 0; POS.saved = POS.ver; }
   POS.drawer = false;
   return posHtml();
 };
@@ -1573,7 +1573,7 @@ function posHtml() {
        <label>Senior / PWD<span class="step"><button type="button" data-posstep="seniors|-1">−</button><b>${o.seniors}</b><button type="button" data-posstep="seniors|1">＋</button></span></label>
        <p class="small mut">${fq(POS.settings?.senior_pct ?? 20)}% off each Senior/PWD's share of the bill. Check their ID.</p></div>`,
     print: `<div class="ptab-grid two"><button type="button" class="pbtn" data-act="posPreBill"${o.lines.length ? '' : ' disabled'}>🧾 Print bill</button>
-       <button type="button" class="pbtn" data-act="posBill"${o.lines.length && posCash() ? '' : ' disabled'}>💳 Card / split</button>${o.id ? '<button type="button" class="pbtn danger" data-act="posVoid">✕ Void order</button>' : ''}</div>`
+       <button type="button" class="pbtn" data-act="posBill"${o.lines.length && posCash() ? '' : ' disabled'}>💳 Card / split</button>${o.id && (!o.lines.some(l => l.sent_at) || can('restaurant', 'manager')) ? '<button type="button" class="pbtn danger" data-act="posVoid">✕ Void order</button>' : ''}</div>`
   }[POS.tab] || '';
   return `<div class="pos2 pos3">
    <div class="p-left">
@@ -1615,16 +1615,16 @@ function posPaint() {
   if (L) { const f = L.querySelector('.pl.flash'); if (f && POS.flashNew) f.scrollIntoView({ block: 'nearest' }); else L.scrollTop = l; }
   POS.flashNew = false;
 }
-function posQueueSave() { clearTimeout(POS.t); POS.t = setTimeout(() => posSave().catch(err => toast(err.message, true)), 700); }
+function posQueueSave() { POS.ver++; clearTimeout(POS.t); POS.t = setTimeout(() => posSave().catch(err => toast(err.message, true)), 700); }
 async function posSave() {
   clearTimeout(POS.t); const o = POS.order; if (!o.id && !o.lines.length) return o;
   while (POS.busy) await new Promise(r => setTimeout(r, 120));
-  POS.busy = true;
+  POS.busy = true; const v = POS.ver;
   try {
     const r = await db.rpc('pos_save', { p: { id: o.id, kind: o.kind, table_no: o.table_no, pax: o.pax, seniors: o.seniors, customer: o.customer, note: o.note,
       lines: o.lines.map(l => ({ id: l.id || null, dish_id: l.dish_id, qty: num(l.qty), note: l.note || '' })) } });
     const lines = await db.select('pos_lines', { eq: { order_id: r.id }, order: [['created_at']] });
-    const wasNew = !o.id; POS.order = { ...r, lines };
+    const wasNew = !o.id; POS.order = { ...r, lines }; POS.saved = Math.max(POS.saved, v);
     if (wasNew) { history.replaceState(null, '', '#/r/pos/' + r.id); POS.open = await db.select('pos_orders', { eq: { status: 'open' }, order: [['opened_at']] }); }
     else POS.open = POS.open.map(x => x.id === r.id ? r : x);
     if (!$('[data-posq]') || document.activeElement !== $('[data-posq]')) posPaint();
@@ -1709,13 +1709,30 @@ ACT.posNewItem = async (el, e) => {
     } catch (err) { toast(err.message, true); }
   });
 };
+// Ready for the next customer straight away: the bill panel clears locally and the
+// open orders and "X left" counts refresh quietly behind it (no full POS reload).
+function posNext(doneId) {
+  POS.open = (POS.open || []).filter(x => x.id !== doneId);
+  POS.order = posBlank(); POS.cash = 0; POS.tab = undefined; POS.saved = POS.ver;
+  history.replaceState(null, '', '#/r/pos/new'); posPaint(); posRefreshQuiet();
+}
+async function posRefreshQuiet() {
+  try {
+    const [open, sheet] = await Promise.all([db.select('pos_orders', { eq: { status: 'open' }, order: [['opened_at']] }),
+      db.rpc('kitchen_sheet', { p_date: today() }).catch(() => null)]);
+    if (!current.startsWith('r/pos')) return;
+    POS.open = open; if (sheet) POS.left = Object.fromEntries(sheet.map(r => [r.dish_id, num(r.ending)]));
+    if (!document.activeElement?.closest('#main input, #main textarea')) posPaint();   // don't interrupt someone typing
+  } catch (e) { /* the next full load picks it up */ }
+}
 async function posPayNow(pay) {
   try {
-    const o = await posSave();
+    const o = !POS.order.id || POS.ver !== POS.saved ? await posSave() : POS.order;   // skip the save when nothing changed
     const r = await db.rpc('pos_pay', { p_order: o.id, p_cash: pay.cash || 0, p_card: pay.card || 0, p_gcash: pay.gcash || 0, p_charge: pay.charge || 0, p_ref: pay.ref || '', p_invoice: pay.invoice || '' });
-    const lines = POS.order.lines; toast(num(r.change_due) ? `Paid · change ${peso(r.change_due)}` : 'Paid');
+    const lines = POS.order.lines;
+    lines.forEach(l => { if (l.dish_id in POS.left) POS.left[l.dish_id] -= num(l.qty); });   // tiles show the sale before the refresh lands
+    posNext(r.id); toast(num(r.change_due) ? `Paid · change ${peso(r.change_due)}` : 'Paid');
     if (confirm(`Paid${num(r.change_due) ? ' — change ' + peso(r.change_due) : ''}. Print the order slip?`)) posSlip(r, lines);
-    POS.order = posBlank(); POS.cash = 0; POS.tab = undefined; go('#/r/pos/new');
   } catch (err) { toast(err.message, true); }
 }
 ACT.posCharge = async () => {
@@ -1763,7 +1780,7 @@ ACT.posBill = async () => {
 };
 ACT.posVoid = async () => {
   const reason = prompt('Why is this order being voided? (Paid or already-cooking orders need a manager.)'); if (!reason) return;
-  try { await db.rpc('pos_void', { p_order: POS.order.id, p_reason: reason }); toast('Order voided'); POS.order = posBlank(); go('#/r/pos/new'); } catch (err) { toast(err.message, true); }
+  try { const id = POS.order.id; await db.rpc('pos_void', { p_order: id, p_reason: reason }); posNext(id); toast('Order voided'); } catch (err) { toast(err.message, true); }
 };
 ACT.posShift = async () => {
   const v = prompt('Opening cash in the drawer (₱):', '0'); if (v === null) return;
@@ -1794,7 +1811,7 @@ routes['r/sales'] = async arg => {
   const people = {}; (await db.select('profiles', { cols: 'id,full_name' }).catch(() => [])).forEach(p => people[p.id] = p.full_name);
   const z = day || { orders: 0, guests: 0, gross: 0, service_charge: 0, discounts: 0, net: 0, cash: 0, card: 0, gcash: 0, charge: 0 };
   const dayShifts = shifts.filter(s => (s.opened_at || '').slice(0, 10) <= d && (!s.closed_at || s.closed_at.slice(0, 10) >= addDays(d, -1)));
-  const openShift = shifts.find(s => !s.closed_at);
+  const openShift = shifts.find(s => !s.closed_at), canVoidPaid = can('restaurant', 'manager');
   const diff = (a, b) => { const x = num(a) - num(b); return Math.abs(x) < 0.5 ? '<span class="ok-t">matches</span>' : `<span class="bad-t">${x > 0 ? '+' : ''}${peso(x)}</span>`; };
   return `<div class="row wrap"><h1>Sales</h1><span class="sp"></span><label class="inline">Date <input type="date" value="${d}" max="${today()}" onchange="location.hash='#/r/sales/'+this.value"></label><button class="ghost" onclick="window.print()">Print</button></div>
    ${open.length ? `<div class="alert warn"><b>${open.length} order${open.length > 1 ? 's are' : ' is'} still open:</b> ${open.map(o => `<a href="#/r/pos/${o.id}">#${o.order_no}${o.table_no ? ' (T' + esc(o.table_no) + ')' : ''}</a>`).join(', ')}</div>` : ''}
@@ -1813,14 +1830,21 @@ routes['r/sales'] = async arg => {
      <div class="grid">${[['gross', 'Gross sales (before SC)', z.gross], ['service_charge', 'Service charge', z.service_charge], ['discounts', 'Discounts', z.discounts], ['cash', 'Cash', z.cash], ['card', 'Card', z.card], ['gcash', 'GCash / other', z.gcash], ['charge', 'Charge / AR', z.charge]].map(([k, l, mine]) => `<label>${l}<input name="${k}" type="number" step="any" min="0" value="${reg && reg[k] != null ? num(reg[k]) : ''}"><small>${reg && reg[k] != null ? diff(reg[k], mine) : 'app: ' + peso(mine)}</small></label>`).join('')}
       <label>Guests<input name="guests" type="number" min="0" value="${reg?.guests ?? ''}"></label><label>Beginning invoice no.<input name="or_from" value="${esc(reg?.or_from || '')}"></label><label>Ending invoice no.<input name="or_to" value="${esc(reg?.or_to || '')}"></label></div>
      <div class="row end"><button class="pri">Save Z-reading</button></div></form>` : ''}
-   ${orders.length ? `<details class="card"><summary>All orders (${orders.length})</summary><div class="tw"><table><thead><tr><th>#</th><th>Type</th><th>Time</th><th class="n">Total</th><th>Paid by</th><th>Status</th></tr></thead><tbody>
-     ${orders.map(o => `<tr><td>${o.order_no}</td><td>${KIND_L[o.kind]}${o.table_no ? ' · T' + esc(o.table_no) : ''}</td><td>${o.paid_at ? esc(new Date(o.paid_at).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })) : ''}</td><td class="n">${peso(o.total)}</td><td>${['cash', 'gcash', 'card', 'charge'].filter(k => num(o['paid_' + k])).join(' + ')}${o.invoice_no ? `<div class="small mut">inv ${esc(o.invoice_no)}</div>` : ''}</td><td>${chip(o.status, o.status === 'paid' ? 'ok' : o.status === 'void' ? 'bad' : 'warn')}</td></tr>`).join('')}</tbody></table></div></details>` : ''}`;
+   ${orders.length ? `<details class="card"${canVoidPaid && paid.length ? ' open' : ''}><summary>All orders (${orders.length})</summary>${canVoidPaid && paid.length ? '<p class="small mut">To undo a paid sale (wrong item, customer cancelled), tap <b>Void</b> on its row.</p>' : ''}<div class="tw"><table><thead><tr><th>#</th><th>Type</th><th>Time</th><th class="n">Total</th><th>Paid by</th><th>Status</th>${canVoidPaid ? '<th></th>' : ''}</tr></thead><tbody>
+     ${orders.map(o => `<tr><td>${o.order_no}</td><td>${KIND_L[o.kind]}${o.table_no ? ' · T' + esc(o.table_no) : ''}</td><td>${o.paid_at ? esc(new Date(o.paid_at).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })) : ''}</td><td class="n">${peso(o.total)}</td><td>${['cash', 'gcash', 'card', 'charge'].filter(k => num(o['paid_' + k])).join(' + ')}${o.invoice_no ? `<div class="small mut">inv ${esc(o.invoice_no)}</div>` : ''}</td><td>${chip(o.status, o.status === 'paid' ? 'ok' : o.status === 'void' ? 'bad' : 'warn')}</td>${canVoidPaid ? `<td>${o.status === 'paid' ? `<button type="button" class="ghost sm danger" data-act="salesVoid" data-id="${o.id}" data-no="${o.order_no}" data-total="${num(o.total)}" data-cash="${num(o.paid_cash)}" data-open="${o.shift_id && o.shift_id === openShift?.id ? 1 : ''}">Void</button>` : ''}</td>` : ''}</tr>`).join('')}</tbody></table></div></details>` : ''}`;
 };
 FORMS.saveZ = async (f, el) => {
   const n = k => f[k] === '' ? null : num(f[k]);
   await db.upsert('daily_sales', { sale_date: el.dataset.date, gross: n('gross') ?? 0, discounts: n('discounts') ?? 0, service_charge: n('service_charge') ?? 0, cash: n('cash'), card: n('card'), gcash: n('gcash'), charge: n('charge'),
     guests: f.guests === '' ? null : Math.round(num(f.guests)), or_from: f.or_from || null, or_to: f.or_to || null, source: 'registered_pos', verified_by: S.user.id }, 'sale_date');
   toast('Z-reading saved'); refresh();
+};
+ACT.salesVoid = async el => {   // managers: undo a paid sale (the database also allows only managers)
+  const { id, no, total, cash, open } = el.dataset;
+  const money = num(cash) ? open ? `\nIf you refund the customer, take ${peso(cash)} out of the drawer — it is no longer expected at closing.` : `\nThis order's drawer is already closed, so its count stays as it was.` : '';
+  const reason = prompt(`Void paid order #${no} (${peso(total)})? It comes off today's sales and Kitchen stocks.${money}\n\nReason:`);
+  if (!reason?.trim()) return;
+  await db.rpc('pos_void', { p_order: id, p_reason: reason.trim() }); toast(`Order #${no} voided`); refreshKeep();
 };
 ACT.posCloseShift = async () => {
   const v = prompt('Count all the cash in the drawer. Total cash (₱):'); if (v === null || v === '') return;
