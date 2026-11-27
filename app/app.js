@@ -148,7 +148,7 @@ function renderShell(key) {
   const nav = inCat ? [['c/events', 'Events'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes'], ...(can('catering', 'manager', 'finance') ? [['c/billing', 'Billing']] : [])]
     : inRes ? [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']] : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
-    <div class="who"><span>Hi, ${esc(who().split(' ')[0])}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}${isAdmin() ? '<a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
+    <div class="who"><span>Hi, ${esc(who().split(' ')[0])}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
     ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a></nav>` : ''}`;
 }
 function navOf(key) {
@@ -2279,6 +2279,92 @@ routes.people = async arg => {
     <div class="row end"><a class="btn ghost" href="#/people">Close</a><button class="pri">Save</button></div></form>` : ''}
   ${tabletsHtml(tabs, dev)}`;
 };
+/* ================= activity log (owner) ================= */
+// Every change in the database is stamped with who and when (audit_log). This page reads it in plain words.
+const AUD_AREA = {
+  'Catering events': ['events', 'event_menu', 'event_extra_needs', 'event_finance', 'stock_reservations', 'clients', 'bookings'],
+  'Purchasing': ['purchase_requests', 'pr_lines', 'purchase_orders', 'po_lines', 'receipts', 'receipt_lines', 'suppliers', 'cash_advances', 'expenses', 'purchase_report_lines'],
+  'Stock': ['items', 'item_par', 'stock_moves', 'stock_counts', 'stock_count_lines'],
+  'Menu & recipes': ['dishes', 'dish_aliases', 'recipes', 'recipe_lines', 'restaurant_menu', 'course_rules', 'pack_sets', 'pack_components'],
+  'POS & sales': ['pos_orders', 'pos_lines', 'pos_shifts', 'pos_settings', 'pos_devices', 'daily_sales', 'kitchen_days', 'dish_day_counts'],
+  'Billing': ['bills', 'bill_lines', 'payments', 'bill_settings'],
+  'People & HR': ['profiles', 'memberships', 'employees', 'time_punches', 'auth.users']
+};
+const AUD_NOUN = { events: 'event', event_menu: 'event menu dish', event_extra_needs: 'off-menu ingredient', event_finance: 'contract price', stock_reservations: 'stock set aside',
+  clients: 'client', bookings: 'website inquiry', purchase_requests: 'purchase request', pr_lines: 'request line', purchase_orders: 'purchase order', po_lines: 'order line',
+  receipts: 'delivery', receipt_lines: 'delivery line', suppliers: 'supplier', cash_advances: 'cash advance', expenses: 'expense', items: 'ingredient', item_par: 'par level',
+  stock_moves: 'stock movement', stock_counts: 'stock count', stock_count_lines: 'count line', dishes: 'dish', dish_aliases: 'dish name', recipes: 'recipe', recipe_lines: 'recipe line',
+  restaurant_menu: 'POS menu item', course_rules: 'course rule', pack_sets: 'pack set', pack_components: 'pack item', pos_orders: 'POS order', pos_lines: 'POS order line',
+  pos_shifts: 'cash drawer', pos_settings: 'POS settings', pos_devices: 'POS tablet', daily_sales: 'daily sales / Z-reading', kitchen_days: 'kitchen day', dish_day_counts: 'kitchen count',
+  bills: 'billing statement', bill_lines: 'statement line', payments: 'payment', bill_settings: 'statement settings', profiles: 'person', memberships: 'role',
+  employees: 'employee', time_punches: 'time punch', 'auth.users': 'login' };
+const AUD_SKIP = new Set(['updated_at', 'created_at', 'last_seen', 'token_hash']);
+function audLabel(e, row, evById) {
+  const r = row || {}, dish = S.dishById[r.dish_id]?.name, item = S.itemsById?.[r.item_id]?.name, ev = evById[r.event_id];
+  const own = r.ref || r.pr_no || r.po_no || r.bill_no || (r.order_no != null && e.tbl.startsWith('pos_') ? '#' + r.order_no : '') || r.title || r.name || r.full_name || r.username || '';
+  const bits = [own, dish && dish !== own ? dish : '', item && item !== own ? item : '', e.tbl === 'memberships' && r.role ? `${r.ws} · ${r.role}` : '',
+    ev && e.tbl !== 'events' ? `for ${ev.ref || ''} ${ev.title || ''}`.trim() : ''].filter(Boolean);
+  return bits.join(' · ');
+}
+const audVal = v => v == null || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v).slice(0, 40) : String(v).length > 40 ? String(v).slice(0, 40) + '…' : String(v);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function audWhat(e, nameOf) {
+  const o = e.old_row || {}, n = e.new_row || {};
+  if (e.action === 'PASSWORD_RESET') return { verb: 'reset the password of', changes: [] };
+  if (e.action === 'INSERT') return { verb: 'created', changes: [] };
+  if (e.action === 'DELETE') return { verb: 'deleted', changes: [] };
+  // what a person changed: names for *_by, no internal codes or timestamps (the entry already has its time)
+  const shown = (k, v) => k.endsWith('_by') ? (v ? nameOf[v] || 'someone' : '—') : audVal(v);
+  const changes = Object.keys(n).filter(k => !AUD_SKIP.has(k) && JSON.stringify(o[k]) !== JSON.stringify(n[k])
+    && !k.endsWith('_at') && k !== 'id' && !(k.endsWith('_id') || UUID_RE.test(String(n[k] ?? o[k] ?? ''))) || (k.endsWith('_by') && JSON.stringify(o[k]) !== JSON.stringify(n[k])));
+  let verb = 'changed';
+  if (n.status !== o.status && n.status === 'void') verb = 'voided';
+  else if (n.voided_at && !o.voided_at) verb = 'voided';
+  else if (n.approved_by && !o.approved_by) verb = n.status === 'rejected' ? 'rejected' : 'approved';
+  else if (n.status === 'paid' && o.status !== 'paid') verb = 'took payment for';
+  else if (n.revoked_at && !o.revoked_at) verb = 'removed';
+  else if (n.closed_at && !o.closed_at) verb = 'closed';
+  else if (n.posted_at && !o.posted_at) verb = 'posted';
+  else if (n.verified_at && !o.verified_at) verb = 'verified';
+  else if (n.sent_at && !o.sent_at && changes.length === 1) verb = 'sent to the kitchen';
+  return { verb, changes: changes.map(k => `${k.replace(/_/g, ' ')}: ${shown(k, o[k])} → ${shown(k, n[k])}`) };
+}
+const dayIso = (d, end) => new Date(`${d}T${end ? '23:59:59.999' : '00:00:00'}+08:00`).toISOString();
+routes.activity = async arg => {
+  if (!isAdmin()) return '<div class="card">Only the owner can see the activity log.</div>';
+  const [d0, who0, area0, tbl0, row0] = decodeURIComponent(arg || '').split('|');
+  const day = d0 || today(), area = area0 || '', actor = who0 || '', tbl = tbl0 || '', rowId = row0 || '';
+  const opts = { order: [['at', false]], limit: 400 };
+  if (rowId) opts.eq = { tbl, row_id: rowId }; else { opts.gte = { at: dayIso(day) }; opts.lte = { at: dayIso(day, true) }; }
+  if (actor) opts.eq = { ...(opts.eq || {}), actor };
+  if (area && !rowId) opts.in = { tbl: AUD_AREA[area] || [] };
+  const [rows, people] = await Promise.all([db.select('audit_log', opts), db.rpc('admin_people')]);
+  const nameOf = Object.fromEntries(people.map(p => [p.id, p.full_name || p.email]));
+  const evIds = [...new Set(rows.map(e => (e.new_row || e.old_row || {}).event_id).filter(Boolean))];
+  const evs = evIds.length ? await db.select('events', { cols: 'id,ref,title', in: { id: evIds } }).catch(() => []) : [];
+  const evById = Object.fromEntries(evs.map(x => [x.id, x]));
+  const list = rows.map(e => {
+    const row = e.new_row || e.old_row, w = audWhat(e, nameOf), lbl = audLabel(e, row, evById);
+    if (e.action === 'UPDATE' && w.verb === 'changed' && !w.changes.length) return '';   // system recalculation, nothing a person changed
+    return `<div class="li"><div class="li-main"><span><b>${esc(e.actor ? nameOf[e.actor] || 'Someone (removed account)' : 'Supabase dashboard / system')}</b> ${esc(w.verb)} ${esc(AUD_NOUN[e.tbl] || e.tbl)}${lbl ? ' <b>' + esc(lbl) + '</b>' : ''}</span>
+      ${w.changes.length ? `<span class="small">${w.changes.slice(0, 6).map(esc).join(' · ')}${w.changes.length > 6 ? ` · +${w.changes.length - 6} more` : ''}</span>` : ''}
+      ${n0(row?.void_reason) ? `<span class="small">Reason: ${esc(row.void_reason)}</span>` : ''}${n0(row?.decision_note) && w.verb !== 'changed' ? `<span class="small">Note: ${esc(row.decision_note)}</span>` : ''}
+      <span class="mut small">${fmtT(e.at)} · <a href="#/activity/${encodeURIComponent(['', '', '', e.tbl, e.row_id].join('|'))}">history of this record</a></span></div></div>`;
+  }).join('');
+  return `<h1>Activity</h1>
+  <p class="mut small">Every creation, change, approval, void and deletion in the app is recorded here with who did it and when. Entries can't be edited or deleted.</p>
+  ${rowId ? `<div class="alert info small">History of one ${esc(AUD_NOUN[tbl] || tbl)} — <a href="#/activity">back to all activity</a></div>`
+    : `<form class="card row" data-form="audFilter" style="flex-wrap:wrap;gap:10px;align-items:end">
+      <label>Day<input type="date" name="day" value="${day}" max="${today()}"></label>
+      <label>Person<select name="actor">${opt('', 'Everyone')}${people.map(p => opt(p.id, p.full_name || p.email, p.id === actor)).join('')}</select></label>
+      <label>Area<select name="area">${opt('', 'Everything')}${Object.keys(AUD_AREA).map(a => opt(a, a, a === area)).join('')}</select></label>
+      <button class="pri">Show</button></form>`}
+  ${rows.length ? `<input class="search mt" placeholder="Search these entries…" data-filter="#audList .li"><div class="list" id="audList">${list}</div>${rows.length === 400 ? '<p class="small mut">Showing the latest 400 — narrow it with Person or Area.</p>' : ''}`
+    : '<div class="card mt">Nothing recorded for this choice.</div>'}`;
+};
+const n0 = v => v != null && String(v).trim() !== '';
+FORMS.audFilter = async f => go('#/activity/' + encodeURIComponent([f.day, f.actor, f.area].join('|')));
+
 function tabletsHtml(tabs, dev) {
   if (!tabs) return `<section class="card mt"><h2>POS tablets</h2><p class="small mut">Needs the latest database update (migration <code>20261127000100_pos_tablets</code>).</p></section>`;
   const live = tabs.filter(t => !t.revoked_at);
