@@ -6,7 +6,7 @@ do $$ declare t text; begin
   for t in
     select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
     where n.nspname = 'public' and c.relkind = 'r'
-      and c.relname not in ('audit_log', 'doc_counters', 'push_subs', 'presence')   -- the log itself; document-number counters; phone notification keys; "in the app" pings
+      and c.relname not in ('audit_log', 'doc_counters', 'push_subs', 'presence', 'avatars')   -- the log itself; document-number counters; phone notification keys; "in the app" pings
       and not exists (select 1 from pg_trigger g join pg_proc p on p.oid = g.tgfoid
                       where g.tgrelid = c.oid and p.proname = 'audit_trigger')
   loop

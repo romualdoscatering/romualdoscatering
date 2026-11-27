@@ -157,7 +157,7 @@ function renderShell(key) {
     : inRes ? (resFront() ? [['r/pos', 'POS'], ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['r/kitchen', '86 & running low'], ['r/requests', 'Requests']]
       : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
-    <div class="who"><span>Hi, ${esc(nick())}</span><span class="bell-slot">${bellHtml()}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}<a href="#/events"${key === 'events' ? ' class="on"' : ''}>Events</a>${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<a href="#/me"${key === 'me' ? ' class="on"' : ''}>My account</a><button class="ghost" data-act="logout">Log out</button></div>
+    <div class="who"><a href="#/me" class="who-av" title="My account">${av(S.me?.id, S.me?.full_name, "xs")}</a><span>Hi, ${esc(nick())}</span><span class="bell-slot">${bellHtml()}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}<a href="#/events"${key === 'events' ? ' class="on"' : ''}>Events</a>${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<a href="#/me"${key === 'me' ? ' class="on"' : ''}>My account</a><button class="ghost" data-act="logout">Log out</button></div>
     ${mobileMenu(key, nav, inCat, inRes)}</div>
     ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a></nav>` : ''}`;
 }
@@ -171,7 +171,7 @@ function mobileMenu(key, nav, inCat, inRes) {
     ...(isAdmin() ? [a('activity', '🕘 Activity', key.startsWith('activity')), a('people', '👥 People', key === 'people')] : [])].join('');
   return `<span class="bell-slot mob">${bellHtml()}</span><details class="mnav"><summary aria-label="Menu"><span class="mn-cur">${esc(cur)}</span><span class="mn-ic">☰</span></summary>
     <div class="mn-p">${sect}<div class="mn-h">Go to</div><div class="mn-l">${go}</div>
-      <div class="mn-f"><span>Hi, ${esc(nick())}</span>${canInstall() ? '<button class="ghost" data-act="install">📲 Get the app</button>' : ''}<a class="mn-me" href="#/me">👤 My account</a><button class="ghost" data-act="logout">Log out</button></div></div></details>`;
+      <div class="mn-f"><span class="mn-hi">${av(S.me?.id, S.me?.full_name, "xs")} Hi, ${esc(nick())}</span>${canInstall() ? '<button class="ghost" data-act="install">📲 Get the app</button>' : ''}<a class="mn-me" href="#/me">👤 My account</a><button class="ghost" data-act="logout">Log out</button></div></div></details>`;
 }
 // close the menu after picking something, or when tapping outside it
 document.addEventListener('click', e => {
@@ -265,7 +265,7 @@ document.addEventListener('submit', async e => {
 async function afterLogin() {
   S.me = await db.rpc('my_access');
   if (!S.me || S.me.active === false) { await db.signOut(); S.user = null; return renderLogin(!S.me ? 'Your login is not set up yet. Ask the owner to add you on the People page.' : 'This account is switched off. Ask the owner.'); }
-  await loadMaster();
+  await Promise.all([loadMaster(), loadAvatars()]);
   route(); pokePoll();
 }
 
@@ -2396,9 +2396,9 @@ routes.people = async arg => {
   const has = (ws, role) => (sel?.roles || []).some(r => r.ws === ws && r.role === role);
   return `<h1>People & roles</h1>
   <div class="alert info"><b>Adding someone new:</b> first create their login in Supabase → <b>Authentication → Users → Add user</b> (their email, or <code>username@staff.romualdos.ph</code> if they have none, and a starting password). Then they appear below — open them and give them roles.</div>
-  <div class="list">${people.map(p => `<a class="li" href="#/people/${p.id}"><div class="li-main"><b>${esc(p.full_name || p.email)}${p.nickname ? ` <span class="mut">“${esc(p.nickname)}”</span>` : ''}</b><span class="mut small">${esc(p.email)}${p.username ? ' · ' + esc(p.username) : ''}</span>
+  <div class="list">${people.map(p => `<a class="li" href="#/people/${p.id}">${av(p.id, p.full_name || p.email, "sm")}<div class="li-main"><b>${esc(p.full_name || p.email)}${p.nickname ? ` <span class="mut">“${esc(p.nickname)}”</span>` : ''}</b><span class="mut small">${esc(p.email)}${p.username ? ' · ' + esc(p.username) : ''}</span>
     <span class="small">${p.is_admin ? chip('Owner', 'info') + ' ' : ''}${(p.roles || []).map(r => chip(`${r.ws === 'catering' ? 'Catering' : 'Restaurant'} · ${roleName(r.role)}`)).join(' ')}${!p.username ? chip('not set up', 'warn') : ''}${p.username && !p.active ? chip('switched off', 'bad') : ''}</span></div></a>`).join('')}</div>
-  ${sel ? `<form class="card mt" data-form="savePerson" data-email="${esc(sel.email)}" data-id="${sel.id}"><h2>${esc(sel.full_name || sel.email)}</h2>
+  ${sel ? `<form class="card mt" data-form="savePerson" data-email="${esc(sel.email)}" data-id="${sel.id}"><div class="row" style="gap:12px">${av(sel.id, sel.full_name || sel.email, "md")}<h2 style="margin:0">${esc(sel.full_name || sel.email)}</h2>${AV.img[sel.id] ? `<span class="sp"></span><button type="button" class="lnk" data-act="avatarClear" data-id="${sel.id}">Remove photo</button>` : ""}</div>
     <div class="grid"><label>Full name<input name="full_name" value="${esc(sel.full_name || '')}" required></label><label>Username<input name="username" value="${esc(sel.username || sel.email.split('@')[0])}" required pattern="[a-z0-9._\\-]{2,40}" title="lower-case letters, numbers, . _ -"></label>
       <label>Nickname<input name="nickname" value="${esc(sel.nickname || '')}" maxlength="30" placeholder="${esc((sel.full_name || '').split(' ')[0] || 'e.g. Chef Jas')}"><span class="small mut">What the app calls them — on their home screen (“Magandang umaga, …!”) and at the top. Leave blank to use their first name.</span></label></div>
     <table class="roles"><thead><tr><th></th><th>Catering</th><th>Restaurant</th></tr></thead><tbody>
@@ -2419,7 +2419,7 @@ const AUD_AREA = {
   'POS & sales': ['pos_orders', 'pos_lines', 'pos_shifts', 'pos_settings', 'pos_devices', 'daily_sales', 'kitchen_days', 'dish_day_counts'],
   'Billing': ['bills', 'bill_lines', 'payments', 'bill_settings'],
   'Pokes': ['pokes', 'poke_to', 'app_config'],
-  'People & HR': ['profiles', 'memberships', 'employees', 'time_punches', 'auth.users']
+  'People & HR': ['profiles', 'avatars', 'memberships', 'employees', 'time_punches', 'auth.users']
 };
 const AUD_NOUN = { events: 'event', event_menu: 'event menu dish', event_extra_needs: 'off-menu ingredient', event_finance: 'contract price', stock_reservations: 'stock set aside',
   clients: 'client', bookings: 'website inquiry', purchase_requests: 'purchase request', pr_lines: 'request line', purchase_orders: 'purchase order', po_lines: 'order line',
@@ -2428,7 +2428,7 @@ const AUD_NOUN = { events: 'event', event_menu: 'event menu dish', event_extra_n
   restaurant_menu: 'POS menu item', course_rules: 'course rule', pack_sets: 'pack set', pack_components: 'pack item', pos_orders: 'POS order', pos_lines: 'POS order line',
   pos_shifts: 'cash drawer', pos_settings: 'POS settings', pos_devices: 'POS tablet', daily_sales: 'daily sales / Z-reading', kitchen_days: 'kitchen day', dish_day_counts: 'kitchen count',
   bills: 'billing statement', bill_lines: 'statement line', payments: 'payment', bill_settings: 'statement settings', profiles: 'person', memberships: 'role',
-  pokes: 'poke', poke_to: 'poke', app_config: 'app setting', employees: 'employee', time_punches: 'time punch', 'auth.users': 'login' };
+  pokes: 'poke', poke_to: 'poke', avatars: 'profile photo', app_config: 'app setting', employees: 'employee', time_punches: 'time punch', 'auth.users': 'login' };
 const AUD_SKIP = new Set(['updated_at', 'created_at', 'last_seen', 'token_hash']);
 function audLabel(e, row, evById) {
   const r = row || {}, dish = S.dishById[r.dish_id]?.name, item = S.itemsById?.[r.item_id]?.name, ev = evById[r.event_id];
@@ -2496,6 +2496,44 @@ routes.activity = async arg => {
 const n0 = v => v != null && String(v).trim() !== '';
 FORMS.audFilter = async f => go('#/activity/' + encodeURIComponent([f.day, f.actor, f.area].join('|')));
 
+/* ================= Profile photos ================= */
+// Small square JPEGs kept in the database; each phone keeps a copy and only downloads photos that changed.
+const AV = { img: {}, key: 'rom-avatars' };
+try { AV.img = JSON.parse(localStorage.getItem(AV.key) || '{}'); } catch (e) { AV.img = {}; }
+async function loadAvatars() {
+  try {
+    const list = await db.rpc('avatar_list'), now = {}; for (const a of list) now[a.user_id] = a.updated_at;
+    const need = list.filter(a => AV.img[a.user_id]?.t !== a.updated_at).map(a => a.user_id);
+    for (const id of Object.keys(AV.img)) if (!now[id]) delete AV.img[id];
+    if (need.length) for (const a of await db.rpc('avatar_get', { p_ids: need })) AV.img[a.user_id] = { t: a.updated_at, img: a.img };
+    try { localStorage.setItem(AV.key, JSON.stringify(AV.img)); } catch (e) {}
+  } catch (e) {}
+}
+// A person's photo, or their initials when there's none
+const av = (id, name, cls = '') => { const a = AV.img[id]?.img;
+  return `<span class="av ${cls}">${a ? `<img src="${a}" alt="">` : esc(initials(name || '?'))}</span>`; };
+// Shrink a picked photo to a 320px square JPEG (centre crop)
+async function squareJpeg(file, size = 320) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => bad(new Error("That file isn't a photo this phone can open. Try a JPG or PNG.")); i.src = url; });
+    const s = Math.min(img.naturalWidth, img.naturalHeight), c = document.createElement('canvas'); c.width = c.height = size;
+    const g = c.getContext('2d'); g.imageSmoothingQuality = 'high';
+    g.drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, 0, 0, size, size);
+    let q = 0.85, out = c.toDataURL('image/jpeg', q);
+    while (out.length > 150000 && q > 0.4) { q -= 0.1; out = c.toDataURL('image/jpeg', q); }
+    return out;
+  } finally { URL.revokeObjectURL(url); }
+}
+document.addEventListener('change', async e => {
+  const inp = e.target; if (!inp.matches('input[data-avatar]') || !inp.files?.[0]) return;
+  const wrap = inp.closest('.av-up'); wrap?.classList.add('busy');
+  try { await db.rpc('my_set_avatar', { p_img: await squareJpeg(inp.files[0]) }); await loadAvatars(); toast('Photo saved'); renderShell(current); refresh(); }
+  catch (err) { toast(err.message, true); } finally { wrap?.classList.remove('busy'); inp.value = ''; }
+});
+ACT.avatarRemove = async () => { if (!confirm('Remove your photo?')) return; await db.rpc('my_set_avatar', { p_img: null }); await loadAvatars(); toast('Photo removed'); renderShell(current); refresh(); };
+ACT.avatarClear = async el => { if (!confirm('Remove this person’s photo?')) return; await db.rpc('admin_clear_avatar', { p_user: el.dataset.id }); await loadAvatars(); toast('Photo removed'); refresh(); };
+
 /* ================= My account: your details, your roles and what they let you do, password, this device, your recent activity ================= */
 const ROLE_DO = {
   manager: ['Approves purchase requests, orders and reports', 'Creates and edits events; closes and voids when needed', 'Sees billing, sales and costing for the workspace'],
@@ -2515,7 +2553,7 @@ const initials = n => (n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w 
 const ago = s => { if (!s) return ''; const m = Math.round((Date.now() - new Date(s)) / 60000);
   return m < 2 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : fmtT(s); };
 routes.me = async () => {
-  const [acct, acts, dev, team] = await Promise.all([db.rpc('my_account').catch(() => null), db.rpc('my_activity', { p_limit: 15 }).catch(() => null), db.rpc('pos_device_status').catch(() => null), db.rpc('team_list').catch(() => null)]);
+  const [acct, , acts, dev, team] = await Promise.all([db.rpc('my_account').catch(() => null), loadAvatars(), db.rpc('my_activity', { p_limit: 15 }).catch(() => null), db.rpc('pos_device_status').catch(() => null), db.rpc('team_list').catch(() => null)]);
   const me = { ...S.me, ...(acct || {}) }, roles = S.me?.roles || [];
   const byWs = Object.keys(WS_NAME).map(ws => [ws, roles.filter(r => r.ws === ws)]).filter(([, rs]) => rs.length);
   const roleCards = me.is_admin
@@ -2535,7 +2573,7 @@ routes.me = async () => {
   }).map((h, i, all) => h && (i === 0 || h !== all[i - 1]) && `<div class="li"><div class="li-main">${h}<span class="mut small">${ago(acts[i].at)}</span></div></div>`).filter(Boolean);
   const actList = acts == null ? '<p class="small mut">Needs the latest database update.</p>'
     : !actRows.length ? '<p class="small mut">Nothing yet. What you create, change, approve or void will show here.</p>' : `<div class="list">${actRows.join('')}</div>`;
-  return `<div class="me-hero"><div class="me-av">${esc(initials(me.full_name || me.username))}</div>
+  return `<div class="me-hero"><div class="me-avw"><label class="av-up" title="Change photo">${av(me.id, me.full_name || me.username, "me-av")}<span class="av-cam">📷</span><input type="file" accept="image/*" data-avatar hidden></label>${AV.img[me.id] ? '<button class="lnk me-avx" data-act="avatarRemove">Remove photo</button>' : '<span class="me-avx">Add a photo</span>'}</div>
       <div><span class="me-hi">Hi, ${esc(nick())}</span><h1>${esc(me.full_name || me.username || '')}</h1>
       <div class="me-chips">${me.is_admin ? chip('Owner', 'ok') : roles.map(r => chip(`${roleName(r.role)} · ${WS_NAME[r.ws] || r.ws}`, 'info')).join('')}</div></div></div>
   <div class="me-grid">
@@ -2585,7 +2623,7 @@ function teamHtml(team) {
       <span class="tm-on">${nOn ? `<i></i>${nOn} in the app now` : 'Nobody else in the app right now'}</span></div>
     ${others.length > 6 ? '<input class="search" placeholder="Find a teammate…" data-filter="#tmList .tm">' : ''}
     <div class="tm-list" id="tmList">${others.map(t => { const [txt, st] = seenText(t.last_seen);
-      return `<div class="tm"><div class="tm-av ${st}">${esc(initials(t.full_name))}<i></i></div>
+      return `<div class="tm"><div class="tm-av ${st}">${av(t.id, t.full_name)}<i></i></div>
         <div class="tm-main"><b>${esc(t.name)}</b>${t.name !== t.full_name ? ` <span class="mut small">${esc(t.full_name)}</span>` : ''}
           <div class="tm-roles">${roles(t)}</div><span class="tm-st ${st}">${esc(txt)}</span></div>
         <a class="btn" href="#/pokes/new~${t.id}" title="Poke ${esc(t.name)}">👉 Poke</a></div>`; }).join('') || '<p class="mut">No teammates yet.</p>'}</div></section>`;
@@ -2622,8 +2660,9 @@ function pokeCard(p, mode) {
     : mode === 'in' ? (p.done_at ? `<span class="chip ok">Done ${ago(p.done_at)}</span>${p.reply ? ` <span class="small mut">“${esc(p.reply)}”</span>` : ''} <button class="lnk" data-act="pokeUndo" data-id="${p.id}">Undo</button>`
         : `<button class="pri" data-act="pokeDone" data-id="${p.id}">✓ Done</button><button class="ghost" data-act="pokeReply" data-id="${p.id}">Reply</button>`)
     : (allDone ? '<span class="chip ok">All done</span>' : '') + ((mode === 'sent' || isAdmin()) && !allDone ? `<button class="lnk" data-act="pokeCancel" data-id="${p.id}">Take back</button>` : '');
+  const face = av(mode === 'sent' ? S.me.id : p.from_user, mode === 'sent' ? S.me.full_name : p.from_full || p.from_name, 'sm');
   return `<div class="poke${p.urgent ? ' urgent' : ''}${(mode === 'in' && p.done_at) || p.cancelled_at ? ' done' : ''}">
-    <div class="pk-h"><span>${head}</span><span class="mut small">${ago(p.created_at)}</span></div>
+    <div class="pk-h"><span class="pk-who">${face}<span>${head}</span></span><span class="mut small">${ago(p.created_at)}</span></div>
     <div class="pk-b">${esc(p.body)}</div>
     ${p.urgent || p.due_at ? `<div class="pk-tags">${p.urgent ? '<span class="chip bad">Urgent</span>' : ''}${p.due_at ? `<span class="chip ${pokeLate(p) ? 'bad' : 'warn'}">⏰ ${esc(pokeDue(p.due_at))}${pokeLate(p) ? ' · late' : ''}</span>` : ''}</div>` : ''}
     ${rec}<div class="pk-a">${acts}</div></div>`;
