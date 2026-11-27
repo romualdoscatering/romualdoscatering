@@ -322,7 +322,8 @@ routes.home = async () => {
   const t = today(), tm = addDays(t, 1), hour = new Date(Date.now() + 8 * 3600e3).getUTCHours();
   const [fil, en] = GREET(hour), first = esc(nick());
   const doy = Math.floor((Date.parse(t) - Date.parse(t.slice(0, 4) + '-01-01')) / 864e5);
-  const [ev, pk, tk] = await Promise.all([db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null), homePokes(), homeTasks()]);
+  const [ev, pk, tk] = await Promise.all([db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null), homePokes(), homeTasks(), appCfg().catch(() => null)]);
+  const nextGo = ev && CFG.v ? ev.map(e => ({ e, p: sendOff(e, e.travel_mins != null ? { mins: e.travel_mins, km: e.travel_km, source: e.travel_source } : null, CFG.v) })).filter(x => x.p?.leave && x.p.leave > Date.now() - 15 * 60000 && mnlParts(x.p.leave)[0] === t).sort((a, b) => a.p.leave - b.p.leave)[0] : null;
   const nToday = ev ? ev.filter(e => e.event_date === t).length : null, nTmr = ev ? ev.filter(e => e.event_date === tm).length : null;
   const next = ev?.find(e => e.event_date === t && e.serve_time && e.serve_time.slice(0, 5) >= new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16));
   const cards = [];
@@ -336,7 +337,7 @@ routes.home = async () => {
       ${ev ? `<div class="hw-glance">
         <a href="#/events"><b>${nToday}</b><span>event${nToday === 1 ? '' : 's'} today</span></a>
         <a href="#/events"><b>${nTmr}</b><span>event${nTmr === 1 ? '' : 's'} tomorrow</span></a>
-        ${next ? `<a href="#/events"><b>${esc(fmtClock(next.serve_time))}</b><span>next: ${esc(next.client || next.title)}</span></a>` : ''}
+        ${nextGo ? `<a href="#/events"><b>${esc(clk(nextGo.p.leave))}</b><span>send-off: ${esc(nextGo.e.client || nextGo.e.title)}</span></a>` : next ? `<a href="#/events"><b>${esc(fmtClock(next.serve_time))}</b><span>next: ${esc(next.client || next.title)}</span></a>` : ''}
       </div>` : ''}
     </section>
     <div class="hw-today${pk && tk ? '' : ' one'}">${pk}${tk}</div>
@@ -349,6 +350,13 @@ routes.home = async () => {
 /* ================= EVENTS BOARD (everyone, read-only) ================= */
 // The whole team sees what's coming (like the 86 board); only catering roles open and edit events.
 const BOARD_DAYS = 45;
+function boardSendOff(e) {
+  const pl = CFG.v ? sendOff(e, e.travel_mins != null ? { mins: e.travel_mins, km: e.travel_km, source: e.travel_source } : null, CFG.v) : null;
+  if (!pl) return '';
+  if (!pl.out) return `<div class="evb-go">Ready for pick-up by <b>${esc(clk(pl.ready))}</b></div>`;
+  if (pl.leave) return `<div class="evb-go">Leave the kitchen by <b>${esc(clk(pl.leave))}</b><span> · ${pl.mins} min drive${pl.source === 'google' ? '' : ' (rough)'} · load by ${esc(clk(pl.load))}</span></div>`;
+  return `<div class="evb-go mut">Arrive by <b>${esc(clk(pl.arrive))}</b><span> · pin the location for a send-off time</span></div>`;
+}
 function boardCard(e, open) {
   const cat = e.kind === 'buffet', fulfil = e.fulfil || 'Pick-up', del = fulfil === 'Delivery';
   const t = e.serve_time ? fmtClock(e.serve_time).split(' ') : null;
@@ -367,6 +375,7 @@ function boardCard(e, open) {
       ${evName({ title: e.title }, { name: e.client }) ? `<div class="evb-sub">${esc(e.title)}</div>` : ''}
       <div class="evb-facts">${facts.map(esc).join(' · ')}</div>
       ${where ? `<div class="evb-where">${IC.pin(15)} ${esc(where)}</div>` : ''}
+      ${boardSendOff(e)}
       ${e.allergy ? `<div class="evb-warn">Allergies: ${esc(e.allergy)}</div>` : ''}
       ${e.special ? `<div class="evb-note">Special requests: ${esc(e.special)}</div>` : ''}
       <details class="evb-det"${open ? ' open' : ''}><summary>Menu${(e.menu || []).length ? ` (${e.menu.length})` : ''}</summary>${menu}</details>
@@ -376,7 +385,7 @@ function boardCard(e, open) {
 routes.events = async () => {
   clearTimeout(S.evTimer); S.evTimer = setTimeout(() => { if (location.hash.startsWith('#/events') && !document.querySelector('.modal')) refresh(); }, 60000);   // new bookings show up within a minute
   const t = today(), tm = addDays(t, 1);
-  const rows = await db.rpc('events_board', { p_from: t, p_to: addDays(t, BOARD_DAYS) });
+  const [rows] = await Promise.all([db.rpc('events_board', { p_from: t, p_to: addDays(t, BOARD_DAYS) }), appCfg()]);
   const on = d => rows.filter(e => e.event_date === d), later = rows.filter(e => e.event_date > tm);
   const sec = (cls, title, sub, list, open, empty) => `<section class="evb-sec ${cls}"><h2>${title} <span class="evb-n">${list.length}</span><span class="evb-d">${sub}</span></h2>
     ${list.length ? list.map(e => boardCard(e, open)).join('') : `<div class="evb-empty">${empty}</div>`}</section>`;
@@ -574,6 +583,7 @@ routes['c/event'] = async id => {
   <div id="evlive"></div>
   <div class="row" id="evhead"><h1>${esc(evClient(ev, client))}</h1>${chip(EVENT_STATUS[ev.status], statusTone(ev.status))}<span class="sp"></span><button class="pdf lg" data-act="evPdf" data-id="${ev.id}" title="Print the one-page event sheet: works at any status, for the team's hard copy">Print event sheet (PDF)</button>${delEvBtn({ ...ev, _name: evClient(ev, client) }, 'Delete', 'ghost')}</div>
   ${evHero(ev, client)}
+  ${await evAssist(ev, client, { menu, prs })}
   ${changedLine(ev, names)}
 
   ${canEdit ? `<details class="card"><summary>Edit details & status</summary><form data-form="editEvent" data-id="${ev.id}" class="mt">
@@ -2435,7 +2445,7 @@ routes.people = async arg => {
     <label class="tick"><input type="checkbox" name="is_admin" ${sel.is_admin ? 'checked' : ''}> Owner (everything, both workspaces)</label>
     <label class="tick"><input type="checkbox" name="active" ${!sel.username || sel.active ? 'checked' : ''}> Can log in</label>
     <div class="row end"><a class="btn ghost" href="#/people">Close</a><button class="pri">Save</button></div></form>` : ''}
-  ${tabletsHtml(tabs, dev)}${pushSetupHtml(!!vk)}`;
+  ${tabletsHtml(tabs, dev)}${deliveryCfgHtml(await appCfg(true))}${pushSetupHtml(!!vk)}`;
 };
 /* ================= activity log (owner) ================= */
 // Every change in the database is stamped with who and when (audit_log). This page reads it in plain words.
@@ -2768,6 +2778,202 @@ async function tkReminderCheck() {
   try { sessionStorage.setItem('rom-tk-shown', JSON.stringify([...TK_SHOWN].slice(-200))); } catch (e) {}
 }
 
+/* ================= EVENT ASSISTANT: pin the venue, drive time (Google Maps), send-off time ================= */
+// Send-off = serve time − set-up buffer (30 min) − drive (Google Maps, with traffic for that time of day) ; loading starts before that.
+const CFG = { at: 0, v: null };
+async function appCfg(force) {
+  if (!force && CFG.v && Date.now() - CFG.at < 5 * 60000) return CFG.v;
+  const rows = await db.select('app_config').catch(() => []), m = Object.fromEntries(rows.map(r => [r.key, r.value]));
+  let origin = null; try { origin = JSON.parse(m.origin || 'null'); } catch (e) {}
+  CFG.v = { gmaps: m.gmaps_key || '', origin, setup: Number(m.setup_mins || 30), load: Number(m.load_mins || 15) }; CFG.at = Date.now(); return CFG.v;
+}
+const hav = (a, b) => { const R = 6371, r = x => x * Math.PI / 180, dLa = r(b.lat - a.lat), dLo = r(b.lng - a.lng);
+  const h = Math.sin(dLa / 2) ** 2 + Math.cos(r(a.lat)) * Math.cos(r(b.lat)) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
+const rush = d => { const h = new Date(d.getTime() + 8 * 3600e3).getUTCHours(); return (h >= 7 && h < 9) || (h >= 16 && h < 19) || (h >= 11 && h < 13); };
+// Rough drive when Google Maps isn't connected: straight line × 1.4 for roads, 20 km/h at rush hour, 28 km/h otherwise, +5 min
+function roughDrive(origin, dest, around) { const km = hav(origin, dest) * 1.4; return { mins: Math.ceil((km / (rush(around) ? 20 : 28) * 60 + 5) / 5) * 5, km: Math.round(km * 10) / 10, source: 'rough' }; }
+const goesOut = e => e.kind === 'buffet' || (e.fulfil || e.sheet?.fulfil) === 'Delivery';
+// The plan for one event: { out, serve, leave, load, arrive, mins, km, source } (times as Date)
+function sendOff(e, travel, cfg) {
+  if (!e.serve_time) return null;
+  const serve = mnl(e.event_date, e.serve_time);
+  if (!goesOut(e)) return { out: false, serve, ready: new Date(serve.getTime() - 15 * 60000) };
+  const pinned = e.venue_lat != null && e.venue_lng != null;
+  let t = travel && travel.mins != null ? { mins: travel.mins, km: travel.km, source: travel.source || 'google', at: travel.computed_at } : null;
+  if (!t && pinned && cfg.origin) t = roughDrive(cfg.origin, { lat: e.venue_lat, lng: e.venue_lng }, new Date(serve.getTime() - 90 * 60000));
+  if (!t) return { out: true, serve, pinned, arrive: new Date(serve.getTime() - cfg.setup * 60000) };
+  const arrive = new Date(serve.getTime() - cfg.setup * 60000), leave = new Date(arrive.getTime() - t.mins * 60000);
+  return { out: true, serve, pinned, arrive, leave, load: new Date(leave.getTime() - cfg.load * 60000), ...t };
+}
+const clk = d => d.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit', timeZone: 'Asia/Manila' });
+const dayWord = (d, ref) => { const a = mnlParts(d)[0]; return a === ref ? '' : a === addDays(ref, -1) ? ' (day before)' : ' (' + new Date(a + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' }) + ')'; };
+const gmapsLink = (lat, lng) => `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+const gmapsDir = (o, d) => `https://www.google.com/maps/dir/?api=1&origin=${o.lat},${o.lng}&destination=${d.lat},${d.lng}&travelmode=driving`;
+
+async function evAssist(ev, client, ctx) {
+  const cfg = await appCfg(), [tr] = await db.select('event_travel', { eq: { event_id: ev.id } }).catch(() => []);
+  const s = ev.sheet || {}, plan = sendOff(ev, tr, cfg), canPin = can('catering', 'event_specialist', 'coordinator', 'manager', 'finance');
+  const pinned = ev.venue_lat != null && ev.venue_lng != null, out = goesOut(ev);
+  // what's still missing, in the order it matters
+  const checks = [
+    ['Serving time set', !!ev.serve_time],
+    ...(out ? [['Address / venue written', !!(ev.venue || '').trim()], ['Location pinned on the map', pinned]] : []),
+    ...(ev.kind === 'buffet' ? [['Number of guests', !!ev.pax]] : []),
+    ['Menu has dishes', ctx.menu.length > 0],
+    ...(ctx.menu.length ? [['Purchase request made', ctx.prs.length > 0]] : []),
+    ['Client contact number', !!(s.mobile || client?.phone)],
+    ['Status is Confirmed or later', ['confirmed', 'in_prep', 'done'].includes(ev.status)],
+  ];
+  const nOk = checks.filter(c => c[1]).length;
+  const tips = [];
+  if (plan?.leave) {
+    if (rush(plan.leave) && plan.source !== 'google') tips.push('The send-off falls in busy traffic hours. Leave 10–15 minutes earlier to be safe.');
+    const h = new Date(plan.leave.getTime() + 8 * 3600e3).getUTCHours(); if (h < 6) tips.push('Very early send-off: check that the kitchen and driver are in on time.');
+    if (plan.km > 25) tips.push(`It's a long drive (${plan.km} km). Pack food hot-held and bring extra fuel for chafing dishes.`);
+    if (plan.source === 'google' && plan.at && (Date.now() - new Date(plan.at)) > 6 * 3600e3) tips.push('The drive time is from ' + ago(plan.at) + '. Recalculate on the day for live traffic.');
+  }
+  if (out && pinned && !cfg.origin) tips.push(isAdmin() ? 'Pin the kitchen location on the People page so the app can work out the drive.' : 'The owner still needs to pin the kitchen location.');
+  if (ev.kind === 'buffet' && ev.pax >= 150) tips.push(`${ev.pax} guests: plan for two buffet lines and an extra server.`);
+  const row = (label, d, strong, note) => `<div class="as-t${strong ? ' key' : ''}"><span>${label}</span><b>${d ? esc(clk(d)) + esc(dayWord(d, ev.event_date)) : '—'}</b>${note ? `<small>${note}</small>` : ''}</div>`;
+  let body = '';
+  if (!plan) body = `<p class="as-warn">Add the serving time (Edit details) and the assistant will work out the send-off.</p>`;
+  else if (!plan.out) body = `<div class="as-line">${row('Ready for pick-up by', plan.ready, true, '15 minutes before the pick-up time')}${row('Client picks up', plan.serve)}</div>`;
+  else {
+    const src = plan.mins == null ? '' : plan.source === 'google' ? `Google Maps, with expected traffic · updated ${ago(plan.at)}` : 'Rough estimate (straight-line distance). Connect Google Maps for traffic.';
+    body = `<div class="as-drive">${pinned
+        ? `<div><b>${plan.mins != null ? `${plan.mins} min drive` : 'Drive time not worked out yet'}</b>${plan.km != null ? ` <span class="mut">· ${plan.km} km</span>` : ''}<small>${esc(src)}</small></div>
+           <div class="as-btns">${cfg.origin ? `<a class="btn" target="_blank" rel="noopener" href="${gmapsDir(cfg.origin, { lat: ev.venue_lat, lng: ev.venue_lng })}">Directions</a>` : ''}${cfg.gmaps ? `<button class="ghost" data-act="evRoute" data-id="${ev.id}">Recalculate</button>` : ''}</div>`
+        : `<div><b>Pin the location</b><small>So the app can work out the drive and the send-off time.</small></div>`}</div>
+      <div class="as-place">${IC.pin(14)} ${pinned ? `<a target="_blank" rel="noopener" href="${gmapsLink(ev.venue_lat, ev.venue_lng)}">${esc(ev.venue_place || ev.venue || 'Pinned location')}</a>` : `<span class="mut">${esc(ev.venue || 'No address yet')}</span>`}
+        ${canPin ? `<button class="lnk" data-act="evPin" data-id="${ev.id}">${pinned ? 'Change pin' : 'Pin on the map'}</button>` : ''}</div>
+      ${plan.leave ? `<div class="as-line">${row('Pack & load by', plan.load, false, `${cfg.load} min to load the van`)}${row('Leave the kitchen by', plan.leave, true, 'send-off')}${row('Arrive by', plan.arrive, false, `${cfg.setup} min to set up`)}${row(ev.kind === 'buffet' ? 'Serve at' : 'Hand over at', plan.serve)}</div>
+        <div class="as-btns mt"><button class="ghost" data-act="evSendTask" data-id="${ev.id}" data-at="${plan.leave.toISOString()}" data-name="${esc(evClient(ev, client))}">Add send-off to my tasks</button><button class="ghost" data-act="evSendPoke" data-at="${plan.leave.toISOString()}" data-load="${plan.load.toISOString()}" data-name="${esc(evClient(ev, client))}" data-venue="${esc(ev.venue || '')}">Poke the team</button></div>`
+        : `<div class="as-line">${row('Arrive by', plan.arrive, true, `${cfg.setup} min before serving, to set up`)}${row(ev.kind === 'buffet' ? 'Serve at' : 'Hand over at', plan.serve)}</div>`}`;
+  }
+  // refresh the drive by itself: none yet, older than 6 hours, or within 2 hours of the send-off (live traffic)
+  if (out && pinned && cfg.gmaps && cfg.origin && ev.serve_time && !['done', 'closed', 'cancelled'].includes(ev.status)) {
+    const age = tr ? Date.now() - new Date(tr.computed_at) : Infinity, toLeave = plan?.leave ? plan.leave - Date.now() : Infinity;
+    const due = age > 6 * 3600e3 || (toLeave < 2 * 3600e3 && toLeave > -3600e3 && age > 10 * 60000);
+    if (due && plan.serve > Date.now() - 3 * 3600e3 && !EV_AUTO[ev.id]) { EV_AUTO[ev.id] = 1; setTimeout(() => evRoute(ev.id, true), 300); }
+  }
+  return `<section class="card as" id="assist"><div class="as-h"><span class="as-ic">${SV('<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>', 18)}</span>
+      <h2>Event assistant</h2><span class="sp"></span><span class="as-score${nOk === checks.length ? ' ok' : ''}">${nOk}/${checks.length} ready</span></div>
+    ${body}
+    ${checks.some(c => !c[1]) ? `<div class="as-todo"><b>Still to do</b>${checks.filter(c => !c[1]).map(c => `<span>${esc(c[0])}</span>`).join('')}</div>` : ''}
+    ${tips.length ? `<ul class="as-tips">${tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</section>`;
+}
+const EV_AUTO = {};
+async function evRoute(id, quiet) {
+  const r = await db.edge('poke-push', { event: 'route', event_id: id });
+  if (r?.ok) { if (!quiet) toast(`Drive: ${r.mins} min (${r.km} km)`); if (current.startsWith('c/event')) refresh(); }
+  else if (!quiet) toast(r?.error || 'Could not reach Google Maps', true);
+}
+ACT.evRoute = async el => { el.textContent = 'Working…'; await evRoute(el.dataset.id); };
+ACT.evPin = async el => {
+  const [ev] = await db.select('events', { eq: { id: el.dataset.id } });
+  openPin({ title: 'Pin the location', lat: ev.venue_lat, lng: ev.venue_lng, query: ev.venue || '', onSave: async (lat, lng, place) => {
+    await db.rpc('event_set_pin', { p_event: ev.id, p_lat: lat, p_lng: lng, p_place: place || ev.venue || null });
+    toast('Location pinned'); delete EV_AUTO[ev.id]; refresh();
+  } });
+};
+ACT.evSendTask = async el => {
+  await tkLoadPrefs(); const [d, t] = mnlParts(el.dataset.at);
+  const row = { title: `Send off food: ${el.dataset.name}`.slice(0, 200), due_date: d, due_time: t, remind: '30', priority: 1 };
+  row.remind_at = remindAt(row); await db.insert('tasks', row); toast('Added to My tasks, with a reminder 30 min before');
+};
+ACT.evSendPoke = async el => {
+  const leave = clk(new Date(el.dataset.at)), load = clk(new Date(el.dataset.load));
+  sessionStorage.setItem('pokeDraft', `Send-off for ${el.dataset.name}${el.dataset.venue ? ' (' + el.dataset.venue + ')' : ''}: food packed and loaded by ${load}, leave the kitchen by ${leave}.`.slice(0, 500));
+  go('#/pokes/new');
+};
+
+// ---- Map pin picker: Google Maps when connected; otherwise paste a link / coordinates or use this phone's location
+let GM_LOAD = null;
+function loadGmaps(key) {
+  if (window.google?.maps) return Promise.resolve();
+  return GM_LOAD ||= new Promise((ok, bad) => { window.__gmOk = ok; const sc = document.createElement('script');
+    sc.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&callback=__gmOk&region=PH&language=en`;
+    sc.async = true; sc.onerror = () => { GM_LOAD = null; bad(new Error('Google Maps did not load')); }; document.head.appendChild(sc); });
+}
+function parseLatLng(t) {
+  t = String(t || '');
+  const m = t.match(/@(-?\d+\.\d+),\s*(-?\d+\.\d+)/) || t.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || t.match(/[?&](?:q|query|ll|destination|center)=(-?\d+\.\d+)(?:,|%2C)\s*(-?\d+\.\d+)/i) || t.match(/(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})/);
+  if (!m) return null; const lat = Number(m[1]), lng = Number(m[2]);
+  return Math.abs(lat) <= 90 && Math.abs(lng) <= 180 ? { lat, lng } : null;
+}
+async function openPin({ title, lat, lng, query, onSave }) {
+  const cfg = await appCfg(), DAVAO = { lat: 7.0731, lng: 125.6128 };
+  let cur = lat != null ? { lat, lng } : null, place = '';
+  const box = document.createElement('div'); box.className = 'modal';
+  box.innerHTML = `<div class="card pin-card"><div class="row"><h2>${esc(title)}</h2><span class="sp"></span><button type="button" class="x" data-close>✕</button></div>
+    ${cfg.gmaps ? `<div class="pin-search"><input placeholder="Search a place or address" value="${esc(query || '')}"><button type="button" class="pri" data-pin-find>Find</button></div>
+      <div class="pin-map"></div><p class="small mut">Tap the map or drag the pin to the exact gate or entrance.</p>`
+      : `<p class="small">Google Maps isn't connected yet, so pin it this way:</p>`}
+    <label class="small">${cfg.gmaps ? 'Or paste' : 'Paste'} a Google Maps link or coordinates<input data-pin-paste placeholder="e.g. 7.0731, 125.6128"></label>
+    <p class="small mut">In Google Maps, long-press the spot: the coordinates appear at the top. Copy and paste them here. Short links (maps.app.goo.gl) can't be read; open them first and copy the coordinates.</p>
+    <div class="pin-now"><span data-pin-show>${cur ? `${cur.lat.toFixed(5)}, ${cur.lng.toFixed(5)}` : 'No pin yet'}</span>${cur ? ` · <a target="_blank" rel="noopener" href="${gmapsLink(cur.lat, cur.lng)}">check on Google Maps</a>` : ''}</div>
+    <div class="row end mt"><button type="button" class="ghost" data-pin-here>Use this phone's location</button>${lat != null ? '<button type="button" class="lnk bad-t" data-pin-clear>Remove pin</button>' : ''}<span class="sp"></span><button type="button" class="pri" data-pin-save>Save pin</button></div></div>`;
+  document.body.appendChild(box);
+  const show = () => { const s = box.querySelector('[data-pin-show]'); s.parentElement.innerHTML = `<span data-pin-show>${cur ? `${cur.lat.toFixed(5)}, ${cur.lng.toFixed(5)}` : 'No pin yet'}</span>${cur ? ` · <a target="_blank" rel="noopener" href="${gmapsLink(cur.lat, cur.lng)}">check on Google Maps</a>` : ''}${place ? `<br><small>${esc(place)}</small>` : ''}`; };
+  let map, marker, geo;
+  const setPin = (p, pan, reverse = true) => { cur = { lat: +p.lat, lng: +p.lng }; show();
+    if (map) { marker.setPosition(cur); if (pan) { map.panTo(cur); map.setZoom(Math.max(map.getZoom(), 16)); } }
+    if (geo && reverse) geo.geocode({ location: cur }, (r, st) => { if (st === 'OK' && r[0]) { place = r[0].formatted_address; show(); } }); };
+  if (cfg.gmaps) {
+    try {
+      await loadGmaps(cfg.gmaps);
+      map = new google.maps.Map(box.querySelector('.pin-map'), { center: cur || cfg.origin || DAVAO, zoom: cur ? 16 : 13, mapTypeControl: false, streetViewControl: false, fullscreenControl: false, clickableIcons: false });
+      marker = new google.maps.Marker({ map, position: cur || cfg.origin || DAVAO, draggable: true, visible: !!cur }); geo = new google.maps.Geocoder();
+      map.addListener('click', e => { marker.setVisible(true); setPin({ lat: e.latLng.lat(), lng: e.latLng.lng() }); });
+      marker.addListener('dragend', e => setPin({ lat: e.latLng.lat(), lng: e.latLng.lng() }));
+      const find = () => { const q = box.querySelector('.pin-search input').value.trim(); if (!q) return;
+        geo.geocode({ address: q, region: 'ph', bounds: new google.maps.LatLngBounds({ lat: 6.9, lng: 125.3 }, { lat: 7.4, lng: 125.8 }) }, (r, st) => {
+          if (st !== 'OK' || !r[0]) return toast('Not found. Try a nearby landmark, or tap the map.', true);
+          marker.setVisible(true); place = r[0].formatted_address; setPin({ lat: r[0].geometry.location.lat(), lng: r[0].geometry.location.lng() }, true, false); }); };
+      box.querySelector('[data-pin-find]').onclick = find;
+      box.querySelector('.pin-search input').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); find(); } });
+    } catch (err) { box.querySelector('.pin-map').innerHTML = `<p class="small bad-t" style="padding:12px">${esc(err.message)}. Check the Google Maps key on the People page.</p>`; }
+  }
+  box.querySelector('[data-pin-paste]').addEventListener('input', e => { const p = parseLatLng(e.target.value); if (p) { marker?.setVisible(true); setPin(p, true); } });
+  box.querySelector('[data-pin-here]').onclick = () => { if (!navigator.geolocation) return toast("This phone can't share its location", true);
+    navigator.geolocation.getCurrentPosition(p => { marker?.setVisible(true); setPin({ lat: p.coords.latitude, lng: p.coords.longitude }, true); }, () => toast('Location not allowed', true), { enableHighAccuracy: true, timeout: 10000 }); };
+  box.querySelector('[data-pin-clear]')?.addEventListener('click', async () => { if (!confirm('Remove this pin?')) return; box.remove(); await onSave(null, null, null); });
+  box.querySelector('[data-pin-save]').onclick = async () => { if (!cur) return toast('Put a pin first.', true); try { await onSave(cur.lat, cur.lng, place); box.remove(); } catch (err) { toast(err.message, true); } };
+  box.addEventListener('click', e => { if (e.target.dataset.close !== undefined || e.target === box) box.remove(); });
+}
+
+// ---- Owner: delivery planning settings (People page)
+function deliveryCfgHtml(cfg) {
+  return `<section class="card mt" id="delivery-cfg"><h2>Delivery planning</h2>
+    <p class="small mut">Used by the Event assistant to work out send-off times: serving time − set-up buffer − drive time − loading.</p>
+    <div class="as-place">${IC.pin(14)} ${cfg.origin ? `Kitchen: <a target="_blank" rel="noopener" href="${gmapsLink(cfg.origin.lat, cfg.origin.lng)}">${esc(cfg.origin.place || `${cfg.origin.lat.toFixed(5)}, ${cfg.origin.lng.toFixed(5)}`)}</a>` : '<span class="bad-t">Kitchen location not pinned yet</span>'}
+      <button class="lnk" data-act="cfgOrigin">${cfg.origin ? 'Change' : 'Pin the kitchen'}</button></div>
+    <form data-form="cfgDelivery" class="tk-pf">
+      <label>Set-up buffer at the venue (minutes)<input type="number" name="setup" min="0" max="240" value="${cfg.setup}"></label>
+      <label>Loading time before leaving (minutes)<input type="number" name="load" min="0" max="240" value="${cfg.load}"></label>
+      <label style="grid-column:1/-1">Google Maps key for the map <span class="small mut">(browser key, locked to romualdos.ph)</span><input name="gmaps" value="${esc(cfg.gmaps)}" placeholder="AIza…" autocomplete="off"></label>
+      <div class="row end"><button class="pri">Save</button></div></form>
+    <details class="small mt"><summary><b>How to connect Google Maps</b></summary><ol>
+      <li>Go to <b>console.cloud.google.com</b>, make a project (e.g. "Romualdos app") and add a billing account.</li>
+      <li>APIs &amp; Services → Library: enable <b>Maps JavaScript API</b>, <b>Geocoding API</b> and <b>Routes API</b>.</li>
+      <li>Credentials → Create API key → <b>Browser key</b>: restrict it to websites <code>https://romualdos.ph/*</code> and to the Maps JavaScript and Geocoding APIs. Paste it above.</li>
+      <li>Create a second key → <b>Server key</b>: restrict it to the Routes API only. In Supabase → Edge Functions → Secrets, add it as <code>GOOGLE_MAPS_KEY</code>.</li>
+      <li>Paste the latest <b>poke-push</b> code from GitHub into the Edge Function and deploy it.</li></ol>
+      <p>Without Google Maps the assistant still works with rough estimates from the pinned locations.</p></details></section>`;
+}
+FORMS.cfgDelivery = async f => {
+  await db.rpc('admin_set_config', { p_key: 'setup_mins', p_value: String(Math.max(0, Number(f.setup) || 30)) });
+  await db.rpc('admin_set_config', { p_key: 'load_mins', p_value: String(Math.max(0, Number(f.load) || 15)) });
+  await db.rpc('admin_set_config', { p_key: 'gmaps_key', p_value: (f.gmaps || '').trim() });
+  await appCfg(true); toast('Saved'); refresh();
+};
+ACT.cfgOrigin = async () => {
+  const cfg = await appCfg();
+  openPin({ title: 'Pin the kitchen', lat: cfg.origin?.lat, lng: cfg.origin?.lng, query: "Romualdo's", onSave: async (lat, lng, place) => {
+    await db.rpc('admin_set_config', { p_key: 'origin', p_value: lat == null ? '' : JSON.stringify({ lat, lng, place: place || '' }) });
+    await appCfg(true); toast('Kitchen location saved'); refresh(); } });
+};
+
 /* ================= Profile photos ================= */
 // Small square JPEGs kept in the database; each phone keeps a copy and only downloads photos that changed.
 const AV = { img: {}, key: 'rom-avatars' };
@@ -2989,6 +3195,7 @@ function pokeTeams(people) {
   return Object.values(t).map(x => ({ ...x, n: x.ids.size, label: x.role === '*' ? `Everyone · ${WS_NAME[x.ws] || x.ws}` : `${roleName(x.role)} · ${WS_NAME[x.ws] || x.ws}` }))
     .sort((a, b) => (a.role === '*') - (b.role === '*') || a.label.localeCompare(b.label));
 }
+const pokeDraft = () => { const d = sessionStorage.getItem('pokeDraft') || ''; sessionStorage.removeItem('pokeDraft'); return d; };
 function pokeForm(people, preTo) {
   const others = people.filter(p => p.id !== S.me.id), teams = pokeTeams(others);
   const role1 = p => roleName((p.roles || [])[0]?.role || '') || (p.is_admin ? 'Owner' : '');
@@ -3003,7 +3210,7 @@ function pokeForm(people, preTo) {
       <span class="pk-fav">${av(p.id, p.full_name, '')}<i class="pk-ck">✓</i></span><b>${esc(p.name)}</b><small>${esc(role1(p))}</small><span hidden>${esc(p.full_name)}</span></label>`).join('')}</div>
     <details class="pk-tdet"><summary>Send to a whole team</summary>
       ${groups.map(([ws, ts]) => `<div class="pk-tg"><span>${WS_NAME[ws]}</span><div class="pk-teams">${ts.map(t => `<label class="pk-chip"><input type="checkbox" name="t_${t.ws}|${t.role}" data-label="${esc(t.label)}"><span>${esc(plural(t.role))} <i>${t.n}</i></span></label>`).join('')}</div></div>`).join('')}</details>
-    <label>Message<textarea name="body" maxlength="500" rows="3" required placeholder="e.g. Put the crispy pata in the oven by 8AM tomorrow"></textarea></label>
+    <label>Message<textarea name="body" maxlength="500" rows="3" required placeholder="e.g. Put the crispy pata in the oven by 8AM tomorrow">${esc(pokeDraft())}</textarea></label>
     <div class="pk-row"><label>Needed by <span class="small mut">(optional)</span><input type="datetime-local" name="due"></label>
       <label class="pk-urg"><input type="checkbox" name="urgent"> <span>Urgent</span></label></div>
     <div class="row end"><a class="btn" href="#/pokes">Cancel</a><button class="pri">Send poke</button></div></form>`;

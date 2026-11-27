@@ -20,17 +20,20 @@ Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
   const pub = Deno.env.get("VAPID_PUBLIC_KEY") ?? "", priv = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
-  if (!pub || !priv) return json({ ok: false, error: "Phone notifications are not set up yet (VAPID keys missing)" });
-  webpush.setVapidDetails(Deno.env.get("VAPID_SUBJECT") || "https://romualdos.ph", pub, priv);
+  const pushReady = !!(pub && priv);
+  if (pushReady) webpush.setVapidDetails(Deno.env.get("VAPID_SUBJECT") || "https://romualdos.ph", pub, priv);
+  const noPush = () => json({ ok: false, error: "Phone notifications are not set up yet (VAPID keys missing)" });
 
   const url = Deno.env.get("SUPABASE_URL")!;
   const serviceKey = Deno.env.get("SERVICE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
   const db = createClient(url, serviceKey, { auth: { persistSession: false } });
 
-  const { poke_id, event } = await req.json().catch(() => ({}));
+  const body: any = await req.json().catch(() => ({}));
+  const { poke_id, event } = body;
 
   // My tasks reminders (from the every-minute database job)
   if (event === "reminders") {
+    if (!pushReady) return noPush();
     const { data: okKey } = await db.rpc("cron_key_ok", { k: req.headers.get("x-cron-key") ?? "" });
     if (okKey !== true) return json({ error: "Not allowed" }, 403);
     const { data: due, error: dErr } = await db.rpc("tasks_due_reminders");
@@ -47,6 +50,54 @@ Deno.serve(async (req) => {
     return json({ ok: true, reminders: due.length, sent });
   }
 
+  // Event assistant: drive time from the kitchen to the event, with Google's traffic for that time of day.
+  // Needs the secret GOOGLE_MAPS_KEY (a server key with the Routes API enabled).
+  if (event === "route") {
+    const token = (req.headers.get("Authorization") ?? "").replace("Bearer ", "");
+    const { data: who } = await db.auth.getUser(token);
+    if (!who?.user) return json({ error: "Not signed in" }, 401);
+    const gkey = Deno.env.get("GOOGLE_MAPS_KEY") ?? "";
+    if (!gkey) return json({ ok: false, error: "Google Maps is not connected yet (GOOGLE_MAPS_KEY missing)" });
+    // the caller must be able to see the event (same rule as the app)
+    const asUser = createClient(url, Deno.env.get("SUPABASE_ANON_KEY") ?? "", { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false } });
+    const { data: ev } = await asUser.from("events").select("id, event_date, serve_time, venue_lat, venue_lng").eq("id", body.event_id).maybeSingle();
+    if (!ev) return json({ error: "Event not found" }, 404);
+    if (ev.venue_lat == null || ev.venue_lng == null) return json({ ok: false, error: "Pin the location first" });
+    const { data: cfgRows } = await db.from("app_config").select("key, value").in("key", ["origin", "setup_mins"]);
+    const cfg = Object.fromEntries((cfgRows ?? []).map((r: any) => [r.key, r.value]));
+    let origin: any = null; try { origin = JSON.parse(cfg.origin || "null"); } catch (_) { origin = null; }
+    if (!origin?.lat) return json({ ok: false, error: "The owner hasn't pinned the kitchen location yet" });
+    const setup = Number(cfg.setup_mins || 30);
+    const serve = new Date(`${ev.event_date}T${String(ev.serve_time || "12:00").slice(0, 5)}:00+08:00`).getTime();
+    const soon = Date.now() + 2 * 60 * 1000;
+    const drive = async (depart: number) => {
+      const r = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Goog-Api-Key": gkey, "X-Goog-FieldMask": "routes.duration,routes.distanceMeters" },
+        body: JSON.stringify({
+          origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
+          destination: { location: { latLng: { latitude: ev.venue_lat, longitude: ev.venue_lng } } },
+          travelMode: "DRIVE", routingPreference: "TRAFFIC_AWARE_OPTIMAL", departureTime: new Date(Math.max(depart, soon)).toISOString(),
+        }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.routes?.length) throw new Error(j.error?.message || "Google Maps found no route");
+      return { mins: Math.ceil(parseInt(String(j.routes[0].duration), 10) / 60), km: Math.round(j.routes[0].distanceMeters / 100) / 10 };
+    };
+    try {
+      // 1st guess: leaving 2 hours before serving; 2nd: at the send-off time that guess gives. Keep the longer of the two.
+      const a = await drive(serve - 120 * 60000);
+      const leave = serve - (setup + a.mins) * 60000;
+      const b = await drive(leave);
+      const best = b.mins >= a.mins ? b : a;
+      const row = { event_id: ev.id, mins: best.mins, km: best.km, depart_for: new Date(Math.max(leave, soon)).toISOString(), source: "google", computed_at: new Date().toISOString() };
+      const { error: upErr } = await db.from("event_travel").upsert(row, { onConflict: "event_id" });
+      if (upErr) return json({ error: upErr.message }, 500);
+      return json({ ok: true, ...row });
+    } catch (e: any) { return json({ ok: false, error: String(e?.message || e) }); }
+  }
+
+  if (!pushReady) return noPush();
   // Who is calling? Only the sender of the poke may trigger its notifications.
   const token = (req.headers.get("Authorization") ?? "").replace("Bearer ", "");
   const { data: who, error: whoErr } = await db.auth.getUser(token);
