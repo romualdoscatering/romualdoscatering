@@ -13,3 +13,6 @@ window.ROM_CONTACT = {
   email: 'romualdoscatering@gmail.com',
   web: 'romualdos.ph'
 };
+
+// The phone-notification / drive-time Edge Function: the last part of its URL in Supabase → Edge Functions.
+window.ROM_PUSH_FN = 'clever-service';

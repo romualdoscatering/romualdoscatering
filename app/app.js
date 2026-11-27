@@ -30,6 +30,9 @@ const roleName = k => (ROLES.find(r => r[0] === k) || [k, k])[1];
 const chip = (label, tone) => `<span class="chip ${tone || ''}">${esc(label)}</span>`;
 const statusTone = s => ({ draft: 'mut', inquiry: 'mut', for_client_approval: 'warn', submitted: 'warn', confirmed: 'ok', approved: 'ok', in_prep: 'info', ordered: 'info', open: 'info', partly_received: 'warn', done: 'ok', received: 'ok', closed: 'mut', rejected: 'bad', cancelled: 'bad' }[s] || '');
 
+// The Edge Function's web address name (Supabase → Edge Functions → URL ends in /functions/v1/<this>). Set in config.js.
+const PUSH_FN = window.ROM_PUSH_FN || 'poke-push';
+
 /* ================= Line icons (used instead of emoji) ================= */
 const SV = (d, w = 16) => `<svg class="ico" viewBox="0 0 24 24" width="${w}" height="${w}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
 const IC = {
@@ -2875,7 +2878,7 @@ document.addEventListener('change', async e => {
   catch (err) { toast(err.message, true); }
 });
 async function evRoute(id, quiet) {
-  const r = await db.edge('poke-push', { event: 'route', event_id: id });
+  const r = await db.edge(PUSH_FN, { event: 'route', event_id: id });
   if (r?.ok) { if (!quiet) toast(`Drive: ${r.mins} min (${r.km} km)`); if (current.startsWith('c/event')) refresh(); }
   else if (!quiet) toast(r?.error || 'Could not reach Google Maps', true);
 }
@@ -3253,11 +3256,11 @@ FORMS.sendPoke = async (f, form) => {
   if (!to.length && !teams.length) return toast('Pick who to poke.', true);
   const label = boxes.filter(b => b.dataset.label).map(b => b.dataset.label).join(', ');
   const id = await db.rpc('send_poke', { p_to: to, p_teams: teams.length ? teams : null, p_body: f.body, p_due: f.due ? new Date(f.due).toISOString() : null, p_urgent: !!f.urgent, p_label: label });
-  db.edge('poke-push', { poke_id: id });   // phone notifications; the poke is already saved even if this fails
+  db.edge(PUSH_FN, { poke_id: id });   // phone notifications; the poke is already saved even if this fails
   toast('Poke sent to ' + label); go('#/pokes/sent');
 };
-ACT.pokeDone = async el => { await db.rpc('poke_done', { p_poke: el.dataset.id, p_reply: '' }); db.edge('poke-push', { poke_id: el.dataset.id, event: 'done' }); toast('Marked done — the sender is told'); pokePoll(); refresh(); };
-ACT.pokeReply = async el => { const r = prompt('Reply (it also marks the poke done):'); if (r == null) return; await db.rpc('poke_done', { p_poke: el.dataset.id, p_reply: r }); db.edge('poke-push', { poke_id: el.dataset.id, event: 'done' }); toast('Reply sent'); pokePoll(); refresh(); };
+ACT.pokeDone = async el => { await db.rpc('poke_done', { p_poke: el.dataset.id, p_reply: '' }); db.edge(PUSH_FN, { poke_id: el.dataset.id, event: 'done' }); toast('Marked done — the sender is told'); pokePoll(); refresh(); };
+ACT.pokeReply = async el => { const r = prompt('Reply (it also marks the poke done):'); if (r == null) return; await db.rpc('poke_done', { p_poke: el.dataset.id, p_reply: r }); db.edge(PUSH_FN, { poke_id: el.dataset.id, event: 'done' }); toast('Reply sent'); pokePoll(); refresh(); };
 ACT.pokeUndo = async el => { await db.rpc('poke_undo', { p_poke: el.dataset.id }); pokePoll(); refresh(); };
 ACT.pokeCancel = async el => { if (!confirm('Take back this poke? It disappears from their home screen.')) return; await db.rpc('poke_cancel', { p_poke: el.dataset.id }); toast('Taken back'); refresh(); };
 
