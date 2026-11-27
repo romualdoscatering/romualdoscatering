@@ -2515,7 +2515,7 @@ const initials = n => (n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w 
 const ago = s => { if (!s) return ''; const m = Math.round((Date.now() - new Date(s)) / 60000);
   return m < 2 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : fmtT(s); };
 routes.me = async () => {
-  const [acct, acts, dev] = await Promise.all([db.rpc('my_account').catch(() => null), db.rpc('my_activity', { p_limit: 15 }).catch(() => null), db.rpc('pos_device_status').catch(() => null)]);
+  const [acct, acts, dev, team] = await Promise.all([db.rpc('my_account').catch(() => null), db.rpc('my_activity', { p_limit: 15 }).catch(() => null), db.rpc('pos_device_status').catch(() => null), db.rpc('team_list').catch(() => null)]);
   const me = { ...S.me, ...(acct || {}) }, roles = S.me?.roles || [];
   const byWs = Object.keys(WS_NAME).map(ws => [ws, roles.filter(r => r.ws === ws)]).filter(([, rs]) => rs.length);
   const roleCards = me.is_admin
@@ -2565,8 +2565,31 @@ routes.me = async () => {
       <li>Using a shared or borrowed phone? Log out when you're done.</li>
       <li>Forgot your password? Ask the owner to reset it.</li></ul></section>
   </div>
+  ${teamHtml(team)}
   <section class="card mt"><h2>My recent activity</h2>${actList}</section>`;
 };
+// My teammates: everyone on the team, who's in the app right now, and a quick poke
+const ONLINE_MS = 2 * 60 * 1000;
+function seenText(t) {
+  if (!t) return ["Hasn't opened the app yet", 'never'];
+  const ms = Date.now() - new Date(t);
+  if (ms < ONLINE_MS) return ['In the app now', 'on'];
+  if (ms < 864e5) return ['Active ' + ago(t), 'today'];
+  return ['Last in ' + new Date(t).toLocaleDateString('en-PH', { month: 'short', day: 'numeric' }), 'old'];
+}
+function teamHtml(team) {
+  if (!team) return '<section class="card mt"><h2>My teammates</h2><p class="small mut">Needs the latest database update.</p></section>';
+  const others = team.filter(t => t.id !== S.me.id), nOn = others.filter(t => seenText(t.last_seen)[1] === 'on').length;
+  const roles = t => t.is_admin ? chip('Owner', 'ok') : (t.roles || []).map(r => chip(`${roleName(r.role)} · ${WS_NAME[r.ws] || r.ws}`, 'info')).join(' ');
+  return `<section class="card mt" id="teammates"><div class="row"><h2>My teammates <span class="mut small">${others.length}</span></h2><span class="sp"></span>
+      <span class="tm-on">${nOn ? `<i></i>${nOn} in the app now` : 'Nobody else in the app right now'}</span></div>
+    ${others.length > 6 ? '<input class="search" placeholder="Find a teammate…" data-filter="#tmList .tm">' : ''}
+    <div class="tm-list" id="tmList">${others.map(t => { const [txt, st] = seenText(t.last_seen);
+      return `<div class="tm"><div class="tm-av ${st}">${esc(initials(t.full_name))}<i></i></div>
+        <div class="tm-main"><b>${esc(t.name)}</b>${t.name !== t.full_name ? ` <span class="mut small">${esc(t.full_name)}</span>` : ''}
+          <div class="tm-roles">${roles(t)}</div><span class="tm-st ${st}">${esc(txt)}</span></div>
+        <a class="btn" href="#/pokes/new~${t.id}" title="Poke ${esc(t.name)}">👉 Poke</a></div>`; }).join('') || '<p class="mut">No teammates yet.</p>'}</div></section>`;
+}
 FORMS.meSave = async f => {
   await db.rpc('my_update_profile', { p_nickname: f.nickname || '', p_phone: f.phone || '' });
   S.me = await db.rpc('my_access'); toast('Saved'); refresh();
@@ -2621,14 +2644,14 @@ async function homePokes() {
       : '<p class="mut small">Nothing for you right now. 👌</p>'}</section>`;
 }
 routes.pokes = async arg => {
-  const tab = arg === 'sent' || arg === 'all' ? arg : 'in', compose = arg === 'new';
+  const tab = arg === 'sent' || arg === 'all' ? arg : 'in', compose = (arg || '').startsWith('new'), preTo = (arg || '').split('~')[1] || '';
   const [d, people] = await Promise.all([db.rpc('my_pokes'), compose ? db.rpc('poke_people') : null]);
   const lists = { in: d.inbox, sent: d.sent, all: d.all || [] }, nOpen = d.inbox.filter(p => !p.done_at).length;
   if (tab === 'in' && !compose) setTimeout(() => pokesSeen(d.inbox), 800);
   const tabs = [['in', `For me${nOpen ? ' (' + nOpen + ')' : ''}`], ['sent', 'Sent'], ...(d.overseer ? [['all', 'All pokes']] : [])];
   return `<div class="row"><h1>Pokes</h1><span class="sp"></span>${compose ? '' : '<a class="btn pri" href="#/pokes/new">＋ New poke</a>'}</div>
   <p class="mut small" style="margin-top:-4px">Endorsements to a person or a team. They show on their home screen and ping their phone.${d.overseer ? ' As owner, manager or head chef you see every poke.' : ''}</p>
-  ${compose ? pokeForm(people) : ''}
+  ${compose ? pokeForm(people, preTo) : ''}
   <div class="seg">${tabs.map(([k, l]) => `<a href="#/pokes${k === 'in' ? '' : '/' + k}" class="${tab === k && !compose ? 'on' : ''}">${l}</a>`).join('')}</div>
   <div class="pk-list mt">${lists[tab].length ? lists[tab].map(p => pokeCard(p, tab)).join('') : `<div class="card mut">${tab === 'in' ? 'No pokes for you.' : tab === 'sent' ? "You haven't sent any pokes in the last 14 days." : 'No pokes in the last 7 days.'}</div>`}</div>
   ${await pushCard(d)}`;
@@ -2641,7 +2664,7 @@ function pokeTeams(people) {
   return Object.values(t).map(x => ({ ...x, n: x.ids.size, label: x.role === '*' ? `Everyone · ${WS_NAME[x.ws] || x.ws}` : `${roleName(x.role)} · ${WS_NAME[x.ws] || x.ws}` }))
     .sort((a, b) => (a.role === '*') - (b.role === '*') || a.label.localeCompare(b.label));
 }
-function pokeForm(people) {
+function pokeForm(people, preTo) {
   const others = people.filter(p => p.id !== S.me.id), teams = pokeTeams(others);
   const rl = p => (p.roles || []).map(r => roleName(r.role)).filter((v, i, a) => a.indexOf(v) === i).join(', ');
   return `<form class="card pk-form" data-form="sendPoke">
@@ -2649,7 +2672,7 @@ function pokeForm(people) {
     <div class="pk-lbl">To <span class="small mut">(tap people, a team, or both)</span></div>
     <div class="pk-teams">${teams.map(t => `<label class="pk-chip"><input type="checkbox" name="t_${t.ws}|${t.role}" data-label="${esc(t.label)}"><span>👥 ${esc(t.label)} <i>${t.n}</i></span></label>`).join('')}</div>
     <input class="search" placeholder="Find a person…" data-filter=".pk-people .pk-chip">
-    <div class="pk-people">${others.map(p => `<label class="pk-chip"><input type="checkbox" name="u_${p.id}" data-label="${esc(p.name)}"><span><b>${esc(p.name)}</b> <small>${esc(p.full_name)}${rl(p) ? ' · ' + esc(rl(p)) : ''}</small></span></label>`).join('')}</div>
+    <div class="pk-people">${others.map(p => `<label class="pk-chip"><input type="checkbox" name="u_${p.id}"${p.id === preTo ? ' checked' : ''} data-label="${esc(p.name)}"><span><b>${esc(p.name)}</b> <small>${esc(p.full_name)}${rl(p) ? ' · ' + esc(rl(p)) : ''}</small></span></label>`).join('')}</div>
     <label>Message<textarea name="body" maxlength="500" rows="3" required placeholder="e.g. Put the crispy pata in the oven by 8AM tomorrow"></textarea></label>
     <div class="pk-row"><label>Needed by <span class="small mut">(optional)</span><input type="datetime-local" name="due"></label>
       <label class="pk-urg"><input type="checkbox" name="urgent"> <span>🔴 Urgent</span></label></div>
@@ -2681,6 +2704,7 @@ let pokeBusy = false;
 async function pokePoll() {
   if (!S.user || !S.me || pokeBusy || !navigator.onLine) return; pokeBusy = true;
   try {
+    if (!document.hidden) db.rpc('i_am_here').catch(() => {});   // "in the app now" for My teammates
     const u = await db.rpc('poke_unread'); const prev = POKE.lastId; POKE.unread = u; paintBell();
     const l = u.latest;
     if (l && l.id !== prev && prev !== null) {

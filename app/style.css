@@ -721,3 +721,15 @@ body:not(.pos-mode) main{padding-bottom:calc(80px + env(safe-area-inset-bottom))
 .vk{display:grid;grid-template-columns:150px 1fr auto;gap:8px;align-items:center;margin:6px 0}.vk code{overflow-wrap:anywhere;background:#fff;padding:6px 8px;border-radius:6px;font-size:12px}
 @media (max-width:760px){.bell-slot.mob{display:inline-flex;margin-left:auto;margin-right:4px}.bell-slot.mob+.mnav{margin-left:0}.vk{grid-template-columns:1fr}}
 .pk-form .pk-urg{flex-direction:row!important}.pk-form .pk-row>label:first-child{min-width:220px}
+/* ---- My teammates ---- */
+.tm-on{font-size:13px;color:var(--mut);display:inline-flex;align-items:center;gap:6px}.tm-on i{width:9px;height:9px;border-radius:50%;background:#22a55a;box-shadow:0 0 0 3px #22a55a33}
+.tm-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-top:10px}
+.tm{display:flex;gap:12px;align-items:center;border:1px solid #e3ddcf;border-radius:12px;padding:10px 12px;background:#fffdf7}
+.tm-av{position:relative;flex:0 0 42px;height:42px;border-radius:50%;display:grid;place-items:center;background:#e9e3d2;color:var(--navy);font-weight:700;font-size:14px}
+.tm-av i{position:absolute;right:-1px;bottom:-1px;width:12px;height:12px;border-radius:50%;border:2px solid #fffdf7;background:#c9c3b3}
+.tm-av.on{background:#e2c77e}.tm-av.on i{background:#22a55a}.tm-av.today i{background:#e8b04a}
+.tm-main{flex:1;min-width:0}.tm-main b{color:var(--navy)}
+.tm-roles{display:flex;flex-wrap:wrap;gap:4px;margin:3px 0}
+.tm-st{font-size:12px;color:var(--mut)}.tm-st.on{color:#1d7a3a;font-weight:600}
+.tm .btn{padding:6px 10px;font-size:12.5px;white-space:nowrap}
+@media (max-width:560px){.tm-list{grid-template-columns:1fr}}
