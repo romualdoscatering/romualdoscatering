@@ -2,7 +2,8 @@
 Serves the repo's static files and answers the app's data calls against the local PostgreSQL copy of the
 Supabase schema, running each call as the logged-in user (role 'authenticated' + their id) so the real
 row-level security rules apply — the same way Supabase's Data API does."""
-import json, re, subprocess, sys, os
+import json, re, subprocess, sys, os, threading
+_req = threading.local()   # per-request: the POS tablet key header, passed on like Supabase's request.headers
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
 DB = os.environ.get('TESTDB', 'rom')
@@ -24,7 +25,9 @@ def lit(v):
     return "'" + json.dumps(v).replace("'", "''") + "'"
 
 def run(sql, uid):
-    pre = f"set role authenticated; set request.jwt.claim.sub = '{uid}';" if uid else "set role anon;"
+    dev = getattr(_req, 'dev', '') or ''
+    hdr = "set request.headers = " + lit(json.dumps({'x-pos-device': dev} if dev else {})) + ";"
+    pre = hdr + (f"set role authenticated; set request.jwt.claim.sub = '{uid}';" if uid else "set role anon;")
     p = subprocess.run(['psql', '-h', '/tmp', '-p', '5433', '-U', 'postgres', '-d', DB, '-qAt', '-v', 'ON_ERROR_STOP=1', '-c', pre + sql],
                        capture_output=True, text=True)
     if p.returncode != 0:
@@ -77,7 +80,7 @@ def handle(b):
             p = subprocess.run(['psql', '-h', '/tmp', '-p', '5433', '-U', 'postgres', '-d', DB, '-qAt', '-c', f"select proretset::text || '|' || prorettype::regtype::text from pg_proc where proname = '{fn}' limit 1"], capture_output=True, text=True)
             _fn[fn] = p.stdout.strip().split('|')
         retset, rettype = _fn[fn]
-        args = ', '.join(f"{ident(k)} => {lit(v)}" for k, v in (b.get('args') or {}).items() if v is not None)
+        args = ', '.join(f"{ident(k)} => {lit(v)}" for k, v in (b.get('args') or {}).items())   # nulls passed as NULL, as Supabase does
         if retset == 'true': return run(f"select coalesce(json_agg(t), '[]'::json) from {fn}({args}) t", uid)
         if rettype == 'void': run(f"select 'null' from (select {fn}({args})) x", uid); return None
         return run(f"select to_json({fn}({args}))", uid)
@@ -93,6 +96,7 @@ class H(SimpleHTTPRequestHandler):
         return super().do_GET()
     def do_POST(self):
         b = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+        _req.dev = self.headers.get('x-pos-device', '')
         try: data, code = {'data': handle(b)}, 200
         except Exception as e: data, code = {'message': str(e)}, 400
         out = json.dumps(data).encode()

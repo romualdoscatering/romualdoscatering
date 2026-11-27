@@ -1,5 +1,5 @@
 // Romualdo's staff app · Restaurant & Catering
-import { db } from './db.js';
+import { db, posDevice } from './db.js';
 
 /* ================= helpers ================= */
 const $ = (s, r = document) => r.querySelector(s);
@@ -1870,6 +1870,12 @@ function posTotals(o) {   // preview while tapping; the database recalculates on
 }
 routes['r/pos'] = async arg => {
   if (!posCan()) return '<div class="card">The POS is for cashiers, servers and managers. Ask the owner to add the Cashier or Staff job in Restaurant.</div>';
+  const dev = await db.rpc('pos_device_status').catch(() => ({ registered: true }));   // before the database update: no lock yet
+  if (!dev.registered && !isAdmin()) return `<div class="card"><h2>This device isn't a POS tablet</h2>
+    <p>The POS works only on the restaurant's registered tablet, so sales can't be rung up from personal phones.</p>
+    <p class="small mut">Owner: to make this tablet a POS, open <b>People → POS tablets</b> on this tablet and tap <b>Register this device</b>.</p>
+    <div class="row" style="flex-wrap:wrap;gap:8px"><a class="btn" href="#/r/sales">Sales today</a><a class="btn ghost" href="#/r/kitchen">Kitchen stocks</a><a class="btn ghost" href="#/">Home</a></div></div>`;
+  if (!dev.registered && !POS.ownerNoted) { POS.ownerNoted = true; setTimeout(() => toast('Owner access: this device isn\'t a registered POS tablet.'), 300); }
   const [menu, [st], [shift], open, sheet] = await Promise.all([
     db.select('restaurant_menu', { eq: { on_pos: true }, order: [['sort']] }), db.select('pos_settings'),
     db.select('pos_shifts', { order: [['opened_at', false]], limit: 1 }), db.select('pos_orders', { eq: { status: 'open' }, order: [['opened_at']] }),
@@ -2211,7 +2217,8 @@ ACT.posCloseShift = async () => {
 /* ================= PEOPLE (owner) ================= */
 routes.people = async arg => {
   if (!isAdmin()) return '<div class="card">Only the owner can manage people.</div>';
-  const people = await db.rpc('admin_people');
+  const [people, tabs, dev] = await Promise.all([db.rpc('admin_people'),
+    db.select('pos_devices', { order: [['registered_at']] }).catch(() => null), db.rpc('pos_device_status').catch(() => null)]);
   const sel = people.find(p => p.id === arg);
   const has = (ws, role) => (sel?.roles || []).some(r => r.ws === ws && r.role === role);
   return `<h1>People & roles</h1>
@@ -2225,7 +2232,31 @@ routes.people = async arg => {
     </tbody></table>
     <label class="tick"><input type="checkbox" name="is_admin" ${sel.is_admin ? 'checked' : ''}> Owner (everything, both workspaces)</label>
     <label class="tick"><input type="checkbox" name="active" ${!sel.username || sel.active ? 'checked' : ''}> Can log in</label>
-    <div class="row end"><a class="btn ghost" href="#/people">Close</a><button class="pri">Save</button></div></form>` : ''}`;
+    <div class="row end"><a class="btn ghost" href="#/people">Close</a><button class="pri">Save</button></div></form>` : ''}
+  ${tabletsHtml(tabs, dev)}`;
+};
+function tabletsHtml(tabs, dev) {
+  if (!tabs) return `<section class="card mt"><h2>POS tablets</h2><p class="small mut">Needs the latest database update (migration <code>20261127000100_pos_tablets</code>).</p></section>`;
+  const live = tabs.filter(t => !t.revoked_at);
+  return `<section class="card mt" id="pos-tablets"><h2>POS tablets</h2>
+    <p class="small mut">Only these tablets can ring up sales, send orders to the kitchen and take payment. You (owner) can use the POS anywhere; managers can check Sales, close the drawer and void a paid order from any device.</p>
+    ${dev?.registered ? `<div class="alert ok small">✓ This device is registered as <b>${esc(dev.name)}</b>.</div>`
+      : `<form class="row" data-form="regTablet" style="flex-wrap:wrap;gap:8px"><input name="name" placeholder="e.g. Counter tablet" required maxlength="60" style="flex:1;min-width:200px"><button class="pri">Register this device</button></form>
+         <p class="small mut">Do this on the tablet itself${STANDALONE ? '' : ', after adding the app to its home screen and opening it from there (the app and the browser keep separate memory)'}.</p>`}
+    ${live.length ? `<div class="list">${live.map(t => `<div class="li"><div class="li-main"><b>${esc(t.name)}${dev?.id === t.id ? ' ' + chip('this device', 'info') : ''}</b><span class="mut small">Registered ${fmtT(t.registered_at)}${t.last_seen ? ' · last used ' + fmtT(t.last_seen) : ''}</span></div>
+      <button type="button" class="ghost sm danger" data-act="revokeTablet" data-id="${t.id}" data-name="${esc(t.name)}" data-me="${dev?.id === t.id ? 1 : ''}">Remove</button></div>`).join('')}</div>`
+      : '<p class="small mut">No tablets yet — until you register one, only you can use the POS.</p>'}
+  </section>`;
+}
+FORMS.regTablet = async f => {
+  const key = await db.rpc('pos_register_device', { p_name: f.name });
+  posDevice.set(key); toast(`Registered “${f.name.trim()}” — this device can now use the POS`); refresh();
+};
+ACT.revokeTablet = async el => {
+  if (!confirm(`Remove “${el.dataset.name}”? It stops working as a POS right away.`)) return;
+  await db.rpc('pos_revoke_device', { p_id: el.dataset.id });
+  if (el.dataset.me) posDevice.set('');
+  toast('Tablet removed'); refresh();
 };
 FORMS.savePerson = async (f, el) => {
   const roles = Object.keys(f).filter(k => k.startsWith('r_')).map(k => { const [, ws, role] = k.split('_'); return { ws, role }; });

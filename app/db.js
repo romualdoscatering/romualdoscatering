@@ -9,6 +9,14 @@ let sb = null;
 // Pinned so a library update can never change the app under the team's feet.
 const SUPA_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.2/+esm';
 let signedOutCb = null;
+// A registered POS tablet keeps its secret key here and sends it with every request (x-pos-device).
+// The database only lets the POS ring up, send and take payment when the key matches a registered tablet.
+const DEVICE_KEY = 'rom-pos-device';
+const deviceKey = () => { try { return localStorage.getItem(DEVICE_KEY) || ''; } catch (e) { return ''; } };
+function withDevice(init = {}) {
+  const k = deviceKey(); if (!k) return init;
+  const h = new Headers(init.headers || {}); h.set('x-pos-device', k); return { ...init, headers: h };
+}
 async function supa() {
   if (!sb) {
     const { createClient } = await import(SUPA_JS);
@@ -17,7 +25,8 @@ async function supa() {
       if (!localStorage.getItem('rom-staff-auth') && localStorage.getItem(old)) localStorage.setItem('rom-staff-auth', localStorage.getItem(old)); } catch (e) {}
     // Staff stay signed in: the session is kept on the device and renewed in the background
     // until they tap Log out (or the owner switches the account off).
-    sb = createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'rom-staff-auth' } });
+    sb = createClient(CFG.url, CFG.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false, storageKey: 'rom-staff-auth' },
+      global: { fetch: (input, init) => fetch(input, withDevice(init)) } });
     sb.auth.onAuthStateChange(ev => { if (ev === 'SIGNED_OUT' && signedOutCb) signedOutCb(); });
     // Ask the phone not to clear the app's storage (keeps the login on Android / installed apps)
     try { navigator.storage?.persist?.(); } catch (e) {}
@@ -48,13 +57,17 @@ const TEST = window.ROM_TEST_API;
 let testUser = null;
 async function t(op, body) {
   let r;
-  try { r = await fetch(TEST, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op, uid: testUser?.id || null, ...body }) }); }
+  try { r = await fetch(TEST, withDevice({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op, uid: testUser?.id || null, ...body }) })); }
   catch (e) { fail(e); }
   const j = await r.json();
   if (!r.ok) fail(j.message || 'Error');
   return j.data;
 }
 
+export const posDevice = {
+  key: deviceKey,
+  set(k) { try { k ? localStorage.setItem(DEVICE_KEY, k) : localStorage.removeItem(DEVICE_KEY); } catch (e) {} }
+};
 export const db = {
   // ---------- logins ----------
   async signIn(login, password) {
