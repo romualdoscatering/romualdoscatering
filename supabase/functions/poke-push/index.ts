@@ -60,12 +60,15 @@ Deno.serve(async (req) => {
     if (!gkey) return json({ ok: false, error: "Google Maps is not connected yet (GOOGLE_MAPS_KEY missing)" });
     // the caller must be able to see the event (same rule as the app)
     const asUser = createClient(url, Deno.env.get("SUPABASE_ANON_KEY") ?? "", { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false } });
-    const { data: ev } = await asUser.from("events").select("id, event_date, serve_time, venue_lat, venue_lng").eq("id", body.event_id).maybeSingle();
+    const { data: ev } = await asUser.from("events").select("id, event_date, serve_time, venue_lat, venue_lng, kitchen").eq("id", body.event_id).maybeSingle();
     if (!ev) return json({ error: "Event not found" }, 404);
     if (ev.venue_lat == null || ev.venue_lng == null) return json({ ok: false, error: "Pin the location first" });
-    const { data: cfgRows } = await db.from("app_config").select("key, value").in("key", ["origin", "setup_mins"]);
+    const { data: cfgRows } = await db.from("app_config").select("key, value").in("key", ["origin", "kitchens", "setup_mins"]);
     const cfg = Object.fromEntries((cfgRows ?? []).map((r: any) => [r.key, r.value]));
-    let origin: any = null; try { origin = JSON.parse(cfg.origin || "null"); } catch (_) { origin = null; }
+    // which kitchen the food leaves from: the event's choice, else the first kitchen
+    let kitchens: any[] = []; try { kitchens = JSON.parse(cfg.kitchens || "[]"); } catch (_) { kitchens = []; }
+    if (!kitchens.length) { try { const o = JSON.parse(cfg.origin || "null"); if (o?.lat) kitchens = [{ id: "k1", ...o }]; } catch (_) { /* none */ } }
+    const origin: any = kitchens.find((k) => k.id === ev.kitchen) || kitchens[0];
     if (!origin?.lat) return json({ ok: false, error: "The owner hasn't pinned the kitchen location yet" });
     const setup = Number(cfg.setup_mins || 30);
     const serve = new Date(`${ev.event_date}T${String(ev.serve_time || "12:00").slice(0, 5)}:00+08:00`).getTime();
