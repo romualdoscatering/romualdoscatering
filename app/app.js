@@ -2939,6 +2939,7 @@ routes.pokes = async arg => {
   const [d, people] = await Promise.all([db.rpc('my_pokes'), compose ? db.rpc('poke_people') : null]);
   const lists = { in: d.inbox, sent: d.sent, all: d.all || [] }, nOpen = d.inbox.filter(p => !p.done_at).length;
   if (tab === 'in' && !compose) setTimeout(() => pokesSeen(d.inbox), 800);
+  if (compose) setTimeout(() => { const f = $('form[data-form="sendPoke"]'); if (f) pkSummary(f); }, 0);
   const nNews = pokeNews(d.sent).length;
   if (tab === 'sent' && nNews) setTimeout(() => db.rpc('poke_sent_seen').then(pokePoll).catch(() => {}), 1500);
   const tabs = [['in', `For me${nOpen ? ' (' + nOpen + ')' : ''}`], ['sent', `Sent${nNews ? ' (' + nNews + ' new)' : ''}`], ...(d.overseer ? [['all', 'All pokes']] : [])];
@@ -2959,18 +2960,33 @@ function pokeTeams(people) {
 }
 function pokeForm(people, preTo) {
   const others = people.filter(p => p.id !== S.me.id), teams = pokeTeams(others);
-  const rl = p => (p.roles || []).map(r => roleName(r.role)).filter((v, i, a) => a.indexOf(v) === i).join(', ');
+  const role1 = p => roleName((p.roles || [])[0]?.role || '') || (p.is_admin ? 'Owner' : '');
+  const plural = r => r === '*' ? 'Everyone' : /staff$/i.test(roleName(r)) ? roleName(r) : roleName(r) + 's';
+  // people as bubble heads; teams tucked away, grouped by workspace
+  const groups = Object.keys(WS_NAME).map(ws => [ws, teams.filter(t => t.ws === ws)]).filter(([, ts]) => ts.length);
   return `<form class="card pk-form" data-form="sendPoke">
     <h2>New poke</h2>
-    <div class="pk-lbl">To <span class="small mut">(tap people, a team, or both)</span></div>
-    <div class="pk-teams">${teams.map(t => `<label class="pk-chip"><input type="checkbox" name="t_${t.ws}|${t.role}" data-label="${esc(t.label)}"><span>👥 ${esc(t.label)} <i>${t.n}</i></span></label>`).join('')}</div>
-    <input class="search" placeholder="Find a person…" data-filter=".pk-people .pk-chip">
-    <div class="pk-people">${others.map(p => `<label class="pk-chip"><input type="checkbox" name="u_${p.id}"${p.id === preTo ? ' checked' : ''} data-label="${esc(p.name)}"><span><b>${esc(p.name)}</b> <small>${esc(p.full_name)}${rl(p) ? ' · ' + esc(rl(p)) : ''}</small></span></label>`).join('')}</div>
+    <div class="pk-to"><span class="pk-lbl">To</span><span class="pk-sum mut">Tap a face (or a team below)</span><button type="button" class="lnk pk-clear" data-act="pkClear" hidden>Clear</button></div>
+    ${others.length > 10 ? '<input class="search pk-find" placeholder="Find a person…" data-filter=".pk-faces .pk-face">' : ''}
+    <div class="pk-faces">${others.map(p => `<label class="pk-face" title="${esc(p.full_name)}"><input type="checkbox" name="u_${p.id}"${p.id === preTo ? ' checked' : ''} data-label="${esc(p.name)}">
+      <span class="pk-fav">${av(p.id, p.full_name, '')}<i class="pk-ck">✓</i></span><b>${esc(p.name)}</b><small>${esc(role1(p))}</small><span hidden>${esc(p.full_name)}</span></label>`).join('')}</div>
+    <details class="pk-tdet"><summary>👥 Send to a whole team</summary>
+      ${groups.map(([ws, ts]) => `<div class="pk-tg"><span>${WS_NAME[ws]}</span><div class="pk-teams">${ts.map(t => `<label class="pk-chip"><input type="checkbox" name="t_${t.ws}|${t.role}" data-label="${esc(t.label)}"><span>${esc(plural(t.role))} <i>${t.n}</i></span></label>`).join('')}</div></div>`).join('')}</details>
     <label>Message<textarea name="body" maxlength="500" rows="3" required placeholder="e.g. Put the crispy pata in the oven by 8AM tomorrow"></textarea></label>
     <div class="pk-row"><label>Needed by <span class="small mut">(optional)</span><input type="datetime-local" name="due"></label>
       <label class="pk-urg"><input type="checkbox" name="urgent"> <span>🔴 Urgent</span></label></div>
     <div class="row end"><a class="btn" href="#/pokes">Cancel</a><button class="pri">Send poke</button></div></form>`;
 }
+// "To: Kamata, Jeoff + Chefs · Catering" as you tap
+function pkSummary(form) {
+  const on = [...form.querySelectorAll('.pk-face input:checked, .pk-tdet input:checked')].map(b => b.dataset.label);
+  const sum = form.querySelector('.pk-sum'); sum.textContent = on.length ? on.join(', ') : 'Tap a face (or a team below)';
+  sum.classList.toggle('mut', !on.length); form.querySelector('.pk-clear').hidden = !on.length;
+  const nT = form.querySelectorAll('.pk-tdet input:checked').length, s = form.querySelector('.pk-tdet summary');
+  s.textContent = nT ? `👥 ${nT} team${nT > 1 ? 's' : ''} picked` : '👥 Send to a whole team';
+}
+document.addEventListener('change', e => { const f = e.target.closest('form[data-form="sendPoke"]'); if (f && e.target.type === 'checkbox' && e.target.name !== 'urgent') pkSummary(f); });
+ACT.pkClear = async el => { const f = el.closest('form'); f.querySelectorAll('.pk-face input, .pk-tdet input').forEach(i => i.checked = false); pkSummary(f); };
 FORMS.sendPoke = async (f, form) => {
   const boxes = [...form.querySelectorAll('input[type=checkbox]:checked')];
   const to = boxes.filter(b => b.name.startsWith('u_')).map(b => b.name.slice(2));
