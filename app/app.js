@@ -166,7 +166,7 @@ function mobileMenu(key, nav, inCat, inRes) {
   const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People', me: 'My account', pokes: 'Pokes' }[key.split('/')[0]] || 'Home';
   const a = (href, label, on) => `<a href="#/${href}"${on ? ' class="on"' : ''}>${label}</a>`;
   const sect = nav.length ? `<div class="mn-h">${inCat ? 'Catering' : 'Restaurant'}</div><div class="mn-g">${nav.map(([k, l]) => a(k, l, navOf(key) === k)).join('')}</div>` : '';
-  const go = [`<a class="mn-pokes${key === 'pokes' ? ' on' : ''}" href="#/pokes">🔔 Pokes <i${POKE.unread.open ? '' : ' hidden'}>${POKE.unread.open || ''}</i></a>`, a('', '🏠 Home', key === '' || key === 'home'), a('events', '📅 Events board', key === 'events'),
+  const go = [`<a class="mn-pokes${key === 'pokes' ? ' on' : ''}" href="#/pokes">🔔 Pokes <i${POKE.unread.open + (POKE.unread.replies || 0) ? '' : ' hidden'}>${POKE.unread.open + (POKE.unread.replies || 0) || ''}</i></a>`, a('', '🏠 Home', key === '' || key === 'home'), a('events', '📅 Events board', key === 'events'),
     ...(inCat ? [a('r', '⇄ Switch to Restaurant')] : inRes ? [a('c', '⇄ Switch to Catering')] : []),
     ...(isAdmin() ? [a('activity', '🕘 Activity', key.startsWith('activity')), a('people', '👥 People', key === 'people')] : [])].join('');
   return `<span class="bell-slot mob">${bellHtml()}</span><details class="mnav"><summary aria-label="Menu"><span class="mn-cur">${esc(cur)}</span><span class="mn-ic">☰</span></summary>
@@ -2642,7 +2642,7 @@ document.addEventListener('change', e => { if (e.target.matches('[data-showpw]')
 /* ================= POKES (endorsements) ================= */
 // A short note to a person or a team ("Put the crispy pata in the oven by 8AM tomorrow"). It shows on their home screen,
 // the 🔔 in the header counts what's open, and their phone gets a notification. Owner, managers and head chefs see every poke.
-const POKE = { unread: { open: 0, unseen: 0 }, lastId: null };
+const POKE = { unread: { open: 0, unseen: 0, replies: 0 }, lastId: null, lastReply: null };
 const pokeDue = d => {
   if (!d) return '';
   const t = new Date(d), now = new Date(), day = x => x.toDateString(), tm = new Date(now.getTime() + 864e5);
@@ -2654,7 +2654,7 @@ function pokeCard(p, mode) {
   // mode: 'in' (for me), 'sent' (I sent it), 'all' (overseer view)
   const head = mode === 'in' ? `<b>${esc(p.from_name)}</b>${p.others > 0 ? ` <span class="mut small">to you + ${p.others} other${p.others > 1 ? 's' : ''}</span>` : ''}`
     : `<b>${esc(mode === 'sent' ? 'You' : p.from_name)}</b> → ${esc(p.to_label || (p.recipients || []).map(r => r.name).join(', '))}`;
-  const rec = mode !== 'in' && p.recipients ? `<div class="pk-rec">${p.recipients.map(r => `<span class="pk-st ${r.done_at ? 'done' : r.seen_at ? 'seen' : ''}" title="${r.done_at ? 'Done ' + fmtT(r.done_at) : r.seen_at ? 'Seen ' + fmtT(r.seen_at) : 'Not seen yet'}">${r.done_at ? '✓' : r.seen_at ? '👀' : '•'} ${esc(r.name)}${r.reply ? `: “${esc(r.reply)}”` : ''}</span>`).join('')}</div>` : '';
+  const rec = mode !== 'in' && p.recipients ? `<div class="pk-rec">${p.recipients.map(r => `<span class="pk-st ${r.done_at ? 'done' : r.seen_at ? 'seen' : ''}${mode === 'sent' && r.done_at && r.done_at > (p.sender_seen_at || p.created_at) ? ' new' : ''}" title="${r.done_at ? 'Done ' + fmtT(r.done_at) : r.seen_at ? 'Seen ' + fmtT(r.seen_at) : 'Not seen yet'}">${r.done_at ? '✓' : r.seen_at ? '👀' : '•'} ${esc(r.name)}${r.reply ? `: “${esc(r.reply)}”` : ''}</span>`).join('')}</div>` : '';
   const allDone = p.recipients && p.recipients.every(r => r.done_at);
   const acts = p.cancelled_at ? `<span class="chip mut">Taken back</span>`
     : mode === 'in' ? (p.done_at ? `<span class="chip ok">Done ${ago(p.done_at)}</span>${p.reply ? ` <span class="small mut">“${esc(p.reply)}”</span>` : ''} <button class="lnk" data-act="pokeUndo" data-id="${p.id}">Undo</button>`
@@ -2674,11 +2674,21 @@ async function pokesSeen(list) {
   pokePoll();
 }
 // Home screen block: open pokes for me
+// "done / replied" on pokes I sent, since I last looked at Sent
+function pokeNews(sent) {
+  const out = [];
+  for (const p of sent || []) if (!p.cancelled_at) for (const r of p.recipients || [])
+    if (r.done_at && r.done_at > (p.sender_seen_at || p.created_at)) out.push({ p, r });
+  return out.sort((a, b) => b.r.done_at.localeCompare(a.r.done_at));
+}
+const newsLine = ({ p, r }) => `<a class="pk-nl" href="#/pokes/sent">${av(r.id, r.name, 'sm')}<span><b>${esc(r.name)}</b> ${r.reply ? `replied: “${esc(r.reply)}”` : 'marked it done ✓'}<small>re: ${esc(p.body.slice(0, 90))}${p.body.length > 90 ? '…' : ''} · ${ago(r.done_at)}</small></span></a>`;
 async function homePokes() {
   const d = await db.rpc('my_pokes').catch(() => null); if (!d) return '';
   const open = d.inbox.filter(p => !p.done_at);
   setTimeout(() => pokesSeen(open), 1200);
-  return `<section class="pk-home"><div class="row"><h2>👉 Pokes for you${open.length ? ` <span class="pk-n">${open.length}</span>` : ''}</h2><span class="sp"></span><a class="btn" href="#/pokes/new">＋ Poke someone</a></div>
+  const news = pokeNews(d.sent);
+  return `${news.length ? `<section class="pk-news"><div class="row"><h2>📬 Updates on your pokes</h2><span class="sp"></span><a class="btn" href="#/pokes/sent">See sent →</a></div>${news.slice(0, 5).map(newsLine).join('')}</section>` : ''}
+  <section class="pk-home"><div class="row"><h2>👉 Pokes for you${open.length ? ` <span class="pk-n">${open.length}</span>` : ''}</h2><span class="sp"></span><a class="btn" href="#/pokes/new">＋ Poke someone</a></div>
     ${open.length ? open.slice(0, 6).map(p => pokeCard(p, 'in')).join('') + (open.length > 6 ? `<a href="#/pokes">See all ${open.length} →</a>` : '')
       : '<p class="mut small">Nothing for you right now. 👌</p>'}</section>`;
 }
@@ -2687,7 +2697,9 @@ routes.pokes = async arg => {
   const [d, people] = await Promise.all([db.rpc('my_pokes'), compose ? db.rpc('poke_people') : null]);
   const lists = { in: d.inbox, sent: d.sent, all: d.all || [] }, nOpen = d.inbox.filter(p => !p.done_at).length;
   if (tab === 'in' && !compose) setTimeout(() => pokesSeen(d.inbox), 800);
-  const tabs = [['in', `For me${nOpen ? ' (' + nOpen + ')' : ''}`], ['sent', 'Sent'], ...(d.overseer ? [['all', 'All pokes']] : [])];
+  const nNews = pokeNews(d.sent).length;
+  if (tab === 'sent' && nNews) setTimeout(() => db.rpc('poke_sent_seen').then(pokePoll).catch(() => {}), 1500);
+  const tabs = [['in', `For me${nOpen ? ' (' + nOpen + ')' : ''}`], ['sent', `Sent${nNews ? ' (' + nNews + ' new)' : ''}`], ...(d.overseer ? [['all', 'All pokes']] : [])];
   return `<div class="row"><h1>Pokes</h1><span class="sp"></span>${compose ? '' : '<a class="btn pri" href="#/pokes/new">＋ New poke</a>'}</div>
   <p class="mut small" style="margin-top:-4px">Endorsements to a person or a team. They show on their home screen and ping their phone.${d.overseer ? ' As owner, manager or head chef you see every poke.' : ''}</p>
   ${compose ? pokeForm(people, preTo) : ''}
@@ -2727,17 +2739,18 @@ FORMS.sendPoke = async (f, form) => {
   db.edge('poke-push', { poke_id: id });   // phone notifications; the poke is already saved even if this fails
   toast('Poke sent to ' + label); go('#/pokes/sent');
 };
-ACT.pokeDone = async el => { await db.rpc('poke_done', { p_poke: el.dataset.id, p_reply: '' }); toast('Marked done'); pokePoll(); refresh(); };
-ACT.pokeReply = async el => { const r = prompt('Reply (it also marks the poke done):'); if (r == null) return; await db.rpc('poke_done', { p_poke: el.dataset.id, p_reply: r }); toast('Replied'); pokePoll(); refresh(); };
+ACT.pokeDone = async el => { await db.rpc('poke_done', { p_poke: el.dataset.id, p_reply: '' }); db.edge('poke-push', { poke_id: el.dataset.id, event: 'done' }); toast('Marked done — the sender is told'); pokePoll(); refresh(); };
+ACT.pokeReply = async el => { const r = prompt('Reply (it also marks the poke done):'); if (r == null) return; await db.rpc('poke_done', { p_poke: el.dataset.id, p_reply: r }); db.edge('poke-push', { poke_id: el.dataset.id, event: 'done' }); toast('Reply sent'); pokePoll(); refresh(); };
 ACT.pokeUndo = async el => { await db.rpc('poke_undo', { p_poke: el.dataset.id }); pokePoll(); refresh(); };
 ACT.pokeCancel = async el => { if (!confirm('Take back this poke? It disappears from their home screen.')) return; await db.rpc('poke_cancel', { p_poke: el.dataset.id }); toast('Taken back'); refresh(); };
 
 // The 🔔 count: checked every 30 seconds and whenever the app comes back to the front
-function bellHtml() { const n = POKE.unread.open; return `<a href="#/pokes" class="bell${POKE.unread.unseen ? ' new' : ''}" title="Pokes">🔔${n ? `<i>${n}</i>` : ''}</a>`; }
+function bellHtml() { const u = POKE.unread, n = (u.open || 0) + (u.replies || 0);
+  return `<a href="#/pokes${!u.open && u.replies ? '/sent' : ''}" class="bell${u.unseen || u.replies ? ' new' : ''}" title="Pokes${u.replies ? ` · ${u.replies} update${u.replies > 1 ? 's' : ''} on pokes you sent` : ''}">🔔${n ? `<i>${n}</i>` : ''}</a>`; }
 function paintBell() {
   document.querySelectorAll('.bell-slot').forEach(s => s.innerHTML = bellHtml());
-  document.querySelectorAll('.mn-pokes i').forEach(i => { i.textContent = POKE.unread.open || ''; i.hidden = !POKE.unread.open; });
-  document.querySelector('.mnav summary')?.classList.toggle('dot', !!POKE.unread.unseen);
+  document.querySelectorAll('.mn-pokes i').forEach(i => { const n = (POKE.unread.open || 0) + (POKE.unread.replies || 0); i.textContent = n || ''; i.hidden = !n; });
+  document.querySelector('.mnav summary')?.classList.toggle('dot', !!(POKE.unread.unseen || POKE.unread.replies));
 }
 let pokeBusy = false;
 async function pokePoll() {
@@ -2754,6 +2767,17 @@ async function pokePoll() {
       if (['home', 'pokes'].includes((current || 'home').split('/')[0])) refresh();
     }
     POKE.lastId = l ? l.id : (prev ?? '');
+    // someone did (or answered) a poke I sent
+    const r = u.latest_reply, prevR = POKE.lastReply;
+    if (r && r.key !== prevR && prevR !== null) {
+      const t = r.reply ? `💬 ${r.from} replied: “${r.reply}”` : `✓ ${r.from} did your poke`;
+      toast(`${t} — ${r.body.slice(0, 50)}${r.body.length > 50 ? '…' : ''}`);
+      if (document.hidden && 'Notification' in window && Notification.permission === 'granted' && !(await pushSub())) {
+        const reg = await navigator.serviceWorker?.getRegistration(); reg?.showNotification(t, { body: 're: ' + r.body, tag: 'pokedone-' + r.key, icon: './icons/icon-192.png' });
+      }
+      if (['home', 'pokes'].includes((current || 'home').split('/')[0])) refresh();
+    }
+    POKE.lastReply = r ? r.key : (prevR ?? '');
   } catch (e) {} finally { pokeBusy = false; }
 }
 setInterval(pokePoll, 30000);

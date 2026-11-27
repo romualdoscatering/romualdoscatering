@@ -748,3 +748,9 @@ body:not(.pos-mode) main{padding-bottom:calc(80px + env(safe-area-inset-bottom))
 .mn-hi{display:flex!important;align-items:center;gap:8px}
 .li>.av{margin-right:10px;align-self:center}
 @media (max-width:760px){.av-up .av.me-av{width:60px;height:60px;font-size:22px}}
+/* ---- Pokes: updates for the sender ---- */
+.pk-news{margin:0 0 16px;background:#f2f8f3;border:1px solid #cfe5d5;border-radius:14px;padding:12px 14px}.pk-news h2{margin:0}.pk-news>.row{margin-bottom:8px}
+.pk-nl{display:flex;gap:10px;align-items:center;text-decoration:none;color:var(--ink);padding:8px 0;border-top:1px solid #dcebdf}.pk-nl:first-of-type{border-top:0}
+.pk-nl>span:last-child{display:grid;gap:2px;font-size:14px}.pk-nl b{color:var(--navy)}.pk-nl small{color:var(--mut);font-size:12px}
+.pk-st.new{box-shadow:0 0 0 2px #1d7a3a;animation:pkPulse 1.6s ease-out 2}
+@keyframes pkPulse{0%{box-shadow:0 0 0 0 #1d7a3a88}100%{box-shadow:0 0 0 2px #1d7a3a}}

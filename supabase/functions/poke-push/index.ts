@@ -1,7 +1,7 @@
 // Romualdo's · poke-push
 // Sends a phone notification for a new poke (endorsement) to the people it was sent to,
 // and a quieter one to the owner, managers and head chefs who keep "notify me of all pokes" on.
-// Called by the staff app right after a poke is sent. Settings: Verify JWT OFF (the function checks the caller itself).
+// Called by the staff app right after a poke is sent, and when someone marks a poke done or replies (event "done": tells the sender). Settings: Verify JWT OFF (the function checks the caller itself).
 // Secrets needed (Edge Functions → Secrets): SERVICE_KEY (already there), VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import webpush from "npm:web-push@3.6.7";
@@ -30,13 +30,36 @@ Deno.serve(async (req) => {
   const token = (req.headers.get("Authorization") ?? "").replace("Bearer ", "");
   const { data: who, error: whoErr } = await db.auth.getUser(token);
   if (whoErr || !who?.user) return json({ error: "Not signed in" }, 401);
-  const { poke_id } = await req.json().catch(() => ({}));
+  const { poke_id, event } = await req.json().catch(() => ({}));
   if (!poke_id) return json({ error: "poke_id missing" }, 400);
 
   const { data: poke, error: pErr } = await db.from("pokes").select("id, from_user, body, urgent, due_at, created_at, cancelled_at").eq("id", poke_id).maybeSingle();
   if (pErr) return json({ error: pErr.message }, 500);
-  if (!poke || poke.from_user !== who.user.id) return json({ error: "Not your poke" }, 403);
+  if (!poke) return json({ error: "Poke not found" }, 404);
   if (poke.cancelled_at) return json({ ok: true, sent: 0 });
+
+  // "done": the caller marked this poke done (or replied) — tell the sender
+  if (event === "done") {
+    const { data: mine } = await db.from("poke_to").select("done_at, reply").eq("poke_id", poke_id).eq("user_id", who.user.id).maybeSingle();
+    if (!mine?.done_at || Date.now() - new Date(mine.done_at).getTime() > 10 * 60 * 1000) return json({ error: "Not done by you just now" }, 403);
+    if (poke.from_user === who.user.id) return json({ ok: true, sent: 0 });
+    const { data: me } = await db.from("profiles").select("full_name, nickname").eq("id", who.user.id).maybeSingle();
+    const name = (me?.nickname || "").trim() || String(me?.full_name || "Someone").split(" ")[0];
+    const payload = JSON.stringify({
+      title: mine.reply ? `💬 ${name} replied` : `✓ ${name} did your poke`,
+      body: (mine.reply ? `“${mine.reply}” — ` : "") + "re: " + poke.body.slice(0, 140),
+      tag: "pokedone-" + poke.id + "-" + who.user.id, url: "./#/pokes/sent",
+    });
+    const { data: subs } = await db.from("push_subs").select("endpoint, p256dh, auth").eq("user_id", poke.from_user);
+    let sent = 0;
+    await Promise.all((subs ?? []).map(async (s: any) => {
+      try { await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 60 * 60 * 12, urgency: "normal" }); sent++; }
+      catch (e: any) { if (e?.statusCode === 404 || e?.statusCode === 410) await db.from("push_subs").delete().eq("endpoint", s.endpoint); }
+    }));
+    return json({ ok: true, sent });
+  }
+
+  if (poke.from_user !== who.user.id) return json({ error: "Not your poke" }, 403);
   if (Date.now() - new Date(poke.created_at).getTime() > 10 * 60 * 1000) return json({ ok: true, sent: 0, note: "too old" });
 
   const { data: to } = await db.from("poke_to").select("user_id").eq("poke_id", poke_id);
