@@ -21,7 +21,12 @@ const PO_STATUS = { open: 'Open', partly_received: 'Partly received', received: 
 const KIND = { buffet: 'Buffet', trays: 'Food trays', packs: 'Packed meals' };
 const COURSES = ['Soup', 'Salad / appetizer', 'Main', 'Pasta / noodles', 'Vegetables', 'Rice', 'Dessert', 'Drinks', 'Station'];
 const EV_TYPES = ['Anniversary', 'Birthday', 'Christening / Baptism', 'Christmas Party', 'Corporate Event', 'Debut', 'Funeral / Wake', 'Graduation', 'Retirement Party', 'Reunion', 'Seminar', 'Training', 'Wedding', 'Other'];
-const ROLES = [['manager', 'Manager'], ['finance', 'Finance'], ['purchaser', 'Purchaser'], ['storekeeper', 'Storekeeper'], ['chef', 'Chef'], ['coordinator', 'Coordinator'], ['cashier', 'Cashier'], ['staff', 'Staff']];
+const ROLES = [['manager', 'Manager', 'Runs the workspace: approvals, events, billing'], ['finance', 'Finance', 'Billing, payments, contract prices, costing'],
+  ['event_specialist', 'Event specialist', 'Bookings, inquiries and events: creates events'], ['coordinator', 'Coordinator', 'Runs events: menu, details, print (cannot create events)'],
+  ['purchaser', 'Purchaser', 'Orders and buying'], ['storekeeper', 'Storekeeper', 'Stockist: receiving, stock counts, Kitchen stocks daily count'],
+  ['head_chef', 'Head chef', 'Recipes, dish details and costing'], ['rnd_chef', 'R&D chef', 'Writes and costs recipes only'], ['chef', 'Chef', 'Kitchen work: event menus, prep (reads recipes)'],
+  ['cashier', 'Cashier', 'POS payments and Z-reading'], ['staff', 'Staff', 'POS orders; sees the 86 / running-low list']];
+const roleName = k => (ROLES.find(r => r[0] === k) || [k, k])[1];
 const chip = (label, tone) => `<span class="chip ${tone || ''}">${esc(label)}</span>`;
 const statusTone = s => ({ draft: 'mut', inquiry: 'mut', for_client_approval: 'warn', submitted: 'warn', confirmed: 'ok', approved: 'ok', in_prep: 'info', ordered: 'info', open: 'info', partly_received: 'warn', done: 'ok', received: 'ok', closed: 'mut', rejected: 'bad', cancelled: 'bad' }[s] || '');
 
@@ -29,6 +34,8 @@ const statusTone = s => ({ draft: 'mut', inquiry: 'mut', for_client_approval: 'w
 const S = { user: null, me: null, items: [], itemsById: {}, dishes: [], dishById: {}, aliasMap: {}, packs: [] };
 const isAdmin = () => !!S.me?.is_admin;
 const member = ws => isAdmin() || (S.me?.roles || []).some(r => r.ws === ws);
+const resFront = () => !can('restaurant', 'manager', 'finance', 'purchaser', 'storekeeper', 'head_chef', 'chef');   // Restaurant Staff / Cashier only
+const kCounts = () => can('restaurant', 'storekeeper', 'manager');   // the stockist (Storekeeper) and Manager enter the daily count
 const can = (ws, ...roles) => isAdmin() || (S.me?.roles || []).some(r => r.ws === ws && roles.includes(r.role));
 const canAny = (...roles) => isAdmin() || (S.me?.roles || []).some(r => roles.includes(r.role));
 const who = () => S.me?.full_name || S.me?.username || '';
@@ -146,7 +153,8 @@ function renderShell(key) {
   requestAnimationFrame(fitHeader);
   const inCat = key.startsWith('c/'), inRes = key.startsWith('r/');
   const nav = inCat ? [['c/events', 'Events'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes'], ...(can('catering', 'manager', 'finance') ? [['c/billing', 'Billing']] : [])]
-    : inRes ? [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']] : [];
+    : inRes ? (resFront() ? [['r/pos', 'POS'], ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['r/kitchen', '86 & running low'], ['r/requests', 'Requests']]
+      : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
     <div class="who"><span>Hi, ${esc(who().split(' ')[0])}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}${isAdmin() ? '<a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
     ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a></nav>` : ''}`;
@@ -237,7 +245,7 @@ routes['c/events'] = async arg => {
   if (cids.length) (await db.select('clients', { cols: 'id,name', in: { id: cids } })).forEach(c => cl[c.id] = c);
   const MM = canBill() ? await moneyOf(ev.map(e => e.id)) : {};
   const tabs = [['upcoming', 'Upcoming'], ['past', 'Past'], ['all', 'All']];
-  return `<div class="row"><h1>Events</h1><span class="sp"></span>${can('catering', 'coordinator', 'manager') ? '<a class="btn pri" href="#/c/event-new">＋ New event</a>' : ''}</div>
+  return `<div class="row"><h1>Events</h1><span class="sp"></span>${can('catering', 'event_specialist', 'manager') ? '<a class="btn pri" href="#/c/event-new">＋ New event</a>' : ''}</div>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/events/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
    ${ev.length ? `<div class="list">${ev.map(e => `<a class="li" href="#/c/event/${e.id}"><div class="li-date"><b>${esc(fmtD(e.event_date).split(',')[0])}</b><span>${esc(fmtD(e.event_date).split(',').slice(1).join(','))}</span></div>
       <div class="li-main"><b>${esc(evClient(e, cl[e.client_id]))}</b><span class="mut small">${evSub(e, cl[e.client_id]) ? esc(evSub(e, cl[e.client_id])) + ' · ' : ''}${esc(e.ref)} · ${KIND[e.kind]}${e.pax ? ' · ' + e.pax + ' guests' : ''}${e.serve_time ? ' · ' + fmtClock(e.serve_time) : ''}${e.venue ? ' · ' + esc(e.venue) : ''}</span></div>
@@ -245,7 +253,7 @@ routes['c/events'] = async arg => {
 };
 
 routes['c/event-new'] = async () => {
-  if (!can('catering', 'coordinator', 'manager')) return '<div class="card">Only coordinators and managers can add events.</div>';
+  if (!can('catering', 'event_specialist', 'manager')) return '<div class="card">Only the owner, managers and event specialists can create events.</div>';
   return `<h1>New event</h1><form class="card" data-form="newEvent">
     <h3 style="margin-top:0">Client</h3>
     <div class="grid">
@@ -381,8 +389,8 @@ routes['c/event'] = async id => {
   const recipeState = {}; const dishIds = [...new Set(menu.map(m => m.dish_id).filter(Boolean))];
   if (dishIds.length) (await db.select('recipes', { cols: 'dish_id,status', in: { dish_id: dishIds } })).forEach(r => recipeState[r.dish_id] = r.status);
   const open = !['done', 'closed', 'cancelled'].includes(ev.status);
-  const canMenu = open && can('catering', 'coordinator', 'manager', 'chef');
-  const canEdit = ev.status !== 'closed' && can('catering', 'coordinator', 'manager', 'finance');
+  const canMenu = open && can('catering', 'event_specialist', 'coordinator', 'manager', 'chef', 'head_chef');
+  const canEdit = ev.status !== 'closed' && can('catering', 'event_specialist', 'coordinator', 'manager', 'finance');
   const byCourse = COURSES.map(c => [c, menu.filter(m => m.course === c)]).concat([['Other', menu.filter(m => !COURSES.includes(m.course))]]).filter(([, l]) => l.length);
   const lineName = m => m.dish_id ? S.dishById[m.dish_id]?.name : m.pack_id ? (S.packs.find(p => p.id === m.pack_id)?.name || 'Packed meal set') : m.custom_name;
   const lineChip = m => m.custom_name && !m.dish_id && !m.pack_id ? chip('off-menu', 'warn') : m.dish_id ? (recipeState[m.dish_id] === 'verified' ? '' : chip(recipeState[m.dish_id] ? 'recipe draft' : 'no recipe', 'warn')) : '';
@@ -426,11 +434,11 @@ routes['c/event'] = async id => {
 
   ${(menu.some(m => m.custom_name && !m.dish_id && !m.pack_id) || extras.length) ? `<section class="card"><h2>Off-menu ingredients</h2>
     <p class="small mut">For off-menu dishes the chef lists the extra ingredients to buy.</p>
-    ${extras.length ? `<table><tbody>${extras.map(x => `<tr><td>${esc(itemName(x.item_id))}</td><td class="n">${fq(x.qty)} ${esc(itemUnit(x.item_id))}</td><td class="mut small">${esc(x.note || '')}</td><td>${can('catering', 'chef', 'manager') && open ? `<button class="x" data-act="rmExtra" data-ev="${ev.id}" data-item="${x.item_id}">✕</button>` : ''}</td></tr>`).join('')}</tbody></table>` : ''}
-    ${can('catering', 'chef', 'manager') && open ? `<form data-form="addExtra" data-id="${ev.id}" class="addline"><input name="item" list="dl-items" placeholder="Ingredient" autocomplete="off"><input name="qty" type="number" step="any" min="0" placeholder="qty" class="qty"><input name="note" placeholder="for which dish"><button class="pri">Add</button></form>${itemDatalist()}` : ''}
+    ${extras.length ? `<table><tbody>${extras.map(x => `<tr><td>${esc(itemName(x.item_id))}</td><td class="n">${fq(x.qty)} ${esc(itemUnit(x.item_id))}</td><td class="mut small">${esc(x.note || '')}</td><td>${can('catering', 'chef', 'head_chef', 'manager') && open ? `<button class="x" data-act="rmExtra" data-ev="${ev.id}" data-item="${x.item_id}">✕</button>` : ''}</td></tr>`).join('')}</tbody></table>` : ''}
+    ${can('catering', 'chef', 'head_chef', 'manager') && open ? `<form data-form="addExtra" data-id="${ev.id}" class="addline"><input name="item" list="dl-items" placeholder="Ingredient" autocomplete="off"><input name="qty" type="number" step="any" min="0" placeholder="qty" class="qty"><input name="note" placeholder="for which dish"><button class="pri">Add</button></form>${itemDatalist()}` : ''}
   </section>` : ''}
 
-  <section class="card"><div class="row"><h2>Purchasing</h2><span class="sp"></span>${open && can('catering', 'coordinator', 'manager', 'chef') && menu.length ? `<button class="pri" data-act="genPR" data-id="${ev.id}">${prs.some(p => p.status === 'draft' && p.source === 'event_auto') ? 'Update purchase request' : 'Create purchase request'}</button>` : ''}</div>
+  <section class="card"><div class="row"><h2>Purchasing</h2><span class="sp"></span>${open && can('catering', 'event_specialist', 'coordinator', 'manager', 'chef', 'head_chef') && menu.length ? `<button class="pri" data-act="genPR" data-id="${ev.id}">${prs.some(p => p.status === 'draft' && p.source === 'event_auto') ? 'Update purchase request' : 'Create purchase request'}</button>` : ''}</div>
    ${warnings.length ? `<div class="alert warn"><b>Not included yet:</b><ul>${warnings.map(w => `<li>${esc(w.dish)} — ${esc(w.problem)}</li>`).join('')}</ul></div>` : ''}
    ${needs.length ? `<details ${toBuy.length ? 'open' : ''}><summary>What this event needs (${needs.length} ingredients, ${toBuy.length} to buy · est. ${peso(needs.reduce((s, n) => s + num(n.est_cost), 0))})</summary>
      <div class="tw"><table><thead><tr><th>Ingredient</th><th class="n">Needed</th><th class="n">In store</th><th class="n">To buy</th><th class="n">Est. cost</th></tr></thead><tbody>
@@ -439,7 +447,7 @@ routes['c/event'] = async id => {
    ${prs.length ? `<h3 class="mt">Requests for this event</h3><div class="list">${prs.map(p => `<a class="li" href="#/c/pr/${p.id}"><div class="li-main"><b>${esc(p.pr_no)}</b><span class="mut small">${p.line_count} items · ${peso(p.est_total)} · ${esc(fmtT(p.created_at))}</span></div>${chip(PR_STATUS[p.status], statusTone(p.status))}</a>`).join('')}</div>` : ''}
   </section>
 
-  ${(pick.length || ['confirmed', 'in_prep', 'done'].includes(ev.status)) && can('catering', 'storekeeper', 'manager', 'chef') ? `<section class="card"><h2>Prep day</h2>
+  ${(pick.length || ['confirmed', 'in_prep', 'done'].includes(ev.status)) && can('catering', 'storekeeper', 'manager', 'chef', 'head_chef') ? `<section class="card"><h2>Prep day</h2>
    ${pick.length ? `<form data-form="issue" data-id="${ev.id}"><p class="small mut">Stock set aside for this event in the catering store. Issue it to the cook in charge.</p>
      <div class="tw"><table><thead><tr><th>Item</th><th class="n">Set aside</th><th class="n">Issue now</th></tr></thead><tbody>
      ${shopRows(pick, p => p.item_id, p => p.reserved, 3, p => `<tr><td>${esc(p.name)}</td><td class="n">${fq(p.reserved)} ${esc(p.stock_unit)}</td><td class="n"><input name="q_${p.item_id}" type="number" step="any" min="0" value="${num(p.reserved)}" class="qty"></td></tr>`)}
@@ -1103,7 +1111,8 @@ async function cleanupHtml() {
       `<div class="list">${archived.map(d => `<div class="li"><div class="li-main"><b>${esc(d.name)}</b><span class="mut small">dish · ${esc(d.category)}</span></div><button type="button" class="ghost sm" data-act="archDish" data-id="${d.id}" data-on="0">Restore</button></div>`).join('')}
        ${oldItems.map(i => `<div class="li"><div class="li-main"><b>${esc(i.name)}</b><span class="mut small">ingredient · ${esc(i.category)} · ${esc(i.stock_unit)}</span></div><button type="button" class="ghost sm" data-act="restoreItem" data-id="${i.id}">Restore</button></div>`).join('')}</div>`)}`;
 }
-const canEditMenu = () => canAny('chef', 'manager');
+const canEditMenu = () => canAny('head_chef', 'rnd_chef');
+const canSeeCost = () => canAny('head_chef', 'rnd_chef', 'finance');   // ingredient costs, recipe costs, Costing tab
 const needsUpdate = err => /merge_dishes|delete_dish|archive_dish|merge_items|delete_item|function/i.test(err.message || '') && /find|exist|schema cache/i.test(err.message || '');
 async function cleanRun(fn, args, ok) {
   try { const r = await db.rpc(fn, args); await loadMaster(); toast(ok(r)); refresh(); }
@@ -1148,9 +1157,9 @@ routes['c/recipes'] = async arg => {
   const [rs, rl] = await Promise.all([db.select('recipes', { cols: 'dish_id,status,batch_serves' }), db.select('recipe_lines', { cols: 'dish_id,item_id,qty' })]);
   const recipes = Object.fromEntries(rs.map(r => [r.dish_id, r]));
   const costOf = {}; rl.forEach(l => costOf[l.dish_id] = (costOf[l.dish_id] || 0) + num(l.qty) * num(S.itemsById[l.item_id]?.last_cost));
-  const costTag = d => { const r = recipes[d.id]; if (!r || !costOf[d.id]) return ''; const c = costOf[d.id], pct = d.tray_price && num(r.batch_serves) > 1 ? Math.round(c / num(d.tray_price) * 100) : null;
+  const costTag = d => { const r = recipes[d.id]; if (!r || !costOf[d.id] || !canSeeCost()) return ''; const c = costOf[d.id], pct = d.tray_price && num(r.batch_serves) > 1 ? Math.round(c / num(d.tray_price) * 100) : null;
     return ` · cost ${peso(c)}${pct !== null ? ` · <span class="${pct > 45 ? 'bad-t' : pct > 35 ? 'warn-t' : 'ok-t'}">${pct}%</span>` : ''}`; };
-  const tabs = [['standard', 'Standard list'], ['draft', 'Draft recipes'], ['verified', 'Verified'], ['none', 'No recipe'], ['all', 'All dishes'], ...(canAny('chef', 'manager', 'finance') ? [['costing', '💰 Costing']] : []), ...(canEditMenu() ? [['cleanup', '🧹 Clean-up']] : [])];
+  const tabs = [['standard', 'Standard list'], ['draft', 'Draft recipes'], ['verified', 'Verified'], ['none', 'No recipe'], ['all', 'All dishes'], ...(canSeeCost() ? [['costing', '💰 Costing']] : []), ...(canEditMenu() ? [['cleanup', '🧹 Clean-up']] : [])];
   const list = S.dishes.filter(d => d.active).filter(d => tab === 'all' || (tab === 'standard' ? d.standard : tab === 'none' ? !recipes[d.id] && d.standard : recipes[d.id]?.status === tab));
   return `<h1>Dishes & recipes</h1><p class="lede">A dish's recipe lists what to buy for one batch: one large tray (10–12 guests, planned at 10), or one guest for rice, drinks and fruit. Only <b>verified</b> recipes are used for purchase requests.</p>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/recipes/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
@@ -1190,7 +1199,7 @@ document.addEventListener('change', async e => {
 routes['c/recipe'] = async id => {
   const d = S.dishById[id]; if (!d) return '<div class="card">Dish not found.</div>';
   const [[r], lines] = await Promise.all([db.select('recipes', { eq: { dish_id: id } }), db.select('recipe_lines', { eq: { dish_id: id } })]);
-  const edit = canAny('chef', 'manager');
+  const edit = canAny('head_chef', 'rnd_chef'), sc = edit || canSeeCost();   // sc: may see ingredient prices and costs
   const cost = lines.reduce((s, l) => s + num(l.qty) * num(S.itemsById[l.item_id]?.last_cost), 0);
   // No meat, pasta or rice (desserts, soups, salads)? The ingredient named in the dish is the main one — Buko Pandan → buko
   const words = d.name.toLowerCase().split(/[^a-z]+/).filter(w => w.length > 3);
@@ -1214,14 +1223,14 @@ routes['c/recipe'] = async id => {
     <datalist id="dl-dishcats">${DISH_CATS.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
     <p class="small mut">The new name shows everywhere this dish is used: event menus, the POS, Kitchen stocks and purchase requests.</p>
     <div class="row end">${canEditMenu() ? `<button type="button" class="ghost danger" data-act="archDish" data-id="${id}" data-on="${d.active ? 1 : 0}" title="${d.active ? 'Hide from the POS and new event menus; history is kept' : ''}">${d.active ? 'Take off the menu' : 'Put back on the menu'}</button><button type="button" class="ghost danger" data-act="delDish" data-id="${id}" data-name="${esc(d.name)}">Delete dish</button><span class="sp"></span>` : ''}<button type="button" class="ghost" data-act="toggleDishEdit">Cancel</button><button class="pri">Save dish</button></div></form>` : ''}
-  ${!edit && !r ? '<div class="card">No recipe yet. A chef can add it.</div>' : `
+  ${!edit && !r ? '<div class="card">No recipe yet. The head chef or R&D chef can add it.</div>' : `
   <form class="card" data-form="${edit ? 'saveRecipe' : 'none'}" data-id="${id}">
    <div class="row rhead"><h2>Ingredients for</h2>${edit ? batchSel(serves) : `<b>${serves === 1 ? 'one guest' : serves === 10 ? 'one tray (10–12 guests)' : `one batch (${fq(serves)} guests)`}</b>`}</div>
-   ${lines.length ? `<div class="tw"><table class="rtable"><thead><tr><th>Ingredient</th><th class="n">Qty</th><th class="n">Price per unit</th><th class="n">Cost</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>
+   ${lines.length ? `<div class="tw"><table class="rtable"><thead><tr><th>Ingredient</th><th class="n">Qty</th>${sc ? '<th class="n">Price per unit</th><th class="n">Cost</th>' : ''}${edit ? '<th></th>' : ''}</tr></thead><tbody>
    ${lines.map(l => { const it = S.itemsById[l.item_id] || {}, u = esc(itemUnit(l.item_id)); return `${head(l.item_id)}<tr><td>${esc(itemName(l.item_id))}</td>
      <td class="n nowrap">${edit ? `<input name="q_${l.item_id}" type="number" step="any" min="0" value="${num(l.qty) || ''}" placeholder="qty?" class="qty${num(l.qty) ? '' : ' need'}">` : num(l.qty) ? fq(l.qty) : '<span class="warn-t small">qty?</span>'} ${u}</td>
-     <td class="n nowrap">${edit ? `₱<input name="p_${l.item_id}" type="number" step="any" min="0" value="${num(it.last_cost) || ''}" placeholder="—" class="qty price" title="Price per ${u}: changes it for every recipe using ${esc(it.name || '')}"> /${u}` : num(it.last_cost) ? `${peso(it.last_cost)} /${u}` : '<span class="mut small">no price</span>'}</td>
-     <td class="n" data-linecost="${l.item_id}" data-price="${num(it.last_cost)}" data-qty="${num(l.qty)}">${num(it.last_cost) && num(l.qty) ? peso(num(l.qty) * num(it.last_cost)) : '<span class="mut small">—</span>'}</td>${edit ? `<td class="nowrap"><button type="button" class="x" title="Rename, change unit, or replace" data-act="editIng" data-item="${l.item_id}">✎</button><button type="button" class="x" title="Remove" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>
+     ${sc ? `<td class="n nowrap">${edit ? `₱<input name="p_${l.item_id}" type="number" step="any" min="0" value="${num(it.last_cost) || ''}" placeholder="—" class="qty price" title="Price per ${u}: changes it for every recipe using ${esc(it.name || '')}"> /${u}` : num(it.last_cost) ? `${peso(it.last_cost)} /${u}` : '<span class="mut small">no price</span>'}</td>
+     <td class="n" data-linecost="${l.item_id}" data-price="${num(it.last_cost)}" data-qty="${num(l.qty)}">${num(it.last_cost) && num(l.qty) ? peso(num(l.qty) * num(it.last_cost)) : '<span class="mut small">—</span>'}</td>` : ''}${edit ? `<td class="nowrap"><button type="button" class="x" title="Rename, change unit, or replace" data-act="editIng" data-item="${l.item_id}">✎</button><button type="button" class="x" title="Remove" data-act="rmIng" data-dish="${id}" data-item="${l.item_id}">✕</button></td>` : ''}</tr>
    ${edit ? `<tr class="ing-edit" id="ie_${l.item_id}" hidden><td colspan="5"><div class="grid">
      <label>Ingredient name<input name="e_name_${l.item_id}" value="${esc(it.name || '')}" data-cap></label>
      <label>Unit used in recipes<input name="e_unit_${l.item_id}" list="dl-units" value="${esc(it.stock_unit || '')}"></label>
@@ -1229,7 +1238,7 @@ routes['c/recipe'] = async id => {
      <label>Or replace with another ingredient (this recipe only)<input name="e_swap_${l.item_id}" list="dl-items" placeholder="leave empty to keep ${esc(it.name || '')}" autocomplete="off"></label></div>
      <p class="small mut">Name, unit and price belong to the ingredient, so they change in every recipe that uses it. Price is updated again automatically when goods are received.</p>
      <div class="row end"><button type="button" class="ghost" data-act="editIng" data-item="${l.item_id}">Cancel</button><button type="button" class="pri" data-act="saveIng" data-dish="${id}" data-item="${l.item_id}">Save ingredient</button></div></td></tr>` : ''}`; }).join('')}
-   </tbody><tfoot><tr><td colspan="5" id="recipeTotal" data-tray="${trayP}" data-serves="${serves}">${recipeTotalText(cost, trayP, serves)}</td></tr></tfoot></table></div>` : `<p class="mut">No ingredients yet${edit ? ' — add the first one below. The recipe is saved as you go.' : '.'}</p>`}
+   </tbody>${sc ? `<tfoot><tr><td colspan="5" id="recipeTotal" data-tray="${trayP}" data-serves="${serves}">${recipeTotalText(cost, trayP, serves)}</td></tr></tfoot>` : ''}</table></div>` : `<p class="mut">No ingredients yet${edit ? ' — add the first one below. The recipe is saved as you go.' : '.'}</p>`}
    ${edit ? `<div class="addrow mt" id="addRow"><label class="an">Ingredient<input name="new_item" list="dl-items" placeholder="Type or pick an ingredient" autocomplete="off" data-newitem></label>
      <label>Qty <span class="mut">(can wait)</span><input name="new_qty" type="number" step="any" min="0" placeholder="later" class="qty"></label>
      <label>Unit<input name="new_unit" list="dl-units" placeholder="kg" class="qty"></label>
@@ -1240,12 +1249,12 @@ routes['c/recipe'] = async id => {
      ${itemDatalist()}<datalist id="dl-cats">${[...new Set(S.items.map(i => i.category))].sort().map(c => `<option value="${esc(c)}">`).join('')}</datalist>
      <datalist id="dl-units">${['kg', 'g', 'L', 'ml', 'pc', 'pack', 'can', 'bundle', 'bottle', 'tray', 'sack', 'box'].map(u => `<option value="${u}">`).join('')}</datalist>
      ${r && lines.length ? `<div class="row end mt">${r.status !== 'verified' ? `<button type="button" class="pri" data-act="verify" data-id="${id}">Mark verified</button>` : ''}</div>
-     <p class="small mut">Every change saves by itself. ${r.status === 'verified' ? 'A manager\'s change puts this recipe back to draft until a chef verifies it again.' : 'Check each quantity against how the kitchen really cooks this dish, then mark it verified so it can be used for purchase requests.'}</p>` : ''}
+     <p class="small mut">Every change saves by itself. ${r.status === 'verified' ? 'Any change puts this recipe back to draft until the head chef or R&D chef verifies it again.' : 'Check each quantity against how the kitchen really cooks this dish, then mark it verified so it can be used for purchase requests.'}</p>` : ''}
      <details class="copyr mt"><summary>Copy ingredients from another dish</summary><div class="addline mt"><input id="copyFrom" list="dl-recipes" placeholder="Dish with a recipe, e.g. Tuna Bicol Express" autocomplete="off"><button type="button" data-act="copyRecipe" data-id="${id}">Copy</button></div>
        <p class="small mut">Adds the other recipe's ingredients that aren't here yet (quantities you already have stay). Good for variants of the same dish.</p>
        <datalist id="dl-recipes">${S.dishes.filter(x => x.id !== id && x.active).map(x => `<option value="${esc(x.name)}">`).join('')}</datalist></details>` : ''}
   </form>
-  ${lines.length ? costingCard(d, r, lines, serves, edit) : ''}
+  ${lines.length && sc ? costingCard(d, r, lines, serves, edit) : ''}
   ${edit || r?.method ? `<section class="card"><h2>Method &amp; notes</h2>${edit ? `<textarea id="recipeMethod" data-dish="${id}" rows="5" placeholder="Prep and cooking steps, yields, plating, what to watch out for…">${esc(r?.method || '')}</textarea><p class="small mut">Saves when you click away. Printed on the recipe card.</p>` : `<p class="pre">${esc(r.method)}</p>`}</section>` : ''}`}`;
 };
 /* ---- House pricing (Romualdo's) ----
@@ -1513,7 +1522,7 @@ async function ensureRecipe(dishId) {
   await db.insert('recipes', { dish_id: dishId, batch_serves: num(document.querySelector(`[data-recipeserves="${dishId}"]`)?.value) || 10, status: 'draft' });
 }
 document.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.closest('#addRow') && e.target.tagName === 'INPUT') { e.preventDefault(); e.target.closest('#addRow').querySelector('[data-act=addIng]').click(); } });
-const canEditDish = () => canAny('chef', 'manager', 'coordinator');
+const canEditDish = () => canAny('head_chef', 'rnd_chef');
 ACT.toggleDishEdit = () => { const f = document.getElementById('dishEdit'); if (f) { f.hidden = !f.hidden; if (!f.hidden) f.name.focus(); } };
 FORMS.editDish = async (f, el) => {
   const name = f.name.trim().replace(/\s+/g, ' '), id = el.dataset.id;
@@ -1660,7 +1669,7 @@ routes['c/inquiries'] = async arg => {
 routes['c/inquiry'] = async id => {
   const [b] = await db.select('bookings', { eq: { id } }); if (!b) return '<div class="card">Inquiry not found.</div>';
   const p = b.payload || {}, c = p.customer || {}, ev = p.event || {}, pl = p.plan || {}, es = p.estimate || {}, k = p.corp || {};
-  const canAct = can('catering', 'coordinator', 'manager');
+  const canAct = can('catering', 'event_specialist', 'manager');
   const items = (p.items || []).filter(i => i.dish);
   const row = (l, v) => v ? `<tr><td class="mut">${l}</td><td>${v}</td></tr>` : '';
   const plan = pl.kind === 'package' ? `${esc(pl.packageName || 'Package')}${canBill() && num(pl.pricePerHead) ? ` · ${peso(pl.pricePerHead)} per head` : ''}` : esc(BK_KIND[pl.kind] || pl.kind || '');
@@ -1734,18 +1743,29 @@ const kGroups = (rows, by) => { const g = new Map(); const order = by === 'prote
   rows.forEach(r => { const k = by === 'protein' ? r.protein : r.section; g.has(k) || g.set(k, []); g.get(k).push(r); });
   return [...g].sort((a, b) => (order.indexOf(a[0]) + 1 || 99) - (order.indexOf(b[0]) + 1 || 99)); };
 routes['r/kitchen'] = async arg => {
+  if (!kCounts()) return `<h1>86 &amp; running low</h1>${await kOut()}`;
   const [tab, dArg] = (arg || 'day').split('/');
-  const tabs = [['day', 'Daily count'], ['restock', 'Restock list'], ['week', 'Weekly report'], ...(can('restaurant', 'manager', 'chef') ? [['dishes', 'Menu, prices & par']] : [])];
+  const tabs = [['day', 'Daily count'], ['restock', 'Restock list'], ['week', 'Weekly report'], ...(can('restaurant', 'manager', 'head_chef', 'chef') ? [['dishes', 'Menu, prices & par']] : [])];
   const seg = `<div class="seg">${tabs.map(([k, l]) => `<a href="#/r/kitchen/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>`;
   const body = tab === 'restock' ? await kRestock(dArg) : tab === 'week' ? await kWeek(dArg) : tab === 'dishes' ? await kDishes() : await kDay(dArg);
   return `<h1>Kitchen stocks</h1>${seg}${body}`;
 };
+/* Staff, Cashier, Chef and others: the stockist's latest count, as a read-only 86 / running-low list (POS sales today included) */
+async function kOut() {
+  const d = today(), [rows, days] = await Promise.all([db.rpc('kitchen_sheet', { p_date: d }), db.select('kitchen_days', { cols: 'count_date,saved_by,saved_at,note', order: [['count_date', false]], limit: 1 })]);
+  const last = days[0], who = last?.saved_by ? (await db.select('profiles', { cols: 'full_name', eq: { id: last.saved_by } }))[0]?.full_name : (last?.note || '').replace(/^Counted by /, '').replace(/ \(copied from \/ops\)$/, '');
+  const out = rows.filter(r => kEnd(r) <= 0), low = rows.filter(r => kEnd(r) > 0 && kEnd(r) < num(r.min_level));
+  const list = (rs, tone) => rs.length ? kGroups(rs, 'section').map(([g, l]) => `<h3 class="small mut" style="margin:10px 0 4px">${esc(g)}</h3>${l.map(r => `<div class="li"><div class="li-main"><b>${esc(r.name)}</b></div><b class="${tone}">${tone === 'bad-t' ? '86' : fq(kEnd(r)) + ' left'}</b></div>`).join('')}`).join('') : '<p class="mut">None.</p>';
+  return `<p class="lede">From the stockist's count${last ? ` · last counted ${esc(fmtD(last.count_date))}${who ? ' by ' + esc(who) : ''}` : ''}${d !== last?.count_date ? ', plus today\'s POS sales' : ''}. Only the storekeeper and manager change the count.</p>
+   <section class="card"><h2>86 — out <span class="cnt">${out.length}</span></h2>${list(out, 'bad-t')}</section>
+   <section class="card"><h2>Running low <span class="cnt">${low.length}</span></h2>${list(low, 'warn-t')}</section>`;
+}
 async function kDay(d) {
   d = d || S.kDate || today(); S.kDate = d;
   const [rows, [day], posDay] = await Promise.all([db.rpc('kitchen_sheet', { p_date: d }), db.select('kitchen_days', { eq: { count_date: d } }), db.select('pos_daily', { eq: { biz_date: d } }).catch(() => [])]);
   const fromPos = num(posDay[0]?.orders) > 0 && !can('restaurant', 'manager');
   S.kRows = Object.fromEntries(rows.map(r => [r.dish_id, r]));
-  const by = S.kGroup || 'section', mayEdit = member('restaurant');
+  const by = S.kGroup || 'section', mayEdit = kCounts();
   const low = rows.filter(r => kEnd(r) < num(r.min_level));
   const saver = day?.saved_by ? (await db.select('profiles', { cols: 'full_name', eq: { id: day.saved_by } }))[0]?.full_name : '';
   return `<div class="card"><div class="row wrap"><label class="inline">Date <input type="date" value="${d}" data-kdate max="${today()}"></label>
@@ -1784,7 +1804,7 @@ async function kSave(r, field) {
   r.saved = true;
 }
 document.addEventListener('click', async e => {
-  const n = e.target.closest('.kname'); if (!n || !member('restaurant')) return;
+  const n = e.target.closest('.kname'); if (!n || !kCounts()) return;
   const row = n.closest('[data-kid]'), r = S.kRows?.[row.dataset.kid]; if (!r) return;
   const note = prompt(`Note for ${r.name} (e.g. 2 burnt, staff meal):`, r.note || ''); if (note === null) return;
   r.note = note.trim(); try { await kSave(r, 'note'); toast('Note saved'); refresh(); } catch (err) { toast(err.message, true); }
@@ -2217,11 +2237,11 @@ routes.people = async arg => {
   return `<h1>People & roles</h1>
   <div class="alert info"><b>Adding someone new:</b> first create their login in Supabase → <b>Authentication → Users → Add user</b> (their email, or <code>username@staff.romualdos.ph</code> if they have none, and a starting password). Then they appear below — open them and give them roles.</div>
   <div class="list">${people.map(p => `<a class="li" href="#/people/${p.id}"><div class="li-main"><b>${esc(p.full_name || p.email)}</b><span class="mut small">${esc(p.email)}${p.username ? ' · ' + esc(p.username) : ''}</span>
-    <span class="small">${p.is_admin ? chip('Owner', 'info') + ' ' : ''}${(p.roles || []).map(r => chip(`${r.ws === 'catering' ? 'Catering' : 'Restaurant'} · ${r.role}`)).join(' ')}${!p.username ? chip('not set up', 'warn') : ''}${p.username && !p.active ? chip('switched off', 'bad') : ''}</span></div></a>`).join('')}</div>
+    <span class="small">${p.is_admin ? chip('Owner', 'info') + ' ' : ''}${(p.roles || []).map(r => chip(`${r.ws === 'catering' ? 'Catering' : 'Restaurant'} · ${roleName(r.role)}`)).join(' ')}${!p.username ? chip('not set up', 'warn') : ''}${p.username && !p.active ? chip('switched off', 'bad') : ''}</span></div></a>`).join('')}</div>
   ${sel ? `<form class="card mt" data-form="savePerson" data-email="${esc(sel.email)}"><h2>${esc(sel.full_name || sel.email)}</h2>
     <div class="grid"><label>Full name<input name="full_name" value="${esc(sel.full_name || '')}" required></label><label>Username<input name="username" value="${esc(sel.username || sel.email.split('@')[0])}" required pattern="[a-z0-9._\\-]{2,40}" title="lower-case letters, numbers, . _ -"></label></div>
     <table class="roles"><thead><tr><th></th><th>Catering</th><th>Restaurant</th></tr></thead><tbody>
-    ${ROLES.map(([k, l]) => `<tr><td>${l}</td><td><input type="checkbox" name="r_catering_${k}" ${has('catering', k) ? 'checked' : ''}></td><td><input type="checkbox" name="r_restaurant_${k}" ${has('restaurant', k) ? 'checked' : ''}></td></tr>`).join('')}
+    ${ROLES.map(([k, l, h]) => `<tr><td>${l}<div class="small mut">${esc(h || '')}</div></td><td><input type="checkbox" name="r_catering_${k}" ${has('catering', k) ? 'checked' : ''}></td><td><input type="checkbox" name="r_restaurant_${k}" ${has('restaurant', k) ? 'checked' : ''}></td></tr>`).join('')}
     </tbody></table>
     <label class="tick"><input type="checkbox" name="is_admin" ${sel.is_admin ? 'checked' : ''}> Owner (everything, both workspaces)</label>
     <label class="tick"><input type="checkbox" name="active" ${!sel.username || sel.active ? 'checked' : ''}> Can log in</label>
