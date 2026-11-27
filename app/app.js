@@ -194,15 +194,12 @@ function mobileMenu(key, nav, inCat, inRes) {
   const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People', me: 'My account', pokes: 'Pokes', tasks: 'My tasks' }[key.split('/')[0]] || 'Home';
   const a = (href, label, on) => `<a href="#/${href}"${on ? ' class="on"' : ''}>${label}</a>`;
   const sect = nav.length ? `<div class="mn-h">${inCat ? 'Catering' : 'Restaurant'}</div><div class="mn-g">${nav.map(([k, l]) => a(k, l, navOf(key) === k)).join('')}</div>` : '';
-  const n = (POKE.unread.open || 0) + (POKE.unread.replies || 0);
-  const go = [a('', 'Home', key === '' || key === 'home'), a('tasks', 'My tasks', key === 'tasks'),
-    `<a class="mn-pokes${key === 'pokes' ? ' on' : ''}" href="#/pokes">Pokes <i${n ? '' : ' hidden'}>${n || ''}</i></a>`, a('events', 'Events board', key === 'events'),
-    ...(inCat ? [a('r', 'Switch to Restaurant')] : inRes ? [a('c', 'Switch to Catering')] : [])].join('');
-  const own = isAdmin() ? `<div class="mn-h">Owner</div><div class="mn-l">${a('people', 'People & roles', key === 'people')}${a('activity', 'Activity', key.startsWith('activity'))}</div>` : '';
+  const go = [a('', 'Home', key === '' || key === 'home'), a('tasks', 'My tasks', key === 'tasks'), a('events', 'Events board', key === 'events'),
+    ...(inCat ? [a('r', 'Switch to Restaurant')] : inRes ? [a('c', 'Switch to Catering')] : []),
+    ...(isAdmin() ? [a('people', 'People & roles', key === 'people'), a('activity', 'Activity', key.startsWith('activity'))] : [])].join('');
   return `<span class="bell-slot mob">${bellHtml()}</span><details class="mnav"><summary aria-label="Menu"><span class="mn-cur">${esc(cur)}</span><span class="mn-ic">☰</span></summary>
-    <div class="mn-p">${sect}<div class="mn-l">${go}</div>${own}
-      <a class="mn-acct" href="#/me">${av(S.me?.id, S.me?.full_name, 'sm')}<span><b>${esc(S.me?.full_name || nick())}</b><small>My account</small></span></a>
-      <div class="mn-x">${canInstall() ? '<button type="button" data-act="install">Get the app</button>' : ''}<button type="button" class="mn-out" data-act="logout">Log out</button></div></div></details>`;
+    <div class="mn-p">${sect}<div class="mn-l">${go}</div>
+      <div class="mn-q">${esc(nick())} · <a href="#/me">My account</a>${canInstall() ? ' · <button type="button" data-act="install">Get the app</button>' : ''} · <button type="button" data-act="logout">Log out</button></div></div></details>`;
 }
 // close the menu after picking something, or when tapping outside it
 document.addEventListener('click', e => {

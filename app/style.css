@@ -881,3 +881,13 @@ a.mn-acct>span:not(.av){flex:1;display:grid;margin:0!important;color:var(--ink)}
 .av-cam .ico{color:var(--navy)}
 .p-kind .ico,.p-open .ico{vertical-align:-3px}
 .hp-ic.pk{background:#fff3d9;color:#8a5a00}
+/* ---- Phone menu: plain rows, thin dividers, quiet current page, one-line account ---- */
+.mn-g,.mn-l{display:grid;grid-template-columns:1fr!important;gap:0!important;border-top:0;padding:0;margin:0}
+.mn-g{border-bottom:1px solid #eee7d6;margin-bottom:2px}
+.mn-g a,.mn-l a{border-radius:0!important;border-bottom:1px solid #f1ecdf!important;padding:13px 14px!important}
+.mn-l a:last-child{border-bottom:0!important}
+.mn-g a.on,.mn-l a.on{background:none!important;color:var(--navy)!important;font-weight:700;box-shadow:inset 3px 0 0 var(--gold)}
+.mn-h{margin:8px 14px 2px}
+.mn-q{border-top:1px solid #eee7d6;padding:12px 14px 6px;font-size:12.5px;color:var(--mut)}
+.mn-q a,.mn-q button{color:var(--mut)!important;font:inherit;background:none!important;border:0!important;padding:0!important;text-decoration:none;cursor:pointer;min-height:0}
+.mn-q a:hover,.mn-q button:hover{color:var(--navy)!important;text-decoration:underline}
