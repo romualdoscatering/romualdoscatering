@@ -39,6 +39,7 @@ const kCounts = () => can('restaurant', 'storekeeper', 'manager');   // the stoc
 const can = (ws, ...roles) => isAdmin() || (S.me?.roles || []).some(r => r.ws === ws && roles.includes(r.role));
 const canAny = (...roles) => isAdmin() || (S.me?.roles || []).some(r => roles.includes(r.role));
 const who = () => S.me?.full_name || S.me?.username || '';
+const nick = () => (S.me?.nickname || '').trim() || (S.me?.full_name || '').split(' ')[0] || S.me?.username || 'team';   // what the app calls them
 
 async function loadMaster() {
   const [items, dishes, aliases, packs] = await Promise.all([
@@ -156,7 +157,7 @@ function renderShell(key) {
     : inRes ? (resFront() ? [['r/pos', 'POS'], ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['r/kitchen', '86 & running low'], ['r/requests', 'Requests']]
       : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
-    <div class="who"><span>Hi, ${esc(who().split(' ')[0])}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}<a href="#/events"${key === 'events' ? ' class="on"' : ''}>Events</a>${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
+    <div class="who"><span>Hi, ${esc(nick())}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}<a href="#/events"${key === 'events' ? ' class="on"' : ''}>Events</a>${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
     ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a></nav>` : ''}`;
 }
 function navOf(key) {
@@ -272,7 +273,7 @@ const ICONS = {
 };
 routes.home = async () => {
   const t = today(), tm = addDays(t, 1), hour = new Date(Date.now() + 8 * 3600e3).getUTCHours();
-  const [fil, en] = GREET(hour), first = esc((S.me.full_name || '').split(' ')[0] || 'team');
+  const [fil, en] = GREET(hour), first = esc(nick());
   const doy = Math.floor((Date.parse(t) - Date.parse(t.slice(0, 4) + '-01-01')) / 864e5);
   const ev = await db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null);
   const nToday = ev ? ev.filter(e => e.event_date === t).length : null, nTmr = ev ? ev.filter(e => e.event_date === tm).length : null;
@@ -2064,7 +2065,7 @@ function posTile(m, o) {
     ${inO ? `<i class="q">${fq(inO)}</i>` : ''}<b class="nm">${esc(m.name)}</b><span class="ft"><span class="pr">${peso(m.price).replace('.00', '')}</span>${stock}</span></button>`;
 }
 function posHtml() {
-  const o = POS.order, T = posTotals(o), first = (S.me.full_name || '').split(' ')[0];
+  const o = POS.order, T = posTotals(o), first = nick();
   if (POS.tab === 'service') POS.tab = 'change';
   if (POS.tab === undefined) POS.tab = innerHeight > 820 ? 'change' : null;   // short tablets: keypad folded until 💵 Cash is tapped
   const priced = POS.menu.filter(m => m.price != null), unpriced = POS.menu.length - priced.length;
@@ -2376,10 +2377,11 @@ routes.people = async arg => {
   const has = (ws, role) => (sel?.roles || []).some(r => r.ws === ws && r.role === role);
   return `<h1>People & roles</h1>
   <div class="alert info"><b>Adding someone new:</b> first create their login in Supabase → <b>Authentication → Users → Add user</b> (their email, or <code>username@staff.romualdos.ph</code> if they have none, and a starting password). Then they appear below — open them and give them roles.</div>
-  <div class="list">${people.map(p => `<a class="li" href="#/people/${p.id}"><div class="li-main"><b>${esc(p.full_name || p.email)}</b><span class="mut small">${esc(p.email)}${p.username ? ' · ' + esc(p.username) : ''}</span>
+  <div class="list">${people.map(p => `<a class="li" href="#/people/${p.id}"><div class="li-main"><b>${esc(p.full_name || p.email)}${p.nickname ? ` <span class="mut">“${esc(p.nickname)}”</span>` : ''}</b><span class="mut small">${esc(p.email)}${p.username ? ' · ' + esc(p.username) : ''}</span>
     <span class="small">${p.is_admin ? chip('Owner', 'info') + ' ' : ''}${(p.roles || []).map(r => chip(`${r.ws === 'catering' ? 'Catering' : 'Restaurant'} · ${roleName(r.role)}`)).join(' ')}${!p.username ? chip('not set up', 'warn') : ''}${p.username && !p.active ? chip('switched off', 'bad') : ''}</span></div></a>`).join('')}</div>
-  ${sel ? `<form class="card mt" data-form="savePerson" data-email="${esc(sel.email)}"><h2>${esc(sel.full_name || sel.email)}</h2>
-    <div class="grid"><label>Full name<input name="full_name" value="${esc(sel.full_name || '')}" required></label><label>Username<input name="username" value="${esc(sel.username || sel.email.split('@')[0])}" required pattern="[a-z0-9._\\-]{2,40}" title="lower-case letters, numbers, . _ -"></label></div>
+  ${sel ? `<form class="card mt" data-form="savePerson" data-email="${esc(sel.email)}" data-id="${sel.id}"><h2>${esc(sel.full_name || sel.email)}</h2>
+    <div class="grid"><label>Full name<input name="full_name" value="${esc(sel.full_name || '')}" required></label><label>Username<input name="username" value="${esc(sel.username || sel.email.split('@')[0])}" required pattern="[a-z0-9._\\-]{2,40}" title="lower-case letters, numbers, . _ -"></label>
+      <label>Nickname<input name="nickname" value="${esc(sel.nickname || '')}" maxlength="30" placeholder="${esc((sel.full_name || '').split(' ')[0] || 'e.g. Chef Jas')}"><span class="small mut">What the app calls them — on their home screen (“Magandang umaga, …!”) and at the top. Leave blank to use their first name.</span></label></div>
     <table class="roles"><thead><tr><th></th><th>Catering</th><th>Restaurant</th></tr></thead><tbody>
     ${ROLES.map(([k, l, h]) => `<tr><td>${l}<div class="small mut">${esc(h || '')}</div></td><td><input type="checkbox" name="r_catering_${k}" ${has('catering', k) ? 'checked' : ''}></td><td><input type="checkbox" name="r_restaurant_${k}" ${has('restaurant', k) ? 'checked' : ''}></td></tr>`).join('')}
     </tbody></table>
@@ -2498,9 +2500,14 @@ ACT.revokeTablet = async el => {
   toast('Tablet removed'); refresh();
 };
 FORMS.savePerson = async (f, el) => {
-  const roles = Object.keys(f).filter(k => k.startsWith('r_')).map(k => { const [, ws, role] = k.split('_'); return { ws, role }; });
+  // r_<workspace>_<role>: the role itself may contain "_" (event_specialist, head_chef, rnd_chef)
+  const roles = Object.keys(f).filter(k => k.startsWith('r_')).map(k => { const [, ws, ...rest] = k.split('_'); return { ws, role: rest.join('_') }; });
   await db.rpc('admin_set_member', { p_email: el.dataset.email, p_username: f.username, p_full_name: f.full_name, p_roles: roles, p_is_admin: !!f.is_admin, p_active: !!f.active });
-  toast('Saved'); refresh();
+  let note = '';
+  try { await db.rpc('admin_set_nickname', { p_user: el.dataset.id, p_nickname: f.nickname || '' }); }
+  catch (e) { note = ' — nickname needs the latest database update (20261127000400_nicknames)'; }
+  if (el.dataset.id === S.me?.id) S.me = await db.rpc('my_access');   // your own nickname shows straight away
+  toast('Saved' + note); refresh();
 };
 
 /* ================= account ================= */
