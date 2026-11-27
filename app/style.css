@@ -754,3 +754,41 @@ body:not(.pos-mode) main{padding-bottom:calc(80px + env(safe-area-inset-bottom))
 .pk-nl>span:last-child{display:grid;gap:2px;font-size:14px}.pk-nl b{color:var(--navy)}.pk-nl small{color:var(--mut);font-size:12px}
 .pk-st.new{box-shadow:0 0 0 2px #1d7a3a;animation:pkPulse 1.6s ease-out 2}
 @keyframes pkPulse{0%{box-shadow:0 0 0 0 #1d7a3a88}100%{box-shadow:0 0 0 2px #1d7a3a}}
+/* ---- My tasks ---- */
+.tk-quick{position:relative;display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 12px}
+.tk-quick input{flex:1;min-width:0;font-size:16px;padding:12px 14px;border-radius:12px;border:1.5px solid #d9d2b8;background:#fff}
+.tk-quick input:focus{border-color:var(--navy);outline:none;box-shadow:0 0 0 3px #14213f1a}
+.tk-quick>button{min-width:48px;font-size:20px;border-radius:12px;padding:0 14px}
+.tk-prev{flex:1 0 100%;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.tk-views a i{font-style:normal;font-size:11px;background:#e9e3d2;color:var(--navy);border-radius:9px;padding:0 6px;margin-left:3px}.tk-views a.on i{background:#ffffff33;color:#fff}
+.tk-lists{display:flex;gap:6px;overflow-x:auto;padding:8px 0 2px;scrollbar-width:none}
+.tk-lists button{white-space:nowrap;border:1px solid #e3ddcf;background:#fff;border-radius:999px;padding:5px 12px;font-size:13px;color:var(--navy);display:inline-flex;align-items:center;gap:6px}
+.tk-lists button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.tkdot{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--lc,#c9a44c)}
+.tk-list{margin-top:6px}
+.tk-g{margin:14px 2px 6px;font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;color:#8a5a00}.tk-g.late{color:#b42318}
+.tk{display:flex;align-items:flex-start;gap:10px;background:#fff;border:1px solid #e9e3d2;border-left:4px solid var(--lc,transparent);border-radius:12px;padding:10px 12px;margin-bottom:6px;transition:opacity .25s}
+.tk.imp{background:#fffaf5}
+.tk-chk{flex:0 0 26px;width:26px;height:26px;border-radius:50%;border:2px solid #b8b09a;background:#fff;color:#fff;font-weight:800;font-size:14px;line-height:1;padding:0;display:grid;place-items:center;margin-top:1px}
+.tk.imp .tk-chk{border-color:#b42318}
+.tk-chk:hover{border-color:var(--navy);background:#f1ead3}
+.tk.done .tk-chk{background:#2f7a45;border-color:#2f7a45}
+.tk.done .tk-t{text-decoration:line-through;color:var(--mut)}.tk.done{opacity:.7}
+.tk.pop .tk-chk{animation:tkPop .3s ease-out}@keyframes tkPop{50%{transform:scale(1.25)}}
+.tk-main{flex:1;min-width:0;text-align:left;background:none;border:0;padding:0;color:var(--ink);font:inherit;cursor:pointer;display:grid;gap:4px}
+.tk-t{font-size:15px;line-height:1.35;overflow-wrap:anywhere}.tk-imp{color:#b42318}
+.tk-m{display:flex;flex-wrap:wrap;gap:5px}
+.tkc{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;background:#f4f0e5;color:#5b6170;border-radius:999px;padding:2px 8px}
+.tkc.today{background:#fff3d9;color:#8a5300}.tkc.late{background:#fdecea;color:#b42318;font-weight:600}
+.tk-empty{padding:26px 10px;text-align:center;color:var(--mut);background:#fffdf7;border:1px dashed #e3ddcf;border-radius:12px}
+.tk-undo{display:flex;gap:8px;align-items:center;background:#e6f4ea;color:#1d7a3a;border-radius:10px;padding:8px 12px;margin:0 0 10px;font-size:14px}.tk-undo b{color:#14532d}.tk-undo .lnk{margin-left:auto}
+.tk-form{display:grid;gap:10px}.tk-form h2{margin:0}
+.tk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.tk-grid label,.tk-form>label{display:grid;gap:4px}
+.tk-impl{display:flex!important;flex-direction:row!important;align-items:center;gap:8px;cursor:pointer}.tk-impl input{width:20px;height:20px;accent-color:#b42318}
+.tk-set{display:grid;gap:8px}.tk-set h2,.tk-set h3{margin:0}.tk-set h3{margin-top:6px;font-size:15px;color:var(--navy)}
+.tk-ls{display:grid;gap:6px}
+.tk-l{display:flex;gap:6px;align-items:center}.tk-l input[name=name]{flex:1;min-width:0}.tk-l .tk-em{width:52px;text-align:center;font-size:18px}.tk-l input[type=color]{width:42px;height:38px;padding:2px;border-radius:8px}
+.tk-pf{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:8px}.tk-pf label{display:grid;gap:4px}.tk-pf .tk-impl,.tk-pf .row{grid-column:1/-1}
+.tk-gear.on{background:var(--navy);color:#fff}
+.tk-home{margin:0 0 18px}.tk-home h2{margin:0}.tk-home>.row{margin-bottom:8px}.tk-n{background:var(--navy)!important}
+@media (max-width:760px){.tk-grid{grid-template-columns:1fr 1fr}.tk-pf{grid-template-columns:1fr}}

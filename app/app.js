@@ -157,16 +157,16 @@ function renderShell(key) {
     : inRes ? (resFront() ? [['r/pos', 'POS'], ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['r/kitchen', '86 & running low'], ['r/requests', 'Requests']]
       : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
-    <div class="who"><a href="#/me" class="who-av" title="My account">${av(S.me?.id, S.me?.full_name, "xs")}</a><span>Hi, ${esc(nick())}</span><span class="bell-slot">${bellHtml()}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}<a href="#/events"${key === 'events' ? ' class="on"' : ''}>Events</a>${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<a href="#/me"${key === 'me' ? ' class="on"' : ''}>My account</a><button class="ghost" data-act="logout">Log out</button></div>
+    <div class="who"><a href="#/me" class="who-av" title="My account">${av(S.me?.id, S.me?.full_name, "xs")}</a><span>Hi, ${esc(nick())}</span><span class="bell-slot">${bellHtml()}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}<a href="#/tasks"${key === 'tasks' ? ' class="on"' : ''}>Tasks</a><a href="#/events"${key === 'events' ? ' class="on"' : ''}>Events</a>${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<a href="#/me"${key === 'me' ? ' class="on"' : ''}>My account</a><button class="ghost" data-act="logout">Log out</button></div>
     ${mobileMenu(key, nav, inCat, inRes)}</div>
     ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a></nav>` : ''}`;
 }
 // Phones: one "☰ Menu" button opens a dropdown with every page and account action (pills and header links are hidden there).
 function mobileMenu(key, nav, inCat, inRes) {
-  const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People', me: 'My account', pokes: 'Pokes' }[key.split('/')[0]] || 'Home';
+  const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People', me: 'My account', pokes: 'Pokes', tasks: 'My tasks' }[key.split('/')[0]] || 'Home';
   const a = (href, label, on) => `<a href="#/${href}"${on ? ' class="on"' : ''}>${label}</a>`;
   const sect = nav.length ? `<div class="mn-h">${inCat ? 'Catering' : 'Restaurant'}</div><div class="mn-g">${nav.map(([k, l]) => a(k, l, navOf(key) === k)).join('')}</div>` : '';
-  const go = [`<a class="mn-pokes${key === 'pokes' ? ' on' : ''}" href="#/pokes">🔔 Pokes <i${POKE.unread.open + (POKE.unread.replies || 0) ? '' : ' hidden'}>${POKE.unread.open + (POKE.unread.replies || 0) || ''}</i></a>`, a('', '🏠 Home', key === '' || key === 'home'), a('events', '📅 Events board', key === 'events'),
+  const go = [`<a class="mn-pokes${key === 'pokes' ? ' on' : ''}" href="#/pokes">🔔 Pokes <i${POKE.unread.open + (POKE.unread.replies || 0) ? '' : ' hidden'}>${POKE.unread.open + (POKE.unread.replies || 0) || ''}</i></a>`, a('', '🏠 Home', key === '' || key === 'home'), a('tasks', '✅ My tasks', key === 'tasks'), a('events', '📅 Events board', key === 'events'),
     ...(inCat ? [a('r', '⇄ Switch to Restaurant')] : inRes ? [a('c', '⇄ Switch to Catering')] : []),
     ...(isAdmin() ? [a('activity', '🕘 Activity', key.startsWith('activity')), a('people', '👥 People', key === 'people')] : [])].join('');
   return `<span class="bell-slot mob">${bellHtml()}</span><details class="mnav"><summary aria-label="Menu"><span class="mn-cur">${esc(cur)}</span><span class="mn-ic">☰</span></summary>
@@ -293,7 +293,7 @@ routes.home = async () => {
   const t = today(), tm = addDays(t, 1), hour = new Date(Date.now() + 8 * 3600e3).getUTCHours();
   const [fil, en] = GREET(hour), first = esc(nick());
   const doy = Math.floor((Date.parse(t) - Date.parse(t.slice(0, 4) + '-01-01')) / 864e5);
-  const [ev, pk] = await Promise.all([db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null), homePokes()]);
+  const [ev, pk, tk] = await Promise.all([db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null), homePokes(), homeTasks()]);
   const nToday = ev ? ev.filter(e => e.event_date === t).length : null, nTmr = ev ? ev.filter(e => e.event_date === tm).length : null;
   const next = ev?.find(e => e.event_date === t && e.serve_time && e.serve_time.slice(0, 5) >= new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16));
   const cards = [];
@@ -311,7 +311,7 @@ routes.home = async () => {
         ${next ? `<a href="#/events"><b>${esc(fmtClock(next.serve_time))}</b><span>next: ${esc(next.client || next.title)}</span></a>` : ''}
       </div>` : ''}
     </section>
-    ${pk}
+    ${pk}${tk}
     <h2 class="hw-where">Where are you working today?</h2>
     <div class="hw-grid">${cards.join('')}</div>
     ${!member('restaurant') && !member('catering') ? `<div class="card mt"><p>You don't have a workspace yet — ask the owner to give you a role. Meanwhile you can see the Events board.</p></div>` : ''}
@@ -2496,6 +2496,248 @@ routes.activity = async arg => {
 const n0 = v => v != null && String(v).trim() !== '';
 FORMS.audFilter = async f => go('#/activity/' + encodeURIComponent([f.day, f.actor, f.area].join('|')));
 
+/* ================= MY TASKS (private to-do list for each person) ================= */
+// Quick add understands: "Order eggs tomorrow 8am !" → tomorrow 8:00 AM, important. "#Prep" puts it in your Prep list.
+// Reminders ping the phone (when phone notifications are on) and pop up in the app when it's open.
+const TK = { prefs: null, edit: null, gear: false, justDone: null, list: '' };
+const TK_DEF = { view: 'today', morning: '08:00', defRemind: 'at', home: true };
+const TK_COLORS = ['#c9a44c', '#2f7a45', '#294074', '#b42318', '#8a5a00', '#6b4fa0', '#1d8a99', '#555555'];
+const REPEAT = { none: 'Does not repeat', daily: 'Every day', weekdays: 'Every weekday (Mon–Fri)', weekly: 'Every week', monthly: 'Every month' };
+// (lists, not objects: number-like keys would otherwise jump to the front)
+const REMIND_T = [['none', 'No reminder'], ['at', 'At the time'], ['10', '10 minutes before'], ['30', '30 minutes before'], ['60', '1 hour before'], ['1440', '1 day before'], ['custom', 'Pick a time…']];
+const REMIND_D = [['none', 'No reminder'], ['at', 'Morning of (your morning time)'], ['1440', 'Morning, 1 day before'], ['custom', 'Pick a time…']];
+const hasOpt = (list, k) => list.some(o => o[0] === k);
+const tkPrefs = () => ({ ...TK_DEF, ...(TK.prefs || {}) });
+async function tkLoadPrefs() { if (TK.prefs) return; const r = await db.select('task_prefs').catch(() => []); TK.prefs = r[0]?.prefs || {}; }
+async function tkSavePrefs(patch) { TK.prefs = { ...(TK.prefs || {}), ...patch }; await db.upsert('task_prefs', { user_id: S.me.id, prefs: TK.prefs, updated_at: new Date().toISOString() }, 'user_id'); }
+const mnl = (d, t) => new Date(`${d}T${(t || '00:00').slice(0, 5)}:00+08:00`);
+const mnlParts = dt => { const x = new Date(new Date(dt).getTime() + 8 * 3600e3).toISOString(); return [x.slice(0, 10), x.slice(11, 16)]; };
+// When the reminder goes off
+function remindAt(t, custom) {
+  const r = t.remind || 'none';
+  if (r === 'none') return null;
+  if (r === 'custom') return custom ? new Date(custom + ':00+08:00').toISOString() : null;
+  if (!t.due_date) return null;
+  if (!t.due_time) return mnl(r === '1440' ? addDays(t.due_date, -1) : t.due_date, tkPrefs().morning).toISOString();
+  return new Date(mnl(t.due_date, t.due_time).getTime() - (r === 'at' ? 0 : Number(r)) * 60000).toISOString();
+}
+const DOW = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+const MON = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+// "Order eggs tomorrow 8am ! #Purchasing" → { title, due_date, due_time, priority, list_id }
+function tkParse(text, lists) {
+  let s = ' ' + text + ' ', due_date = null, due_time = null, priority = 0, list_id = null;
+  const t0 = today(), dowToday = new Date(t0 + 'T00:00:00Z').getUTCDay();
+  const cut = re => { const m = s.match(re); if (m) s = s.replace(m[0], ' '); return m; };
+  if (cut(/\s!+(?=\s)/)) priority = 1;
+  const lm = s.match(/\s#([^\s#]+)/);
+  if (lm) { const key = lm[1].toLowerCase(), l = lists.find(x => x.name.toLowerCase().replace(/[^\p{L}\p{N}]/gu, '').startsWith(key.replace(/[^\p{L}\p{N}]/gu, ''))); if (l) { list_id = l.id; s = s.replace(lm[0], ' '); } }
+  if (cut(/\s(today|ngayon)(?=\s)/i)) due_date = t0;
+  else if (cut(/\s(tonight|mamaya)(?=\s)/i)) { due_date = t0; due_time = '19:00'; }
+  else if (cut(/\s(tomorrow|tmrw|tom|bukas)(?=\s)/i)) due_date = addDays(t0, 1);
+  else { let m = cut(/\s(?:on\s)?(sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)(?:day|nesday|rsday|urday)?(?=\s)/i);
+    if (m) { const d = DOW.indexOf(m[1].slice(0, 3).toLowerCase()); due_date = addDays(t0, ((d - dowToday) + 7) % 7); }
+    else if ((m = cut(/\s(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.?\s(\d{1,2})(?=\s)/i))) {
+      const mo = MON.indexOf(m[1].slice(0, 3).toLowerCase()), y = Number(t0.slice(0, 4)); let d = `${y}-${String(mo + 1).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`;
+      if (d < t0) d = `${y + 1}${d.slice(4)}`; due_date = d; }
+    else if ((m = cut(/\s(\d{1,2})\/(\d{1,2})(?=\s)/))) { const y = Number(t0.slice(0, 4)); let d = `${y}-${String(m[1]).padStart(2, '0')}-${String(m[2]).padStart(2, '0')}`; if (d < t0) d = `${y + 1}${d.slice(4)}`; due_date = d; } }
+  let m = cut(/\s(?:at\s|@)?(\d{1,2})(?::(\d{2}))?\s?(am|pm|a|p)(?=\s)/i);
+  if (m) { let h = Number(m[1]) % 12; if (/p/i.test(m[3])) h += 12; due_time = `${String(h).padStart(2, '0')}:${m[2] || '00'}`; }
+  else if ((m = cut(/\s(?:at\s|@)(\d{1,2}):(\d{2})(?=\s)/i)) || (m = cut(/\s(\d{1,2}):(\d{2})(?=\s)/))) due_time = `${String(m[1]).padStart(2, '0')}:${m[2]}`;
+  else if (cut(/\s(noon|tanghali)(?=\s)/i)) due_time = '12:00';
+  if (due_time && !due_date) due_date = due_time > new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16) ? t0 : addDays(t0, 1);
+  return { title: s.replace(/\s+/g, ' ').trim(), due_date, due_time, priority, list_id };
+}
+const tkWhen = t => {
+  if (!t.due_date) return '';
+  const t0 = today(), d = t.due_date, tm = t.due_time ? ' ' + fmtClock(t.due_time) : '';
+  const day = d === t0 ? 'Today' : d === addDays(t0, 1) ? 'Tomorrow' : d === addDays(t0, -1) ? 'Yesterday'
+    : new Date(d + 'T00:00:00').toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' });
+  return day + tm;
+};
+const tkLate = t => !t.done_at && t.due_date && (t.due_date < today() || (t.due_date === today() && t.due_time && mnl(t.due_date, t.due_time) < new Date()));
+function tkRow(t, lists, opts = {}) {
+  const l = lists.find(x => x.id === t.list_id), rem = t.remind_at && !t.done_at ? mnlParts(t.remind_at) : null;
+  const chips = [t.due_date ? `<span class="tkc ${tkLate(t) ? 'late' : t.due_date === today() ? 'today' : ''}">📅 ${esc(tkWhen(t))}${tkLate(t) ? ' · late' : ''}</span>` : '',
+    rem ? `<span class="tkc">🔔 ${esc(rem[0] === today() ? fmtClock(rem[1]) : tkWhen({ due_date: rem[0], due_time: rem[1] }))}</span>` : '',
+    t.repeat !== 'none' ? `<span class="tkc">🔁 ${esc(REPEAT[t.repeat].replace('Every ', '').replace(' (Mon–Fri)', ''))}</span>` : '',
+    l && !opts.hideList ? `<span class="tkc" style="--lc:${esc(l.color || '#c9a44c')}"><i class="tkdot"></i>${esc((l.emoji ? l.emoji + ' ' : '') + l.name)}</span>` : '',
+    t.notes ? '<span class="tkc">📝</span>' : '', t.from_poke ? '<span class="tkc">👉 from a poke</span>' : ''].filter(Boolean).join('');
+  return `<div class="tk${t.done_at ? ' done' : ''}${t.priority ? ' imp' : ''}" style="--lc:${esc(l?.color || 'transparent')}">
+    <button class="tk-chk" data-act="${t.done_at ? 'tkUndone' : 'tkDone'}" data-id="${t.id}" aria-label="${t.done_at ? 'Mark not done' : 'Mark done'}">${t.done_at ? '✓' : ''}</button>
+    <button class="tk-main" data-act="tkEdit" data-id="${t.id}"><span class="tk-t">${t.priority ? '<b class="tk-imp">!</b> ' : ''}${esc(t.title)}</span>${chips ? `<span class="tk-m">${chips}</span>` : ''}</button></div>`;
+}
+function tkForm(t, lists) {
+  const p = tkPrefs(), isNew = !t.id, rem = t.remind || (isNew ? (t.due_time ? p.defRemind : t.due_date ? (p.defRemind === 'none' ? 'none' : 'at') : 'none') : 'none');
+  const custom = t.remind === 'custom' && t.remind_at ? mnlParts(t.remind_at).join('T') : '';
+  const remOpts = (t.due_time ? REMIND_T : REMIND_D);
+  return `<form class="card tk-form" data-form="tkSave" data-id="${t.id || ''}" data-poke="${esc(t.from_poke || '')}">
+    <div class="row"><h2>${isNew ? 'New task' : 'Edit task'}</h2><span class="sp"></span><button type="button" class="lnk" data-act="tkClose">Close</button></div>
+    <label>Task<input name="title" maxlength="200" required value="${esc(t.title || '')}" placeholder="What needs doing?" autocomplete="off"></label>
+    <label>Notes <span class="small mut">(optional)</span><textarea name="notes" maxlength="1000" rows="2">${esc(t.notes || '')}</textarea></label>
+    <div class="tk-grid">
+      <label>Date<input type="date" name="due_date" value="${t.due_date || ''}" data-tkre></label>
+      <label>Time <span class="small mut">(optional)</span><input type="time" name="due_time" value="${(t.due_time || '').slice(0, 5)}" data-tkre></label>
+      <label>Reminder<select name="remind" data-tkrem>${remOpts.map(([k, v]) => opt(k, v, k === rem)).join('')}</select></label>
+      <label class="tk-cust"${rem === 'custom' ? '' : ' hidden'}>Remind me at<input type="datetime-local" name="custom" value="${custom}"></label>
+      <label>Repeat<select name="repeat">${Object.entries(REPEAT).map(([k, v]) => opt(k, v, k === (t.repeat || 'none'))).join('')}</select></label>
+      <label>List<select name="list_id">${opt('', 'No list')}${lists.map(l => opt(l.id, (l.emoji ? l.emoji + ' ' : '') + l.name, l.id === (t.list_id ?? (isNew ? (TK.list || p.defaultList || '') : '')))).join('')}</select></label>
+    </div>
+    <label class="tk-impl"><input type="checkbox" name="priority" ${t.priority ? 'checked' : ''}> <span>❗ Important</span></label>
+    <div class="row end">${isNew ? '' : `<button type="button" class="lnk bad-t" data-act="tkDelete" data-id="${t.id}">Delete</button><span class="sp"></span>`}<button class="pri">${isNew ? 'Add task' : 'Save'}</button></div>
+  </form>`;
+}
+// Date/time changes switch the reminder choices (a task with a time can remind "10 minutes before"; a date-only task reminds in the morning)
+document.addEventListener('change', e => {
+  const f = e.target.closest('form[data-form="tkSave"]'); if (!f) return;
+  if (e.target.matches('[data-tkrem]')) f.querySelector('.tk-cust').hidden = e.target.value !== 'custom';
+  if (e.target.matches('[data-tkre]')) {
+    const sel = f.querySelector('[data-tkrem]'), cur = sel.value, src = f.due_time.value ? REMIND_T : REMIND_D, p = tkPrefs();
+    let pick = hasOpt(src, cur) ? cur : (f.due_time.value ? p.defRemind : 'at');
+    if (cur === 'none' && !f.dataset.touched) pick = f.due_date.value ? (f.due_time.value ? p.defRemind : (p.defRemind === 'none' ? 'none' : 'at')) : 'none';
+    sel.innerHTML = src.map(([k, v]) => opt(k, v, k === pick)).join('');
+    f.querySelector('.tk-cust').hidden = pick !== 'custom';
+  }
+  if (e.target.matches('[data-tkrem]')) f.dataset.touched = '1';
+});
+
+routes.tasks = async arg => {
+  await tkLoadPrefs();
+  const p = tkPrefs(), view = arg && ['today', 'upcoming', 'anytime', 'all', 'done'].includes(arg) ? arg : p.view;
+  const since = new Date(Date.now() - 7 * 864e5).toISOString();
+  const [lists, open, done] = await Promise.all([db.select('task_lists', { order: [['sort'], ['created_at']] }), db.select('tasks', { eq: { done_at: null }, order: [['due_date'], ['due_time'], ['created_at']] }),
+    view === 'done' ? db.select('tasks', { gte: { done_at: since }, order: [['done_at', false]], limit: 100 }) : []]);
+  TK.lists = lists;
+  const t0 = today(), inList = t => !TK.list || t.list_id === TK.list;
+  const byDue = (a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999') || (a.due_time || '99').localeCompare(b.due_time || '99') || b.priority - a.priority;
+  const sets = { today: open.filter(t => t.due_date && t.due_date <= t0), upcoming: open.filter(t => t.due_date > t0), anytime: open.filter(t => !t.due_date), all: open, done };
+  const cnt = k => sets[k].filter(inList).length;
+  const shown = sets[view].filter(inList).sort(view === 'done' ? () => 0 : byDue);
+  // groups
+  let body = '';
+  if (view === 'today') {
+    const late = shown.filter(tkLate), rest = shown.filter(t => !tkLate(t)).sort((a, b) => b.priority - a.priority || (a.due_time || '99').localeCompare(b.due_time || '99'));
+    body = (late.length ? `<h3 class="tk-g late">Late</h3>${late.map(t => tkRow(t, lists)).join('')}` : '') + (rest.length ? `<h3 class="tk-g">Today</h3>${rest.map(t => tkRow(t, lists)).join('')}` : '');
+  } else if (view === 'upcoming' || view === 'all') {
+    const g = {}; for (const t of shown) (g[t.due_date ? (t.due_date < t0 ? 'late' : t.due_date) : 'none'] ||= []).push(t);
+    body = Object.keys(g).sort((a, b) => (a === 'late' ? '0' : a === 'none' ? 'z' : a).localeCompare(b === 'late' ? '0' : b === 'none' ? 'z' : b))
+      .map(k => `<h3 class="tk-g${k === 'late' ? ' late' : ''}">${k === 'late' ? 'Late' : k === 'none' ? 'Anytime' : esc(tkWhen({ due_date: k }))}</h3>${g[k].map(t => tkRow(t, lists)).join('')}`).join('');
+  } else body = shown.map(t => tkRow(t, lists)).join('');
+  const empty = { today: 'Nothing due today. 🎉 Add one above, or check Upcoming.', upcoming: 'Nothing planned for the coming days.', anytime: 'No tasks without a date.', all: 'No open tasks. 🎉', done: 'Nothing finished in the last 7 days yet.' }[view];
+  const editT = TK.edit === 'new' ? { title: '', due_date: view === 'today' ? t0 : null } : TK.edit ? [...open, ...done].find(t => t.id === TK.edit) : null;
+  const jd = TK.justDone;
+  return `<div class="row"><h1>My tasks</h1><span class="sp"></span><button class="ghost tk-gear${TK.gear ? ' on' : ''}" data-act="tkGear" title="Customize">⚙︎ Customize</button></div>
+  <p class="mut small" style="margin-top:-4px">Only you can see your tasks.</p>
+  ${TK.gear ? await tkSettings(lists) : ''}
+  <form class="tk-quick" data-form="tkQuick" autocomplete="off"><input name="q" placeholder="Add a task… e.g. Order eggs tomorrow 8am !" maxlength="240" data-tkq><button class="pri" aria-label="Add">＋</button>
+    <button type="button" class="ghost" data-act="tkNew" title="More details">⋯</button><div class="tk-prev" hidden></div></form>
+  ${editT ? tkForm(editT, lists) : ''}
+  ${jd ? `<div class="tk-undo">✓ Done: <b>${esc(jd.title)}</b>${jd.next ? ' · next one added' : ''}<button class="lnk" data-act="tkUndo">Undo</button></div>` : ''}
+  <div class="seg tk-views">${[['today', 'Today'], ['upcoming', 'Upcoming'], ['anytime', 'Anytime'], ['all', 'All'], ['done', 'Done']].map(([k, l]) => `<a href="#/tasks/${k}" class="${view === k ? 'on' : ''}">${l}${k !== 'done' && cnt(k) ? ` <i>${cnt(k)}</i>` : ''}</a>`).join('')}</div>
+  ${lists.length ? `<div class="tk-lists"><button class="${!TK.list ? 'on' : ''}" data-act="tkList" data-id="">All lists</button>${lists.map(l => `<button class="${TK.list === l.id ? 'on' : ''}" data-act="tkList" data-id="${l.id}" style="--lc:${esc(l.color || '#c9a44c')}"><i class="tkdot"></i>${esc((l.emoji ? l.emoji + ' ' : '') + l.name)}</button>`).join('')}</div>` : ''}
+  <div class="tk-list">${body || `<div class="tk-empty">${empty}</div>`}</div>
+  <p class="small mut mt">Tip: type <b>today</b>, <b>tomorrow</b>, a day (<b>fri</b>), a date (<b>dec 5</b>), a time (<b>8am</b>, <b>3:30pm</b>), <b>!</b> for important${lists.length ? ' and <b>#' + esc(lists[0].name.split(' ')[0]) + '</b> for a list' : ''}.</p>`;
+};
+async function tkSettings(lists) {
+  const p = tkPrefs();
+  return `<section class="card tk-set"><h2>Customize my tasks</h2>
+    <h3>My lists</h3><p class="small mut">Group your tasks your way — e.g. 🥚 Purchasing, 🔪 Prep, 🏠 Personal.</p>
+    <div class="tk-ls">${lists.map(l => `<form class="tk-l" data-form="tkListSave" data-id="${l.id}"><input name="emoji" value="${esc(l.emoji || '')}" maxlength="4" placeholder="🙂" class="tk-em"><input name="name" value="${esc(l.name)}" maxlength="40" required><input type="color" name="color" value="${esc(l.color || '#c9a44c')}"><button class="ghost">Save</button><button type="button" class="lnk bad-t" data-act="tkListDel" data-id="${l.id}" title="Delete list">✕</button></form>`).join('')}
+      <form class="tk-l" data-form="tkListSave" data-id=""><input name="emoji" maxlength="4" placeholder="🙂" class="tk-em"><input name="name" maxlength="40" required placeholder="New list name"><input type="color" name="color" value="${TK_COLORS[lists.length % TK_COLORS.length]}"><button class="pri">Add list</button></form></div>
+    <form data-form="tkPrefs" class="tk-pf">
+      <label>Open on<select name="view">${[['today', 'Today'], ['upcoming', 'Upcoming'], ['all', 'All']].map(([k, l]) => opt(k, l, p.view === k)).join('')}</select></label>
+      <label>My morning time <span class="small mut">(reminders for tasks with a date but no time)</span><input type="time" name="morning" value="${esc(p.morning)}"></label>
+      <label>Default reminder for tasks with a time<select name="defRemind">${REMIND_T.filter(o => ['none', 'at', '10', '30', '60'].includes(o[0])).map(([k, v]) => opt(k, v, p.defRemind === k)).join('')}</select></label>
+      <label>New tasks go to<select name="defaultList">${opt('', 'No list')}${lists.map(l => opt(l.id, (l.emoji ? l.emoji + ' ' : '') + l.name, p.defaultList === l.id)).join('')}</select></label>
+      <label class="tk-impl"><input type="checkbox" name="home" ${p.home !== false ? 'checked' : ''}> <span>Show my tasks for today on the home screen</span></label>
+      <div class="row end"><button class="pri">Save settings</button></div></form>
+    ${await pushCard(null)}</section>`;
+}
+// Live preview of what quick add understood
+document.addEventListener('input', e => {
+  if (!e.target.matches('[data-tkq]')) return;
+  const box = e.target.form.querySelector('.tk-prev'), v = e.target.value.trim(); if (!v) { box.hidden = true; return; }
+  const r = tkParse(v, TK.lists || []), l = (TK.lists || []).find(x => x.id === r.list_id);
+  const bits = [r.due_date && '📅 ' + tkWhen(r), r.priority && '❗ Important', l && '📁 ' + l.name].filter(Boolean);
+  box.hidden = !bits.length; box.innerHTML = bits.map(b => `<span class="tkc">${esc(b)}</span>`).join('') + (bits.length ? `<span class="small mut">“${esc(r.title)}”</span>` : '');
+});
+FORMS.tkQuick = async (f, form) => {
+  if (!f.q) return;
+  const p = tkPrefs(), r = tkParse(f.q, TK.lists || []); if (!r.title) return toast('Write the task first.', true);
+  const t = { ...r, list_id: r.list_id || TK.list || p.defaultList || null, due_date: r.due_date || null, remind: r.due_time ? p.defRemind : r.due_date ? (p.defRemind === 'none' ? 'none' : 'at') : 'none' };
+  if (t.list_id && !(TK.lists || []).some(l => l.id === t.list_id)) t.list_id = null;
+  t.remind_at = remindAt(t);
+  if (t.remind_at && new Date(t.remind_at) < new Date()) { t.remind_at = null; t.remind = 'none'; }
+  await db.insert('tasks', t); form.reset(); toast('Added' + (t.due_date ? ' · ' + tkWhen(t) : '') + (t.remind_at ? ' · 🔔' : ''));
+  refresh(); setTimeout(() => $('[data-tkq]')?.focus(), 150);
+};
+FORMS.tkSave = async (f, form) => {
+  const t = { title: f.title, notes: f.notes || null, due_date: f.due_date || null, due_time: f.due_date && f.due_time ? f.due_time : null, remind: f.remind || 'none',
+    repeat: f.due_date ? f.repeat : 'none', list_id: f.list_id || null, priority: f.priority ? 1 : 0 };
+  if (t.remind === 'custom' && !f.custom) return toast('Pick when to remind you.', true);
+  if (!t.due_date && !['none', 'custom'].includes(t.remind)) t.remind = 'none';
+  t.remind_at = remindAt(t, f.custom);
+  if (t.remind_at && new Date(t.remind_at) < new Date(Date.now() - 60000) && t.remind !== 'none') toast('Note: that reminder time has already passed.');
+  if (form.dataset.id) await db.update('tasks', t, { id: form.dataset.id });
+  else await db.insert('tasks', { ...t, from_poke: form.dataset.poke || null });
+  TK.edit = null; toast(form.dataset.id ? 'Saved' : 'Task added'); refresh();
+};
+FORMS.tkListSave = async (f, form) => {
+  const row = { name: f.name, emoji: f.emoji || null, color: f.color || null };
+  if (form.dataset.id) await db.update('task_lists', row, { id: form.dataset.id }); else await db.insert('task_lists', { ...row, sort: (TK.lists || []).length });
+  toast('List saved'); refresh();
+};
+FORMS.tkPrefs = async f => { await tkSavePrefs({ view: f.view, morning: f.morning || '08:00', defRemind: f.defRemind, defaultList: f.defaultList || null, home: !!f.home }); toast('Settings saved'); TK.gear = false; refresh(); };
+ACT.tkListDel = async el => { if (!confirm('Delete this list? Its tasks stay, without a list.')) return; await db.remove('task_lists', { id: el.dataset.id }); if (TK.list === el.dataset.id) TK.list = ''; refresh(); };
+ACT.tkGear = async () => { TK.gear = !TK.gear; refresh(); };
+ACT.tkList = async el => { TK.list = el.dataset.id; refresh(); };
+ACT.tkNew = async () => { TK.edit = 'new'; await refresh(); $('.tk-form [name=title]')?.focus(); };
+ACT.tkEdit = async el => { TK.edit = TK.edit === el.dataset.id ? null : el.dataset.id; await refresh(); if (TK.edit) $('.tk-form')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+ACT.tkClose = async () => { TK.edit = null; refresh(); };
+ACT.tkDelete = async el => { if (!confirm('Delete this task?')) return; await db.remove('tasks', { id: el.dataset.id }); TK.edit = null; toast('Deleted'); refresh(); };
+ACT.tkDone = async el => {
+  el.closest('.tk')?.classList.add('done', 'pop');
+  const [t] = await db.select('tasks', { eq: { id: el.dataset.id } });
+  const next = await db.rpc('task_done', { p_id: el.dataset.id });
+  TK.justDone = { id: el.dataset.id, title: t?.title || '', next }; if (TK.edit === el.dataset.id) TK.edit = null;
+  setTimeout(() => { if (TK.justDone?.id === el.dataset.id) { TK.justDone = null; if (current.startsWith('tasks')) refresh(); } }, 8000);
+  setTimeout(refresh, 350);
+};
+ACT.tkUndo = async () => { const j = TK.justDone; if (!j) return; await db.update('tasks', { done_at: null }, { id: j.id }); if (j.next) await db.remove('tasks', { id: j.next }).catch(() => {}); TK.justDone = null; toast('Undone'); refresh(); };
+ACT.tkUndone = async el => { await db.update('tasks', { done_at: null }, { id: el.dataset.id }); toast('Back on your list'); refresh(); };
+// A poke → my task (keeps its due time; reminder at that time)
+ACT.pokeToTask = async el => {
+  const d = JSON.parse(el.dataset.poke); await tkLoadPrefs();
+  const t = { title: d.body.slice(0, 200), from_poke: d.id, due_date: null, due_time: null, remind: 'none' };
+  if (d.due) { const [dd, tt] = mnlParts(d.due); t.due_date = dd; t.due_time = tt; t.remind = tkPrefs().defRemind === 'none' ? 'at' : tkPrefs().defRemind; }
+  t.remind_at = remindAt(t);
+  await db.insert('tasks', t); el.textContent = '✓ In My tasks'; el.disabled = true; toast('Added to My tasks' + (t.due_date ? ' · ' + tkWhen(t) : ''));
+};
+// Home screen: today's tasks
+async function homeTasks() {
+  try {
+    await tkLoadPrefs(); if (tkPrefs().home === false) return '';
+    const t0 = today(), [lists, rows] = await Promise.all([db.select('task_lists'), db.select('tasks', { eq: { done_at: null }, lte: { due_date: t0 }, order: [['due_date'], ['due_time']], limit: 30 })]);
+    TK.lists = lists;
+    const list = rows.sort((a, b) => tkLate(b) - tkLate(a) || b.priority - a.priority || (a.due_time || '99').localeCompare(b.due_time || '99'));
+    return `<section class="tk-home"><div class="row"><h2>✅ My tasks today${list.length ? ` <span class="pk-n tk-n">${list.length}</span>` : ''}</h2><span class="sp"></span><a class="btn" href="#/tasks">Open →</a></div>
+      ${list.length ? `<div class="tk-list">${list.slice(0, 5).map(t => tkRow(t, lists)).join('')}</div>${list.length > 5 ? `<a class="small" href="#/tasks/today">+ ${list.length - 5} more</a>` : ''}`
+        : `<p class="mut small">Nothing due today. <a href="#/tasks">Add a task →</a></p>`}</section>`;
+  } catch (e) { return ''; }
+}
+// In-app reminder pop-ups while the app is open (the phone notification comes from the server)
+const TK_SHOWN = new Set(JSON.parse(sessionStorage.getItem('rom-tk-shown') || '[]'));
+async function tkReminderCheck() {
+  const now = Date.now(), rows = await db.select('tasks', { cols: 'id,title,priority,remind_at', eq: { done_at: null }, lte: { remind_at: new Date(now).toISOString() }, gte: { remind_at: new Date(now - 15 * 60000).toISOString() } }).catch(() => []);
+  for (const t of rows) {
+    if (TK_SHOWN.has(t.id + t.remind_at)) continue; TK_SHOWN.add(t.id + t.remind_at);
+    toast(`${t.priority ? '❗' : '⏰'} Reminder: ${t.title}`);
+    if (document.hidden && 'Notification' in window && Notification.permission === 'granted' && !(await pushSub())) {
+      const reg = await navigator.serviceWorker?.getRegistration(); reg?.showNotification(`⏰ Reminder: ${t.title}`, { body: 'From My tasks', tag: 'task-' + t.id, icon: './icons/icon-192.png', data: { url: './#/tasks' } });
+    }
+  }
+  try { sessionStorage.setItem('rom-tk-shown', JSON.stringify([...TK_SHOWN].slice(-200))); } catch (e) {}
+}
+
 /* ================= Profile photos ================= */
 // Small square JPEGs kept in the database; each phone keeps a copy and only downloads photos that changed.
 const AV = { img: {}, key: 'rom-avatars' };
@@ -2658,7 +2900,7 @@ function pokeCard(p, mode) {
   const allDone = p.recipients && p.recipients.every(r => r.done_at);
   const acts = p.cancelled_at ? `<span class="chip mut">Taken back</span>`
     : mode === 'in' ? (p.done_at ? `<span class="chip ok">Done ${ago(p.done_at)}</span>${p.reply ? ` <span class="small mut">“${esc(p.reply)}”</span>` : ''} <button class="lnk" data-act="pokeUndo" data-id="${p.id}">Undo</button>`
-        : `<button class="pri" data-act="pokeDone" data-id="${p.id}">✓ Done</button><button class="ghost" data-act="pokeReply" data-id="${p.id}">Reply</button>`)
+        : `<button class="pri" data-act="pokeDone" data-id="${p.id}">✓ Done</button><button class="ghost" data-act="pokeReply" data-id="${p.id}">Reply</button><button class="lnk" data-act="pokeToTask" data-poke="${esc(JSON.stringify({ id: p.id, body: p.body, due: p.due_at }))}">＋ My tasks</button>`)
     : (allDone ? '<span class="chip ok">All done</span>' : '') + ((mode === 'sent' || isAdmin()) && !allDone ? `<button class="lnk" data-act="pokeCancel" data-id="${p.id}">Take back</button>` : '');
   const face = av(mode === 'sent' ? S.me.id : p.from_user, mode === 'sent' ? S.me.full_name : p.from_full || p.from_name, 'sm');
   return `<div class="poke${p.urgent ? ' urgent' : ''}${(mode === 'in' && p.done_at) || p.cancelled_at ? ' done' : ''}">
@@ -2756,7 +2998,8 @@ let pokeBusy = false;
 async function pokePoll() {
   if (!S.user || !S.me || pokeBusy || !navigator.onLine) return; pokeBusy = true;
   try {
-    if (!document.hidden) db.rpc('i_am_here').catch(() => {});   // "in the app now" for My teammates
+    if (!document.hidden) db.rpc('i_am_here').catch(() => {});
+    tkReminderCheck();   // "in the app now" for My teammates
     const u = await db.rpc('poke_unread'); const prev = POKE.lastId; POKE.unread = u; paintBell();
     const l = u.latest;
     if (l && l.id !== prev && prev !== null) {

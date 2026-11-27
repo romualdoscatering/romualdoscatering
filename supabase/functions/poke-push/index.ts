@@ -1,6 +1,7 @@
 // Romualdo's · poke-push
 // Sends a phone notification for a new poke (endorsement) to the people it was sent to,
 // and a quieter one to the owner, managers and head chefs who keep "notify me of all pokes" on.
+// Also sends My tasks reminders: a database job calls it every minute with {"event":"reminders"} and its own x-cron-key.
 // Called by the staff app right after a poke is sent, and when someone marks a poke done or replies (event "done": tells the sender). Settings: Verify JWT OFF (the function checks the caller itself).
 // Secrets needed (Edge Functions → Secrets): SERVICE_KEY (already there), VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
@@ -8,7 +9,7 @@ import webpush from "npm:web-push@3.6.7";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-pos-device",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-pos-device, x-cron-key",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) =>
@@ -26,11 +27,30 @@ Deno.serve(async (req) => {
   const serviceKey = Deno.env.get("SERVICE_KEY") || Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
   const db = createClient(url, serviceKey, { auth: { persistSession: false } });
 
+  const { poke_id, event } = await req.json().catch(() => ({}));
+
+  // My tasks reminders (from the every-minute database job)
+  if (event === "reminders") {
+    const { data: okKey } = await db.rpc("cron_key_ok", { k: req.headers.get("x-cron-key") ?? "" });
+    if (okKey !== true) return json({ error: "Not allowed" }, 403);
+    const { data: due, error: dErr } = await db.rpc("tasks_due_reminders");
+    if (dErr) return json({ error: dErr.message }, 500);
+    if (!due?.length) return json({ ok: true, sent: 0 });
+    const { data: subs } = await db.from("push_subs").select("endpoint, user_id, p256dh, auth").in("user_id", [...new Set(due.map((t: any) => t.user_id))]);
+    let sent = 0;
+    await Promise.all(due.flatMap((t: any) => (subs ?? []).filter((s: any) => s.user_id === t.user_id).map(async (s: any) => {
+      const when = t.due_time ? " · " + String(t.due_time).slice(0, 5) : "";
+      const payload = JSON.stringify({ title: `${t.priority ? "❗ " : "⏰ "}Reminder: ${t.title}`.slice(0, 120), body: "From My tasks" + when, tag: "task-" + t.id, url: "./#/tasks", urgent: !!t.priority });
+      try { await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 60 * 60, urgency: "high" }); sent++; }
+      catch (e: any) { if (e?.statusCode === 404 || e?.statusCode === 410) await db.from("push_subs").delete().eq("endpoint", s.endpoint); }
+    })));
+    return json({ ok: true, reminders: due.length, sent });
+  }
+
   // Who is calling? Only the sender of the poke may trigger its notifications.
   const token = (req.headers.get("Authorization") ?? "").replace("Bearer ", "");
   const { data: who, error: whoErr } = await db.auth.getUser(token);
   if (whoErr || !who?.user) return json({ error: "Not signed in" }, 401);
-  const { poke_id, event } = await req.json().catch(() => ({}));
   if (!poke_id) return json({ error: "poke_id missing" }, 400);
 
   const { data: poke, error: pErr } = await db.from("pokes").select("id, from_user, body, urgent, due_at, created_at, cancelled_at").eq("id", poke_id).maybeSingle();
