@@ -170,20 +170,64 @@ function renderLogin(msg) {
 /* ---- home-screen app (same as /ops): icon, full-screen launch, install button ---- */
 const STANDALONE = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const UA = navigator.userAgent, ANDROID = /android/i.test(UA);
+// Messenger, Facebook, Instagram etc. open links in their own browser, where "Add to Home Screen" doesn't exist
+const INAPP = /FBAN|FBAV|FB_IAB|FBIOS|Messenger|Instagram|Line\/|MicroMessenger|TikTok|musical_ly|Snapchat/i.test(UA);
+const IOS_OTHER = IOS && /CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(UA);   // Chrome/Firefox/Google app on iPhone
+const APP_URL = 'https://romualdos.ph/app/';
 let INSTALL_EVT = null;
-const canInstall = () => !STANDALONE && (INSTALL_EVT || IOS);
+const canInstall = () => !STANDALONE && (INSTALL_EVT || IOS || ANDROID);
 window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); INSTALL_EVT = e; if (S.user) renderShell(current); else renderLogin(); });
 window.addEventListener('appinstalled', () => { INSTALL_EVT = null; toast("Romualdo's is on your home screen"); if (S.user) renderShell(current); });
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 function installTip() {
-  if (STANDALONE) return '';
-  if (INSTALL_EVT) return `<button type="button" class="ghost wide" data-act="install">📲 Add the staff app to this phone's home screen</button>`;
-  if (IOS) return `<div class="alert info small">📲 <b>Put the staff app on your home screen:</b> in Safari, tap <b>Share</b> (the square with an arrow), then <b>Add to Home Screen</b>.</div>`;
-  return `<p class="small mut">📲 On Android, open the browser menu <b>⋮</b> and tap <b>Add to Home screen</b> (or <b>Install app</b>).</p>`;
+  if (STANDALONE || !(INSTALL_EVT || IOS || ANDROID)) return '';
+  return `<button type="button" class="ghost wide" data-act="install">📲 Add the staff app to this phone's home screen</button>`;
 }
 async function doInstall() {
-  if (!INSTALL_EVT) return toast('In Safari, tap Share (the square with an arrow), then “Add to Home Screen”.');
-  INSTALL_EVT.prompt(); try { await INSTALL_EVT.userChoice; } catch (e) {} INSTALL_EVT = null; if (S.user) renderShell(current); else renderLogin();
+  if (INSTALL_EVT && !INAPP) {   // Android Chrome: the phone's own install prompt
+    INSTALL_EVT.prompt(); try { await INSTALL_EVT.userChoice; } catch (e) {} INSTALL_EVT = null; if (S.user) renderShell(current); else renderLogin(); return;
+  }
+  installGuide();
+}
+// Step-by-step help for putting the app on the home screen (iPhone has no one-tap install for web apps)
+const IG = {
+  dots: '<span class="ig-key" aria-label="three dots">•••</span>',
+  share: '<span class="ig-key" aria-label="Share"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg></span>',
+  add: '<span class="ig-key" aria-label="Add to Home Screen"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/></svg></span>',
+  kebab: '<span class="ig-key" aria-label="menu">⋮</span>'
+};
+function installGuide() {
+  const app = INAPP ? (/Messenger|MESSENGER/.test(UA) ? 'Messenger' : /Instagram/.test(UA) ? 'Instagram' : /FBAN|FBAV|FB_IAB|FBIOS/.test(UA) ? 'Facebook' : 'this app') : '';
+  const steps = (list) => `<ol class="ig-steps">${list.map(x => `<li>${x}</li>`).join('')}</ol>`;
+  const copy = `<div class="ig-link"><input readonly value="${APP_URL}" aria-label="Staff app link"><button type="button" class="ghost" data-igcopy>Copy link</button></div>`;
+  let body;
+  if (INAPP) body = `<div class="alert warn small">You're inside <b>${app}</b>. The app can't be added to the home screen from here — open the page in ${IOS ? 'Safari' : 'Chrome'} first.</div>
+    ${steps([`Tap ${IG.dots} or ${IG.kebab} at the ${IOS ? 'bottom or top right' : 'top right'} of this screen.`,
+      `Tap <b>${IOS ? 'Open in Safari' : 'Open in Chrome'}</b> (it may say <b>Open in browser</b> or <b>Open in external browser</b>).`,
+      `Then tap <b>📲 Get the app</b> again — the steps for ${IOS ? 'Safari' : 'Chrome'} will show.`])}
+    <p class="small mut">No “Open in” option? Copy the link, open ${IOS ? 'Safari' : 'Chrome'} and paste it in the address bar.</p>${copy}`;
+  else if (IOS_OTHER) body = `<div class="alert warn small">On iPhone, use <b>Safari</b> to add the app — it gives the full-screen app.</div>
+    ${steps(['Tap <b>Copy link</b> below.', 'Open <b>Safari</b>, tap the address bar and paste the link.', 'Tap <b>📲 Get the app</b> there and follow the steps.'])}${copy}`;
+  else if (IOS) body = steps([
+      `Tap ${IG.dots} at the bottom of Safari, next to the address bar.<br><span class="small mut">Older iPhones: skip this — the ${IG.share} Share button is already at the bottom.</span>`,
+      `Tap ${IG.share} <b>Share</b>.`,
+      `Scroll down and tap ${IG.add} <b>Add to Home Screen</b>.`,
+      `Keep <b>Open as Web App</b> on, then tap <b>Add</b> (top right).`])
+    + `<p class="small mut">The <b>Romualdo's</b> icon appears on your home screen. Open the app from that icon from now on — you stay signed in.</p>`;
+  else body = steps([`Tap ${IG.kebab} at the top right of Chrome.`, `Tap <b>Add to Home screen</b> or <b>Install app</b>.`, `Tap <b>Install</b> / <b>Add</b>.`])
+    + `<p class="small mut">The <b>Romualdo's</b> icon appears on your home screen.</p>`;
+  const box = document.createElement('div'); box.className = 'modal';
+  box.innerHTML = `<div class="card ig"><div class="row"><h2>📲 Get the staff app</h2><span class="sp"></span><button type="button" class="x" data-close aria-label="Close">✕</button></div>${body}
+    <div class="row end"><button type="button" class="pri" data-close>Got it</button></div></div>`;
+  document.body.appendChild(box);
+  box.addEventListener('click', async ev => {
+    if (ev.target.closest('[data-close]') || ev.target === box) return box.remove();
+    const c = ev.target.closest('[data-igcopy]'); if (!c) return;
+    const inp = box.querySelector('.ig-link input');
+    try { await navigator.clipboard.writeText(APP_URL); } catch (e) { inp.select(); try { document.execCommand('copy'); } catch (e2) {} }
+    c.textContent = 'Copied ✓';
+  });
 }
 document.addEventListener('submit', async e => {
   if (e.target.id !== 'loginForm') return;
