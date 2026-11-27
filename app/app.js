@@ -2544,10 +2544,10 @@ FORMS.audFilter = async f => go('#/activity/' + encodeURIComponent([f.day, f.act
 const TK = { prefs: null, edit: null, gear: false, justDone: null, list: '' };
 const TK_DEF = { view: 'today', morning: '08:00', defRemind: 'at', home: true };
 const TK_COLORS = ['#c9a44c', '#2f7a45', '#294074', '#b42318', '#8a5a00', '#6b4fa0', '#1d8a99', '#555555'];
-const REPEAT = { none: 'Does not repeat', daily: 'Every day', weekdays: 'Every weekday (Mon–Fri)', weekly: 'Every week', monthly: 'Every month' };
+const REPEAT = { none: 'Never', daily: 'Every day', weekdays: 'Every weekday (Mon–Fri)', weekly: 'Every week', monthly: 'Every month' };
 // (lists, not objects: number-like keys would otherwise jump to the front)
 const REMIND_T = [['none', 'No reminder'], ['at', 'At the time'], ['10', '10 minutes before'], ['30', '30 minutes before'], ['60', '1 hour before'], ['1440', '1 day before'], ['custom', 'Pick a time…']];
-const REMIND_D = [['none', 'No reminder'], ['at', 'Morning of (your morning time)'], ['1440', 'Morning, 1 day before'], ['custom', 'Pick a time…']];
+const REMIND_D = [['none', 'No reminder'], ['at', 'Morning of'], ['1440', 'Morning before'], ['custom', 'Pick a time…']];
 const hasOpt = (list, k) => list.some(o => o[0] === k);
 const tkPrefs = () => ({ ...TK_DEF, ...(TK.prefs || {}) });
 async function tkLoadPrefs() { if (TK.prefs) return; const r = await db.select('task_prefs').catch(() => []); TK.prefs = r[0]?.prefs || {}; }
@@ -2615,10 +2615,10 @@ function tkForm(t, lists) {
   return `<form class="card tk-form" data-form="tkSave" data-id="${t.id || ''}" data-poke="${esc(t.from_poke || '')}">
     <div class="row"><h2>${isNew ? 'New task' : 'Edit task'}</h2><span class="sp"></span><button type="button" class="lnk" data-act="tkClose">Close</button></div>
     <label>Task<input name="title" maxlength="200" required value="${esc(t.title || '')}" placeholder="What needs doing?" autocomplete="off"></label>
-    <label>Notes <span class="small mut">(optional)</span><textarea name="notes" maxlength="1000" rows="2">${esc(t.notes || '')}</textarea></label>
+    <label>Notes<textarea name="notes" maxlength="1000" rows="2" placeholder="Optional">${esc(t.notes || '')}</textarea></label>
     <div class="tk-grid">
       <label>Date<input type="date" name="due_date" value="${t.due_date || ''}" data-tkre></label>
-      <label>Time <span class="small mut">(optional)</span><input type="time" name="due_time" value="${(t.due_time || '').slice(0, 5)}" data-tkre></label>
+      <label>Time<input type="time" name="due_time" value="${(t.due_time || '').slice(0, 5)}" data-tkre></label>
       <label>Reminder<select name="remind" data-tkrem>${remOpts.map(([k, v]) => opt(k, v, k === rem)).join('')}</select></label>
       <label class="tk-cust"${rem === 'custom' ? '' : ' hidden'}>Remind me at<input type="datetime-local" name="custom" value="${custom}"></label>
       <label>Repeat<select name="repeat">${Object.entries(REPEAT).map(([k, v]) => opt(k, v, k === (t.repeat || 'none'))).join('')}</select></label>
@@ -3235,7 +3235,7 @@ function pokeForm(people, preTo) {
     <details class="pk-tdet"><summary>Send to a whole team</summary>
       ${groups.map(([ws, ts]) => `<div class="pk-tg"><span>${WS_NAME[ws]}</span><div class="pk-teams">${ts.map(t => `<label class="pk-chip"><input type="checkbox" name="t_${t.ws}|${t.role}" data-label="${esc(t.label)}"><span>${esc(plural(t.role))} <i>${t.n}</i></span></label>`).join('')}</div></div>`).join('')}</details>
     <label>Message<textarea name="body" maxlength="500" rows="3" required placeholder="e.g. Put the crispy pata in the oven by 8AM tomorrow">${esc(pokeDraft())}</textarea></label>
-    <div class="pk-row"><label>Needed by <span class="small mut">(optional)</span><input type="datetime-local" name="due"></label>
+    <div class="pk-row"><label>Needed by<input type="datetime-local" name="due"></label>
       <label class="pk-urg"><input type="checkbox" name="urgent"> <span>Urgent</span></label></div>
     <div class="row end"><a class="btn" href="#/pokes">Cancel</a><button class="pri">Send poke</button></div></form>`;
 }

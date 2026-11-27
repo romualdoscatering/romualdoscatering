@@ -923,3 +923,20 @@ a.mn-acct>span:not(.av){flex:1;display:grid;margin:0!important;color:var(--ink)}
 .kt input{width:180px}.kt-pl{flex:1;min-width:160px;font-size:13.5px;display:flex;gap:6px;align-items:center}.kt-pl .ico{color:#8a5a00}.kt-pl a{color:var(--navy);font-weight:600}
 .kt-list>.ghost{justify-self:start}
 .as-kit{font-size:14px;margin:10px 2px 0;display:flex;align-items:center;gap:8px}.as-kit select{width:auto;padding:6px 10px}
+/* ---- Task & poke forms: roomier on phones ---- */
+.tk-form,.pk-form{gap:14px}
+.tk-form label,.pk-form label:not(.pk-chip):not(.pk-urg):not(.pk-face),.tk-grid label{display:block!important;font-size:13px;font-weight:600;color:var(--mut)}
+.tk-form label>input,.tk-form label>select,.tk-form label>textarea,.pk-form label>input,.pk-form label>textarea{display:block;width:100%;min-width:0;margin-top:6px;box-sizing:border-box;font-size:16px;color:var(--ink);font-weight:500}
+.tk-form input[type=date],.tk-form input[type=time],.tk-form input[type=datetime-local],.pk-form input[type=datetime-local]{-webkit-appearance:none;appearance:none;min-height:46px;text-align:left;background:#fff}
+.tk-form .tk-impl{font-size:15px;color:var(--ink);font-weight:500}
+@media (max-width:640px){
+  .tk-grid{grid-template-columns:1fr 1fr;gap:12px}
+  .tk-grid .tk-cust{grid-column:1/-1}
+  .tk-form .row.end{gap:10px}
+  .pk-row{display:grid;grid-template-columns:1fr;gap:12px}.pk-row>label{min-width:0!important}
+}
+.tk-form label[hidden],.pk-form label[hidden]{display:none!important}
+.tk-form label.tk-impl{display:flex!important;flex-direction:row;align-items:center;gap:10px;font-size:15px;color:var(--ink);font-weight:500}
+.tk-form label.tk-impl>input{display:inline-block;width:22px;height:22px;margin:0;flex:0 0 auto}
+@media (max-width:640px){.tk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tk-grid>label:nth-child(3){grid-column:1/-1}}
+.pk-form label.pk-urg{justify-content:flex-start;padding:0}.pk-form label.pk-urg>input{display:inline-block;width:22px;height:22px;margin:0;flex:0 0 auto}.pk-form label.pk-urg>span{font-size:15px;color:var(--ink);font-weight:500}
