@@ -156,7 +156,7 @@ function renderShell(key) {
     : inRes ? (resFront() ? [['r/pos', 'POS'], ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['r/kitchen', '86 & running low'], ['r/requests', 'Requests']]
       : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
-    <div class="who"><span>Hi, ${esc(who().split(' ')[0])}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
+    <div class="who"><span>Hi, ${esc(who().split(' ')[0])}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}<a href="#/events"${key === 'events' ? ' class="on"' : ''}>Events</a>${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
     ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a></nav>` : ''}`;
 }
 function navOf(key) {
@@ -256,8 +256,50 @@ routes.home = async () => {
   if (member('catering')) cards.push(`<a class="ws-card cat" href="#/c/events"><b>Catering</b><span>Events, menus, purchase requests, receiving, stock, recipes</span></a>`);
   if (member('restaurant')) cards.push(`<a class="ws-card res" href="#/r/${can('restaurant', 'cashier', 'staff') && !can('restaurant', 'manager', 'chef') ? 'pos' : 'kitchen'}"><b>Restaurant</b><span>POS, daily sales, kitchen stocks, restock, purchase requests, receiving, store and par levels</span></a>`);
   if (!cards.length) cards.push(`<div class="card"><p>You don't have a workspace yet. Ask the owner to give you a role.</p></div>`);
+  cards.push(`<a class="ws-card evs" href="#/events"><b>Events board</b><span>Today's, tomorrow's and upcoming events and bookings — client, time, venue, menu</span></a>`);
   return `<h1>Good day, ${esc(S.me.full_name.split(' ')[0])}</h1><p class="lede">Choose where you're working.</p><div class="ws-grid">${cards.join('')}</div>
     ${isAdmin() ? `<p class="small mut" style="margin-top:24px">Owner: <a href="#/people">add people and give them roles</a>.</p>` : ''}`;
+};
+
+/* ================= EVENTS BOARD (everyone, read-only) ================= */
+// The whole team sees what's coming (like the 86 board); only catering roles open and edit events.
+const BOARD_DAYS = 45;
+function boardCard(e, open) {
+  const cat = e.kind === 'buffet', fulfil = e.fulfil || 'Pick-up', del = fulfil === 'Delivery';
+  const t = e.serve_time ? fmtClock(e.serve_time).split(' ') : null;
+  const where = cat ? e.venue : del ? (e.venue ? 'Deliver to ' + e.venue : 'Delivery') : 'Pick-up' + (e.venue && !/romualdo/i.test(e.venue) ? ' · ' + e.venue : ' at Romualdo\'s');
+  const facts = [e.event_type, e.pax ? e.pax + ' guests' : '', KIND[e.kind] || '', e.pkg ? 'Package: ' + e.pkg : '', e.call ? 'Call time ' + e.call : ''].filter(Boolean);
+  const unit = e.kind === 'trays' ? ' tray' : e.kind === 'packs' ? ' pack' : '';
+  const qty = m => num(m.qty) ? ` <span class="evb-q">× ${fq(m.qty)}${unit}${num(m.qty) > 1 && unit ? 's' : ''}</span>` : '';
+  const byCourse = {}; (e.menu || []).forEach(m => (byCourse[cat ? (m.course || 'Menu') : 'Menu'] ||= []).push(m));
+  const menu = (e.menu || []).length ? Object.entries(byCourse).map(([c, ms]) => `${cat && Object.keys(byCourse).length > 1 ? `<div class="evb-course">${esc(c)}</div>` : ''}<ul class="evb-menu">${ms.map(m => `<li>${esc(m.name || '—')}${qty(m)}${m.note ? ` <span class="mut small">(${esc(m.note)})</span>` : ''}</li>`).join('')}</ul>`).join('')
+    : '<p class="small mut">Menu not set yet.</p>';
+  return `<article class="evb${NOT_APPROVED.includes(e.status) ? ' tent' : ''}">
+    <div class="evb-time">${t ? `<b>${t[0]}</b><span>${t[1]}</span>` : '<span>Time<br>TBC</span>'}</div>
+    <div class="evb-main">
+      <div class="evb-head"><h3>${esc(e.client || e.title)}</h3>${chip(EVENT_STATUS[e.status], statusTone(e.status))}</div>
+      ${evName({ title: e.title }, { name: e.client }) ? `<div class="evb-sub">${esc(e.title)}</div>` : ''}
+      <div class="evb-facts">${facts.map(esc).join(' · ')}</div>
+      ${where ? `<div class="evb-where">📍 ${esc(where)}</div>` : ''}
+      ${e.allergy ? `<div class="evb-warn">Allergies: ${esc(e.allergy)}</div>` : ''}
+      ${e.special ? `<div class="evb-note">Special requests: ${esc(e.special)}</div>` : ''}
+      <details class="evb-det"${open ? ' open' : ''}><summary>Menu${(e.menu || []).length ? ` (${e.menu.length})` : ''}</summary>${menu}</details>
+      <div class="evb-foot"><span class="mut small">${esc(e.ref)}${NOT_APPROVED.includes(e.status) ? ' · not yet confirmed by the client' : ''}</span>${member('catering') ? `<a href="#/c/event/${e.id}">Open event →</a>` : ''}</div>
+    </div></article>`;
+}
+routes.events = async () => {
+  const t = today(), tm = addDays(t, 1);
+  const rows = await db.rpc('events_board', { p_from: t, p_to: addDays(t, BOARD_DAYS) });
+  const on = d => rows.filter(e => e.event_date === d), later = rows.filter(e => e.event_date > tm);
+  const sec = (cls, title, sub, list, open, empty) => `<section class="evb-sec ${cls}"><h2>${title} <span class="evb-n">${list.length}</span><span class="evb-d">${sub}</span></h2>
+    ${list.length ? list.map(e => boardCard(e, open)).join('') : `<div class="evb-empty">${empty}</div>`}</section>`;
+  const days = [...new Set(later.map(e => e.event_date))];
+  return `<div class="row"><h1>Events</h1><span class="sp"></span>${member('catering') ? '<a class="btn ghost" href="#/c/events">Catering list</a>' : ''}</div>
+    <p class="mut small" style="margin-top:-6px">What's coming up for the whole team. Prices and client contact details aren't shown here.</p>
+    ${sec('today', 'Today', fmtLong(t), on(t), true, 'No events today.')}
+    ${sec('tmr', 'Tomorrow', fmtLong(tm), on(tm), true, 'No events tomorrow.')}
+    <section class="evb-sec later"><h2>Upcoming <span class="evb-n">${later.length}</span><span class="evb-d">next ${BOARD_DAYS - 1} days</span></h2>
+    ${later.length ? days.map(d => `<h4 class="evb-day">${esc(fmtLong(d))}</h4>${later.filter(e => e.event_date === d).map(e => boardCard(e, false)).join('')}`).join('') : '<div class="evb-empty">Nothing booked yet.</div>'}</section>`;
 };
 
 /* ================= EVENTS ================= */
@@ -291,9 +333,10 @@ routes['c/events'] = async arg => {
   const tabs = [['upcoming', 'Upcoming'], ['past', 'Past'], ['all', 'All']];
   return `<div class="row"><h1>Events</h1><span class="sp"></span>${can('catering', 'event_specialist', 'manager') ? '<a class="btn pri" href="#/c/event-new">＋ New event</a>' : ''}</div>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/events/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
-   ${ev.length ? `<div class="list">${ev.map(e => `<a class="li" href="#/c/event/${e.id}"><div class="li-date"><b>${esc(fmtD(e.event_date).split(',')[0])}</b><span>${esc(fmtD(e.event_date).split(',').slice(1).join(','))}</span></div>
+   ${ev.length ? (tab === 'upcoming' ? [['Today', ev.filter(e => e.event_date === t)], ['Tomorrow', ev.filter(e => e.event_date === addDays(t, 1))], ['Upcoming', ev.filter(e => e.event_date > addDays(t, 1))]] : [['', ev]])
+      .filter(([h, g]) => g.length || h === 'Today').map(([h, g]) => `${h ? `<h2 class="ev-grp">${h} <span class="evb-n">${g.length}</span></h2>` : ''}${g.length ? `<div class="list">${g.map(e => `<a class="li" href="#/c/event/${e.id}"><div class="li-date"><b>${esc(fmtD(e.event_date).split(',')[0])}</b><span>${esc(fmtD(e.event_date).split(',').slice(1).join(','))}</span></div>
       <div class="li-main"><b>${esc(evClient(e, cl[e.client_id]))}</b><span class="mut small">${evSub(e, cl[e.client_id]) ? esc(evSub(e, cl[e.client_id])) + ' · ' : ''}${esc(e.ref)} · ${KIND[e.kind]}${e.pax ? ' · ' + e.pax + ' guests' : ''}${e.serve_time ? ' · ' + fmtClock(e.serve_time) : ''}${e.venue ? ' · ' + esc(e.venue) : ''}</span></div>
-      <span class="li-act"><span class="li-st">${['partial', 'paid', 'over'].includes(MM[e.id]?.status) ? payChip(MM[e.id]) : ''}${chip(EVENT_STATUS[e.status], statusTone(e.status))}</span><button class="pdf sm" data-act="evPdf" data-id="${e.id}" title="Print the event sheet">🖨️ PDF</button>${delEvBtn({ ...e, _name: evClient(e, cl[e.client_id]) }, '🗑') || '<span class="x-ph"></span>'}</span></a>`).join('')}</div>` : '<div class="empty">No events here.</div>'}`;
+      <span class="li-act"><span class="li-st">${['partial', 'paid', 'over'].includes(MM[e.id]?.status) ? payChip(MM[e.id]) : ''}${chip(EVENT_STATUS[e.status], statusTone(e.status))}</span><button class="pdf sm" data-act="evPdf" data-id="${e.id}" title="Print the event sheet">🖨️ PDF</button>${delEvBtn({ ...e, _name: evClient(e, cl[e.client_id]) }, '🗑') || '<span class="x-ph"></span>'}</span></a>`).join('')}</div>` : '<div class="empty small">No events today.</div>'}`).join('') : '<div class="empty">No events here.</div>'}`;
 };
 
 routes['c/event-new'] = async () => {
