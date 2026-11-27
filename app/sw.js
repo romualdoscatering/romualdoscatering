@@ -58,3 +58,21 @@ self.addEventListener('fetch', e => {
   if (CDN.test(req.url)) return e.respondWith(cacheFirst(req));       // pinned sign-in library + fonts
   // everything else (Supabase data, logins) goes to the network untouched
 });
+
+// Pokes: phone notifications (sent by the "poke-push" Edge Function)
+self.addEventListener('push', e => {
+  let d = {}; try { d = e.data ? e.data.json() : {}; } catch (err) { d = { title: "Romualdo's", body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || "Romualdo's", {
+    body: d.body || '', tag: d.tag, renotify: true, icon: './icons/icon-192.png', badge: './icons/icon-192.png',
+    requireInteraction: !!d.urgent, data: { url: d.url || './#/pokes' }
+  }));
+});
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  const url = new URL(e.notification.data?.url || './#/pokes', self.registration.scope).href;
+  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+    const w = list.find(c => c.url.startsWith(self.registration.scope));
+    if (w) { w.navigate(url).catch(() => {}); return w.focus(); }
+    return self.clients.openWindow(url);
+  }));
+});

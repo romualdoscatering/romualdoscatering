@@ -137,4 +137,10 @@ export const db = {
     if (TEST) return t('rpc', { fn, args });
     const { data, error } = await call(c => c.rpc(fn, args)); if (error) fail(error); return data;
   },
+  // Edge Function (e.g. poke-push); never throws — returns { ok:false, error } instead
+  async edge(name, body) {
+    if (TEST) return { ok: false, error: 'test mode' };
+    try { const c = await supa(); const { data, error } = await c.functions.invoke(name, { body }); return error ? { ok: false, error: error.message } : data; }
+    catch (e) { return { ok: false, error: e.message }; }
+  },
 };

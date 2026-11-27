@@ -691,3 +691,33 @@ body:not(.pos-mode) main{padding-bottom:calc(80px + env(safe-area-inset-bottom))
 .mn-f a.mn-me{color:var(--navy);font-weight:600;text-decoration:none;border:1px solid #d9d2b8;border-radius:999px;padding:7px 14px;font-size:13px}
 @media (max-width:760px){.me-grid{grid-template-columns:1fr}.me-hero{padding:16px}.me-av{flex-basis:52px;height:52px;font-size:21px}.me-hero h1{font-size:20px}}
 .stack label.row{justify-content:flex-start;font-weight:500;color:var(--mut)}.stack label.row input{width:18px;height:18px;margin:0;flex:0 0 auto}
+/* ---- Pokes (endorsements) ---- */
+.bell-slot{display:inline-flex}.bell-slot.mob{display:none}
+.bell{position:relative;text-decoration:none;font-size:18px;line-height:1;padding:6px 8px!important;border-radius:999px}
+.bell i{position:absolute;top:-2px;right:-4px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:#b42318;color:#fff;font:700 11px/18px Montserrat,sans-serif;font-style:normal;text-align:center}
+.bell.new{animation:bellShake 1.2s ease-in-out 2}
+@keyframes bellShake{0%,100%{transform:rotate(0)}15%{transform:rotate(14deg)}30%{transform:rotate(-12deg)}45%{transform:rotate(8deg)}60%{transform:rotate(-5deg)}75%{transform:rotate(2deg)}}
+.mnav summary.dot .mn-ic{box-shadow:0 0 0 2px #b42318}
+.mn-pokes i{display:inline-block;margin-left:6px;min-width:20px;padding:0 6px;border-radius:10px;background:#b42318;color:#fff;font-style:normal;font-size:12px;text-align:center}
+.pk-home{margin:0 0 18px}.pk-home h2{margin:0}.pk-home>.row{margin-bottom:10px}
+.pk-n{display:inline-block;min-width:22px;padding:0 7px;border-radius:11px;background:#b42318;color:#fff;font:700 13px/22px Montserrat,sans-serif;text-align:center;vertical-align:3px}
+.poke{background:#fff;border:1px solid #e3ddcf;border-left:5px solid var(--gold);border-radius:12px;padding:12px 14px;margin-bottom:10px;box-shadow:0 2px 8px #14213f0d}
+.poke.urgent{border-left-color:#b42318;background:#fffaf9}.poke.done{opacity:.62;border-left-color:#9aa39a}
+.pk-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline;font-size:13.5px;color:var(--navy)}
+.pk-b{font-size:16px;line-height:1.45;margin:6px 0 4px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--ink)}
+.pk-tags{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0}
+.pk-rec{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px}
+.pk-st{font-size:12.5px;padding:3px 9px;border-radius:999px;background:#f1eee6;color:#6b6a66}.pk-st.seen{background:#e9eefb;color:#294074}.pk-st.done{background:#e6f4ea;color:#1d7a3a}
+.pk-a{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}.pk-a button{padding:7px 14px}
+.pk-form{display:grid;gap:10px}.pk-form h2{margin:0}.pk-lbl{font-weight:600;font-size:13px}
+.pk-teams,.pk-people{display:flex;flex-wrap:wrap;gap:6px}.pk-people{max-height:240px;overflow:auto;padding:2px}
+.pk-chip{position:relative;cursor:pointer}.pk-chip input{position:absolute;opacity:0;pointer-events:none}
+.pk-chip span{display:inline-block;padding:7px 12px;border:1px solid #d9d2b8;border-radius:999px;background:#fff;font-size:13.5px;color:var(--navy)}
+.pk-chip span small{color:var(--mut)}.pk-chip span i{font-style:normal;color:var(--mut);font-size:12px}
+.pk-chip input:checked+span{background:var(--navy);border-color:var(--navy);color:#fff}.pk-chip input:checked+span small,.pk-chip input:checked+span i{color:#e2c77e}
+.pk-chip input:focus-visible+span{outline:2px solid var(--gold)}
+.pk-row{display:flex;gap:14px;align-items:end;flex-wrap:wrap}.pk-row label{display:grid;gap:4px}
+.pk-urg{display:flex!important;align-items:center;gap:8px;cursor:pointer;padding-bottom:8px}.pk-urg input{width:20px;height:20px;accent-color:#b42318}
+.vk{display:grid;grid-template-columns:150px 1fr auto;gap:8px;align-items:center;margin:6px 0}.vk code{overflow-wrap:anywhere;background:#fff;padding:6px 8px;border-radius:6px;font-size:12px}
+@media (max-width:760px){.bell-slot.mob{display:inline-flex;margin-left:auto;margin-right:4px}.bell-slot.mob+.mnav{margin-left:0}.vk{grid-template-columns:1fr}}
+.pk-form .pk-urg{flex-direction:row!important}.pk-form .pk-row>label:first-child{min-width:220px}

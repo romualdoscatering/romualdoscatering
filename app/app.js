@@ -157,19 +157,19 @@ function renderShell(key) {
     : inRes ? (resFront() ? [['r/pos', 'POS'], ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['r/kitchen', '86 & running low'], ['r/requests', 'Requests']]
       : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
-    <div class="who"><span>Hi, ${esc(nick())}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}<a href="#/events"${key === 'events' ? ' class="on"' : ''}>Events</a>${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<a href="#/me"${key === 'me' ? ' class="on"' : ''}>My account</a><button class="ghost" data-act="logout">Log out</button></div>
+    <div class="who"><span>Hi, ${esc(nick())}</span><span class="bell-slot">${bellHtml()}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}<a href="#/events"${key === 'events' ? ' class="on"' : ''}>Events</a>${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<a href="#/me"${key === 'me' ? ' class="on"' : ''}>My account</a><button class="ghost" data-act="logout">Log out</button></div>
     ${mobileMenu(key, nav, inCat, inRes)}</div>
     ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a></nav>` : ''}`;
 }
 // Phones: one "☰ Menu" button opens a dropdown with every page and account action (pills and header links are hidden there).
 function mobileMenu(key, nav, inCat, inRes) {
-  const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People', me: 'My account' }[key.split('/')[0]] || 'Home';
+  const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People', me: 'My account', pokes: 'Pokes' }[key.split('/')[0]] || 'Home';
   const a = (href, label, on) => `<a href="#/${href}"${on ? ' class="on"' : ''}>${label}</a>`;
   const sect = nav.length ? `<div class="mn-h">${inCat ? 'Catering' : 'Restaurant'}</div><div class="mn-g">${nav.map(([k, l]) => a(k, l, navOf(key) === k)).join('')}</div>` : '';
-  const go = [a('', '🏠 Home', key === '' || key === 'home'), a('events', '📅 Events board', key === 'events'),
+  const go = [`<a class="mn-pokes${key === 'pokes' ? ' on' : ''}" href="#/pokes">🔔 Pokes <i${POKE.unread.open ? '' : ' hidden'}>${POKE.unread.open || ''}</i></a>`, a('', '🏠 Home', key === '' || key === 'home'), a('events', '📅 Events board', key === 'events'),
     ...(inCat ? [a('r', '⇄ Switch to Restaurant')] : inRes ? [a('c', '⇄ Switch to Catering')] : []),
     ...(isAdmin() ? [a('activity', '🕘 Activity', key.startsWith('activity')), a('people', '👥 People', key === 'people')] : [])].join('');
-  return `<details class="mnav"><summary aria-label="Menu"><span class="mn-cur">${esc(cur)}</span><span class="mn-ic">☰</span></summary>
+  return `<span class="bell-slot mob">${bellHtml()}</span><details class="mnav"><summary aria-label="Menu"><span class="mn-cur">${esc(cur)}</span><span class="mn-ic">☰</span></summary>
     <div class="mn-p">${sect}<div class="mn-h">Go to</div><div class="mn-l">${go}</div>
       <div class="mn-f"><span>Hi, ${esc(nick())}</span>${canInstall() ? '<button class="ghost" data-act="install">📲 Get the app</button>' : ''}<a class="mn-me" href="#/me">👤 My account</a><button class="ghost" data-act="logout">Log out</button></div></div></details>`;
 }
@@ -266,7 +266,7 @@ async function afterLogin() {
   S.me = await db.rpc('my_access');
   if (!S.me || S.me.active === false) { await db.signOut(); S.user = null; return renderLogin(!S.me ? 'Your login is not set up yet. Ask the owner to add you on the People page.' : 'This account is switched off. Ask the owner.'); }
   await loadMaster();
-  route();
+  route(); pokePoll();
 }
 
 /* ================= home ================= */
@@ -293,7 +293,7 @@ routes.home = async () => {
   const t = today(), tm = addDays(t, 1), hour = new Date(Date.now() + 8 * 3600e3).getUTCHours();
   const [fil, en] = GREET(hour), first = esc(nick());
   const doy = Math.floor((Date.parse(t) - Date.parse(t.slice(0, 4) + '-01-01')) / 864e5);
-  const ev = await db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null);
+  const [ev, pk] = await Promise.all([db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null), homePokes()]);
   const nToday = ev ? ev.filter(e => e.event_date === t).length : null, nTmr = ev ? ev.filter(e => e.event_date === tm).length : null;
   const next = ev?.find(e => e.event_date === t && e.serve_time && e.serve_time.slice(0, 5) >= new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16));
   const cards = [];
@@ -311,6 +311,7 @@ routes.home = async () => {
         ${next ? `<a href="#/events"><b>${esc(fmtClock(next.serve_time))}</b><span>next: ${esc(next.client || next.title)}</span></a>` : ''}
       </div>` : ''}
     </section>
+    ${pk}
     <h2 class="hw-where">Where are you working today?</h2>
     <div class="hw-grid">${cards.join('')}</div>
     ${!member('restaurant') && !member('catering') ? `<div class="card mt"><p>You don't have a workspace yet — ask the owner to give you a role. Meanwhile you can see the Events board.</p></div>` : ''}
@@ -2389,8 +2390,8 @@ ACT.posCloseShift = async () => {
 /* ================= PEOPLE (owner) ================= */
 routes.people = async arg => {
   if (!isAdmin()) return '<div class="card">Only the owner can manage people.</div>';
-  const [people, tabs, dev] = await Promise.all([db.rpc('admin_people'),
-    db.select('pos_devices', { order: [['registered_at']] }).catch(() => null), db.rpc('pos_device_status').catch(() => null)]);
+  const [people, tabs, dev, vk] = await Promise.all([db.rpc('admin_people'),
+    db.select('pos_devices', { order: [['registered_at']] }).catch(() => null), db.rpc('pos_device_status').catch(() => null), vapidKey()]);
   const sel = people.find(p => p.id === arg);
   const has = (ws, role) => (sel?.roles || []).some(r => r.ws === ws && r.role === role);
   return `<h1>People & roles</h1>
@@ -2406,7 +2407,7 @@ routes.people = async arg => {
     <label class="tick"><input type="checkbox" name="is_admin" ${sel.is_admin ? 'checked' : ''}> Owner (everything, both workspaces)</label>
     <label class="tick"><input type="checkbox" name="active" ${!sel.username || sel.active ? 'checked' : ''}> Can log in</label>
     <div class="row end"><a class="btn ghost" href="#/people">Close</a><button class="pri">Save</button></div></form>` : ''}
-  ${tabletsHtml(tabs, dev)}`;
+  ${tabletsHtml(tabs, dev)}${pushSetupHtml(!!vk)}`;
 };
 /* ================= activity log (owner) ================= */
 // Every change in the database is stamped with who and when (audit_log). This page reads it in plain words.
@@ -2417,6 +2418,7 @@ const AUD_AREA = {
   'Menu & recipes': ['dishes', 'dish_aliases', 'recipes', 'recipe_lines', 'restaurant_menu', 'course_rules', 'pack_sets', 'pack_components'],
   'POS & sales': ['pos_orders', 'pos_lines', 'pos_shifts', 'pos_settings', 'pos_devices', 'daily_sales', 'kitchen_days', 'dish_day_counts'],
   'Billing': ['bills', 'bill_lines', 'payments', 'bill_settings'],
+  'Pokes': ['pokes', 'poke_to', 'app_config'],
   'People & HR': ['profiles', 'memberships', 'employees', 'time_punches', 'auth.users']
 };
 const AUD_NOUN = { events: 'event', event_menu: 'event menu dish', event_extra_needs: 'off-menu ingredient', event_finance: 'contract price', stock_reservations: 'stock set aside',
@@ -2426,7 +2428,7 @@ const AUD_NOUN = { events: 'event', event_menu: 'event menu dish', event_extra_n
   restaurant_menu: 'POS menu item', course_rules: 'course rule', pack_sets: 'pack set', pack_components: 'pack item', pos_orders: 'POS order', pos_lines: 'POS order line',
   pos_shifts: 'cash drawer', pos_settings: 'POS settings', pos_devices: 'POS tablet', daily_sales: 'daily sales / Z-reading', kitchen_days: 'kitchen day', dish_day_counts: 'kitchen count',
   bills: 'billing statement', bill_lines: 'statement line', payments: 'payment', bill_settings: 'statement settings', profiles: 'person', memberships: 'role',
-  employees: 'employee', time_punches: 'time punch', 'auth.users': 'login' };
+  pokes: 'poke', poke_to: 'poke', app_config: 'app setting', employees: 'employee', time_punches: 'time punch', 'auth.users': 'login' };
 const AUD_SKIP = new Set(['updated_at', 'created_at', 'last_seen', 'token_hash']);
 function audLabel(e, row, evById) {
   const r = row || {}, dish = S.dishById[r.dish_id]?.name, item = S.itemsById?.[r.item_id]?.name, ev = evById[r.event_id];
@@ -2575,6 +2577,176 @@ FORMS.mePassword = async (f, form) => {
   await db.changePassword(f.pw); form.reset(); toast('Password changed');
 };
 document.addEventListener('change', e => { if (e.target.matches('[data-showpw]')) e.target.closest('form').querySelectorAll('input[name^=pw]').forEach(i => i.type = e.target.checked ? 'text' : 'password'); });
+
+/* ================= POKES (endorsements) ================= */
+// A short note to a person or a team ("Put the crispy pata in the oven by 8AM tomorrow"). It shows on their home screen,
+// the 🔔 in the header counts what's open, and their phone gets a notification. Owner, managers and head chefs see every poke.
+const POKE = { unread: { open: 0, unseen: 0 }, lastId: null };
+const pokeDue = d => {
+  if (!d) return '';
+  const t = new Date(d), now = new Date(), day = x => x.toDateString(), tm = new Date(now.getTime() + 864e5);
+  const clock = t.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' });
+  return day(t) === day(now) ? `by ${clock} today` : day(t) === day(tm) ? `by ${clock} tomorrow` : `by ${t.toLocaleDateString('en-PH', { weekday: 'short', month: 'short', day: 'numeric' })}, ${clock}`;
+};
+const pokeLate = p => p.due_at && !p.done_at && new Date(p.due_at) < new Date();
+function pokeCard(p, mode) {
+  // mode: 'in' (for me), 'sent' (I sent it), 'all' (overseer view)
+  const head = mode === 'in' ? `<b>${esc(p.from_name)}</b>${p.others > 0 ? ` <span class="mut small">to you + ${p.others} other${p.others > 1 ? 's' : ''}</span>` : ''}`
+    : `<b>${esc(mode === 'sent' ? 'You' : p.from_name)}</b> → ${esc(p.to_label || (p.recipients || []).map(r => r.name).join(', '))}`;
+  const rec = mode !== 'in' && p.recipients ? `<div class="pk-rec">${p.recipients.map(r => `<span class="pk-st ${r.done_at ? 'done' : r.seen_at ? 'seen' : ''}" title="${r.done_at ? 'Done ' + fmtT(r.done_at) : r.seen_at ? 'Seen ' + fmtT(r.seen_at) : 'Not seen yet'}">${r.done_at ? '✓' : r.seen_at ? '👀' : '•'} ${esc(r.name)}${r.reply ? `: “${esc(r.reply)}”` : ''}</span>`).join('')}</div>` : '';
+  const allDone = p.recipients && p.recipients.every(r => r.done_at);
+  const acts = p.cancelled_at ? `<span class="chip mut">Taken back</span>`
+    : mode === 'in' ? (p.done_at ? `<span class="chip ok">Done ${ago(p.done_at)}</span>${p.reply ? ` <span class="small mut">“${esc(p.reply)}”</span>` : ''} <button class="lnk" data-act="pokeUndo" data-id="${p.id}">Undo</button>`
+        : `<button class="pri" data-act="pokeDone" data-id="${p.id}">✓ Done</button><button class="ghost" data-act="pokeReply" data-id="${p.id}">Reply</button>`)
+    : (allDone ? '<span class="chip ok">All done</span>' : '') + ((mode === 'sent' || isAdmin()) && !allDone ? `<button class="lnk" data-act="pokeCancel" data-id="${p.id}">Take back</button>` : '');
+  return `<div class="poke${p.urgent ? ' urgent' : ''}${(mode === 'in' && p.done_at) || p.cancelled_at ? ' done' : ''}">
+    <div class="pk-h"><span>${head}</span><span class="mut small">${ago(p.created_at)}</span></div>
+    <div class="pk-b">${esc(p.body)}</div>
+    ${p.urgent || p.due_at ? `<div class="pk-tags">${p.urgent ? '<span class="chip bad">Urgent</span>' : ''}${p.due_at ? `<span class="chip ${pokeLate(p) ? 'bad' : 'warn'}">⏰ ${esc(pokeDue(p.due_at))}${pokeLate(p) ? ' · late' : ''}</span>` : ''}</div>` : ''}
+    ${rec}<div class="pk-a">${acts}</div></div>`;
+}
+// Mark what's on screen as seen (clears the bell)
+async function pokesSeen(list) {
+  const ids = (list || []).filter(p => !p.seen_at && !p.done_at).map(p => p.id); if (!ids.length) return;
+  await Promise.all(ids.map(id => db.rpc('poke_seen', { p_poke: id }).catch(() => {})));
+  pokePoll();
+}
+// Home screen block: open pokes for me
+async function homePokes() {
+  const d = await db.rpc('my_pokes').catch(() => null); if (!d) return '';
+  const open = d.inbox.filter(p => !p.done_at);
+  setTimeout(() => pokesSeen(open), 1200);
+  return `<section class="pk-home"><div class="row"><h2>👉 Pokes for you${open.length ? ` <span class="pk-n">${open.length}</span>` : ''}</h2><span class="sp"></span><a class="btn" href="#/pokes/new">＋ Poke someone</a></div>
+    ${open.length ? open.slice(0, 6).map(p => pokeCard(p, 'in')).join('') + (open.length > 6 ? `<a href="#/pokes">See all ${open.length} →</a>` : '')
+      : '<p class="mut small">Nothing for you right now. 👌</p>'}</section>`;
+}
+routes.pokes = async arg => {
+  const tab = arg === 'sent' || arg === 'all' ? arg : 'in', compose = arg === 'new';
+  const [d, people] = await Promise.all([db.rpc('my_pokes'), compose ? db.rpc('poke_people') : null]);
+  const lists = { in: d.inbox, sent: d.sent, all: d.all || [] }, nOpen = d.inbox.filter(p => !p.done_at).length;
+  if (tab === 'in' && !compose) setTimeout(() => pokesSeen(d.inbox), 800);
+  const tabs = [['in', `For me${nOpen ? ' (' + nOpen + ')' : ''}`], ['sent', 'Sent'], ...(d.overseer ? [['all', 'All pokes']] : [])];
+  return `<div class="row"><h1>Pokes</h1><span class="sp"></span>${compose ? '' : '<a class="btn pri" href="#/pokes/new">＋ New poke</a>'}</div>
+  <p class="mut small" style="margin-top:-4px">Endorsements to a person or a team. They show on their home screen and ping their phone.${d.overseer ? ' As owner, manager or head chef you see every poke.' : ''}</p>
+  ${compose ? pokeForm(people) : ''}
+  <div class="seg">${tabs.map(([k, l]) => `<a href="#/pokes${k === 'in' ? '' : '/' + k}" class="${tab === k && !compose ? 'on' : ''}">${l}</a>`).join('')}</div>
+  <div class="pk-list mt">${lists[tab].length ? lists[tab].map(p => pokeCard(p, tab)).join('') : `<div class="card mut">${tab === 'in' ? 'No pokes for you.' : tab === 'sent' ? "You haven't sent any pokes in the last 14 days." : 'No pokes in the last 7 days.'}</div>`}</div>
+  ${await pushCard(d)}`;
+};
+function pokeTeams(people) {
+  const t = {};
+  for (const p of people) for (const r of p.roles || []) {
+    for (const k of [r.ws + '|' + r.role, r.ws + '|*']) (t[k] ||= { ws: r.ws, role: k.split('|')[1], ids: new Set() }).ids.add(p.id);
+  }
+  return Object.values(t).map(x => ({ ...x, n: x.ids.size, label: x.role === '*' ? `Everyone · ${WS_NAME[x.ws] || x.ws}` : `${roleName(x.role)} · ${WS_NAME[x.ws] || x.ws}` }))
+    .sort((a, b) => (a.role === '*') - (b.role === '*') || a.label.localeCompare(b.label));
+}
+function pokeForm(people) {
+  const others = people.filter(p => p.id !== S.me.id), teams = pokeTeams(others);
+  const rl = p => (p.roles || []).map(r => roleName(r.role)).filter((v, i, a) => a.indexOf(v) === i).join(', ');
+  return `<form class="card pk-form" data-form="sendPoke">
+    <h2>New poke</h2>
+    <div class="pk-lbl">To <span class="small mut">(tap people, a team, or both)</span></div>
+    <div class="pk-teams">${teams.map(t => `<label class="pk-chip"><input type="checkbox" name="t_${t.ws}|${t.role}" data-label="${esc(t.label)}"><span>👥 ${esc(t.label)} <i>${t.n}</i></span></label>`).join('')}</div>
+    <input class="search" placeholder="Find a person…" data-filter=".pk-people .pk-chip">
+    <div class="pk-people">${others.map(p => `<label class="pk-chip"><input type="checkbox" name="u_${p.id}" data-label="${esc(p.name)}"><span><b>${esc(p.name)}</b> <small>${esc(p.full_name)}${rl(p) ? ' · ' + esc(rl(p)) : ''}</small></span></label>`).join('')}</div>
+    <label>Message<textarea name="body" maxlength="500" rows="3" required placeholder="e.g. Put the crispy pata in the oven by 8AM tomorrow"></textarea></label>
+    <div class="pk-row"><label>Needed by <span class="small mut">(optional)</span><input type="datetime-local" name="due"></label>
+      <label class="pk-urg"><input type="checkbox" name="urgent"> <span>🔴 Urgent</span></label></div>
+    <div class="row end"><a class="btn" href="#/pokes">Cancel</a><button class="pri">Send poke</button></div></form>`;
+}
+FORMS.sendPoke = async (f, form) => {
+  const boxes = [...form.querySelectorAll('input[type=checkbox]:checked')];
+  const to = boxes.filter(b => b.name.startsWith('u_')).map(b => b.name.slice(2));
+  const teams = boxes.filter(b => b.name.startsWith('t_')).map(b => { const [ws, role] = b.name.slice(2).split('|'); return { ws, role }; });
+  if (!to.length && !teams.length) return toast('Pick who to poke.', true);
+  const label = boxes.filter(b => b.dataset.label).map(b => b.dataset.label).join(', ');
+  const id = await db.rpc('send_poke', { p_to: to, p_teams: teams.length ? teams : null, p_body: f.body, p_due: f.due ? new Date(f.due).toISOString() : null, p_urgent: !!f.urgent, p_label: label });
+  db.edge('poke-push', { poke_id: id });   // phone notifications; the poke is already saved even if this fails
+  toast('Poke sent to ' + label); go('#/pokes/sent');
+};
+ACT.pokeDone = async el => { await db.rpc('poke_done', { p_poke: el.dataset.id, p_reply: '' }); toast('Marked done'); pokePoll(); refresh(); };
+ACT.pokeReply = async el => { const r = prompt('Reply (it also marks the poke done):'); if (r == null) return; await db.rpc('poke_done', { p_poke: el.dataset.id, p_reply: r }); toast('Replied'); pokePoll(); refresh(); };
+ACT.pokeUndo = async el => { await db.rpc('poke_undo', { p_poke: el.dataset.id }); pokePoll(); refresh(); };
+ACT.pokeCancel = async el => { if (!confirm('Take back this poke? It disappears from their home screen.')) return; await db.rpc('poke_cancel', { p_poke: el.dataset.id }); toast('Taken back'); refresh(); };
+
+// The 🔔 count: checked every 30 seconds and whenever the app comes back to the front
+function bellHtml() { const n = POKE.unread.open; return `<a href="#/pokes" class="bell${POKE.unread.unseen ? ' new' : ''}" title="Pokes">🔔${n ? `<i>${n}</i>` : ''}</a>`; }
+function paintBell() {
+  document.querySelectorAll('.bell-slot').forEach(s => s.innerHTML = bellHtml());
+  document.querySelectorAll('.mn-pokes i').forEach(i => { i.textContent = POKE.unread.open || ''; i.hidden = !POKE.unread.open; });
+  document.querySelector('.mnav summary')?.classList.toggle('dot', !!POKE.unread.unseen);
+}
+let pokeBusy = false;
+async function pokePoll() {
+  if (!S.user || !S.me || pokeBusy || !navigator.onLine) return; pokeBusy = true;
+  try {
+    const u = await db.rpc('poke_unread'); const prev = POKE.lastId; POKE.unread = u; paintBell();
+    const l = u.latest;
+    if (l && l.id !== prev && prev !== null) {
+      toast(`👉 ${l.from} poked you: ${l.body.slice(0, 70)}${l.body.length > 70 ? '…' : ''}`);
+      if (document.hidden && 'Notification' in window && Notification.permission === 'granted' && !(await pushSub())) {
+        const reg = await navigator.serviceWorker?.getRegistration(); reg?.showNotification(`${l.urgent ? '🔴' : '👉'} ${l.from} poked you`, { body: l.body, tag: 'poke-' + l.id, icon: './icons/icon-192.png' });
+      }
+      if (['home', 'pokes'].includes((current || 'home').split('/')[0])) refresh();
+    }
+    POKE.lastId = l ? l.id : (prev ?? '');
+  } catch (e) {} finally { pokeBusy = false; }
+}
+setInterval(pokePoll, 30000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) pokePoll(); });
+
+// Phone notifications for this phone
+const b64u = b => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const unb64u = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)), c => c.charCodeAt(0));
+async function pushSub() { try { const reg = await navigator.serviceWorker?.getRegistration(); return await reg?.pushManager?.getSubscription() || null; } catch (e) { return null; } }
+async function vapidKey() { const r = await db.select('app_config', { eq: { key: 'vapid_public' } }).catch(() => []); return r?.[0]?.value || ''; }
+async function pushCard(d) {
+  const IOS = /iphone|ipad|ipod/i.test(navigator.userAgent), standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+  const ok = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
+  const perm = ok ? Notification.permission : 'unsupported', sub = ok ? await pushSub() : null;
+  const status = !ok ? (IOS && !standalone ? 'On iPhone, add the app to your home screen first (📲 Get the app), open it from there, then come back here.' : "This browser can't show notifications. Pokes still appear on your home screen.")
+    : perm === 'denied' ? 'Notifications are blocked for this app. Allow them in the phone’s Settings → Notifications (or the browser’s site settings), then come back here.'
+    : sub ? 'On for this phone ✓ You’ll be pinged when someone pokes you.' : perm === 'granted' ? 'Allowed, but not connected yet. Tap the button to finish.' : 'Off for this phone.';
+  return `<section class="card mt"><h2>🔔 Phone notifications</h2><p class="small">${status}</p>
+    <div class="row" style="gap:8px;flex-wrap:wrap">${ok && perm !== 'denied' && !sub ? '<button class="pri" data-act="pushOn">Turn on for this phone</button>' : ''}${sub ? '<button class="ghost" data-act="pushTest">Send me a test</button><button class="lnk" data-act="pushOff">Turn off for this phone</button>' : ''}</div>
+    ${d?.overseer ? `<label class="row small mt" style="gap:8px;justify-content:flex-start"><input type="checkbox" data-watch ${d.watch !== false ? 'checked' : ''} style="width:18px;height:18px"> Also notify me of every poke between other team members</label>` : ''}</section>`;
+}
+ACT.pushOn = async () => {
+  const p = await Notification.requestPermission(); if (p !== 'granted') return toast('Notifications were not allowed.', true);
+  const key = await vapidKey();
+  if (!key) { toast('On while the app is open. Full phone notifications start once the owner finishes the setup.'); return refresh(); }
+  const reg = await navigator.serviceWorker.ready;
+  const s = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: unb64u(key) });
+  const j = s.toJSON(); await db.rpc('push_subscribe', { p_endpoint: j.endpoint, p_p256dh: j.keys.p256dh, p_auth: j.keys.auth, p_ua: navigator.userAgent });
+  toast('Notifications on for this phone'); refresh();
+};
+ACT.pushOff = async () => { const s = await pushSub(); if (s) { await db.rpc('push_unsubscribe', { p_endpoint: s.endpoint }).catch(() => {}); await s.unsubscribe(); } toast('Notifications off for this phone'); refresh(); };
+ACT.pushTest = async () => { const reg = await navigator.serviceWorker.ready; await reg.showNotification("👉 Test from Romualdo's", { body: 'This is how a poke will look on this phone.', icon: './icons/icon-192.png' }); };
+document.addEventListener('change', async e => { if (!e.target.matches('[data-watch]')) return;
+  try { await db.rpc('set_watch_pokes', { p_on: e.target.checked }); toast(e.target.checked ? 'You’ll be notified of every poke' : 'Only pokes to you will notify you'); } catch (err) { toast(err.message, true); } });
+
+// Owner: one-time setup of the phone-notification keys. Made in this browser; the private key is shown once and saved nowhere in the app.
+function pushSetupHtml(has) {
+  return `<section class="card mt"><h2>Phone notifications setup (Pokes)</h2>
+    <p class="small">${has ? 'Set up ✓ The public key is saved. If phones don’t get pinged, check the <b>poke-push</b> Edge Function and its secrets.' : 'Not set up yet. Pokes already show in the app; this lets them ping phones even when the app is closed.'}</p>
+    <button class="${has ? 'ghost' : 'pri'}" data-act="vapidMake">${has ? 'Make new keys (every phone must turn notifications on again)' : 'Create notification keys'}</button><div id="vapidOut"></div></section>`;
+}
+ACT.vapidMake = async el => {
+  if (el.classList.contains('ghost') && !confirm('Make new keys? Every phone will have to tap "Turn on" again.')) return;
+  const k = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign']);
+  const jwk = await crypto.subtle.exportKey('jwk', k.privateKey), pub = b64u(await crypto.subtle.exportKey('raw', k.publicKey)), priv = jwk.d;
+  await db.rpc('admin_set_config', { p_key: 'vapid_public', p_value: pub });
+  const row = (n, v) => `<div class="vk"><span>${n}</span><code>${esc(v)}</code><button type="button" class="ghost" data-copy="${esc(v)}">Copy</button></div>`;
+  $('#vapidOut').innerHTML = `<div class="alert warn small mt"><b>Do this now — the private key is shown only once.</b>
+    <ol><li>Supabase → <b>Edge Functions</b> → <b>Secrets</b> → add these three (name and value):</li></ol>
+    ${row('VAPID_PUBLIC_KEY', pub)}${row('VAPID_PRIVATE_KEY', priv)}${row('VAPID_SUBJECT', 'https://romualdos.ph')}
+    <ol start="2"><li>Edge Functions → <b>Deploy a new function</b> → name it <b>poke-push</b> → paste the code from <code>supabase/functions/poke-push/index.ts</code> on GitHub → deploy → turn <b>Verify JWT</b> off in its settings.</li>
+    <li>Each person opens <b>🔔 Pokes</b> and taps <b>Turn on for this phone</b>.</li></ol>
+    <p>Don't paste the private key anywhere else — not in chat, not on GitHub.</p></div>`;
+  el.remove();
+};
+document.addEventListener('click', async e => { const b = e.target.closest('[data-copy]'); if (!b) return; try { await navigator.clipboard.writeText(b.dataset.copy); b.textContent = 'Copied ✓'; } catch (err) { toast('Copy failed — select it and copy by hand', true); } });
 
 function tabletsHtml(tabs, dev) {
   if (!tabs) return `<section class="card mt"><h2>POS tablets</h2><p class="small mut">Needs the latest database update (migration <code>20261127000100_pos_tablets</code>).</p></section>`;
