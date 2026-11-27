@@ -157,13 +157,13 @@ function renderShell(key) {
     : inRes ? (resFront() ? [['r/pos', 'POS'], ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['r/kitchen', '86 & running low'], ['r/requests', 'Requests']]
       : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
-    <div class="who"><span>Hi, ${esc(nick())}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}<a href="#/events"${key === 'events' ? ' class="on"' : ''}>Events</a>${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div>
+    <div class="who"><span>Hi, ${esc(nick())}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}<a href="#/events"${key === 'events' ? ' class="on"' : ''}>Events</a>${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<a href="#/me"${key === 'me' ? ' class="on"' : ''}>My account</a><button class="ghost" data-act="logout">Log out</button></div>
     ${mobileMenu(key, nav, inCat, inRes)}</div>
     ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a></nav>` : ''}`;
 }
 // Phones: one "☰ Menu" button opens a dropdown with every page and account action (pills and header links are hidden there).
 function mobileMenu(key, nav, inCat, inRes) {
-  const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People' }[key.split('/')[0]] || 'Home';
+  const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People', me: 'My account' }[key.split('/')[0]] || 'Home';
   const a = (href, label, on) => `<a href="#/${href}"${on ? ' class="on"' : ''}>${label}</a>`;
   const sect = nav.length ? `<div class="mn-h">${inCat ? 'Catering' : 'Restaurant'}</div><div class="mn-g">${nav.map(([k, l]) => a(k, l, navOf(key) === k)).join('')}</div>` : '';
   const go = [a('', '🏠 Home', key === '' || key === 'home'), a('events', '📅 Events board', key === 'events'),
@@ -171,7 +171,7 @@ function mobileMenu(key, nav, inCat, inRes) {
     ...(isAdmin() ? [a('activity', '🕘 Activity', key.startsWith('activity')), a('people', '👥 People', key === 'people')] : [])].join('');
   return `<details class="mnav"><summary aria-label="Menu"><span class="mn-cur">${esc(cur)}</span><span class="mn-ic">☰</span></summary>
     <div class="mn-p">${sect}<div class="mn-h">Go to</div><div class="mn-l">${go}</div>
-      <div class="mn-f"><span>Hi, ${esc(nick())}</span>${canInstall() ? '<button class="ghost" data-act="install">📲 Get the app</button>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div></details>`;
+      <div class="mn-f"><span>Hi, ${esc(nick())}</span>${canInstall() ? '<button class="ghost" data-act="install">📲 Get the app</button>' : ''}<a class="mn-me" href="#/me">👤 My account</a><button class="ghost" data-act="logout">Log out</button></div></div></details>`;
 }
 // close the menu after picking something, or when tapping outside it
 document.addEventListener('click', e => {
@@ -2494,6 +2494,88 @@ routes.activity = async arg => {
 const n0 = v => v != null && String(v).trim() !== '';
 FORMS.audFilter = async f => go('#/activity/' + encodeURIComponent([f.day, f.actor, f.area].join('|')));
 
+/* ================= My account: your details, your roles and what they let you do, password, this device, your recent activity ================= */
+const ROLE_DO = {
+  manager: ['Approves purchase requests, orders and reports', 'Creates and edits events; closes and voids when needed', 'Sees billing, sales and costing for the workspace'],
+  finance: ['Makes billing statements and records payments', 'Sets contract prices', 'Sees costing and ingredient prices'],
+  event_specialist: ['Creates events and takes website inquiries', 'Edits event details and menus', 'Makes purchase requests for events'],
+  coordinator: ['Runs events: menu, details and printouts', 'Makes purchase requests for events', 'Cannot create new events or take inquiries'],
+  purchaser: ['Turns approved requests into purchase orders', 'Records buying and purchase reports'],
+  storekeeper: ['Receives deliveries and counts stock', 'Does the Kitchen stocks daily count (sets the 86 / running-low list)'],
+  head_chef: ['Writes and edits recipes and dish details', 'Sees costing and ingredient prices', 'Kitchen work on events: menus, extra ingredients, prep'],
+  rnd_chef: ['Writes, tests and costs recipes', 'Edits dish details'],
+  chef: ['Kitchen work on events: menus, extra ingredients, prep day', 'Reads recipes'],
+  cashier: ['Takes payments on the POS and opens/closes the cash drawer', 'Gives Senior/PWD discounts', 'Does the Z-reading on the Sales page'],
+  staff: ['Takes orders on the POS and sends them to the kitchen', 'Sees the 86 / running-low list']
+};
+const WS_NAME = { catering: 'Catering', restaurant: 'Restaurant' };
+const initials = n => (n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
+const ago = s => { if (!s) return ''; const m = Math.round((Date.now() - new Date(s)) / 60000);
+  return m < 2 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + ' h ago' : fmtT(s); };
+routes.me = async () => {
+  const [acct, acts, dev] = await Promise.all([db.rpc('my_account').catch(() => null), db.rpc('my_activity', { p_limit: 15 }).catch(() => null), db.rpc('pos_device_status').catch(() => null)]);
+  const me = { ...S.me, ...(acct || {}) }, roles = S.me?.roles || [];
+  const byWs = Object.keys(WS_NAME).map(ws => [ws, roles.filter(r => r.ws === ws)]).filter(([, rs]) => rs.length);
+  const roleCards = me.is_admin
+    ? `<div class="me-role own"><b>Owner</b><span class="small">Full access to everything in Catering and Restaurant, plus People, Activity and POS tablets.</span></div>`
+    : byWs.length ? byWs.map(([ws, rs]) => `<h3 class="me-ws">${WS_NAME[ws]}</h3>${rs.map(r => {
+        const def = ROLES.find(x => x[0] === r.role);
+        return `<div class="me-role"><b>${esc(roleName(r.role))}</b>${def?.[2] ? `<span class="small mut">${esc(def[2])}</span>` : ''}
+          ${ROLE_DO[r.role] ? `<ul>${ROLE_DO[r.role].map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</div>`; }).join('')}`).join('')
+      : '<p class="mut">You have no roles yet. Ask the owner to set them on the People page.</p>';
+  const go2 = [member('catering') && ['#/c', '🍽️ Catering'], member('restaurant') && ['#/r', '🍳 Restaurant'], ['#/events', '📅 Events board'], me.is_admin && ['#/people', '👥 People']].filter(Boolean);
+  const actRows = (acts || []).map(e => { const w = audWhat(e, {}), row = e.new_row || e.old_row || {};
+    if (e.tbl === 'profiles' && e.action === 'UPDATE') return `<span>You updated ${row.username === S.me?.username ? 'your details' : 'the details of <b>' + esc(row.full_name || '') + '</b>'}</span>`;
+    const lbl = row.ref || row.pr_no || row.po_no || row.bill_no || (row.order_no != null && e.tbl.startsWith('pos_') ? '#' + row.order_no : '') || row.title || row.name
+      || (e.tbl === 'memberships' && row.role ? `${roleName(row.role)} · ${WS_NAME[row.ws] || row.ws}` : '') || S.dishById[row.dish_id]?.name || S.itemsById?.[row.item_id]?.name || '';
+    if (e.action === 'UPDATE' && w.verb === 'changed' && !lbl) return '';
+    return `<span>You ${esc(w.verb)} ${esc(AUD_NOUN[e.tbl] || e.tbl)}${lbl ? ' <b>' + esc(String(lbl)) + '</b>' : ''}</span>`;
+  }).map((h, i, all) => h && (i === 0 || h !== all[i - 1]) && `<div class="li"><div class="li-main">${h}<span class="mut small">${ago(acts[i].at)}</span></div></div>`).filter(Boolean);
+  const actList = acts == null ? '<p class="small mut">Needs the latest database update.</p>'
+    : !actRows.length ? '<p class="small mut">Nothing yet. What you create, change, approve or void will show here.</p>' : `<div class="list">${actRows.join('')}</div>`;
+  return `<div class="me-hero"><div class="me-av">${esc(initials(me.full_name || me.username))}</div>
+      <div><span class="me-hi">Hi, ${esc(nick())}</span><h1>${esc(me.full_name || me.username || '')}</h1>
+      <div class="me-chips">${me.is_admin ? chip('Owner', 'ok') : roles.map(r => chip(`${roleName(r.role)} · ${WS_NAME[r.ws] || r.ws}`, 'info')).join('')}</div></div></div>
+  <div class="me-grid">
+  <section class="card"><h2>My details</h2>
+    <form data-form="meSave" class="stack">
+      <label>Nickname <span class="small mut">(what the app calls you)</span><input name="nickname" maxlength="30" value="${esc(me.nickname || '')}" placeholder="${esc((me.full_name || '').split(' ')[0] || '')}"></label>
+      <label>Phone<input name="phone" type="tel" maxlength="30" value="${esc(me.phone || '')}" placeholder="09xx xxx xxxx"></label>
+      <div class="me-ro"><span>Full name</span><b>${esc(me.full_name || '—')}</b></div>
+      <div class="me-ro"><span>Login name</span><b>${esc(me.username || '—')}</b></div>
+      ${me.since ? `<div class="me-ro"><span>On the app since</span><b>${fmtD(me.since)}</b></div>` : ''}
+      <p class="small mut">To change your full name or login name, ask the owner.</p>
+      <button class="pri">Save</button></form></section>
+  <section class="card"><h2>My role${me.is_admin || roles.length > 1 ? 's' : ''}</h2>${roleCards}
+    <p class="small mut mt">Need to do something your role doesn't allow? Ask the owner or your manager.</p></section>
+  <section class="card"><h2>Password &amp; sign-in</h2>
+    <form data-form="mePassword" class="stack">
+      <label>New password<input name="pw" type="password" minlength="8" autocomplete="new-password" required></label>
+      <label>Type it again<input name="pw2" type="password" minlength="8" autocomplete="new-password" required></label>
+      <label class="row small"><input type="checkbox" data-showpw> Show password</label>
+      <button class="pri">Change password</button></form>
+    ${me.last_sign_in ? `<p class="small mut mt">Last signed in: ${fmtT(me.last_sign_in)}</p>` : ''}
+    <div class="me-ro"><span>This device</span><b>${dev?.registered ? `POS tablet “${esc(dev.name || '')}”` : 'Not a POS tablet'}</b></div>
+    <button class="ghost mt" data-act="logout">Log out of this device</button></section>
+  <section class="card"><h2>Go to</h2><div class="me-go">${go2.map(([h, l]) => `<a class="btn" href="${h}">${l}</a>`).join('')}${canInstall() ? '<button class="ghost" data-act="install">📲 Get the app</button>' : ''}</div>
+    <h2 class="mt">Good to know</h2><ul class="me-tips">
+      <li>Keep your password to yourself. Everything you do is saved under your name.</li>
+      <li>Using a shared or borrowed phone? Log out when you're done.</li>
+      <li>Forgot your password? Ask the owner to reset it.</li></ul></section>
+  </div>
+  <section class="card mt"><h2>My recent activity</h2>${actList}</section>`;
+};
+FORMS.meSave = async f => {
+  await db.rpc('my_update_profile', { p_nickname: f.nickname || '', p_phone: f.phone || '' });
+  S.me = await db.rpc('my_access'); toast('Saved'); refresh();
+};
+FORMS.mePassword = async (f, form) => {
+  if ((f.pw || '').length < 8) return toast('Use at least 8 characters.', true);
+  if (f.pw !== f.pw2) return toast("The two passwords don't match.", true);
+  await db.changePassword(f.pw); form.reset(); toast('Password changed');
+};
+document.addEventListener('change', e => { if (e.target.matches('[data-showpw]')) e.target.closest('form').querySelectorAll('input[name^=pw]').forEach(i => i.type = e.target.checked ? 'text' : 'password'); });
+
 function tabletsHtml(tabs, dev) {
   if (!tabs) return `<section class="card mt"><h2>POS tablets</h2><p class="small mut">Needs the latest database update (migration <code>20261127000100_pos_tablets</code>).</p></section>`;
   const live = tabs.filter(t => !t.revoked_at);
@@ -2529,11 +2611,7 @@ FORMS.savePerson = async (f, el) => {
 };
 
 /* ================= account ================= */
-ACT.account = async () => {
-  const pw = prompt('New password (at least 8 characters). Leave empty to cancel.');
-  if (!pw) return; if (pw.length < 8) return toast('Use at least 8 characters.', true);
-  await db.changePassword(pw); toast('Password changed');
-};
+ACT.account = async () => go('#/me');
 ACT.logout = async () => { if (!confirm('Log out of the staff app?\n\nYou stay signed in until you log out, so you only need this on a shared or lost phone.')) return; S.user = null; await db.signOut(); S.user = null; S.me = null; location.hash = ''; renderLogin('You have logged out.'); };
 ACT.reload = () => refresh();
 

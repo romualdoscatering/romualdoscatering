@@ -674,3 +674,20 @@ body:not(.pos-mode) main{padding-bottom:calc(80px + env(safe-area-inset-bottom))
 .mn-f span{flex:1 0 100%;color:var(--mut);font-size:13px;font-weight:500;margin:0 4px 4px}
 .mn-f button{background:transparent;color:var(--navy);border:1px solid #d9d2b8;border-radius:999px;padding:7px 14px;font-size:13px}
 @media (max-width:760px){.mnav{display:block}header#top .who,header#top nav{display:none}}
+/* ---- My account ---- */
+.me-hero{display:flex;gap:16px;align-items:center;background:linear-gradient(150deg,#1d2c52,#14213f);color:#fff;border-radius:18px;padding:20px 22px;margin:4px 0 16px;border-bottom:3px solid #e89908}
+.me-av{flex:0 0 64px;height:64px;border-radius:50%;display:grid;place-items:center;background:#e2c77e;color:#14213f;font-family:'Playfair Display',Georgia,serif;font-size:26px;font-weight:600}
+.me-hero h1{color:#fff;margin:0 0 6px;font-size:24px}.me-hero h1::after{display:none}
+.me-hi{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#e2c77e;font-weight:700}
+.me-chips{display:flex;flex-wrap:wrap;gap:6px}
+.me-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}.me-grid>.card{margin:0}
+.stack{display:grid;gap:10px}.stack label{display:grid;gap:4px}.stack label.row{display:flex;gap:8px;align-items:center}
+.me-ro{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-top:1px solid #eee7d6;font-size:14px}.me-ro span{color:var(--mut)}.me-ro b{color:var(--navy);text-align:right}
+.me-ws{margin:10px 0 6px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#8a5a00}
+.me-role{border:1px solid #e3ddcf;border-left:4px solid var(--gold);border-radius:10px;padding:10px 12px;margin-bottom:8px;display:grid;gap:2px;background:#fffdf7}
+.me-role b{color:var(--navy);font-size:15px}.me-role.own{border-left-color:#1d7a3a}
+.me-role ul,.me-tips{margin:6px 0 0;padding-left:18px;font-size:13.5px;line-height:1.55}
+.me-go{display:flex;flex-wrap:wrap;gap:8px}
+.mn-f a.mn-me{color:var(--navy);font-weight:600;text-decoration:none;border:1px solid #d9d2b8;border-radius:999px;padding:7px 14px;font-size:13px}
+@media (max-width:760px){.me-grid{grid-template-columns:1fr}.me-hero{padding:16px}.me-av{flex-basis:52px;height:52px;font-size:21px}.me-hero h1{font-size:20px}}
+.stack label.row{justify-content:flex-start;font-weight:500;color:var(--mut)}.stack label.row input{width:18px;height:18px;margin:0;flex:0 0 auto}
