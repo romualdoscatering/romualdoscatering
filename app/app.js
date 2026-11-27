@@ -25,7 +25,7 @@ const ROLES = [['manager', 'Manager', 'Runs the workspace: approvals, events, bi
   ['event_specialist', 'Event specialist', 'Bookings, inquiries and events: creates events'], ['coordinator', 'Coordinator', 'Runs events: menu, details, print (cannot create events)'],
   ['purchaser', 'Purchaser', 'Orders and buying'], ['storekeeper', 'Storekeeper', 'Stockist: receiving, stock counts, Kitchen stocks daily count'],
   ['head_chef', 'Head chef', 'Recipes, dish details and costing'], ['rnd_chef', 'R&D chef', 'Writes and costs recipes only'], ['chef', 'Chef', 'Kitchen work: event menus, prep (reads recipes)'],
-  ['cashier', 'Cashier', 'POS payments and Z-reading'], ['staff', 'Staff', 'POS orders; sees the 86 / running-low list']];
+  ['driver', 'Driver', 'Delivery runs: loads, leaves, arrives, hands over'], ['cashier', 'Cashier', 'POS payments and Z-reading'], ['staff', 'Staff', 'POS orders; sees the 86 / running-low list']];
 const roleName = k => (ROLES.find(r => r[0] === k) || [k, k])[1];
 const chip = (label, tone) => `<span class="chip ${tone || ''}">${esc(label)}</span>`;
 const statusTone = s => ({ draft: 'mut', inquiry: 'mut', for_client_approval: 'warn', submitted: 'warn', confirmed: 'ok', approved: 'ok', in_prep: 'info', ordered: 'info', open: 'info', partly_received: 'warn', done: 'ok', received: 'ok', closed: 'mut', rejected: 'bad', cancelled: 'bad' }[s] || '');
@@ -161,7 +161,7 @@ async function route() {
   if (!S.user) return renderLogin();
   const [page, ...rest] = hash.split('/');
   const pre = page === 'c' || page === 'r';
-  const key = pre ? page + '/' + (rest[0] || (page === 'c' ? 'events' : 'kitchen')) : (page || 'home');
+  const key = pre ? page + '/' + (rest[0] || (page === 'c' ? (driverOnly() ? 'runs' : 'events') : 'kitchen')) : (page || 'home');
   const arg = pre ? rest.slice(1).join('/') : rest.join('/');
   const r = routes[key] || routes.home;
   current = key;
@@ -186,9 +186,9 @@ function afterRender() {
 function renderShell(key) {
   requestAnimationFrame(fitHeader);
   const inCat = key.startsWith('c/'), inRes = key.startsWith('r/');
-  const nav = inCat ? [['c/events', 'Events'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes'], ...(can('catering', 'manager', 'finance') ? [['c/billing', 'Billing']] : [])]
+  const nav = inCat ? (driverOnly() ? [['c/runs', 'Runs'], ['c/production', 'Production']] : [['c/events', 'Events'], ...(runTeam() ? [['c/runs', 'Runs']] : []), ['c/production', 'Production'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes'], ...(can('catering', 'manager', 'finance') ? [['c/billing', 'Billing']] : [])])
     : inRes ? (resFront() ? [['r/pos', 'POS'], ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['r/kitchen', '86 & running low'], ['r/requests', 'Requests']]
-      : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
+      : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ...(canProd() ? [['c/production', 'Production']] : []), ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
     <div class="who">${[['tasks', 'Tasks'], ['pokes', 'Pokes'], ['events', 'Events']].map(([k, l]) => `<a href="#/${k}" class="hn${key === k ? ' on' : ''}">${l}</a>`).join('')}<span class="bell-slot">${bellHtml()}</span>${acctMenu(key)}</div>
     ${mobileMenu(key, nav, inCat, inRes)}</div>
@@ -200,16 +200,18 @@ function acctMenu(key) {
   return `<details class="acct"><summary title="My account">${av(S.me?.id, S.me?.full_name, 'sm')}<span class="acct-n">${esc(nick())}</span><span class="acct-car">▾</span></summary>
     <div class="acct-p"><div class="acct-h">${av(S.me?.id, S.me?.full_name, 'md')}<div><b>${esc(S.me?.full_name || '')}</b><small>${esc(role)}</small></div></div>
       <a href="#/me"${key === 'me' ? ' class="on"' : ''}>My account</a>
+      ${canDash() ? `<a href="#/dash"${key === 'dash' ? ' class="on"' : ''}>Dashboard</a>` : ''}${canInbox() ? `<a href="#/approvals"${key === 'approvals' ? ' class="on"' : ''}>Approvals${INBOX.n ? ` <i class="acct-n2">${INBOX.n}</i>` : ''}</a>` : ''}
       ${isAdmin() ? `<a href="#/people"${key === 'people' ? ' class="on"' : ''}>People & roles</a><a href="#/activity"${key === 'activity' ? ' class="on"' : ''}>Activity</a>` : ''}
       ${canInstall() ? '<button type="button" data-act="install">Get the app</button>' : ''}
       <button type="button" class="acct-out" data-act="logout">Log out</button></div></details>`;
 }
 // Phones: one "☰ Menu" button opens a dropdown with every page and account action (pills and header links are hidden there).
 function mobileMenu(key, nav, inCat, inRes) {
-  const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People', me: 'My account', pokes: 'Pokes', tasks: 'My tasks' }[key.split('/')[0]] || 'Home';
+  const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People', me: 'My account', pokes: 'Pokes', tasks: 'My tasks', dash: 'Dashboard', approvals: 'Approvals' }[key.split('/')[0]] || 'Home';
   const a = (href, label, on) => `<a href="#/${href}"${on ? ' class="on"' : ''}>${label}</a>`;
   const sect = nav.length ? `<div class="mn-h">${inCat ? 'Catering' : 'Restaurant'}</div><div class="mn-g">${nav.map(([k, l]) => a(k, l, navOf(key) === k)).join('')}</div>` : '';
   const go = [a('', 'Home', key === '' || key === 'home'), a('tasks', 'My tasks', key === 'tasks'), a('events', 'Events board', key === 'events'),
+    ...(runTeam() && !inCat ? [a('c/runs', 'Runs', key === 'c/runs')] : []), ...(canDash() ? [a('dash', 'Dashboard', key === 'dash')] : []), ...(canInbox() ? [a('approvals', 'Approvals' + (INBOX.n ? ` (${INBOX.n})` : ''), key === 'approvals')] : []),
     ...(inCat ? [a('r', 'Switch to Restaurant')] : inRes ? [a('c', 'Switch to Catering')] : []),
     ...(isAdmin() ? [a('people', 'People & roles', key === 'people'), a('activity', 'Activity', key.startsWith('activity'))] : [])].join('');
   return `<span class="bell-slot mob">${bellHtml()}</span><details class="mnav"><summary aria-label="Menu"><span class="mn-cur">${esc(cur)}</span><span class="mn-ic">☰</span></summary>
@@ -310,7 +312,7 @@ async function afterLogin() {
   S.me = await db.rpc('my_access');
   if (!S.me || S.me.active === false) { await db.signOut(); S.user = null; return renderLogin(!S.me ? 'Your login is not set up yet. Ask the owner to add you on the People page.' : 'This account is switched off. Ask the owner.'); }
   await Promise.all([loadMaster(), loadAvatars()]);
-  route(); pokePoll();
+  route(); pokePoll(); inboxCount();
 }
 
 /* ================= home ================= */
@@ -337,7 +339,7 @@ routes.home = async () => {
   const t = today(), tm = addDays(t, 1), hour = new Date(Date.now() + 8 * 3600e3).getUTCHours();
   const [fil, en] = GREET(hour), first = esc(nick());
   const doy = Math.floor((Date.parse(t) - Date.parse(t.slice(0, 4) + '-01-01')) / 864e5);
-  const [ev, pk, tk] = await Promise.all([db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null), homePokes(), homeTasks(), appCfg().catch(() => null)]);
+  const [ev, pk, tk, , rn, ib] = await Promise.all([db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null), homePokes(), homeTasks(), appCfg().catch(() => null), homeRuns(), homeInbox()]);
   const nextGo = ev && CFG.v ? ev.map(e => ({ e, p: sendOff(e, e.travel_mins != null ? { mins: e.travel_mins, km: e.travel_km, source: e.travel_source } : null, CFG.v) })).filter(x => x.p?.leave && x.p.leave > Date.now() - 15 * 60000 && mnlParts(x.p.leave)[0] === t).sort((a, b) => a.p.leave - b.p.leave)[0] : null;
   const nToday = ev ? ev.filter(e => e.event_date === t).length : null, nTmr = ev ? ev.filter(e => e.event_date === tm).length : null;
   const next = ev?.find(e => e.event_date === t && e.serve_time && e.serve_time.slice(0, 5) >= new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16));
@@ -355,7 +357,8 @@ routes.home = async () => {
         ${nextGo ? `<a href="#/events"><b>${esc(clk(nextGo.p.leave))}</b><span>send-off: ${esc(nextGo.e.client || nextGo.e.title)}</span></a>` : next ? `<a href="#/events"><b>${esc(fmtClock(next.serve_time))}</b><span>next: ${esc(next.client || next.title)}</span></a>` : ''}
       </div>` : ''}
     </section>
-    <div class="hw-today${pk && tk ? '' : ' one'}">${pk}${tk}</div>
+    ${ib}
+    <div class="hw-today${[pk, tk, rn].filter(Boolean).length === 2 ? '' : ' one'}${[pk, tk, rn].filter(Boolean).length === 3 ? ' three' : ''}">${rn}${pk}${tk}</div>
     <h2 class="hw-where">Where are you working today?</h2>
     <div class="hw-grid">${cards.join('')}</div>
     ${!member('restaurant') && !member('catering') ? `<div class="card mt"><p>You don't have a workspace yet — ask the owner to give you a role. Meanwhile you can see the Events board.</p></div>` : ''}
@@ -391,7 +394,7 @@ function boardCard(e, open) {
       ${evName({ title: e.title }, { name: e.client }) ? `<div class="evb-sub">${esc(e.title)}</div>` : ''}
       <div class="evb-facts">${facts.map(esc).join(' · ')}</div>
       ${where ? `<div class="evb-where">${IC.pin(15)} ${esc(where)}</div>` : ''}
-      ${boardSendOff(e)}
+      ${boardSendOff(e)}${runLine(e.run_status, e.run_left_at, e.run_arrived_at, e.run_done_at, CFG.v ? sendOff(e, e.travel_mins != null ? { mins: e.travel_mins } : null, CFG.v) : null)}
       ${e.allergy ? `<div class="evb-warn">Allergies: ${esc(e.allergy)}</div>` : ''}
       ${e.special ? `<div class="evb-note">Special requests: ${esc(e.special)}</div>` : ''}
       <details class="evb-det"${open ? ' open' : ''}><summary>Menu${(e.menu || []).length ? ` (${e.menu.length})` : ''}</summary>${menu}</details>
@@ -599,7 +602,7 @@ routes['c/event'] = async id => {
   <div id="evlive"></div>
   <div class="row" id="evhead"><h1>${esc(evClient(ev, client))}</h1>${chip(EVENT_STATUS[ev.status], statusTone(ev.status))}<span class="sp"></span><button class="pdf lg" data-act="evPdf" data-id="${ev.id}" title="Print the one-page event sheet: works at any status, for the team's hard copy">Print event sheet (PDF)</button>${delEvBtn({ ...ev, _name: evClient(ev, client) }, 'Delete', 'ghost')}</div>
   ${evHero(ev, client)}
-  ${await evAssist(ev, client, { menu, prs })}
+  ${await evAssist(ev, client, { menu, prs, run: runTeam() && goesOut(ev) ? (await db.rpc('runs_for', { p_date: ev.event_date }).catch(() => [])).find(r => r.id === ev.id) : null })}
   ${changedLine(ev, names)}
 
   ${canEdit ? `<details class="card"><summary>Edit details & status</summary><form data-form="editEvent" data-id="${ev.id}" class="mt">
@@ -2879,6 +2882,7 @@ async function evAssist(ev, client, ctx) {
   }
   return `<section class="card as" id="assist"><div class="as-h"><span class="as-ic">${SV('<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>', 18)}</span>
       <h2>Event assistant</h2><span class="sp"></span><span class="as-score${nOk === checks.length ? ' ok' : ''}">${nOk}/${checks.length} ready</span></div>
+    ${ctx.run ? runLine(ctx.run.run_status, ctx.run.left_at, ctx.run.arrived_at, ctx.run.done_at, plan) + (ctx.run.driver_name ? `<p class="small mut">Driver: ${esc(ctx.run.driver_name)} · <a href="#/c/runs/${ev.event_date}">Runs</a></p>` : `<p class="small mut">No driver yet · <a href="#/c/runs/${ev.event_date}">assign on Runs</a></p>`) : ''}
     ${body}
     ${checks.some(c => !c[1]) ? `<div class="as-todo"><b>Still to do</b>${checks.filter(c => !c[1]).map(c => `<span>${esc(c[0])}</span>`).join('')}</div>` : ''}
     ${tips.length ? `<ul class="as-tips">${tips.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</section>`;
@@ -3010,6 +3014,230 @@ ACT.ktDel = async el => { const cfg = await appCfg(true), list = [...cfg.kitchen
 document.addEventListener('change', async e => { const i = e.target.dataset?.ktname; if (i === undefined) return;
   const cfg = await appCfg(true), list = [...cfg.kitchens]; list[+i] = { ...list[+i], name: e.target.value.trim() || `Kitchen ${+i + 1}` }; await saveKitchens(list); toast('Kitchen name saved'); });
 
+/* ================= DRIVER RUNS: today's deliveries in send-off order, with Loaded / Left / Arrived / Handed over ================= */
+const RUN_STEPS = [['loaded', 'Loaded'], ['left', 'Left the kitchen'], ['arrived', 'Arrived'], ['handed_over', 'Handed over']];
+const RUN_LABEL = { planned: 'Not started', loaded: 'Loaded', left: 'On the way', arrived: 'Arrived', handed_over: 'Handed over' };
+const RUN_TONE = { planned: 'mut', loaded: 'warn', left: 'info', arrived: 'info', handed_over: 'ok' };
+const runTeam = () => isAdmin() || can('catering', 'event_specialist', 'coordinator', 'manager', 'driver');
+const runPlanner = () => isAdmin() || can('catering', 'event_specialist', 'coordinator', 'manager');
+const driverOnly = () => !isAdmin() && can('catering', 'driver') && !can('catering', 'manager', 'finance', 'event_specialist', 'coordinator', 'purchaser', 'storekeeper', 'head_chef', 'rnd_chef', 'chef');
+const minsLate = (actual, planned) => actual && planned ? Math.round((new Date(actual) - planned) / 60000) : null;
+function runCard(r, cfg, drivers) {
+  const tr = r.travel_mins != null ? { mins: r.travel_mins, km: r.travel_km, source: r.travel_source } : null;
+  const pl = sendOff(r, tr, cfg), K = kitchenOf(r, cfg), st = r.run_status || 'planned', mine = r.driver === S.me.id;
+  const idx = RUN_STEPS.findIndex(s => s[0] === st), next = RUN_STEPS[idx + 1];
+  const late = pl?.leave && r.left_at ? minsLate(r.left_at, pl.leave) : null;
+  const lateNow = pl?.leave && !r.left_at && st !== 'handed_over' && Date.now() > pl.leave.getTime() + 5 * 60000 ? Math.round((Date.now() - pl.leave) / 60000) : null;
+  const mayAct = runPlanner() || mine || (!r.driver && can('catering', 'driver'));
+  const stamp = (lbl, t) => `<div class="rn-st${t ? ' on' : ''}"><i></i><span>${lbl}</span><b>${t ? esc(clk(new Date(t))) : '—'}</b></div>`;
+  const tel = (r.mobile || '').replace(/[^\d+]/g, '');
+  return `<article class="rn rn-${st}${lateNow ? ' late' : ''}">
+    <div class="rn-top"><div class="rn-time"><small>${pl?.leave ? 'Leave by' : pl && !pl.out ? 'Ready by' : 'Serve at'}</small><b>${pl?.leave ? esc(clk(pl.leave)) : pl?.ready ? esc(clk(pl.ready)) : r.serve_time ? esc(fmtClock(r.serve_time)) : 'TBC'}</b></div>
+      <div class="rn-who"><h3>${esc(r.client)}</h3><span class="mut small">${esc([KIND[r.kind] || '', r.pax ? r.pax + ' guests' : '', r.serve_time ? 'serve ' + fmtClock(r.serve_time) : ''].filter(Boolean).join(' · '))}</span></div>
+      ${chip(RUN_LABEL[st], RUN_TONE[st])}</div>
+    ${lateNow ? `<div class="rn-late">Should have left ${lateNow} min ago</div>` : late != null && late > 5 ? `<div class="rn-late soft">Left ${late} min after the planned send-off</div>` : ''}
+    <div class="rn-where">${IC.pin(15)} <span>${esc(r.venue_place || r.venue || 'No address yet')}</span>
+      ${r.venue_lat != null && K ? `<a class="btn" target="_blank" rel="noopener" href="${gmapsDir(K, { lat: r.venue_lat, lng: r.venue_lng })}">Directions</a>` : r.venue_lat != null ? `<a class="btn" target="_blank" rel="noopener" href="${gmapsLink(r.venue_lat, r.venue_lng)}">Map</a>` : ''}</div>
+    <div class="rn-facts">${[K && (CFG.v.kitchens || []).length > 1 ? ['From', K.name] : null, pl?.load ? ['Load by', clk(pl.load)] : null, pl?.mins != null ? ['Drive', `${pl.mins} min${pl.km != null ? ' · ' + pl.km + ' km' : ''}${pl.source === 'google' ? '' : ' (rough)'}`] : null,
+      r.call ? ['Call time', r.call] : null, r.contact ? ['Contact', r.contact] : null, r.coord ? ['Venue coordinator', r.coord] : null, r.equip ? ['Equipment', r.equip] : null, r.special ? ['Special', r.special] : null]
+      .filter(Boolean).map(([k, v]) => `<div><span>${esc(k)}</span><b>${esc(v)}</b></div>`).join('')}</div>
+    <div class="rn-steps">${stamp('Loaded', r.loaded_at)}${stamp('Left', r.left_at)}${stamp('Arrived', r.arrived_at)}${stamp('Handed over', r.done_at)}</div>
+    ${r.run_note ? `<p class="small mut">Note: ${esc(r.run_note)}</p>` : ''}
+    <div class="rn-act">
+      ${next && mayAct ? (next[0] === 'handed_over'
+        ? `<label class="btn pri rn-go">Handed over<input type="file" accept="image/*" capture="environment" data-runphoto="${r.id}" hidden></label><button class="ghost" data-act="runStep" data-id="${r.id}" data-step="handed_over">Without photo</button>`
+        : `<button class="pri rn-go" data-act="runStep" data-id="${r.id}" data-step="${next[0]}">${next[1]}</button>`) : ''}
+      ${tel ? `<a class="btn" href="tel:${esc(tel)}">Call client</a>` : ''}
+      ${r.has_proof ? `<button class="ghost" data-act="runProof" data-id="${r.id}">See photo</button>` : ''}
+      ${runPlanner() ? `<select class="rn-drv" data-rundriver="${r.id}">${opt('', r.driver ? 'Remove driver' : 'Assign a driver…')}${drivers.map(d => opt(d.id, d.name + (d.name !== d.full_name ? ' · ' + d.full_name : ''), d.id === r.driver)).join('')}</select>` : `<span class="small mut">${r.driver_name ? 'Driver: ' + esc(r.driver_name) : 'No driver yet'}</span>`}
+      ${st !== 'planned' && runPlanner() ? `<button class="lnk" data-act="runStep" data-id="${r.id}" data-step="${idx > 0 ? RUN_STEPS[idx - 1][0] : 'planned'}">Undo</button>` : ''}
+      <a class="lnk" href="#/c/event/${r.id}">Event</a></div></article>`;
+}
+routes['c/runs'] = async arg => {
+  if (!runTeam()) return '<div class="card">Runs are for drivers and the event team.</div>';
+  const t = today(), day = /^\d{4}-\d{2}-\d{2}$/.test(arg || '') ? arg : t;
+  const [rows, cfg, drivers] = await Promise.all([db.rpc('runs_for', { p_date: day }), appCfg(), db.rpc('run_drivers').catch(() => [])]);
+  const mine = rows.filter(r => r.driver === S.me.id), list = driverOnly() && mine.length ? [...mine, ...rows.filter(r => r.driver !== S.me.id)] : rows;
+  const order = list.map(r => ({ r, p: sendOff(r, r.travel_mins != null ? { mins: r.travel_mins } : null, cfg) })).sort((a, b) => ((a.p?.leave || a.p?.ready || a.p?.serve || 0) - (b.p?.leave || b.p?.ready || b.p?.serve || 0)));
+  const done = rows.filter(r => r.run_status === 'handed_over').length;
+  clearTimeout(S.runTimer); S.runTimer = setTimeout(() => { if (location.hash.startsWith('#/c/runs') && !document.querySelector('.modal')) refresh(); }, 60000);
+  return `<div class="row"><h1>Runs</h1><span class="sp"></span><span class="mut small">${done}/${rows.length} handed over</span></div>
+    <div class="seg">${[[t, 'Today'], [addDays(t, 1), 'Tomorrow']].map(([d, l]) => `<a href="#/c/runs/${d}" class="${day === d ? 'on' : ''}">${l}</a>`).join('')}
+      <label class="rn-date"><input type="date" value="${day}" data-rundate></label></div>
+    <p class="small mut">${esc(fmtLong(day))} · deliveries and on-site events, in send-off order. Tap the big button at each step: everyone sees where the food is.</p>
+    ${order.length ? order.map(x => runCard(x.r, cfg, drivers)).join('') : '<div class="card mut">No deliveries or on-site events this day.</div>'}`;
+};
+document.addEventListener('change', async e => {
+  if (e.target.matches('[data-rundate]') && e.target.value) return go('#/c/runs/' + e.target.value);
+  const sel = e.target.closest('[data-rundriver]');
+  if (sel) { try { await db.rpc('run_assign', { p_event: sel.dataset.rundriver, p_driver: sel.value || null }); toast(sel.value ? 'Driver assigned' : 'Driver removed'); refresh(); } catch (err) { toast(err.message, true); } return; }
+  const ph = e.target.closest('[data-runphoto]');
+  if (ph && ph.files?.[0]) {
+    try { const img = await photoJpeg(ph.files[0]); await db.rpc('run_step', { p_event: ph.dataset.runphoto, p_status: 'handed_over', p_note: null, p_img: img }); toast('Handed over, with photo'); refresh(); }
+    catch (err) { toast(err.message, true); }
+  }
+});
+ACT.runStep = async el => {
+  const step = el.dataset.step, note = step === 'arrived' || step === 'handed_over' ? '' : '';
+  await db.rpc('run_step', { p_event: el.dataset.id, p_status: step, p_note: note, p_img: null });
+  toast({ planned: 'Back to not started', loaded: 'Loaded', left: 'On the way — drive safe', arrived: 'Arrived', handed_over: 'Handed over' }[step]); refresh();
+};
+ACT.runProof = async el => {
+  const img = await db.rpc('run_proof', { p_event: el.dataset.id }); if (!img) return toast('No photo', true);
+  const box = document.createElement('div'); box.className = 'modal';
+  box.innerHTML = `<div class="card"><div class="row"><h2>Hand-over photo</h2><span class="sp"></span><button type="button" class="x" data-close>✕</button></div><img src="${img}" alt="" style="width:100%;border-radius:10px"></div>`;
+  document.body.appendChild(box); box.addEventListener('click', ev => { if (ev.target.dataset.close !== undefined || ev.target === box) box.remove(); });
+};
+// A photo for proof: longest side 900px, JPEG under ~150 KB
+async function photoJpeg(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((ok, bad) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => bad(new Error("That file isn't a photo this phone can open.")); i.src = url; });
+    const k = Math.min(1, 900 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+    c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    let q = 0.8, out = c.toDataURL('image/jpeg', q); while (out.length > 190000 && q > 0.35) { q -= 0.1; out = c.toDataURL('image/jpeg', q); }
+    return out;
+  } finally { URL.revokeObjectURL(url); }
+}
+// Status line used on the Event assistant and the Events board
+function runLine(st, leftAt, arrivedAt, doneAt, plan) {
+  if (!st || st === 'planned') return '';
+  const late = plan?.leave && leftAt ? minsLate(leftAt, plan.leave) : null;
+  const txt = st === 'handed_over' ? `Handed over ${clk(new Date(doneAt))}` : st === 'arrived' ? `Arrived ${clk(new Date(arrivedAt))}` : st === 'left' ? `On the way · left ${clk(new Date(leftAt))}${late > 5 ? ` (${late} min late)` : ''}` : 'Loaded, about to leave';
+  return `<div class="run-line run-${st}"><i></i>${esc(txt)}</div>`;
+}
+// Home: the driver's runs today
+async function homeRuns() {
+  if (!can('catering', 'driver') || isAdmin()) return '';
+  try {
+    const [rows, cfg] = await Promise.all([db.rpc('runs_for', { p_date: today() }), appCfg()]);
+    const mine = rows.filter(r => r.driver === S.me.id && r.run_status !== 'handed_over'), open = rows.filter(r => !r.driver && r.run_status !== 'handed_over');
+    const line = r => { const p = sendOff(r, r.travel_mins != null ? { mins: r.travel_mins } : null, cfg); return `<a class="pk-nl" href="#/c/runs"><span class="rn-mini">${p?.leave ? esc(clk(p.leave)) : '—'}</span><span><b>${esc(r.client)}</b><small>${esc(RUN_LABEL[r.run_status])} · ${esc(r.venue || '')}</small></span></a>`; };
+    return `<section class="hw-panel"><div class="hp-h"><span class="hp-ic pk">${IC.bike(18)}</span><h2>My runs today</h2>${mine.length ? `<span class="hp-n hp-dark">${mine.length}</span>` : ''}<span class="sp"></span><a class="hp-a" href="#/c/runs">Open</a></div>
+      ${mine.length ? mine.map(line).join('') : `<div class="hp-empty"><div><b>No runs assigned to you</b><small>${open.length ? open.length + ' run(s) today without a driver.' : 'Nothing going out today.'}</small></div></div>`}</section>`;
+  } catch (e) { return ''; }
+}
+
+/* ================= PRODUCTION SHEET: every dish for a date, added up per kitchen ================= */
+const canProd = () => isAdmin() || member('catering') || can('restaurant', 'manager', 'head_chef', 'chef');
+routes['c/production'] = async arg => {
+  if (!canProd()) return '<div class="card">The production sheet is for the kitchen and event teams.</div>';
+  const [d0, k0] = decodeURIComponent(arg || '').split('|'), day = /^\d{4}-\d{2}-\d{2}$/.test(d0 || '') ? d0 : addDays(today(), 1);
+  const [rows, cfg] = await Promise.all([db.rpc('production_sheet', { p_date: day }), appCfg()]);
+  const kits = (cfg.kitchens || []).filter(k => k.lat != null || k.name), kOf = r => kitchenOf(r, cfg)?.id || '';
+  const kit = k0 && kits.some(k => k.id === k0) ? k0 : '';
+  const use = rows.filter(r => !kit || kOf(r) === kit);
+  // one entry per event (for timing), then dishes
+  const evs = {}; for (const r of use) evs[r.event_id] ||= { ...r, plan: sendOff(r, r.travel_mins != null ? { mins: r.travel_mins, km: r.travel_km, source: r.travel_source } : null, cfg) };
+  const readyBy = e => e.plan ? (e.plan.load || e.plan.ready || e.plan.arrive || e.plan.serve) : null;
+  const dishes = {};
+  for (const r of use) {
+    const key = r.dish_id || r.pack_id || 'c:' + (r.name || '').toLowerCase();
+    const d = dishes[key] ||= { name: r.name || '—', course: r.course || 'Other', lines: [], portions: 0, exact: true, ready: null };
+    const e = evs[r.event_id], rb = readyBy(e);
+    let amt, por;
+    if (r.kind === 'buffet') { amt = (r.servings ? num(r.servings) : num(r.pax)) + ' pax'; por = r.servings ? num(r.servings) : num(r.pax); }
+    else if (r.kind === 'trays') { amt = fq(r.qty || 1) + ' tray' + (num(r.qty) > 1 ? 's' : ''); por = r.tray_serves ? num(r.qty || 1) * num(r.tray_serves) : null; }
+    else { amt = fq(r.qty || 1) + (r.kind === 'packs' ? ' pack' + (num(r.qty) > 1 ? 's' : '') : ''); por = num(r.qty || 1); }
+    if (por == null) d.exact = false; else d.portions += por;
+    if (rb && (!d.ready || rb < d.ready)) d.ready = rb;
+    d.lines.push({ e, amt, note: r.note });
+  }
+  const groups = COURSES.concat(['Other']).map(c => [c, Object.values(dishes).filter(d => (COURSES.includes(d.course) ? d.course : 'Other') === c).sort((a, b) => (a.ready || 0) - (b.ready || 0) || a.name.localeCompare(b.name))]).filter(([, l]) => l.length);
+  const evList = Object.values(evs).sort((a, b) => (readyBy(a) || 0) - (readyBy(b) || 0));
+  const guests = evList.reduce((a, e) => a + (e.kind === 'buffet' ? num(e.pax) : 0), 0);
+  const allergies = evList.filter(e => (e.allergy || '').trim());
+  const ln = (k, l) => `<a href="#/c/production/${encodeURIComponent(day + '|' + k)}" class="${kit === k ? 'on' : ''}">${esc(l)}</a>`;
+  return `<div class="row"><h1>Production</h1><span class="sp"></span><button class="ghost" data-act="prodPrint">Print</button></div>
+    <div class="seg">${[[today(), 'Today'], [addDays(today(), 1), 'Tomorrow']].map(([d, l]) => `<a href="#/c/production/${d}${kit ? encodeURIComponent('|' + kit) : ''}" class="${day === d ? 'on' : ''}">${l}</a>`).join('')}
+      <label class="rn-date"><input type="date" value="${day}" data-proddate="${esc(kit)}"></label></div>
+    ${kits.length > 1 ? `<div class="seg mt">${ln('', 'All kitchens')}${kits.map(k => ln(k.id, k.name || 'Kitchen')).join('')}</div>` : ''}
+    <div class="pd-sum"><div><b>${evList.length}</b><span>event${evList.length === 1 ? '' : 's'}</span></div><div><b>${guests}</b><span>buffet guests</span></div><div><b>${Object.keys(dishes).length}</b><span>dishes</span></div>
+      <div><b>${evList.length && readyBy(evList[0]) ? esc(clk(readyBy(evList[0]))) : '—'}</b><span>first ready-by</span></div></div>
+    <p class="small mut pd-date">${esc(fmtLong(day))}${kit ? ' · ' + esc(kits.find(k => k.id === kit)?.name || '') : ''}. "Ready by" = packed and loaded for deliveries and on-site events, 15 minutes before pick-up for pick-ups.</p>
+    ${allergies.length ? `<div class="alert bad small"><b>Allergies:</b> ${allergies.map(e => `${esc(e.client)}: ${esc(e.allergy)}`).join(' · ')}</div>` : ''}
+    ${evList.length ? `<section class="card"><h2>Events</h2><div class="pd-evs">${evList.map(e => `<a href="#/c/event/${e.event_id}" class="pd-ev"><b>${readyBy(e) ? esc(clk(readyBy(e))) : '—'}</b><span>${esc(e.client)}<small>${esc([KIND[e.kind], e.kind === 'buffet' && e.pax ? e.pax + ' guests' : '', goesOut(e) ? (e.kind === 'buffet' ? 'on site' : 'delivery') : 'pick-up', (CFG.v.kitchens || []).length > 1 ? kitchenOf(e, cfg)?.name : ''].filter(Boolean).join(' · '))}</small></span></a>`).join('')}</div></section>` : ''}
+    ${groups.length ? groups.map(([c, list]) => `<section class="card pd-g"><h2>${esc(c)}</h2>${list.map(d => `<div class="pd-d">
+        <div class="pd-h"><b>${esc(d.name)}</b><span class="pd-t">${d.portions ? (d.exact ? '' : '≈ ') + fq(d.portions) + ' portions' : ''}</span>${d.ready ? `<span class="chip warn">ready by ${esc(clk(d.ready))}</span>` : ''}</div>
+        <div class="pd-l">${d.lines.map(l => `<span>${esc(l.e.client)} · <b>${esc(l.amt)}</b>${l.note ? ` · ${esc(l.note)}` : ''}</span>`).join('')}</div></div>`).join('')}</section>`).join('')
+      : `<div class="card mut">No event dishes ${kit ? 'for this kitchen ' : ''}on this day.</div>`}`;
+};
+document.addEventListener('change', e => { if (e.target.matches('[data-proddate]') && e.target.value) go('#/c/production/' + encodeURIComponent(e.target.value + (e.target.dataset.proddate ? '|' + e.target.dataset.proddate : ''))); });
+ACT.prodPrint = async () => { document.body.classList.add('print-prod'); window.print(); setTimeout(() => document.body.classList.remove('print-prod'), 500); };
+
+/* ================= APPROVALS INBOX + OWNER DASHBOARD ================= */
+const canInbox = () => isAdmin() || canAny('manager', 'finance', 'head_chef') || can('catering', 'event_specialist');
+const canDash = () => isAdmin() || canAny('manager', 'finance');
+const INBOX = { n: null };
+async function inboxCount() {
+  if (!canInbox()) return 0;
+  try { const a = await db.rpc('approvals_inbox'); INBOX.data = a;
+    INBOX.n = a.requests.length + a.reports.length + a.zreadings.length + a.advances.length + a.counts.length + (a.recipes ? 1 : 0) + (a.inquiries ? 1 : 0); return INBOX.n; } catch (e) { return 0; }
+}
+const prLink = (ws, id) => `#/${ws === 'restaurant' ? 'r' : 'c'}/pr/${id}`;
+routes.approvals = async () => {
+  if (!canInbox()) return '<div class="card">Nothing to approve for your role.</div>';
+  const a = await db.rpc('approvals_inbox'), WS = w => w === 'restaurant' ? 'Restaurant' : 'Catering';
+  const sec = (title, items, help) => items.length ? `<section class="card ap-s"><div class="row"><h2>${title}</h2><span class="hp-n">${items.length}</span></div>${help ? `<p class="small mut">${help}</p>` : ''}<div class="list">${items.join('')}</div></section>` : '';
+  const li = (href, main, sub, right) => `<a class="li" href="${href}"><div class="li-main"><b>${main}</b><span class="mut small">${sub}</span></div>${right || ''}<span class="ap-go">›</span></a>`;
+  const parts = [
+    sec('Purchase requests to approve', a.requests.map(p => li(prLink(p.ws, p.id), `${esc(p.no)} · ${peso(p.total)}`, esc([WS(p.ws), p.who, p.event, p.lines + ' items', p.needed_by ? 'needed ' + fmtD(p.needed_by) : '', ago(p.at)].filter(Boolean).join(' · ')), p.priority === 'urgent' ? chip('Urgent', 'bad') : ''))),
+    sec('Purchases bought, to approve', a.reports.map(r => li(prLink(r.ws, r.pr_id), `${esc(r.no)} · ${peso(r.total)}`, esc([WS(r.ws), r.who, r.supplier, ago(r.at)].filter(Boolean).join(' · ')))), 'What was actually bought and paid, against the request.'),
+    sec('Z-readings to verify', a.zreadings.map(z => li('#/r/sales', fmtD(z.date), 'Net ' + peso(z.net)))),
+    sec('Stock counts not posted', a.counts.map(c => li(`#/${c.ws === 'restaurant' ? 'r' : 'c'}/count/${c.id}`, `${WS(c.ws)} count`, esc([c.who, fmtT(c.at)].filter(Boolean).join(' · '))))),
+    sec('Cash advances not liquidated', a.advances.map(x => li(x.ws === 'restaurant' ? '#/r/requests' : '#/c/requests', `${peso(x.amount)} · ${esc(x.who || '')}`, `${WS(x.ws)} · released ${esc(fmtT(x.at))}`)), 'Older than 2 days: ask for receipts and change.'),
+    a.recipes ? sec('Recipes in draft', [li('#/c/recipes/draft', `${a.recipes} draft recipe${a.recipes > 1 ? 's' : ''}`, 'Check and verify so costing is right')]) : '',
+    a.inquiries ? sec('New website inquiries', [li('#/c/inquiries', `${a.inquiries} new inquir${a.inquiries > 1 ? 'ies' : 'y'}`, 'Not contacted yet')]) : '',
+    sec('Voided orders (last 3 days, to review)', a.voids.map(v => li('#/r/sales', `#${v.no} · ${peso(v.total)}${v.paid ? ' · was paid' : ''}`, esc([v.who, v.reason, fmtT(v.at)].filter(Boolean).join(' · '))))),
+  ].filter(Boolean);
+  const waiting = a.requests.length + a.reports.length + a.zreadings.length + a.counts.length + a.advances.length + (a.recipes ? 1 : 0) + (a.inquiries ? 1 : 0);
+  return `<div class="row"><h1>Approvals</h1><span class="sp"></span>${canDash() ? '<a class="btn" href="#/dash">Dashboard</a>' : ''}</div>
+    <p class="mut small">Everything waiting on a decision, in one place. Tap one to open it.</p>
+    ${parts.length ? parts.join('') : '<div class="card"><b>All clear.</b> <span class="mut">Nothing waiting for you.</span></div>'}
+    ${waiting === 0 && a.voids.length ? '' : ''}`;
+};
+const pct = (a, b) => b ? Math.round((a - b) / b * 100) : null;
+const trend = p => p == null ? '' : `<span class="db-tr ${p >= 0 ? 'up' : 'down'}">${p >= 0 ? '▲' : '▼'} ${Math.abs(p)}%</span>`;
+routes.dash = async () => {
+  if (!canDash()) return '<div class="card">The dashboard is for the owner and managers.</div>';
+  const [d, a, board, cfg] = await Promise.all([db.rpc('owner_dashboard'), db.rpc('approvals_inbox').catch(() => null), db.rpc('events_board', { p_from: today(), p_to: today() }).catch(() => []), appCfg()]);
+  const st = d.sales_today || {}, lw = d.sales_lastweek || {};
+  const owed = d.balances.reduce((s, b) => s + num(b.balance), 0), overdue = d.balances.filter(b => b.due && b.due < d.today);
+  const nApp = a ? a.requests.length + a.reports.length + a.zreadings.length + a.counts.length + a.advances.length : 0;
+  const evGuests = d.events_week.reduce((s, e) => s + (e.kind === 'buffet' ? num(e.pax) : 0), 0);
+  const max = Math.max(1, ...d.sales_days.map(x => num(x.net)));
+  const sends = board.map(e => ({ e, p: sendOff(e, e.travel_mins != null ? { mins: e.travel_mins, km: e.travel_km, source: e.travel_source } : null, cfg) })).filter(x => x.p).sort((x, y) => (x.p.leave || x.p.ready || x.p.serve) - (y.p.leave || y.p.ready || y.p.serve));
+  const fc = d.food_cost.map(x => ({ ...x, p: num(x.contract) ? Math.round(num(x.cost) / num(x.contract) * 100) : null }));
+  const tile = (href, label, big, sub, tone) => `<a class="db-t${tone ? ' ' + tone : ''}" href="${href}"><span>${label}</span><b>${big}</b><small>${sub}</small></a>`;
+  return `<div class="row"><h1>Dashboard</h1><span class="sp"></span><span class="mut small">${esc(fmtLong(d.today))}</span></div>
+    <div class="db-grid">
+      ${tile('#/r/sales', 'Restaurant today', peso(st.net || 0), `${st.orders || 0} orders · ${st.guests || 0} guests ${trend(pct(num(st.net), num(lw.net)))} vs last ${new Date(d.today + 'T00:00').toLocaleDateString('en-PH', { weekday: 'short' })}`)}
+      ${tile('#/r/sales', 'Last 7 days', peso(d.sales_7), `${trend(pct(num(d.sales_7), num(d.sales_prev7)))} vs the 7 days before`)}
+      ${tile('#/events', 'Events next 7 days', d.events_week.length, `${evGuests} buffet guests`)}
+      ${tile('#/c/billing', 'Unpaid balances', peso(owed), `${d.balances.length} event${d.balances.length === 1 ? '' : 's'}${overdue.length ? ` · <b class="bad-t">${overdue.length} overdue</b>` : ''}`, overdue.length ? 'bad' : '')}
+      ${tile('#/approvals', 'Waiting for approval', nApp, nApp ? 'Tap to review' : 'All clear', nApp ? 'warn' : 'ok')}
+      ${tile('#/r/kitchen', 'Restaurant 86 / low', `${d.k86} / ${d.klow}`, 'dishes out / running low', d.k86 ? 'bad' : '')}
+      ${tile('#/c/stock', 'Catering stock below par', d.below_par, 'items to restock', d.below_par ? 'warn' : '')}
+      ${tile('#/c/inquiries', 'New inquiries', d.inquiries, d.inquiries ? 'Not contacted yet' : 'All handled', d.inquiries ? 'warn' : '')}
+    </div>
+    <div class="db-two">
+      <section class="card"><h2>Restaurant sales, last 14 days</h2><div class="db-bars">${d.sales_days.map(x => `<div title="${esc(fmtD(x.d))}: ${peso(x.net)}"><i style="height:${Math.max(2, Math.round(num(x.net) / max * 100))}%"${x.d === d.today ? ' class="now"' : ''}></i><span>${new Date(x.d + 'T00:00').toLocaleDateString('en-PH', { weekday: 'narrow' })}</span></div>`).join('')}</div></section>
+      <section class="card"><h2>Send-offs today</h2>${sends.length ? `<div class="list">${sends.map(({ e, p }) => `<a class="li" href="#/c/event/${e.id}"><div class="li-main"><b>${esc(e.client)}</b><span class="mut small">${p.leave ? 'leave ' + clk(p.leave) : p.ready ? 'pick-up ready ' + clk(p.ready) : 'serve ' + fmtClock(e.serve_time)}${e.run_status && e.run_status !== 'planned' ? ' · ' + esc(RUN_LABEL[e.run_status]) : ''}</span></div></a>`).join('')}</div>` : '<p class="mut small">Nothing going out today.</p>'}</section>
+    </div>
+    <div class="db-two">
+      <section class="card"><h2>This week's events</h2>${d.events_week.length ? `<div class="list">${d.events_week.map(e => `<a class="li" href="#/c/event/${e.id}"><div class="li-main"><b>${esc(e.client)}</b><span class="mut small">${esc(fmtD(e.date))}${e.time ? ' · ' + fmtClock(e.time) : ''} · ${esc(KIND[e.kind] || '')}${e.pax ? ' · ' + e.pax + ' guests' : ''}</span></div>${chip(EVENT_STATUS[e.status], statusTone(e.status))}</a>`).join('')}</div>` : '<p class="mut small">No events in the next 7 days.</p>'}</section>
+      <section class="card"><h2>Unpaid balances</h2>${d.balances.length ? `<div class="list">${d.balances.slice(0, 8).map(b => `<a class="li" href="#/c/event/${b.event_id}"><div class="li-main"><b>${esc(b.client)} · ${peso(b.balance)}</b><span class="mut small">${esc(b.ref)} · ${esc(fmtD(b.event_date))}${b.due ? ' · due ' + esc(fmtD(b.due)) : ''}</span></div>${b.due && b.due < d.today ? chip('Overdue', 'bad') : chip(b.status === 'partial' ? 'Partly paid' : 'Unpaid', 'warn')}</a>`).join('')}</div>` : '<p class="mut small">Everything is paid.</p>'}</section>
+    </div>
+    <section class="card"><h2>Food cost, last 30 days</h2><p class="small mut">Ingredients and expenses against the contract price. Above 40% is worth a look.</p>
+      ${fc.length ? `<div class="list">${fc.map(x => `<a class="li" href="#/c/event/${x.id}"><div class="li-main"><b>${esc(x.title)}</b><span class="mut small">${esc(x.ref)} · ${esc(fmtD(x.date))} · cost ${peso(x.cost)} of ${peso(x.contract)}</span></div>${x.p != null ? chip(x.p + '%', x.p > 40 ? 'bad' : x.p > 33 ? 'warn' : 'ok') : ''}</a>`).join('')}</div>` : '<p class="mut small">No priced events in the last 30 days.</p>'}</section>`;
+};
+// Home: a short line for managers and the owner
+async function homeInbox() {
+  if (!canInbox()) return '';
+  const n = await inboxCount();
+  return n ? `<a class="hw-inbox" href="#/approvals"><b>${n}</b><span>waiting for your approval</span><em>Review →</em></a>` : '';
+}
+
 /* ================= Profile photos ================= */
 // Small square JPEGs kept in the database; each phone keeps a copy and only downloads photos that changed.
 const AV = { img: {}, key: 'rom-avatars' };
@@ -3050,6 +3278,7 @@ ACT.avatarClear = async el => { if (!confirm('Remove this person’s photo?')) r
 
 /* ================= My account: your details, your roles and what they let you do, password, this device, your recent activity ================= */
 const ROLE_DO = {
+  driver: ['Sees the day\'s runs in send-off order, with directions and the client contact', 'Taps Loaded, Left, Arrived and Handed over (with a photo)'],
   manager: ['Approves purchase requests, orders and reports', 'Creates and edits events; closes and voids when needed', 'Sees billing, sales and costing for the workspace'],
   finance: ['Makes billing statements and records payments', 'Sets contract prices', 'Sees costing and ingredient prices'],
   event_specialist: ['Creates events and takes website inquiries', 'Edits event details and menus', 'Makes purchase requests for events'],
