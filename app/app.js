@@ -157,9 +157,19 @@ function renderShell(key) {
     : inRes ? (resFront() ? [['r/pos', 'POS'], ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['r/kitchen', '86 & running low'], ['r/requests', 'Requests']]
       : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
-    <div class="who"><a href="#/me" class="who-av" title="My account">${av(S.me?.id, S.me?.full_name, "xs")}</a><span>Hi, ${esc(nick())}</span><span class="bell-slot">${bellHtml()}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}<a href="#/tasks"${key === 'tasks' ? ' class="on"' : ''}>Tasks</a><a href="#/events"${key === 'events' ? ' class="on"' : ''}>Events</a>${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<a href="#/me"${key === 'me' ? ' class="on"' : ''}>My account</a><button class="ghost" data-act="logout">Log out</button></div>
+    <div class="who">${[['tasks', 'Tasks'], ['pokes', 'Pokes'], ['events', 'Events']].map(([k, l]) => `<a href="#/${k}" class="hn${key === k ? ' on' : ''}">${l}</a>`).join('')}<span class="bell-slot">${bellHtml()}</span>${acctMenu(key)}</div>
     ${mobileMenu(key, nav, inCat, inRes)}</div>
     ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a></nav>` : ''}`;
+}
+// Computer: your photo opens a small menu with your account and the owner's pages
+function acctMenu(key) {
+  const role = S.me?.is_admin ? 'Owner' : [...new Set((S.me?.roles || []).map(r => roleName(r.role)))].join(', ');
+  return `<details class="acct"><summary title="My account">${av(S.me?.id, S.me?.full_name, 'sm')}<span class="acct-n">${esc(nick())}</span><span class="acct-car">▾</span></summary>
+    <div class="acct-p"><div class="acct-h">${av(S.me?.id, S.me?.full_name, 'md')}<div><b>${esc(S.me?.full_name || '')}</b><small>${esc(role)}</small></div></div>
+      <a href="#/me"${key === 'me' ? ' class="on"' : ''}>👤 My account</a>
+      ${isAdmin() ? `<a href="#/people"${key === 'people' ? ' class="on"' : ''}>👥 People & roles</a><a href="#/activity"${key === 'activity' ? ' class="on"' : ''}>🕘 Activity</a>` : ''}
+      ${canInstall() ? '<button type="button" data-act="install">📲 Get the app</button>' : ''}
+      <button type="button" class="acct-out" data-act="logout">Log out</button></div></details>`;
 }
 // Phones: one "☰ Menu" button opens a dropdown with every page and account action (pills and header links are hidden there).
 function mobileMenu(key, nav, inCat, inRes) {
@@ -175,8 +185,9 @@ function mobileMenu(key, nav, inCat, inRes) {
 }
 // close the menu after picking something, or when tapping outside it
 document.addEventListener('click', e => {
-  const m = document.querySelector('details.mnav[open]'); if (!m) return;
-  if (!m.contains(e.target) || e.target.closest('.mn-p a, .mn-p button')) m.open = false;
+  document.querySelectorAll('details.mnav[open], details.acct[open]').forEach(m => {
+    if (!m.contains(e.target) || e.target.closest('.mn-p a, .mn-p button, .acct-p a, .acct-p button')) m.open = false;
+  });
 });
 function navOf(key) {
   return { 'c/event': 'c/events', 'c/event-new': 'c/events', 'c/pr': 'c/requests', 'c/po': 'c/orders', 'c/count': 'c/stock', 'c/recipe': 'c/recipes', 'c/inquiry': 'c/inquiries',
@@ -297,13 +308,12 @@ routes.home = async () => {
   const nToday = ev ? ev.filter(e => e.event_date === t).length : null, nTmr = ev ? ev.filter(e => e.event_date === tm).length : null;
   const next = ev?.find(e => e.event_date === t && e.serve_time && e.serve_time.slice(0, 5) >= new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16));
   const cards = [];
-  if (member('restaurant')) cards.push(`<a class="hw-card res" href="#/r/${can('restaurant', 'cashier', 'staff') && !can('restaurant', 'manager', 'chef') ? 'pos' : 'kitchen'}"><span class="hw-ic">${ICONS.res}</span><b>Restaurant</b><span>POS, daily sales, kitchen stocks and the 86 list, restock, receiving, store and par levels</span><em>Open →</em></a>`);
-  if (member('catering')) cards.push(`<a class="hw-card cat" href="#/c/events"><span class="hw-ic">${ICONS.cat}</span><b>Catering</b><span>Events and menus, inquiries, purchase requests, receiving, stock and recipes</span><em>Open →</em></a>`);
-  cards.push(`<a class="hw-card evs" href="#/events"><span class="hw-ic">${ICONS.evs}</span><b>Events board</b><span>What's coming up for the whole team — client, time, venue and menu</span><em>See events →</em></a>`);
+  if (member('restaurant')) cards.push(`<a class="hw-card res" href="#/r/${can('restaurant', 'cashier', 'staff') && !can('restaurant', 'manager', 'chef') ? 'pos' : 'kitchen'}"><span class="hw-ic">${ICONS.res}</span><div class="hw-tx"><b>Restaurant</b><span>POS, sales, kitchen stocks & the 86 list</span></div><em>→</em></a>`);
+  if (member('catering')) cards.push(`<a class="hw-card cat" href="#/c/events"><span class="hw-ic">${ICONS.cat}</span><div class="hw-tx"><b>Catering</b><span>Events, menus, purchasing & recipes</span></div><em>→</em></a>`);
+  cards.push(`<a class="hw-card evs" href="#/events"><span class="hw-ic">${ICONS.evs}</span><div class="hw-tx"><b>Events board</b><span>What's coming up for the whole team</span></div><em>→</em></a>`);
   return `<section class="hw-hero">
       <div class="hw-date">${esc(fmtLong(t))}</div>
       <h1>${fil}, ${first}!</h1>
-      <p class="hw-en">${en} — welcome to Romualdo's.</p>
       <blockquote class="hw-line">${esc(DAILY_LINES[doy % DAILY_LINES.length])}</blockquote>
       ${ev ? `<div class="hw-glance">
         <a href="#/events"><b>${nToday}</b><span>event${nToday === 1 ? '' : 's'} today</span></a>
@@ -311,11 +321,11 @@ routes.home = async () => {
         ${next ? `<a href="#/events"><b>${esc(fmtClock(next.serve_time))}</b><span>next: ${esc(next.client || next.title)}</span></a>` : ''}
       </div>` : ''}
     </section>
-    ${pk}${tk}
+    <div class="hw-today${pk && tk ? '' : ' one'}">${pk}${tk}</div>
     <h2 class="hw-where">Where are you working today?</h2>
     <div class="hw-grid">${cards.join('')}</div>
     ${!member('restaurant') && !member('catering') ? `<div class="card mt"><p>You don't have a workspace yet — ask the owner to give you a role. Meanwhile you can see the Events board.</p></div>` : ''}
-    ${isAdmin() ? `<p class="small mut" style="margin-top:22px">Owner: <a href="#/people">people and roles</a> · <a href="#/activity">activity log</a></p>` : ''}`;
+    `;
 };
 
 /* ================= EVENTS BOARD (everyone, read-only) ================= */
@@ -2719,9 +2729,11 @@ async function homeTasks() {
     const t0 = today(), [lists, rows] = await Promise.all([db.select('task_lists'), db.select('tasks', { eq: { done_at: null }, lte: { due_date: t0 }, order: [['due_date'], ['due_time']], limit: 30 })]);
     TK.lists = lists;
     const list = rows.sort((a, b) => tkLate(b) - tkLate(a) || b.priority - a.priority || (a.due_time || '99').localeCompare(b.due_time || '99'));
-    return `<section class="tk-home"><div class="row"><h2>✅ My tasks today${list.length ? ` <span class="pk-n tk-n">${list.length}</span>` : ''}</h2><span class="sp"></span><a class="btn" href="#/tasks">Open →</a></div>
-      ${list.length ? `<div class="tk-list">${list.slice(0, 5).map(t => tkRow(t, lists)).join('')}</div>${list.length > 5 ? `<a class="small" href="#/tasks/today">+ ${list.length - 5} more</a>` : ''}`
-        : `<p class="mut small">Nothing due today. <a href="#/tasks">Add a task →</a></p>`}</section>`;
+    return `<section class="hw-panel"><div class="hp-h"><span class="hp-ic hp-tk">✓</span><h2>My tasks today</h2>${list.length ? `<span class="hp-n hp-dark">${list.length}</span>` : ''}<span class="sp"></span>
+        <a class="hp-a" href="#/tasks">Open</a></div>
+      <form class="hp-quick" data-form="tkQuick" autocomplete="off"><input name="q" placeholder="＋ Add a task… e.g. Count the rice 3pm" maxlength="240" data-tkq><div class="tk-prev" hidden></div></form>
+      ${list.length ? `<div class="tk-list">${list.slice(0, 5).map(t => tkRow(t, lists)).join('')}</div>${list.length > 5 ? `<a class="hp-more" href="#/tasks/today">+ ${list.length - 5} more today →</a>` : ''}`
+        : `<div class="hp-empty"><span>☀️</span><div><b>Nothing due today</b><small>Type above to add one — try “tomorrow 8am”.</small></div></div>`}</section>`;
   } catch (e) { return ''; }
 }
 // In-app reminder pop-ups while the app is open (the phone notification comes from the server)
@@ -2929,10 +2941,11 @@ async function homePokes() {
   const open = d.inbox.filter(p => !p.done_at);
   setTimeout(() => pokesSeen(open), 1200);
   const news = pokeNews(d.sent);
-  return `${news.length ? `<section class="pk-news"><div class="row"><h2>📬 Updates on your pokes</h2><span class="sp"></span><a class="btn" href="#/pokes/sent">See sent →</a></div>${news.slice(0, 5).map(newsLine).join('')}</section>` : ''}
-  <section class="pk-home"><div class="row"><h2>👉 Pokes for you${open.length ? ` <span class="pk-n">${open.length}</span>` : ''}</h2><span class="sp"></span><a class="btn" href="#/pokes/new">＋ Poke someone</a></div>
-    ${open.length ? open.slice(0, 6).map(p => pokeCard(p, 'in')).join('') + (open.length > 6 ? `<a href="#/pokes">See all ${open.length} →</a>` : '')
-      : '<p class="mut small">Nothing for you right now. 👌</p>'}</section>`;
+  return `<section class="hw-panel"><div class="hp-h"><span class="hp-ic pk">👉</span><h2>Pokes for you</h2>${open.length ? `<span class="hp-n">${open.length}</span>` : ''}<span class="sp"></span>
+      <a class="hp-a" href="#/pokes/new" title="Poke someone">＋ Poke</a></div>
+    ${news.length ? `<div class="hp-news">${news.slice(0, 3).map(newsLine).join('')}${news.length > 3 ? `<a class="small" href="#/pokes/sent">+ ${news.length - 3} more updates</a>` : ''}</div>` : ''}
+    ${open.length ? open.slice(0, 4).map(p => pokeCard(p, 'in')).join('') + (open.length > 4 ? `<a class="hp-more" href="#/pokes">See all ${open.length} →</a>` : '')
+      : `<div class="hp-empty"><span>🙌</span><div><b>All clear</b><small>No endorsements waiting for you.</small></div></div>`}</section>`;
 }
 routes.pokes = async arg => {
   const tab = arg === 'sent' || arg === 'all' ? arg : 'in', compose = (arg || '').startsWith('new'), preTo = (arg || '').split('~')[1] || '';
