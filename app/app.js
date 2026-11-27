@@ -251,14 +251,51 @@ async function afterLogin() {
 }
 
 /* ================= home ================= */
+// Home: a warm welcome, today at a glance, then the three ways in
+const GREET = h => h < 11 ? ['Magandang umaga', 'Good morning'] : h < 13 ? ['Magandang tanghali', 'Good noon'] : h < 18 ? ['Magandang hapon', 'Good afternoon'] : ['Magandang gabi', 'Good evening'];
+const DAILY_LINES = [
+  'Every plate that leaves the kitchen carries our name. Let\'s make it one worth remembering.',
+  'Ready stations, calm service. A good day starts with good prep.',
+  'Serve every guest like family coming home for Sunday lunch.',
+  'Small things done well — a hot plate, a warm greeting, a clean table — are what guests remember.',
+  'Taste, check, then send. Pride is in the details.',
+  'We feed celebrations. Somebody\'s best day depends on our work today.',
+  'Help each other out. A strong kitchen is a team that has each other\'s back.',
+  'Clean as you go, count what you use, say something when something\'s short.',
+  'Masarap, mainit, maayos — delicious, hot and well served, every time.',
+  'Our food goes to birthdays, weddings and offices across Davao. Let\'s make them proud.'
+];
+const ICONS = {
+  res: '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3v8a2 2 0 0 0 2 2v8"/><path d="M11 3v6a2 2 0 0 1-2 2"/><path d="M7 3v6"/><path d="M17 21V3c-2 1.5-3 4-3 7v3h3"/></svg>',
+  cat: '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18h18"/><path d="M4 18a8 8 0 0 1 16 0"/><path d="M12 10V8"/><path d="M10.5 8h3"/><path d="M2 21h20"/></svg>',
+  evs: '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M8 14h3v3H8z"/></svg>'
+};
 routes.home = async () => {
+  const t = today(), tm = addDays(t, 1), hour = new Date(Date.now() + 8 * 3600e3).getUTCHours();
+  const [fil, en] = GREET(hour), first = esc((S.me.full_name || '').split(' ')[0] || 'team');
+  const doy = Math.floor((Date.parse(t) - Date.parse(t.slice(0, 4) + '-01-01')) / 864e5);
+  const ev = await db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null);
+  const nToday = ev ? ev.filter(e => e.event_date === t).length : null, nTmr = ev ? ev.filter(e => e.event_date === tm).length : null;
+  const next = ev?.find(e => e.event_date === t && e.serve_time && e.serve_time.slice(0, 5) >= new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16));
   const cards = [];
-  if (member('catering')) cards.push(`<a class="ws-card cat" href="#/c/events"><b>Catering</b><span>Events, menus, purchase requests, receiving, stock, recipes</span></a>`);
-  if (member('restaurant')) cards.push(`<a class="ws-card res" href="#/r/${can('restaurant', 'cashier', 'staff') && !can('restaurant', 'manager', 'chef') ? 'pos' : 'kitchen'}"><b>Restaurant</b><span>POS, daily sales, kitchen stocks, restock, purchase requests, receiving, store and par levels</span></a>`);
-  if (!cards.length) cards.push(`<div class="card"><p>You don't have a workspace yet. Ask the owner to give you a role.</p></div>`);
-  cards.push(`<a class="ws-card evs" href="#/events"><b>Events board</b><span>Today's, tomorrow's and upcoming events and bookings — client, time, venue, menu</span></a>`);
-  return `<h1>Good day, ${esc(S.me.full_name.split(' ')[0])}</h1><p class="lede">Choose where you're working.</p><div class="ws-grid">${cards.join('')}</div>
-    ${isAdmin() ? `<p class="small mut" style="margin-top:24px">Owner: <a href="#/people">add people and give them roles</a>.</p>` : ''}`;
+  if (member('restaurant')) cards.push(`<a class="hw-card res" href="#/r/${can('restaurant', 'cashier', 'staff') && !can('restaurant', 'manager', 'chef') ? 'pos' : 'kitchen'}"><span class="hw-ic">${ICONS.res}</span><b>Restaurant</b><span>POS, daily sales, kitchen stocks and the 86 list, restock, receiving, store and par levels</span><em>Open →</em></a>`);
+  if (member('catering')) cards.push(`<a class="hw-card cat" href="#/c/events"><span class="hw-ic">${ICONS.cat}</span><b>Catering</b><span>Events and menus, inquiries, purchase requests, receiving, stock and recipes</span><em>Open →</em></a>`);
+  cards.push(`<a class="hw-card evs" href="#/events"><span class="hw-ic">${ICONS.evs}</span><b>Events board</b><span>What's coming up for the whole team — client, time, venue and menu</span><em>See events →</em></a>`);
+  return `<section class="hw-hero">
+      <div class="hw-date">${esc(fmtLong(t))}</div>
+      <h1>${fil}, ${first}!</h1>
+      <p class="hw-en">${en} — welcome to Romualdo's.</p>
+      <blockquote class="hw-line">${esc(DAILY_LINES[doy % DAILY_LINES.length])}</blockquote>
+      ${ev ? `<div class="hw-glance">
+        <a href="#/events"><b>${nToday}</b><span>event${nToday === 1 ? '' : 's'} today</span></a>
+        <a href="#/events"><b>${nTmr}</b><span>event${nTmr === 1 ? '' : 's'} tomorrow</span></a>
+        ${next ? `<a href="#/events"><b>${esc(fmtClock(next.serve_time))}</b><span>next: ${esc(next.client || next.title)}</span></a>` : ''}
+      </div>` : ''}
+    </section>
+    <h2 class="hw-where">Where are you working today?</h2>
+    <div class="hw-grid">${cards.join('')}</div>
+    ${!member('restaurant') && !member('catering') ? `<div class="card mt"><p>You don't have a workspace yet — ask the owner to give you a role. Meanwhile you can see the Events board.</p></div>` : ''}
+    ${isAdmin() ? `<p class="small mut" style="margin-top:22px">Owner: <a href="#/people">people and roles</a> · <a href="#/activity">activity log</a></p>` : ''}`;
 };
 
 /* ================= EVENTS BOARD (everyone, read-only) ================= */
@@ -267,7 +304,8 @@ const BOARD_DAYS = 45;
 function boardCard(e, open) {
   const cat = e.kind === 'buffet', fulfil = e.fulfil || 'Pick-up', del = fulfil === 'Delivery';
   const t = e.serve_time ? fmtClock(e.serve_time).split(' ') : null;
-  const where = cat ? e.venue : del ? (e.venue ? 'Deliver to ' + e.venue : 'Delivery') : 'Pick-up' + (e.venue && !/romualdo/i.test(e.venue) ? ' · ' + e.venue : ' at Romualdo\'s');
+  const v = (e.venue || '').trim(), vOk = v && !/^(pick[\s-]?up|delivery|tba|tbc|-+)$/i.test(v);
+  const where = cat ? v : del ? (vOk ? 'Deliver to ' + v : 'Delivery') : 'Pick-up ' + (vOk && !/romualdo/i.test(v) ? '· ' + v : 'at Romualdo\'s');
   const facts = [e.event_type, e.pax ? e.pax + ' guests' : '', KIND[e.kind] || '', e.pkg ? 'Package: ' + e.pkg : '', e.call ? 'Call time ' + e.call : ''].filter(Boolean);
   const unit = e.kind === 'trays' ? ' tray' : e.kind === 'packs' ? ' pack' : '';
   const qty = m => num(m.qty) ? ` <span class="evb-q">× ${fq(m.qty)}${unit}${num(m.qty) > 1 && unit ? 's' : ''}</span>` : '';
@@ -288,6 +326,7 @@ function boardCard(e, open) {
     </div></article>`;
 }
 routes.events = async () => {
+  clearTimeout(S.evTimer); S.evTimer = setTimeout(() => { if (location.hash.startsWith('#/events') && !document.querySelector('.modal')) refresh(); }, 60000);   // new bookings show up within a minute
   const t = today(), tm = addDays(t, 1);
   const rows = await db.rpc('events_board', { p_from: t, p_to: addDays(t, BOARD_DAYS) });
   const on = d => rows.filter(e => e.event_date === d), later = rows.filter(e => e.event_date > tm);
@@ -295,7 +334,7 @@ routes.events = async () => {
     ${list.length ? list.map(e => boardCard(e, open)).join('') : `<div class="evb-empty">${empty}</div>`}</section>`;
   const days = [...new Set(later.map(e => e.event_date))];
   return `<div class="row"><h1>Events</h1><span class="sp"></span>${member('catering') ? '<a class="btn ghost" href="#/c/events">Catering list</a>' : ''}</div>
-    <p class="mut small" style="margin-top:-6px">What's coming up for the whole team. Prices and client contact details aren't shown here.</p>
+    <p class="mut small" style="margin-top:-6px">What's coming up for the whole team — updates by itself every minute. Prices and client contact details aren't shown here.</p>
     ${sec('today', 'Today', fmtLong(t), on(t), true, 'No events today.')}
     ${sec('tmr', 'Tomorrow', fmtLong(tm), on(tm), true, 'No events tomorrow.')}
     <section class="evb-sec later"><h2>Upcoming <span class="evb-n">${later.length}</span><span class="evb-d">next ${BOARD_DAYS - 1} days</span></h2>
