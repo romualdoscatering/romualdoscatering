@@ -1754,11 +1754,18 @@ routes['r/kitchen'] = async arg => {
 async function kOut() {
   const d = today(), [rows, days] = await Promise.all([db.rpc('kitchen_sheet', { p_date: d }), db.select('kitchen_days', { cols: 'count_date,saved_by,saved_at,note', order: [['count_date', false]], limit: 1 })]);
   const last = days[0], who = last?.saved_by ? (await db.select('profiles', { cols: 'full_name', eq: { id: last.saved_by } }))[0]?.full_name : (last?.note || '').replace(/^Counted by /, '').replace(/ \(copied from \/ops\)$/, '');
-  const out = rows.filter(r => kEnd(r) <= 0), low = rows.filter(r => kEnd(r) > 0 && kEnd(r) < num(r.min_level));
-  const list = (rs, tone) => rs.length ? kGroups(rs, 'section').map(([g, l]) => `<h3 class="small mut" style="margin:10px 0 4px">${esc(g)}</h3>${l.map(r => `<div class="li"><div class="li-main"><b>${esc(r.name)}</b></div><b class="${tone}">${tone === 'bad-t' ? '86' : fq(kEnd(r)) + ' left'}</b></div>`).join('')}`).join('') : '<p class="mut">None.</p>';
-  return `<p class="lede">From the stockist's count${last ? ` · last counted ${esc(fmtD(last.count_date))}${who ? ' by ' + esc(who) : ''}` : ''}${d !== last?.count_date ? ', plus today\'s POS sales' : ''}. Only the storekeeper and manager change the count.</p>
-   <section class="card"><h2>86 — out <span class="cnt">${out.length}</span></h2>${list(out, 'bad-t')}</section>
-   <section class="card"><h2>Running low <span class="cnt">${low.length}</span></h2>${list(low, 'warn-t')}</section>`;
+  return k86Html(rows, last, who, d);
+}
+/* The 86 board: big, colour-coded tiles that read at a glance from across the counter. Refreshes itself every minute. */
+function k86Html(rows, last, who, d) {
+  const out = rows.filter(r => kEnd(r) <= 0), low = rows.filter(r => kEnd(r) > 0 && kEnd(r) < num(r.min_level)).sort((a, b) => kEnd(a) - kEnd(b));
+  const tile = (r, isOut) => `<div class="k86t ${isOut ? 'out' : 'low'}"><span class="k86n">${esc(r.name)}</span><span class="k86v">${isOut ? '86' : fq(kEnd(r))}<small>${isOut ? 'out' : 'left'}</small></span></div>`;
+  const when = last ? `${fmtD(last.count_date)}${last.saved_at && last.count_date === d ? ', ' + new Date(last.saved_at).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : ''}` : '';
+  clearTimeout(S.k86Timer); S.k86Timer = setTimeout(() => { if (location.hash.startsWith('#/r/kitchen')) refresh(); }, 60000);
+  return `<div class="k86sum"><span class="k86c out"><b>${out.length}</b> out</span><span class="k86c low"><b>${low.length}</b> running low</span><span class="k86c ok"><b>${rows.length - out.length - low.length}</b> OK</span></div>
+   <p class="small mut k86when">Stockist's count${when ? ` · ${esc(when)}` : ''}${who ? ` · ${esc(who)}` : ''}${last && d !== last.count_date ? ' · plus today\'s POS sales' : ''} · updates every minute</p>
+   ${out.length ? `<h2 class="k86h out">86 — don't take orders</h2><div class="k86g">${out.map(r => tile(r, true)).join('')}</div>` : '<div class="k86none">Nothing is 86 right now 👍</div>'}
+   ${low.length ? `<h2 class="k86h low">Running low — tell the guest it may run out</h2><div class="k86g">${low.map(r => tile(r, false)).join('')}</div>` : ''}`;
 }
 async function kDay(d) {
   d = d || S.kDate || today(); S.kDate = d;
