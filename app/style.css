@@ -792,3 +792,4 @@ body:not(.pos-mode) main{padding-bottom:calc(80px + env(safe-area-inset-bottom))
 .tk-gear.on{background:var(--navy);color:#fff}
 .tk-home{margin:0 0 18px}.tk-home h2{margin:0}.tk-home>.row{margin-bottom:8px}.tk-n{background:var(--navy)!important}
 @media (max-width:760px){.tk-grid{grid-template-columns:1fr 1fr}.tk-pf{grid-template-columns:1fr}}
+.mn-f .mn-hi .av{flex:0 0 26px;margin:0;width:26px;height:26px}
