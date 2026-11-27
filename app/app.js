@@ -51,6 +51,18 @@ const IC = {
   users: w => SV('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>', w),
 };
 
+/* ================= Night mode: dark from 9 PM to 6 AM (Manila time), or always light / always dark, per phone ================= */
+const THEME_KEY = 'rom-theme';   // 'auto' | 'light' | 'dark'
+const themePref = () => { try { return localStorage.getItem(THEME_KEY) || 'auto'; } catch (e) { return 'auto'; } };
+const isNightHour = () => { const h = new Date(Date.now() + 8 * 3600e3).getUTCHours(); return h >= 21 || h < 6; };
+function applyTheme() {
+  const p = themePref(), dark = p === 'dark' || (p === 'auto' && isNightHour());
+  const pos = document.body?.classList.contains('pos-mode');   // the POS is dark already
+  document.documentElement.classList.toggle('night', dark && !pos);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark && !pos ? '#0f1524' : '#fbf8ee');
+}
+applyTheme(); setInterval(applyTheme, 60000); document.addEventListener('visibilitychange', () => { if (!document.hidden) applyTheme(); });
+
 /* ================= state ================= */
 const S = { user: null, me: null, items: [], itemsById: {}, dishes: [], dishById: {}, aliasMap: {}, packs: [] };
 const isAdmin = () => !!S.me?.is_admin;
@@ -153,7 +165,7 @@ async function route() {
   const arg = pre ? rest.slice(1).join('/') : rest.join('/');
   const r = routes[key] || routes.home;
   current = key;
-  document.body.classList.toggle('pos-mode', key === 'r/pos');
+  document.body.classList.toggle('pos-mode', key === 'r/pos'); applyTheme();
   renderShell(key);
   $('#main').innerHTML = '<div class="loading">Loading…</div>';
   try { $('#main').innerHTML = await r(arg); afterRender(); }
@@ -303,7 +315,7 @@ async function afterLogin() {
 
 /* ================= home ================= */
 // Home: a warm welcome, today at a glance, then the three ways in
-const GREET = h => h < 11 ? ['Magandang umaga', 'Good morning'] : h < 13 ? ['Magandang tanghali', 'Good noon'] : h < 18 ? ['Magandang hapon', 'Good afternoon'] : ['Magandang gabi', 'Good evening'];
+const GREET = h => h < 4 ? ['Magandang gabi', 'Good evening'] : h < 11 ? ['Magandang umaga', 'Good morning'] : h < 13 ? ['Magandang tanghali', 'Good noon'] : h < 18 ? ['Magandang hapon', 'Good afternoon'] : ['Magandang gabi', 'Good evening'];
 const DAILY_LINES = [
   'Every plate that leaves the kitchen carries our name. Let\'s make it one worth remembering.',
   'Ready stations, calm service. A good day starts with good prep.',
@@ -3099,6 +3111,9 @@ routes.me = async () => {
     ${me.last_sign_in ? `<p class="small mut mt">Last signed in: ${fmtT(me.last_sign_in)}</p>` : ''}
     <div class="me-ro"><span>This device</span><b>${dev?.registered ? `POS tablet “${esc(dev.name || '')}”` : 'Not a POS tablet'}</b></div>
     <button class="ghost mt" data-act="logout">Log out of this device</button></section>
+  <section class="card"><h2>Appearance</h2>
+    <div class="seg th-seg">${[['auto', 'Auto'], ['light', 'Light'], ['dark', 'Dark']].map(([k, l]) => `<button type="button" data-theme="${k}" class="${themePref() === k ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <p class="small mut mt">Auto turns dark from 9 PM to 6 AM, easier on the eyes for night work. Saved on this phone only.</p></section>
   <section class="card"><h2>Go to</h2><div class="me-go">${go2.map(([h, l]) => `<a class="btn" href="${h}">${l}</a>`).join('')}${canInstall() ? '<button class="ghost" data-act="install">Get the app</button>' : ''}</div>
     <h2 class="mt">Good to know</h2><ul class="me-tips">
       <li>Keep your password to yourself. Everything you do is saved under your name.</li>
@@ -3130,6 +3145,10 @@ function teamHtml(team) {
           <div class="tm-roles">${roles(t)}</div><span class="tm-st ${st}">${esc(txt)}</span></div>
         <a class="btn" href="#/pokes/new~${t.id}" title="Poke ${esc(t.name)}">Poke</a></div>`; }).join('') || '<p class="mut">No teammates yet.</p>'}</div></section>`;
 }
+document.addEventListener('click', e => { const b = e.target.closest('[data-theme]'); if (!b) return;
+  try { localStorage.setItem(THEME_KEY, b.dataset.theme); } catch (err) {} applyTheme();
+  document.querySelectorAll('[data-theme]').forEach(x => x.classList.toggle('on', x === b));
+  toast(b.dataset.theme === 'auto' ? 'Dark from 9 PM to 6 AM' : b.dataset.theme === 'dark' ? 'Always dark' : 'Always light'); });
 FORMS.meSave = async f => {
   await db.rpc('my_update_profile', { p_nickname: f.nickname || '', p_phone: f.phone || '' });
   S.me = await db.rpc('my_access'); toast('Saved'); refresh();

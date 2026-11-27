@@ -940,3 +940,13 @@ a.mn-acct>span:not(.av){flex:1;display:grid;margin:0!important;color:var(--ink)}
 .tk-form label.tk-impl>input{display:inline-block;width:22px;height:22px;margin:0;flex:0 0 auto}
 @media (max-width:640px){.tk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.tk-grid>label:nth-child(3){grid-column:1/-1}}
 .pk-form label.pk-urg{justify-content:flex-start;padding:0}.pk-form label.pk-urg>input{display:inline-block;width:22px;height:22px;margin:0;flex:0 0 auto}.pk-form label.pk-urg>span{font-size:15px;color:var(--ink);font-weight:500}
+/* ================= Night mode =================
+   The whole page is flipped (light ↔ dark, colours kept), then photos, maps and the already-dark navy panels are flipped back. */
+html.night{filter:invert(1) hue-rotate(180deg);background:#f0ebe0}
+html.night img:not(.brand img),html.night video,html.night canvas,html.night iframe,html.night .pin-map,
+html.night .hw-hero,html.night .hw-card,html.night .me-hero,html.night .evbar>div,html.night .as-ic,html.night .toast{filter:invert(1) hue-rotate(180deg)}
+html.night .hw-hero img,html.night .hw-card img,html.night .me-hero img,html.night .pin-map img,html.night .pin-map canvas{filter:none}
+html.night *{box-shadow:none!important;text-shadow:none!important}
+html.night .card,html.night .hw-panel,html.night .tk,html.night .poke,html.night .li,html.night .evb,html.night .modal .card{border-color:#d9d2bf}
+.th-seg button{min-width:76px}
+@media print{html.night{filter:none}html.night *{filter:none!important}}
