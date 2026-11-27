@@ -186,7 +186,7 @@ function afterRender() {
 function renderShell(key) {
   requestAnimationFrame(fitHeader);
   const inCat = key.startsWith('c/'), inRes = key.startsWith('r/');
-  const nav = inCat ? (driverOnly() ? [['c/runs', 'Runs'], ['c/production', 'Production']] : [['c/events', 'Events'], ...(runTeam() ? [['c/runs', 'Runs']] : []), ['c/production', 'Production'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes'], ...(can('catering', 'manager', 'finance') ? [['c/billing', 'Billing']] : [])])
+  const nav = inCat ? (driverOnly() ? [['c/runs', 'Runs'], ['c/equipment', 'Equipment'], ['c/production', 'Production']] : [['c/events', 'Events'], ...(runTeam() ? [['c/runs', 'Runs']] : []), ['c/production', 'Production'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/equipment', 'Equipment'], ['c/recipes', 'Recipes'], ...(can('catering', 'manager', 'finance') ? [['c/billing', 'Billing']] : [])])
     : inRes ? (resFront() ? [['r/pos', 'POS'], ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['r/kitchen', '86 & running low'], ['r/requests', 'Requests']]
       : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ...(canProd() ? [['c/production', 'Production']] : []), ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
@@ -650,6 +650,7 @@ routes['c/event'] = async id => {
    ${prs.length ? `<h3 class="mt">Requests for this event</h3><div class="list">${prs.map(p => `<a class="li" href="#/c/pr/${p.id}"><div class="li-main"><b>${esc(p.pr_no)}</b><span class="mut small">${p.line_count} items · ${peso(p.est_total)} · ${esc(fmtT(p.created_at))}</span></div>${chip(PR_STATUS[p.status], statusTone(p.status))}</a>`).join('')}</div>` : ''}
   </section>
 
+  ${['inquiry', 'cancelled'].includes(ev.status) ? '' : await evEquipCard(ev)}
   ${(pick.length || ['confirmed', 'in_prep', 'done'].includes(ev.status)) && can('catering', 'storekeeper', 'manager', 'chef', 'head_chef') ? `<section class="card"><h2>Prep day</h2>
    ${pick.length ? `<form data-form="issue" data-id="${ev.id}"><p class="small mut">Stock set aside for this event in the catering store. Issue it to the cook in charge.</p>
      <div class="tw"><table><thead><tr><th>Item</th><th class="n">Set aside</th><th class="n">Issue now</th></tr></thead><tbody>
@@ -1179,6 +1180,7 @@ routes['c/po'] = async id => {
    ${shopRows(lines, l => l.item_id, l => l.ordered, 5, l => { const left = Math.max(num(l.ordered) - num(l.received), 0); return `<tr><td>${esc(l.name)}</td><td class="n">${fq(l.ordered)} ${esc(l.stock_unit)}${packSplit(l.item_id, l.ordered) ? `<div class="small mut">${esc(packSplit(l.item_id, l.ordered))}</div>` : ''}</td><td class="n ${num(l.received) < num(l.ordered) && o.status !== 'open' ? 'warn-t' : ''}">${fq(l.received)}</td>
      ${canRecv ? `<td class="n"><input name="q_${l.id}" type="number" step="any" min="0" value="${left}" class="qty"></td><td class="n"><input name="c_${l.id}" type="number" step="any" min="0" value="${num(l.unit_cost) || ''}" class="qty" placeholder="price"></td>` : `<td class="n">${peso(l.unit_cost)}</td>`}</tr>`; })}
    </tbody></table></div>
+   ${canRecv && o.ws === 'catering' && ((await appCfg()).kitchens || []).length > 1 ? `<label class="mt">Received at<select name="loc">${(CFG.v.kitchens || []).map((k, i) => opt(k.id, k.name, o.event_id ? false : i === 0)).join('')}${o.event_id ? opt('', "The event's kitchen", true) : ''}</select></label>` : ''}
    ${canRecv ? `<div class="grid mt"><label>Official receipt / invoice no.<input name="or_no"></label><label>Note<input name="note" placeholder="e.g. 0.5 kg short, wilted pechay"></label></div><div class="row end"><button class="pri">Receive into store</button></div>` : ''}
   </form>
   ${receipts.length ? `<section class="card"><h2>Receipts</h2><table><tbody>${receipts.map(r => `<tr><td>${esc(fmtT(r.received_at))}<div class="small mut">by ${esc(people[r.received_by] || '')}${r.or_no ? ' · OR ' + esc(r.or_no) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></td>
@@ -1187,7 +1189,8 @@ routes['c/po'] = async id => {
 FORMS.receive = async (f, el) => {
   const lines = Object.keys(f).filter(k => k.startsWith('q_')).map(k => ({ po_line_id: k.slice(2), qty: num(f[k]), unit_cost: f['c_' + k.slice(2)] === '' ? undefined : num(f['c_' + k.slice(2)]) }));
   if (lines.some(l => l.qty > 0 && !(l.unit_cost > 0))) return toast('Enter the actual unit price for each item received.', true);
-  const r = await db.rpc('receive_po', { p_po: el.dataset.id, p_lines: lines, p_or_no: f.or_no || null, p_note: f.note || null });
+  const r = f.loc !== undefined ? await db.rpc('receive_po_at', { p_loc: f.loc || null, p_po: el.dataset.id, p_lines: lines, p_or_no: f.or_no || null, p_note: f.note || null })
+    : await db.rpc('receive_po', { p_po: el.dataset.id, p_lines: lines, p_or_no: f.or_no || null, p_note: f.note || null });
   toast(num(r.short_value) > 0 ? `Received — short by ${peso(r.short_value)}` : 'Received into the ' + STORE(), num(r.short_value) > 0);
   await loadMaster(); refresh();
 };
@@ -1195,16 +1198,59 @@ FORMS.receive = async (f, el) => {
 /* ================= STOCK & COUNTS ================= */
 routes['c/stock'] = async arg => {
   if (arg === 'par') return parView();
-  const [stock, counts] = await Promise.all([db.select('stock_on_hand', { eq: { ws: WS() }, order: [['category'], ['name']] }), db.select('stock_counts', { eq: { ws: WS() }, order: [['counted_at', false]], limit: 15 })]);
+  if (arg === 'transfer') return transferView();
+  const kits = WS() === 'catering' ? ((await appCfg()).kitchens || []) : [], multi = kits.length > 1;
+  const kit = multi && (arg || '').startsWith('k:') ? kits.find(k => k.id === arg.slice(2))?.id || '' : '';
+  const [all, counts, byK] = await Promise.all([db.select('stock_on_hand', { eq: { ws: WS() }, order: [['category'], ['name']] }), db.select('stock_counts', { eq: { ws: WS() }, order: [['counted_at', false]], limit: 15 }),
+    multi ? db.select('stock_by_kitchen', { order: [['name']] }) : []]);
+  const atK = {}; for (const r of byK) (atK[r.item_id] ||= {})[r.loc] = num(r.on_hand);
+  const stock = kit ? byK.filter(r => r.loc === kit && Math.abs(num(r.on_hand)) > 0.0005).sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name)) : all;
+  const kName = id => kits.find(k => k.id === id)?.name || 'Main kitchen';
   const val = stock.reduce((s, x) => s + Math.max(num(x.value), 0), 0);
-  return `<div class="row"><h1>${WS() === 'restaurant' ? 'Restaurant store' : 'Catering store'}</h1><span class="sp"></span><a class="btn ghost" href="#/${P()}/stock/par">Par levels &amp; restock</a>${can(WS(), 'storekeeper', 'manager', 'chef') ? '<button class="pri" data-act="startCount">Start a count</button>' : ''}</div>
+  return `<div class="row"><h1>${WS() === 'restaurant' ? 'Restaurant store' : 'Catering store'}</h1><span class="sp"></span><a class="btn ghost" href="#/${P()}/stock/par">Par levels &amp; restock</a>${multi && canTransfer() ? `<a class="btn" href="#/c/stock/transfer">Transfer between kitchens</a>` : ''}${can(WS(), 'storekeeper', 'manager', 'chef') ? `<button class="pri" data-act="startCount"${kit ? ` data-loc="${esc(kit)}"` : ''}>${kit ? 'Count ' + esc(kName(kit)) : 'Start a count'}</button>` : ''}</div>
+   ${multi ? `<div class="seg"><a href="#/c/stock" class="${kit ? '' : 'on'}">Both kitchens</a>${kits.map(k => `<a href="#/c/stock/k:${esc(k.id)}" class="${kit === k.id ? 'on' : ''}">${esc(k.name)}</a>`).join('')}</div>` : ''}
    <div class="kpis"><div class="kpi"><span>Items in stock</span><b>${stock.filter(s => num(s.on_hand) > 0).length}</b></div><div class="kpi"><span>Stock value (last prices)</span><b>${peso(val)}</b></div></div>
    <input class="search" placeholder="Search…" data-filter="#stockTable tbody tr">
-   ${stock.length ? `<div class="card tw"><table id="stockTable"><thead><tr><th>Item</th><th class="n">On hand</th><th class="n">Value</th></tr></thead><tbody>
-     ${stock.map(s => `<tr><td>${esc(s.name)}<div class="small mut">${esc(s.category)}</div></td><td class="n ${num(s.on_hand) < 0 ? 'bad-t' : ''}">${fq(s.on_hand)} ${esc(s.stock_unit)}</td><td class="n">${peso(s.value)}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty">The ${STORE()} is empty. Receive an order or do an opening count.</div>`}
-   ${counts.length ? `<h2>Counts</h2><div class="list">${counts.map(c => `<a class="li" href="#/${P()}/count/${c.id}"><div class="li-main"><b>${esc(fmtT(c.counted_at))}</b><span class="mut small">${c.status === 'posted' ? `missing ${peso(Math.abs(num(c.loss_value)))} · excess ${peso(c.gain_value)}` : 'not posted yet'}</span></div>${chip(c.status === 'posted' ? 'Posted' : 'Open', c.status === 'posted' ? (num(c.loss_value) < -1 ? 'bad' : 'ok') : 'warn')}</a>`).join('')}</div>` : ''}`;
+   ${stock.length ? `<div class="card tw"><table id="stockTable"><thead><tr><th>Item</th>${multi && !kit ? kits.map(k => `<th class="n">${esc(k.name)}</th>`).join('') : ''}<th class="n">${multi && !kit ? 'Total' : 'On hand'}</th><th class="n">Value</th></tr></thead><tbody>
+     ${stock.map(s => `<tr><td>${esc(s.name)}<div class="small mut">${esc(s.category)}</div></td>${multi && !kit ? kits.map(k => { const v = atK[s.item_id]?.[k.id] || 0; return `<td class="n ${v < 0 ? 'bad-t' : v ? '' : 'mut'}">${v ? fq(v) : '—'}</td>`; }).join('') : ''}<td class="n ${num(s.on_hand) < 0 ? 'bad-t' : ''}">${fq(s.on_hand)} ${esc(s.stock_unit)}</td><td class="n">${peso(s.value)}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty">The ${STORE()} is empty. Receive an order or do an opening count.</div>`}
+   ${counts.length ? `<h2>Counts</h2><div class="list">${counts.map(c => `<a class="li" href="#/${P()}/count/${c.id}"><div class="li-main"><b>${esc(fmtT(c.counted_at))}${multi ? ' · ' + esc(kName(c.loc)) : ''}</b><span class="mut small">${c.status === 'posted' ? `missing ${peso(Math.abs(num(c.loss_value)))} · excess ${peso(c.gain_value)}` : 'not posted yet'}</span></div>${chip(c.status === 'posted' ? 'Posted' : 'Open', c.status === 'posted' ? (num(c.loss_value) < -1 ? 'bad' : 'ok') : 'warn')}</a>`).join('')}</div>` : ''}`;
 };
-ACT.startCount = async () => { const c = (await db.insert('stock_counts', { ws: WS(), counted_by: S.user.id }))[0]; go(`#/${P()}/count/${c.id}`); };
+const canTransfer = () => isAdmin() || can('catering', 'storekeeper', 'manager', 'chef', 'head_chef', 'purchaser');
+async function transferView() {
+  const kits = (await appCfg()).kitchens || [];
+  if (kits.length < 2) return '<div class="card">Add a second kitchen in Delivery settings first.</div>';
+  const [byK, hist] = await Promise.all([db.select('stock_by_kitchen', { order: [['category'], ['name']] }), db.rpc('kitchen_transfers', { p_limit: 15 })]);
+  const kn = id => kits.find(k => k.id === id)?.name || 'Main kitchen';
+  const from = S.trFrom && kits.some(k => k.id === S.trFrom) ? S.trFrom : kits[0].id, to = kits.find(k => k.id !== from).id;
+  const here = byK.filter(r => r.loc === from && num(r.on_hand) > 0.0005);
+  const cats = [...new Set(here.map(r => r.category))];
+  return `<div class="row"><a href="#/c/stock" class="back">‹ Stock</a></div><h1>Transfer between kitchens</h1>
+   <p class="lede">Moving ingredients from one kitchen to the other. Each kitchen's stock goes down and up by the same amount; the catering total stays the same.</p>
+   ${canTransfer() ? `<form class="card" data-form="transfer">
+     <div class="grid"><label>From<select name="from" data-trfrom>${kits.map(k => opt(k.id, k.name, k.id === from)).join('')}</select></label>
+       <label>To<select name="to">${kits.filter(k => k.id !== from).map(k => opt(k.id, k.name, k.id === to)).join('')}</select></label></div>
+     <input class="search mt" placeholder="Find item…" data-filter=".tr-row">
+     ${here.length ? cats.map(c => `<h3>${esc(c)}</h3>${here.filter(r => r.category === c).map(r => `<div class="tr-row mline"><span>${esc(r.name)}<small class="mut"> · ${fq(r.on_hand)} ${esc(r.stock_unit)} here</small></span><span class="sp"></span><input name="q_${r.item_id}" type="number" step="any" min="0" max="${num(r.on_hand)}" class="qty"> <span class="unit">${esc(r.stock_unit)}</span></div>`).join('')}`).join('')
+       : `<p class="mut">${esc(kn(from))} has nothing in stock to send.</p>`}
+     <div class="grid mt"><label>Received by<input name="received_by" placeholder="Who took it at the other kitchen"></label><label>Note<input name="note" placeholder="e.g. for Santos buffet"></label></div>
+     <div class="row end sticky"><button class="pri">Transfer</button></div></form>` : ''}
+   <h2>Recent transfers</h2>
+   ${hist.length ? `<div class="list">${hist.map(t => `<div class="li"><div class="li-main"><b>${esc(kn(t.from_loc))} → ${esc(kn(t.to_loc))} · ${t.items} item${t.items > 1 ? 's' : ''}${num(t.value) ? ' · ' + peso(t.value) : ''}</b>
+     <span class="mut small">${esc(fmtT(t.at))}${t.who ? ' · by ' + esc(t.who) : ''}${(t.note || '').includes('received by') ? ' · ' + esc(t.note.split(' · ').filter(x => x.startsWith('received by')).join('')) : ''}</span>
+     <span class="small">${(t.lines || []).map(l => `${esc(l.name)} ${fq(l.qty)} ${esc(l.unit)}`).join(' · ')}</span></div></div>`).join('')}</div>` : '<p class="mut small">No transfers yet.</p>'}`;
+}
+document.addEventListener('change', e => { if (e.target.matches('[data-trfrom]')) { S.trFrom = e.target.value; refresh(); } });
+FORMS.transfer = async f => {
+  const lines = Object.entries(f).filter(([k, v]) => k.startsWith('q_') && num(v) > 0).map(([k, v]) => ({ item_id: k.slice(2), qty: num(v) }));
+  if (!lines.length) return toast('Enter how much of at least one item.', true);
+  const r = await db.rpc('kitchen_transfer', { p_from: f.from, p_to: f.to, p_lines: lines, p_received_by: f.received_by || null, p_note: f.note || null });
+  toast(r.short ? `Transferred. More than recorded was sent of: ${r.short}. Count that kitchen soon.` : `${r.items} item${r.items > 1 ? 's' : ''} transferred`, !!r.short); refresh();
+};
+ACT.startCount = async el => {
+  let loc = el.dataset.loc || null;
+  if (!loc && WS() === 'catering') { const kits = (await appCfg()).kitchens || []; if (kits.length > 1) return toast('Open one kitchen first (the tabs above), then count it.', true); }
+  const c = (await db.insert('stock_counts', { ws: WS(), counted_by: S.user.id, ...(loc ? { loc } : {}) }))[0]; go(`#/${P()}/count/${c.id}`);
+};
 routes['c/count'] = async id => {
   if (!id) { location.hash = '#/' + P() + '/stock'; return ''; }
   const [c] = await db.select('stock_counts', { eq: { id } }); if (!c) return '<div class="card">Count not found.</div>';
@@ -1216,8 +1262,8 @@ routes['c/count'] = async id => {
      ${diff.length ? `<div class="card tw"><table><thead><tr><th>Item</th><th class="n">Expected</th><th class="n">Counted</th><th class="n">Difference</th></tr></thead><tbody>${diff.map(l => `<tr><td>${esc(itemName(l.item_id))}</td><td class="n">${fq(l.expected)}</td><td class="n">${fq(l.counted)}</td><td class="n ${l.d < 0 ? 'bad-t' : 'ok-t'}">${l.d > 0 ? '+' : ''}${fq(l.d)} ${esc(itemUnit(l.item_id))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="alert ok">Everything matched.</div>'}
      <p class="small mut">Missing stock left the store without an issue or waste record. Recount big differences and ask who had access.</p>`;
   }
-  const cats = [...new Set(S.items.map(i => i.category))];
-  return `<div class="row"><a href="#/${P()}/stock" class="back">‹ Stock</a></div><h1>Count the ${STORE()}</h1>
+  const cats = [...new Set(S.items.map(i => i.category))], kc = c.loc ? ((await appCfg()).kitchens || []).find(k => k.id === c.loc) : null;
+  return `<div class="row"><a href="#/${P()}/stock" class="back">‹ Stock</a></div><h1>Count ${kc ? esc(kc.name) : 'the ' + STORE()}</h1>
    <p class="lede">Count what is physically on the shelves, chiller and freezer. Expected quantities are hidden so nobody copies them. Leave items you didn't count blank.</p>
    <form class="card" data-form="saveCount" data-id="${id}"><label>Witness<input name="witness" value="${esc(c.witness || '')}" placeholder="Second person present"></label>
    <input class="search mt" placeholder="Find item…" data-filter=".count-row">
@@ -3177,7 +3223,7 @@ async function inboxCount() {
 const prLink = (ws, id) => `#/${ws === 'restaurant' ? 'r' : 'c'}/pr/${id}`;
 routes.approvals = async () => {
   if (!canInbox()) return '<div class="card">Nothing to approve for your role.</div>';
-  const a = await db.rpc('approvals_inbox'), WS = w => w === 'restaurant' ? 'Restaurant' : 'Catering';
+  const [a, eqo] = await Promise.all([db.rpc('approvals_inbox'), (isAdmin() || member('catering')) ? db.rpc('equipment_open').catch(() => []) : []]), WS = w => w === 'restaurant' ? 'Restaurant' : 'Catering';
   const sec = (title, items, help) => items.length ? `<section class="card ap-s"><div class="row"><h2>${title}</h2><span class="hp-n">${items.length}</span></div>${help ? `<p class="small mut">${help}</p>` : ''}<div class="list">${items.join('')}</div></section>` : '';
   const li = (href, main, sub, right) => `<a class="li" href="${href}"><div class="li-main"><b>${main}</b><span class="mut small">${sub}</span></div>${right || ''}<span class="ap-go">›</span></a>`;
   const parts = [
@@ -3188,6 +3234,7 @@ routes.approvals = async () => {
     sec('Cash advances not liquidated', a.advances.map(x => li(x.ws === 'restaurant' ? '#/r/requests' : '#/c/requests', `${peso(x.amount)} · ${esc(x.who || '')}`, `${WS(x.ws)} · released ${esc(fmtT(x.at))}`)), 'Older than 2 days: ask for receipts and change.'),
     a.recipes ? sec('Recipes in draft', [li('#/c/recipes/draft', `${a.recipes} draft recipe${a.recipes > 1 ? 's' : ''}`, 'Check and verify so costing is right')]) : '',
     a.inquiries ? sec('New website inquiries', [li('#/c/inquiries', `${a.inquiries} new inquir${a.inquiries > 1 ? 'ies' : 'y'}`, 'Not contacted yet')]) : '',
+    sec('Equipment not back from events', eqo.map(o => li(`#/c/event/${o.id}`, esc(o.client), esc([fmtD(o.date), o.not_back ? o.not_back + ' not checked in' : '', o.missing ? o.missing + ' missing' : ''].filter(Boolean).join(' · ')), o.missing ? chip('Missing', 'bad') : '')), 'Check the items back in on the event page, or chase what is missing.'),
     sec('Voided orders (last 3 days, to review)', a.voids.map(v => li('#/r/sales', `#${v.no} · ${peso(v.total)}${v.paid ? ' · was paid' : ''}`, esc([v.who, v.reason, fmtT(v.at)].filter(Boolean).join(' · '))))),
   ].filter(Boolean);
   const waiting = a.requests.length + a.reports.length + a.zreadings.length + a.counts.length + a.advances.length + (a.recipes ? 1 : 0) + (a.inquiries ? 1 : 0);
@@ -3200,7 +3247,7 @@ const pct = (a, b) => b ? Math.round((a - b) / b * 100) : null;
 const trend = p => p == null ? '' : `<span class="db-tr ${p >= 0 ? 'up' : 'down'}">${p >= 0 ? '▲' : '▼'} ${Math.abs(p)}%</span>`;
 routes.dash = async () => {
   if (!canDash()) return '<div class="card">The dashboard is for the owner and managers.</div>';
-  const [d, a, board, cfg] = await Promise.all([db.rpc('owner_dashboard'), db.rpc('approvals_inbox').catch(() => null), db.rpc('events_board', { p_from: today(), p_to: today() }).catch(() => []), appCfg()]);
+  const [d, a, board, cfg, eqo] = await Promise.all([db.rpc('owner_dashboard'), db.rpc('approvals_inbox').catch(() => null), db.rpc('events_board', { p_from: today(), p_to: today() }).catch(() => []), appCfg(), db.rpc('equipment_open').catch(() => [])]);
   const st = d.sales_today || {}, lw = d.sales_lastweek || {};
   const owed = d.balances.reduce((s, b) => s + num(b.balance), 0), overdue = d.balances.filter(b => b.due && b.due < d.today);
   const nApp = a ? a.requests.length + a.reports.length + a.zreadings.length + a.counts.length + a.advances.length : 0;
@@ -3218,6 +3265,7 @@ routes.dash = async () => {
       ${tile('#/approvals', 'Waiting for approval', nApp, nApp ? 'Tap to review' : 'All clear', nApp ? 'warn' : 'ok')}
       ${tile('#/r/kitchen', 'Restaurant 86 / low', `${d.k86} / ${d.klow}`, 'dishes out / running low', d.k86 ? 'bad' : '')}
       ${tile('#/c/stock', 'Catering stock below par', d.below_par, 'items to restock', d.below_par ? 'warn' : '')}
+      ${tile('#/c/equipment', 'Equipment not back', eqo.reduce((s, o) => s + num(o.missing) + num(o.not_back), 0), eqo.length ? `from ${eqo.length} past event${eqo.length > 1 ? 's' : ''}` : 'Everything returned', eqo.some(o => o.missing) ? 'bad' : eqo.length ? 'warn' : 'ok')}
       ${tile('#/c/inquiries', 'New inquiries', d.inquiries, d.inquiries ? 'Not contacted yet' : 'All handled', d.inquiries ? 'warn' : '')}
     </div>
     <div class="db-two">
@@ -3237,6 +3285,78 @@ async function homeInbox() {
   const n = await inboxCount();
   return n ? `<a class="hw-inbox" href="#/approvals"><b>${n}</b><span>waiting for your approval</span><em>Review →</em></a>` : '';
 }
+
+/* ================= EQUIPMENT: what goes out to each event, what comes back ================= */
+const equipTeam = () => isAdmin() || can('catering', 'manager', 'event_specialist', 'coordinator', 'storekeeper', 'head_chef', 'chef', 'driver');
+async function evEquipCard(ev) {
+  if (!(isAdmin() || member('catering'))) return '';
+  const [lines, eq] = await Promise.all([db.select('event_equipment', { eq: { event_id: ev.id } }), db.select('equipment', { eq: { active: true }, order: [['category'], ['name']] })]);
+  const byId = Object.fromEntries(eq.map(q => [q.id, q])), edit = equipTeam(), sheetEq = (ev.sheet?.equip || '').trim();
+  const rows = lines.map(l => ({ ...l, q: byId[l.equipment_id] || { name: '(removed item)', category: '' } })).sort((a, b) => a.q.category.localeCompare(b.q.category) || a.q.name.localeCompare(b.q.name));
+  const packed = rows.filter(r => r.out_qty != null).length, back = rows.filter(r => r.back_qty != null).length;
+  const missing = rows.filter(r => r.back_qty != null && r.back_qty < r.out_qty);
+  const past = ev.event_date < today();
+  const notBack = past ? rows.filter(r => r.out_qty != null && r.back_qty == null) : [];
+  const unused = eq.filter(q => !lines.some(l => l.equipment_id === q.id));
+  const cell = (r, what) => {
+    const v = what === 'out' ? r.out_qty : r.back_qty, need = what === 'out' ? r.qty : (r.out_qty ?? r.qty);
+    if (!edit) return v == null ? '<span class="mut">—</span>' : `<b>${v}</b>`;
+    if (what === 'back' && r.out_qty == null) return '<span class="mut small">not out</span>';
+    return v == null ? `<button class="eq-tick" data-act="eqTick" data-ev="${ev.id}" data-eq="${r.equipment_id}" data-what="${what}" data-q="${need}">${what === 'out' ? 'Packed' : 'Back'} ${need}</button>`
+      : `<button class="eq-done${what === 'back' && v < r.out_qty ? ' short' : ''}" data-act="eqEdit" data-ev="${ev.id}" data-eq="${r.equipment_id}" data-what="${what}" data-v="${v}" title="Change">${v}${what === 'back' && v < r.out_qty ? ` <small>${r.out_qty - v} missing</small>` : ''}</button>`;
+  };
+  return `<section class="card eq-card" id="equip"><div class="row"><h2>Equipment</h2><span class="sp"></span>${rows.length ? `<span class="small mut">${packed}/${rows.length} packed · ${back}/${rows.length} back</span>` : ''}</div>
+    ${missing.length ? `<div class="alert bad small"><b>Missing after this event:</b> ${missing.map(r => `${esc(r.q.name)} ×${r.out_qty - r.back_qty}`).join(' · ')}</div>` : ''}
+    ${notBack.length ? `<div class="alert warn small"><b>Not checked back in yet:</b> ${notBack.map(r => esc(r.q.name)).join(' · ')}</div>` : ''}
+    ${sheetEq ? `<p class="small mut">From the event sheet: ${esc(sheetEq)}</p>` : ''}
+    ${rows.length ? `<div class="tw"><table class="eq-t"><thead><tr><th>Item</th><th class="n">Needed</th><th class="n">Packed out</th><th class="n">Came back</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>
+      ${rows.map(r => `<tr><td>${esc(r.q.name)}<div class="small mut">${esc(r.q.category)}${r.note ? ' · ' + esc(r.note) : ''}</div></td>
+        <td class="n" data-l="Needed">${edit && r.out_qty == null ? `<input class="qty eq-q" type="number" min="0" value="${r.qty}" data-eqqty="${r.equipment_id}" data-ev="${ev.id}">` : r.qty}</td>
+        <td class="n" data-l="Packed out">${cell(r, 'out')}</td><td class="n" data-l="Came back">${cell(r, 'back')}</td>
+        ${edit ? `<td>${r.out_qty == null ? `<button class="lnk" data-act="eqDel" data-ev="${ev.id}" data-eq="${r.equipment_id}" aria-label="Remove">Remove</button>` : ''}</td>` : ''}</tr>`).join('')}</tbody></table></div>`
+      : `<p class="mut small">No equipment listed yet. Add what has to go out with the food: chafing dishes, linens, serving spoons.</p>`}
+    ${edit ? `<form data-form="eqAdd" data-id="${ev.id}" class="addline mt"><select name="eq">${opt('', 'Add an item…')}${unused.map(q => opt(q.id, q.name)).join('')}</select><input name="qty" type="number" min="1" value="1" class="qty"><button class="ghost">Add</button>
+      ${!rows.length ? `<button type="button" class="lnk" data-act="eqCopy" data-id="${ev.id}">Copy the list from the last similar event</button>` : ''}<a class="lnk" href="#/c/equipment">All equipment</a></form>` : ''}
+  </section>`;
+}
+FORMS.eqAdd = async (f, el) => {
+  if (!f.eq) return toast('Pick an item.', true);
+  await db.upsert('event_equipment', { event_id: el.dataset.id, equipment_id: f.eq, qty: Math.max(1, Math.round(num(f.qty) || 1)) }, 'event_id,equipment_id'); refresh();
+};
+ACT.eqCopy = async el => { const n = await db.rpc('equip_copy_last', { p_event: el.dataset.id }); toast(n ? `${n} items copied. Adjust the quantities.` : 'No earlier event has an equipment list yet.', !n); if (n) refresh(); };
+ACT.eqDel = async el => { await db.remove('event_equipment', { event_id: el.dataset.ev, equipment_id: el.dataset.eq }); refresh(); };
+ACT.eqTick = async el => { await db.rpc('equip_check', { p_event: el.dataset.ev, p_equipment: el.dataset.eq, p_what: el.dataset.what, p_qty: Math.round(num(el.dataset.q)) }); refresh(); };
+ACT.eqEdit = async el => {
+  const v = prompt(`How many ${el.dataset.what === 'out' ? 'were packed out' : 'came back'}? Leave empty to clear.`, el.dataset.v);
+  if (v === null) return;
+  await db.rpc('equip_check', { p_event: el.dataset.ev, p_equipment: el.dataset.eq, p_what: el.dataset.what, p_qty: v.trim() === '' ? null : Math.max(0, Math.round(num(v))) }); refresh();
+};
+document.addEventListener('change', async e => {
+  const q = e.target.closest('[data-eqqty]');
+  if (q) { try { await db.update('event_equipment', { qty: Math.max(0, Math.round(num(q.value))) }, { event_id: q.dataset.ev, equipment_id: q.dataset.eqqty }); toast('Saved'); } catch (err) { toast(err.message, true); } }
+  const o = e.target.closest('[data-eqown]');
+  if (o) { try { await db.update('equipment', { owned: Math.max(0, Math.round(num(o.value))) }, { id: o.dataset.eqown }); toast('Saved'); refresh(); } catch (err) { toast(err.message, true); } }
+});
+routes['c/equipment'] = async () => {
+  if (!(isAdmin() || member('catering'))) return '<div class="card">Equipment is for the catering team.</div>';
+  const [st, open] = await Promise.all([db.rpc('equipment_status'), db.rpc('equipment_open')]), edit = equipTeam();
+  const cats = [...new Set(st.map(q => q.category))];
+  const miss = st.reduce((s, q) => s + num(q.missing), 0), out = st.reduce((s, q) => s + num(q.out_now), 0);
+  return `<div class="row"><h1>Equipment</h1></div>
+    <p class="lede">Chafing dishes, linens, utensils and boxes: how many we own, how many are out at events, and what never came back.</p>
+    <div class="pd-sum"><div><b>${st.filter(q => q.active).length}</b><span>kinds of items</span></div><div><b>${out}</b><span>out at events now</span></div><div><b class="${miss ? 'bad-t' : ''}">${miss}</b><span>missing after events</span></div><div><b>${open.length}</b><span>past events not all back</span></div></div>
+    ${open.length ? `<section class="card"><h2>Not all back yet</h2><div class="list">${open.map(o => `<a class="li" href="#/c/event/${o.id}"><div class="li-main"><b>${esc(o.client)}</b><span class="mut small">${esc(fmtD(o.date))}${o.not_back ? ` · ${o.not_back} not checked in` : ''}${o.missing ? ` · ${o.missing} missing` : ''}</span></div>${o.missing ? chip('Missing', 'bad') : chip('Check in', 'warn')}</a>`).join('')}</div></section>` : ''}
+    <input class="search" placeholder="Search…" data-filter="#eqTable tbody tr">
+    <div class="card tw"><table id="eqTable"><thead><tr><th>Item</th><th class="n">We own</th><th class="n">Out now</th><th class="n">Booked ahead</th><th class="n">Missing</th></tr></thead><tbody>
+    ${cats.map(c => `<tr class="eq-cat"><td colspan="5">${esc(c)}</td></tr>${st.filter(q => q.category === c && q.active).map(q => `<tr><td>${esc(q.name)}${(q.where_now || []).length ? `<div class="small mut">${q.where_now.slice(0, 3).map(w => `<a href="#/c/event/${w.event_id}">${esc(w.client)}</a> ${esc(fmtD(w.date))}`).join(' · ')}</div>` : ''}</td>
+      <td class="n">${edit ? `<input class="qty" type="number" min="0" value="${q.owned}" data-eqown="${q.id}">` : q.owned}</td><td class="n">${q.out_now || '—'}</td>
+      <td class="n ${q.owned && num(q.booked) > q.owned ? 'bad-t' : ''}">${q.booked || '—'}</td><td class="n ${q.missing ? 'bad-t' : ''}">${q.missing || '—'}</td></tr>`).join('')}`).join('')}
+    </tbody></table></div>
+    ${edit ? `<form class="card" data-form="eqNew"><h2>Add equipment</h2><div class="grid"><label>Name<input name="name" required maxlength="80" placeholder="e.g. Chafing dish (half size)"></label>
+      <label>Group<input name="category" list="eqcats" maxlength="40" placeholder="Buffet, Linens…"><datalist id="eqcats">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist></label><label>We own<input name="owned" type="number" min="0" value="0"></label></div>
+      <div class="row end"><button class="pri">Add</button></div></form>` : ''}`;
+};
+FORMS.eqNew = async f => { await db.insert('equipment', { name: f.name.trim(), category: (f.category || 'Other').trim() || 'Other', owned: Math.max(0, Math.round(num(f.owned))) }); toast('Added'); refresh(); };
 
 /* ================= Profile photos ================= */
 // Small square JPEGs kept in the database; each phone keeps a copy and only downloads photos that changed.

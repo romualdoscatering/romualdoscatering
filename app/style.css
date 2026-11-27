@@ -1143,3 +1143,19 @@ html.night .evb-go b{background:#d3cbba!important;color:#452900!important}
 html.night .rn,html.night .pd-sum>div,html.night .db-t{background-color:#d0d9e9!important;border-top-color:#aebcd5!important;border-right-color:#aebcd5!important;border-bottom-color:#aebcd5!important}
 html.night .rn-st,html.night .pd-ev,html.night .pd-l span{background-color:#bdc9df!important}
 html.night .rn-st.on{background-color:#e6f4ea!important}
+/* ================= Equipment ================= */
+.eq-t td{vertical-align:middle}.eq-q{width:70px}
+.eq-tick{background:#fff;border:1.5px dashed #b9b09a;color:var(--navy);border-radius:9px;padding:6px 10px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+.eq-tick:hover{border-style:solid;border-color:var(--navy)}
+.eq-done{background:#e6f4ea;border:1px solid #b7dcc2;color:#1d7a3a;border-radius:9px;padding:6px 12px;font-weight:700;cursor:pointer}
+.eq-done.short{background:#fdecea;border-color:#f3c2bd;color:#b42318}.eq-done small{font-weight:600}
+.eq-cat td{background:#f6f2e7;font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#8a5a00}
+.tr-row small{font-size:12px}
+html.night .eq-tick{background-color:#d0d9e9!important}html.night .eq-cat td{background-color:#bdc9df!important}
+@media (max-width:600px){
+ .eq-card .tw{overflow:visible}.eq-t thead{display:none}.eq-t,.eq-t tbody{display:block}
+ .eq-t tr{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:6px 8px;padding:10px 0;border-top:1px solid #eee7d6;align-items:end}
+ .eq-t td{padding:0;border:0;text-align:left!important}.eq-t td:first-child{grid-column:1/-1}
+ .eq-t td[data-l]::before{content:attr(data-l);display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut);margin-bottom:3px}
+ .eq-t .eq-q{width:64px}
+}
