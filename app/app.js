@@ -157,9 +157,27 @@ function renderShell(key) {
     : inRes ? (resFront() ? [['r/pos', 'POS'], ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['r/kitchen', '86 & running low'], ['r/requests', 'Requests']]
       : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
-    <div class="who"><span>Hi, ${esc(nick())}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}<a href="#/events"${key === 'events' ? ' class="on"' : ''}>Events</a>${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div>
+    <div class="who"><span>Hi, ${esc(nick())}</span>${canInstall() ? '<button class="ghost" data-act="install" title="Add the staff app to the home screen">📲 Get the app</button>' : ''}<a href="#/events"${key === 'events' ? ' class="on"' : ''}>Events</a>${isAdmin() ? '<a href="#/activity">Activity</a><a href="#/people">People</a>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div>
+    ${mobileMenu(key, nav, inCat, inRes)}</div>
     ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a></nav>` : ''}`;
 }
+// Phones: one "☰ Menu" button opens a dropdown with every page and account action (pills and header links are hidden there).
+function mobileMenu(key, nav, inCat, inRes) {
+  const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People' }[key.split('/')[0]] || 'Home';
+  const a = (href, label, on) => `<a href="#/${href}"${on ? ' class="on"' : ''}>${label}</a>`;
+  const sect = nav.length ? `<div class="mn-h">${inCat ? 'Catering' : 'Restaurant'}</div><div class="mn-g">${nav.map(([k, l]) => a(k, l, navOf(key) === k)).join('')}</div>` : '';
+  const go = [a('', '🏠 Home', key === '' || key === 'home'), a('events', '📅 Events board', key === 'events'),
+    ...(inCat ? [a('r', '⇄ Switch to Restaurant')] : inRes ? [a('c', '⇄ Switch to Catering')] : []),
+    ...(isAdmin() ? [a('activity', '🕘 Activity', key.startsWith('activity')), a('people', '👥 People', key === 'people')] : [])].join('');
+  return `<details class="mnav"><summary aria-label="Menu"><span class="mn-cur">${esc(cur)}</span><span class="mn-ic">☰</span></summary>
+    <div class="mn-p">${sect}<div class="mn-h">Go to</div><div class="mn-l">${go}</div>
+      <div class="mn-f"><span>Hi, ${esc(nick())}</span>${canInstall() ? '<button class="ghost" data-act="install">📲 Get the app</button>' : ''}<button class="ghost" data-act="account">Account</button><button class="ghost" data-act="logout">Log out</button></div></div></details>`;
+}
+// close the menu after picking something, or when tapping outside it
+document.addEventListener('click', e => {
+  const m = document.querySelector('details.mnav[open]'); if (!m) return;
+  if (!m.contains(e.target) || e.target.closest('.mn-p a, .mn-p button')) m.open = false;
+});
 function navOf(key) {
   return { 'c/event': 'c/events', 'c/event-new': 'c/events', 'c/pr': 'c/requests', 'c/po': 'c/orders', 'c/count': 'c/stock', 'c/recipe': 'c/recipes', 'c/inquiry': 'c/inquiries',
     'r/pr': 'r/requests', 'r/po': 'r/orders', 'r/count': 'r/stock' }[key] || key;

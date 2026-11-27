@@ -655,3 +655,22 @@ body:not(.pos-mode) main{padding-bottom:calc(80px + env(safe-area-inset-bottom))
 .hw-ic{display:inline-grid;place-items:center;width:52px;height:52px;border-radius:14px;background:#ffffff1f;margin-bottom:6px;opacity:1!important}
 .hw-card.res{background:linear-gradient(160deg,#7a5a1e,#4f3a12)}.hw-card.cat{background:linear-gradient(160deg,var(--navy2),var(--navy))}.hw-card.evs{background:linear-gradient(160deg,#35584a,#1f3a30)}
 @media (max-width:560px){.hw-hero{padding:26px 20px 22px;border-radius:16px}.hw-card{min-height:0}}
+/* ---- Phones: "☰ Menu" dropdown replaces the header links and the row of pills ---- */
+.mnav{display:none;position:relative;margin-left:auto}
+.mnav>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;background:var(--navy);color:#fff;border-radius:999px;padding:7px 8px 7px 14px;font-size:13px;font-weight:600;white-space:nowrap;user-select:none}
+.mnav>summary::-webkit-details-marker{display:none}
+.mn-cur{max-width:38vw;overflow:hidden;text-overflow:ellipsis}
+.mn-ic{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#ffffff1f;font-size:14px;line-height:1}
+.mnav[open]>summary .mn-ic{background:var(--gold);color:var(--navy)}
+.mn-p{position:fixed;left:10px;right:10px;top:calc(var(--hdrH,64px) - 4px);background:#fffdf7;border:1px solid #e3ddcf;border-radius:16px;box-shadow:0 16px 40px #14213f33;padding:12px;max-height:calc(100dvh - var(--hdrH,64px) - 16px);overflow:auto;z-index:30;animation:mnIn .14s ease-out}
+@keyframes mnIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.mn-h{font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#8a5a00;margin:4px 4px 6px}
+.mn-g{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+.mn-g a,.mn-l a{display:block;text-decoration:none;color:var(--navy);font-weight:600;font-size:14px;padding:11px 12px;border:1px solid #e3ddcf;border-radius:12px;background:#fff}
+.mn-g a.on,.mn-l a.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.mn-l{display:grid;gap:6px;margin-bottom:12px}
+.mn-l a{border-color:transparent;background:#f6f0dc66}
+.mn-f{display:flex;flex-wrap:wrap;align-items:center;gap:6px;border-top:1px solid #e3ddcf;padding-top:10px}
+.mn-f span{flex:1 0 100%;color:var(--mut);font-size:13px;font-weight:500;margin:0 4px 4px}
+.mn-f button{background:transparent;color:var(--navy);border:1px solid #d9d2b8;border-radius:999px;padding:7px 14px;font-size:13px}
+@media (max-width:760px){.mnav{display:block}header#top .who,header#top nav{display:none}}
