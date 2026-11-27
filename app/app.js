@@ -30,6 +30,24 @@ const roleName = k => (ROLES.find(r => r[0] === k) || [k, k])[1];
 const chip = (label, tone) => `<span class="chip ${tone || ''}">${esc(label)}</span>`;
 const statusTone = s => ({ draft: 'mut', inquiry: 'mut', for_client_approval: 'warn', submitted: 'warn', confirmed: 'ok', approved: 'ok', in_prep: 'info', ordered: 'info', open: 'info', partly_received: 'warn', done: 'ok', received: 'ok', closed: 'mut', rejected: 'bad', cancelled: 'bad' }[s] || '');
 
+/* ================= Line icons (used instead of emoji) ================= */
+const SV = (d, w = 16) => `<svg class="ico" viewBox="0 0 24 24" width="${w}" height="${w}" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const IC = {
+  bell: w => SV('<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>', w),
+  cal: w => SV('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>', w),
+  clock: w => SV('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', w),
+  repeat: w => SV('<path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>', w),
+  note: w => SV('<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>', w),
+  msg: w => SV('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>', w),
+  check: w => SV('<rect x="3" y="3" width="18" height="18" rx="4"/><path d="m8 12 3 3 5-6"/>', w),
+  pin: w => SV('<path d="M20 10c0 6-8 12-8 12S4 16 4 10a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>', w),
+  cam: w => SV('<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3z"/><circle cx="12" cy="13" r="3"/>', w),
+  plate: w => SV('<circle cx="12" cy="13" r="7"/><circle cx="12" cy="13" r="3.5"/><path d="M3 4v5M21 4v5"/>', w),
+  bag: w => SV('<path d="M6 7h12l1 14H5z"/><path d="M9 7a3 3 0 0 1 6 0"/>', w),
+  bike: w => SV('<circle cx="6" cy="17" r="3"/><circle cx="18" cy="17" r="3"/><path d="M6 17h6l3-7h3M12 17 9 9H6"/>', w),
+  users: w => SV('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>', w),
+};
+
 /* ================= state ================= */
 const S = { user: null, me: null, items: [], itemsById: {}, dishes: [], dishById: {}, aliasMap: {}, packs: [] };
 const isAdmin = () => !!S.me?.is_admin;
@@ -166,9 +184,9 @@ function acctMenu(key) {
   const role = S.me?.is_admin ? 'Owner' : [...new Set((S.me?.roles || []).map(r => roleName(r.role)))].join(', ');
   return `<details class="acct"><summary title="My account">${av(S.me?.id, S.me?.full_name, 'sm')}<span class="acct-n">${esc(nick())}</span><span class="acct-car">▾</span></summary>
     <div class="acct-p"><div class="acct-h">${av(S.me?.id, S.me?.full_name, 'md')}<div><b>${esc(S.me?.full_name || '')}</b><small>${esc(role)}</small></div></div>
-      <a href="#/me"${key === 'me' ? ' class="on"' : ''}>👤 My account</a>
-      ${isAdmin() ? `<a href="#/people"${key === 'people' ? ' class="on"' : ''}>👥 People & roles</a><a href="#/activity"${key === 'activity' ? ' class="on"' : ''}>🕘 Activity</a>` : ''}
-      ${canInstall() ? '<button type="button" data-act="install">📲 Get the app</button>' : ''}
+      <a href="#/me"${key === 'me' ? ' class="on"' : ''}>My account</a>
+      ${isAdmin() ? `<a href="#/people"${key === 'people' ? ' class="on"' : ''}>People & roles</a><a href="#/activity"${key === 'activity' ? ' class="on"' : ''}>Activity</a>` : ''}
+      ${canInstall() ? '<button type="button" data-act="install">Get the app</button>' : ''}
       <button type="button" class="acct-out" data-act="logout">Log out</button></div></details>`;
 }
 // Phones: one "☰ Menu" button opens a dropdown with every page and account action (pills and header links are hidden there).
@@ -176,12 +194,15 @@ function mobileMenu(key, nav, inCat, inRes) {
   const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People', me: 'My account', pokes: 'Pokes', tasks: 'My tasks' }[key.split('/')[0]] || 'Home';
   const a = (href, label, on) => `<a href="#/${href}"${on ? ' class="on"' : ''}>${label}</a>`;
   const sect = nav.length ? `<div class="mn-h">${inCat ? 'Catering' : 'Restaurant'}</div><div class="mn-g">${nav.map(([k, l]) => a(k, l, navOf(key) === k)).join('')}</div>` : '';
-  const go = [`<a class="mn-pokes${key === 'pokes' ? ' on' : ''}" href="#/pokes">🔔 Pokes <i${POKE.unread.open + (POKE.unread.replies || 0) ? '' : ' hidden'}>${POKE.unread.open + (POKE.unread.replies || 0) || ''}</i></a>`, a('', '🏠 Home', key === '' || key === 'home'), a('tasks', '✅ My tasks', key === 'tasks'), a('events', '📅 Events board', key === 'events'),
-    ...(inCat ? [a('r', '⇄ Switch to Restaurant')] : inRes ? [a('c', '⇄ Switch to Catering')] : []),
-    ...(isAdmin() ? [a('activity', '🕘 Activity', key.startsWith('activity')), a('people', '👥 People', key === 'people')] : [])].join('');
+  const n = (POKE.unread.open || 0) + (POKE.unread.replies || 0);
+  const go = [a('', 'Home', key === '' || key === 'home'), a('tasks', 'My tasks', key === 'tasks'),
+    `<a class="mn-pokes${key === 'pokes' ? ' on' : ''}" href="#/pokes">Pokes <i${n ? '' : ' hidden'}>${n || ''}</i></a>`, a('events', 'Events board', key === 'events'),
+    ...(inCat ? [a('r', 'Switch to Restaurant')] : inRes ? [a('c', 'Switch to Catering')] : [])].join('');
+  const own = isAdmin() ? `<div class="mn-h">Owner</div><div class="mn-l">${a('people', 'People & roles', key === 'people')}${a('activity', 'Activity', key.startsWith('activity'))}</div>` : '';
   return `<span class="bell-slot mob">${bellHtml()}</span><details class="mnav"><summary aria-label="Menu"><span class="mn-cur">${esc(cur)}</span><span class="mn-ic">☰</span></summary>
-    <div class="mn-p">${sect}<div class="mn-h">Go to</div><div class="mn-l">${go}</div>
-      <div class="mn-f"><span class="mn-hi">${av(S.me?.id, S.me?.full_name, "xs")} Hi, ${esc(nick())}</span>${canInstall() ? '<button class="ghost" data-act="install">📲 Get the app</button>' : ''}<a class="mn-me" href="#/me">👤 My account</a><button class="ghost" data-act="logout">Log out</button></div></div></details>`;
+    <div class="mn-p">${sect}<div class="mn-l">${go}</div>${own}
+      <a class="mn-acct" href="#/me">${av(S.me?.id, S.me?.full_name, 'sm')}<span><b>${esc(S.me?.full_name || nick())}</b><small>My account</small></span></a>
+      <div class="mn-x">${canInstall() ? '<button type="button" data-act="install">Get the app</button>' : ''}<button type="button" class="mn-out" data-act="logout">Log out</button></div></div></details>`;
 }
 // close the menu after picking something, or when tapping outside it
 document.addEventListener('click', e => {
@@ -220,7 +241,7 @@ window.addEventListener('appinstalled', () => { INSTALL_EVT = null; toast("Romua
 if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
 function installTip() {
   if (STANDALONE || !(INSTALL_EVT || IOS || ANDROID)) return '';
-  return `<button type="button" class="ghost wide" data-act="install">📲 Add the staff app to this phone's home screen</button>`;
+  return `<button type="button" class="ghost wide" data-act="install">Add the staff app to this phone's home screen</button>`;
 }
 async function doInstall() {
   if (INSTALL_EVT && !INAPP) {   // Android Chrome: the phone's own install prompt
@@ -243,10 +264,10 @@ function installGuide() {
   if (INAPP) body = `<div class="alert warn small">You're inside <b>${app}</b>. The app can't be added to the home screen from here — open the page in ${IOS ? 'Safari' : 'Chrome'} first.</div>
     ${steps([`Tap ${IG.dots} or ${IG.kebab} at the ${IOS ? 'bottom or top right' : 'top right'} of this screen.`,
       `Tap <b>${IOS ? 'Open in Safari' : 'Open in Chrome'}</b> (it may say <b>Open in browser</b> or <b>Open in external browser</b>).`,
-      `Then tap <b>📲 Get the app</b> again — the steps for ${IOS ? 'Safari' : 'Chrome'} will show.`])}
+      `Then tap <b>Get the app</b> again — the steps for ${IOS ? 'Safari' : 'Chrome'} will show.`])}
     <p class="small mut">No “Open in” option? Copy the link, open ${IOS ? 'Safari' : 'Chrome'} and paste it in the address bar.</p>${copy}`;
   else if (IOS_OTHER) body = `<div class="alert warn small">On iPhone, use <b>Safari</b> to add the app — it gives the full-screen app.</div>
-    ${steps(['Tap <b>Copy link</b> below.', 'Open <b>Safari</b>, tap the address bar and paste the link.', 'Tap <b>📲 Get the app</b> there and follow the steps.'])}${copy}`;
+    ${steps(['Tap <b>Copy link</b> below.', 'Open <b>Safari</b>, tap the address bar and paste the link.', 'Tap <b>Get the app</b> there and follow the steps.'])}${copy}`;
   else if (IOS) body = steps([
       `Tap ${IG.dots} at the bottom of Safari, next to the address bar.<br><span class="small mut">Older iPhones: skip this — the ${IG.share} Share button is already at the bottom.</span>`,
       `Tap ${IG.share} <b>Share</b>.`,
@@ -256,7 +277,7 @@ function installGuide() {
   else body = steps([`Tap ${IG.kebab} at the top right of Chrome.`, `Tap <b>Add to Home screen</b> or <b>Install app</b>.`, `Tap <b>Install</b> / <b>Add</b>.`])
     + `<p class="small mut">The <b>Romualdo's</b> icon appears on your home screen.</p>`;
   const box = document.createElement('div'); box.className = 'modal';
-  box.innerHTML = `<div class="card ig"><div class="row"><h2>📲 Get the staff app</h2><span class="sp"></span><button type="button" class="x" data-close aria-label="Close">✕</button></div>${body}
+  box.innerHTML = `<div class="card ig"><div class="row"><h2>Get the staff app</h2><span class="sp"></span><button type="button" class="x" data-close aria-label="Close">✕</button></div>${body}
     <div class="row end"><button type="button" class="pri" data-close>Got it</button></div></div>`;
   document.body.appendChild(box);
   box.addEventListener('click', async ev => {
@@ -348,7 +369,7 @@ function boardCard(e, open) {
       <div class="evb-head"><h3>${esc(e.client || e.title)}</h3>${chip(EVENT_STATUS[e.status], statusTone(e.status))}</div>
       ${evName({ title: e.title }, { name: e.client }) ? `<div class="evb-sub">${esc(e.title)}</div>` : ''}
       <div class="evb-facts">${facts.map(esc).join(' · ')}</div>
-      ${where ? `<div class="evb-where">📍 ${esc(where)}</div>` : ''}
+      ${where ? `<div class="evb-where">${IC.pin(15)} ${esc(where)}</div>` : ''}
       ${e.allergy ? `<div class="evb-warn">Allergies: ${esc(e.allergy)}</div>` : ''}
       ${e.special ? `<div class="evb-note">Special requests: ${esc(e.special)}</div>` : ''}
       <details class="evb-det"${open ? ' open' : ''}><summary>Menu${(e.menu || []).length ? ` (${e.menu.length})` : ''}</summary>${menu}</details>
@@ -405,7 +426,7 @@ routes['c/events'] = async arg => {
    ${ev.length ? (tab === 'upcoming' ? [['Today', ev.filter(e => e.event_date === t)], ['Tomorrow', ev.filter(e => e.event_date === addDays(t, 1))], ['Upcoming', ev.filter(e => e.event_date > addDays(t, 1))]] : [['', ev]])
       .filter(([h, g]) => g.length || h === 'Today').map(([h, g]) => `${h ? `<h2 class="ev-grp">${h} <span class="evb-n">${g.length}</span></h2>` : ''}${g.length ? `<div class="list">${g.map(e => `<a class="li" href="#/c/event/${e.id}"><div class="li-date"><b>${esc(fmtD(e.event_date).split(',')[0])}</b><span>${esc(fmtD(e.event_date).split(',').slice(1).join(','))}</span></div>
       <div class="li-main"><b>${esc(evClient(e, cl[e.client_id]))}</b><span class="mut small">${evSub(e, cl[e.client_id]) ? esc(evSub(e, cl[e.client_id])) + ' · ' : ''}${esc(e.ref)} · ${KIND[e.kind]}${e.pax ? ' · ' + e.pax + ' guests' : ''}${e.serve_time ? ' · ' + fmtClock(e.serve_time) : ''}${e.venue ? ' · ' + esc(e.venue) : ''}</span></div>
-      <span class="li-act"><span class="li-st">${['partial', 'paid', 'over'].includes(MM[e.id]?.status) ? payChip(MM[e.id]) : ''}${chip(EVENT_STATUS[e.status], statusTone(e.status))}</span><button class="pdf sm" data-act="evPdf" data-id="${e.id}" title="Print the event sheet">🖨️ PDF</button>${delEvBtn({ ...e, _name: evClient(e, cl[e.client_id]) }, '🗑') || '<span class="x-ph"></span>'}</span></a>`).join('')}</div>` : '<div class="empty small">No events today.</div>'}`).join('') : '<div class="empty">No events here.</div>'}`;
+      <span class="li-act"><span class="li-st">${['partial', 'paid', 'over'].includes(MM[e.id]?.status) ? payChip(MM[e.id]) : ''}${chip(EVENT_STATUS[e.status], statusTone(e.status))}</span><button class="pdf sm" data-act="evPdf" data-id="${e.id}" title="Print the event sheet">PDF</button>${delEvBtn({ ...e, _name: evClient(e, cl[e.client_id]) }, '') || '<span class="x-ph"></span>'}</span></a>`).join('')}</div>` : '<div class="empty small">No events today.</div>'}`).join('') : '<div class="empty">No events here.</div>'}`;
 };
 
 routes['c/event-new'] = async () => {
@@ -475,7 +496,7 @@ async function overwriteCheck(form, ev, part) {
   const diff = changedParts(ev, part); if (!diff.length) return false;
   await namesOf([ev.updated_by]);
   form.querySelector('.conflict')?.remove();
-  form.insertAdjacentHTML('afterbegin', `<div class="alert bad conflict"><b>⚠ ${esc(nameOf(ev.updated_by))} changed this event${ev.updated_at ? ' at ' + esc(clockOf(ev.updated_at)) : ''} while you were editing</b> (${esc(diff.join(', '))}).
+  form.insertAdjacentHTML('afterbegin', `<div class="alert bad conflict"><b>${esc(nameOf(ev.updated_by))} changed this event${ev.updated_at ? ' at ' + esc(clockOf(ev.updated_at)) : ''} while you were editing</b> (${esc(diff.join(', '))}).
     Your typing is still in the boxes below but has <b>not been saved</b>.
     <div class="row mt"><button type="button" class="pri" data-act="keepMine">Save mine (replace theirs)</button><button type="button" class="ghost" data-act="showTheirs">Show their version</button></div></div>`);
   form.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -554,7 +575,7 @@ routes['c/event'] = async id => {
   const margin = cost && ev.contract_price ? num(ev.contract_price) - num(cost.total_cost) : null;
   return `${evBar(ev, client)}<div class="row"><a href="#/c/events" class="back">‹ Events</a></div>
   <div id="evlive"></div>
-  <div class="row" id="evhead"><h1>${esc(evClient(ev, client))}</h1>${chip(EVENT_STATUS[ev.status], statusTone(ev.status))}<span class="sp"></span><button class="pdf lg" data-act="evPdf" data-id="${ev.id}" title="Print the one-page event sheet: works at any status, for the team's hard copy">🖨️ Print event sheet (PDF)</button>${delEvBtn({ ...ev, _name: evClient(ev, client) }, 'Delete', 'ghost')}</div>
+  <div class="row" id="evhead"><h1>${esc(evClient(ev, client))}</h1>${chip(EVENT_STATUS[ev.status], statusTone(ev.status))}<span class="sp"></span><button class="pdf lg" data-act="evPdf" data-id="${ev.id}" title="Print the one-page event sheet: works at any status, for the team's hard copy">Print event sheet (PDF)</button>${delEvBtn({ ...ev, _name: evClient(ev, client) }, 'Delete', 'ghost')}</div>
   ${evHero(ev, client)}
   ${changedLine(ev, names)}
 
@@ -647,7 +668,7 @@ function sheetForm(ev, client) {
    <h3>Notes</h3><div class="grid">${ta('allergy', 'Allergies / dietary needs')}${ta('special', 'Special requests')}</div>
    <h3>Approval</h3><div class="grid">${inp('approvedOn', 'Approved by the client on', '', 'date')}<label>Prepared by<input name="preparedBy" value="${esc(s.preparedBy || S.me.full_name)}"></label></div>
    <p class="small mut">The status on the PDF follows the event status (set it under Edit details).</p>
-   <div class="row end"><button type="button" class="pdf" data-act="evPdf" data-id="${ev.id}">🖨️ Print PDF</button><button class="pri">Save</button></div></form></details>`;
+   <div class="row end"><button type="button" class="pdf" data-act="evPdf" data-id="${ev.id}">Print PDF</button><button class="pri">Save</button></div></form></details>`;
 }
 FORMS.evSheet = async (f, el) => {
   const [ev] = await db.select('events', { eq: { id: el.dataset.id } });
@@ -814,12 +835,12 @@ routes['c/requests'] = async arg => {
   const waitRep = new Set((await db.select('purchase_reports', { cols: 'pr_id', eq: { ws: WS(), status: 'submitted' } }).catch(() => [])).map(r => r.pr_id));
   if (tab === 'approve' && waitRep.size) { const have = new Set(rows.map(r => r.id)), more = [...waitRep].filter(x => !have.has(x));
     if (more.length) rows = [...rows, ...await db.select('pr_overview', { in: { id: more } })]; }
-  return `<div class="row"><h1>Purchase requests</h1><span class="sp"></span>${rows.length ? '<button class="ghost" data-act="delPRs" title="Delete the ticked requests">🗑 Delete ticked</button>' : ''}${rows.length > 1 ? '<button class="ghost" data-act="combinePR">🧾 Combine into one list</button>' : ''}<button class="pri" data-act="newPR">＋ New request</button></div>
+  return `<div class="row"><h1>Purchase requests</h1><span class="sp"></span>${rows.length ? '<button class="ghost" data-act="delPRs" title="Delete the ticked requests">Delete ticked</button>' : ''}${rows.length > 1 ? '<button class="ghost" data-act="combinePR">Combine into one list</button>' : ''}<button class="pri" data-act="newPR">＋ New request</button></div>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/${P()}/requests/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
    ${rows.length ? `<p class="small mut">Tick requests to <b>combine</b> them into one buying list, or to <b>delete</b> ones made by mistake, duplicated, or replaced by a revised order.</p>` : ''}
    ${rows.length ? `<div class="list">${rows.map(p => `<div class="pick"><label class="pk" title="Tick to combine or delete"><input type="checkbox" data-pr="${p.id}" data-no="${esc(p.pr_no)}"></label><a class="li" href="#/${P()}/pr/${p.id}"><div class="li-main"><b>${esc(p.pr_no)}${p.priority === 'urgent' ? ' ' + chip('urgent', 'bad') : ''}</b>
      <span class="mut small">${esc([p.event_title ? p.event_ref + ' · ' + p.event_title : '', prPurpose(p)].filter(Boolean).join(' · '))}</span>
-     <span class="mut small">${p.line_count} items · est. ${peso(p.est_total)} · ${esc(p.requested_by_name || '')}${p.needed_by ? ' · needed ' + esc(fmtD(p.needed_by)) : ''}</span></div>${waitRep.has(p.id) ? chip('🛒 Bought — to check', 'warn') : chip(PR_STATUS[p.status], statusTone(p.status))}</a></div>`).join('')}</div>` : '<div class="empty">No requests here.</div>'}`;
+     <span class="mut small">${p.line_count} items · est. ${peso(p.est_total)} · ${esc(p.requested_by_name || '')}${p.needed_by ? ' · needed ' + esc(fmtD(p.needed_by)) : ''}</span></div>${waitRep.has(p.id) ? chip('Bought — to check', 'warn') : chip(PR_STATUS[p.status], statusTone(p.status))}</a></div>`).join('')}</div>` : '<div class="empty">No requests here.</div>'}`;
 };
 // "Auto from EV-… · client · type" repeats the event already shown — only show a purpose that adds something
 const prPurpose = p => p.event_title && /^auto from/i.test(p.purpose || '') ? '' : (p.purpose || '');
@@ -844,7 +865,7 @@ function buyReportForm(p, toBuy, remaining) {
      <td class="n nowrap"><input name="bq_${l.id}" data-asked="${q}" type="number" step="any" min="0" value="${q}" class="qty" title="Asked ${fq(q)} ${u}"><span class="u">${u}</span></td>
      <td class="n nowrap"><span class="u">₱</span><input name="bc_${l.id}" data-est="${c}" type="number" step="any" min="0" value="${c || ''}" placeholder="0" class="qty" title="Estimated ${peso(c)} per ${u}"><span class="u">/${u}</span></td>
      <td class="n amt" data-bamt>${peso(q * c)}</td></tr>`; };
-  return `<form class="card buyrep" data-form="buyReport" data-id="${p.id}"><h2>🛒 Record what was bought</h2>
+  return `<form class="card buyrep" data-form="buyReport" data-id="${p.id}"><h2>Record what was bought</h2>
    <p class="small mut">Untick what you couldn't buy; fix quantities or prices that differ. Stock updates after a manager or storekeeper approves.${ticks ? ' <b>Pre-ticked from your purchase list.</b>' : ''}</p>
    <div class="tw"><table class="brt"><thead><tr><th></th><th>Item</th><th class="n">Qty</th><th class="n">Price</th><th class="n">Amount</th></tr></thead><tbody>
    ${shopRows(toBuy, l => l.item_id, l => remaining(l), 5, row)}</tbody>
@@ -877,7 +898,7 @@ function reportCard(r, ls, prLines, p) {
   const approver = can(p.ws, 'manager', 'storekeeper') && (r.submitted_by !== me || isAdmin());
   const nb = ls.filter(x => !x.bought), tot = ls.reduce((a, x) => a + (x.bought ? num(x.qty) * num(x.unit_cost) : 0), 0);
   const rows = ls.map(x => ({ ...x, item_id: byId[x.pr_line_id]?.item_id, est: num(byId[x.pr_line_id]?.est_unit_cost), note: byId[x.pr_line_id]?.note }));
-  return `<section class="card buyrep pend"><div class="row"><h2>🛒 Bought — waiting for approval</h2><span class="sp"></span>${chip('To check', 'warn')}</div>
+  return `<section class="card buyrep pend"><div class="row"><h2>Bought — waiting for approval</h2><span class="sp"></span>${chip('To check', 'warn')}</div>
    <p class="small mut">Recorded by <b>${esc(nameOf(r.submitted_by))}</b> · ${esc(fmtT(r.submitted_at))}${r.supplier_text ? ' · ' + esc(r.supplier_text) : ''}${r.or_no ? ' · OR ' + esc(r.or_no) : ''}${r.note ? `<br>“${esc(r.note)}”` : ''}</p>
    <div class="tw"><table class="brt"><thead><tr><th>Item</th><th class="n">Bought</th><th class="n">Price paid</th><th class="n">Amount</th></tr></thead><tbody>
    ${shopRows(rows, x => x.item_id, x => x.qty, 4, x => `<tr class="${x.bought ? '' : 'off'}"><td>${esc(itemName(x.item_id))}${x.bought ? '' : '<div class="small bad-t">Not bought</div>'}</td>
@@ -921,7 +942,7 @@ routes['c/pr'] = async id => {
   const toBuy = lines.filter(l => remaining(l) > 0);
   const total = lines.reduce((s, l) => s + num(l.approved_qty ?? l.qty) * num(l.est_unit_cost), 0);
   return `<div class="row"><a href="#/${P()}/requests" class="back">‹ Requests</a></div>
-  <div class="row"><h1>${esc(p.pr_no)}</h1>${chip(PR_STATUS[p.status], statusTone(p.status))}<span class="sp"></span>${lines.length ? `<button type="button" class="ghost" data-act="prPreview" data-id="${id}">🧾 Preview list</button>` : ''}${prCanDel(p) ? `<button type="button" class="ghost danger" data-act="delPR" data-id="${id}" data-no="${esc(p.pr_no)}" title="Delete this request (mistake, duplicate, or revised order)">🗑 Delete</button>` : ''}</div>
+  <div class="row"><h1>${esc(p.pr_no)}</h1>${chip(PR_STATUS[p.status], statusTone(p.status))}<span class="sp"></span>${lines.length ? `<button type="button" class="ghost" data-act="prPreview" data-id="${id}">Preview list</button>` : ''}${prCanDel(p) ? `<button type="button" class="ghost danger" data-act="delPR" data-id="${id}" data-no="${esc(p.pr_no)}" title="Delete this request (mistake, duplicate, or revised order)">Delete</button>` : ''}</div>
   <p class="lede">${p.event_id ? `<a href="#/c/event/${p.event_id}">${esc(p.event_ref + ' · ' + p.event_title)}</a>${prPurpose(p) ? ' · ' : ''}` : ''}${esc(prPurpose(p))}<br><span class="small mut">Requested by ${esc(p.requested_by_name || '')} · ${esc(fmtT(p.created_at))}${p.needed_by ? ' · needed by ' + esc(fmtD(p.needed_by)) : ''}${p.approved_by_name ? ` · ${p.status === 'rejected' ? 'rejected' : 'approved'} by ${esc(p.approved_by_name)} ${esc(fmtT(p.approved_at))}` : ''}</span></p>
   ${p.decision_note ? `<div class="alert ${p.status === 'rejected' ? 'bad' : 'info'}">${esc(p.decision_note)}</div>` : ''}
   ${(fold => `${fold ? `<details class="card prfold"><summary><b>Requested items</b> <span class="mut">${lines.length} items · est. ${peso(total)}</span></summary>` : ''}<form class="${fold ? 'mt' : 'card'}" data-form="${approver ? 'approvePR' : editable ? 'saveDraft' : 'none'}" data-id="${id}">
@@ -1315,7 +1336,7 @@ routes['c/recipes'] = async arg => {
   const costOf = {}; rl.forEach(l => costOf[l.dish_id] = (costOf[l.dish_id] || 0) + num(l.qty) * num(S.itemsById[l.item_id]?.last_cost));
   const costTag = d => { const r = recipes[d.id]; if (!r || !costOf[d.id] || !canSeeCost()) return ''; const c = costOf[d.id], pct = d.tray_price && num(r.batch_serves) > 1 ? Math.round(c / num(d.tray_price) * 100) : null;
     return ` · cost ${peso(c)}${pct !== null ? ` · <span class="${pct > 45 ? 'bad-t' : pct > 35 ? 'warn-t' : 'ok-t'}">${pct}%</span>` : ''}`; };
-  const tabs = [['standard', 'Standard list'], ['draft', 'Draft recipes'], ['verified', 'Verified'], ['none', 'No recipe'], ['all', 'All dishes'], ...(canSeeCost() ? [['costing', '💰 Costing']] : []), ...(canEditMenu() ? [['cleanup', '🧹 Clean-up']] : [])];
+  const tabs = [['standard', 'Standard list'], ['draft', 'Draft recipes'], ['verified', 'Verified'], ['none', 'No recipe'], ['all', 'All dishes'], ...(canSeeCost() ? [['costing', 'Costing']] : []), ...(canEditMenu() ? [['cleanup', 'Clean-up']] : [])];
   const list = S.dishes.filter(d => d.active).filter(d => tab === 'all' || (tab === 'standard' ? d.standard : tab === 'none' ? !recipes[d.id] && d.standard : recipes[d.id]?.status === tab));
   return `<h1>Dishes & recipes</h1><p class="lede">A dish's recipe lists what to buy for one batch: one large tray (10–12 guests, planned at 10), or one guest for rice, drinks and fruit. Only <b>verified</b> recipes are used for purchase requests.</p>
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/recipes/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
@@ -1555,7 +1576,7 @@ document.addEventListener('click', e => {
 /* ---- Costing on the recipe page: house prices, what-ifs, and a check for swapped quantity/price ---- */
 function costingCard(d, r, lines, serves, edit) {
   return `<section class="card costing" id="costing" data-dish="${d.id}" data-serves="${serves}" data-now="${num(d.tray_price)}">
-   <div class="row"><h2>Costing</h2><span class="small mut">house formula · inside the app only</span><span class="sp"></span><button type="button" class="ghost sm" data-act="recipeCard" data-id="${d.id}">🖨 Recipe card</button></div>
+   <div class="row"><h2>Costing</h2><span class="small mut">house formula · inside the app only</span><span class="sp"></span><button type="button" class="ghost sm" data-act="recipeCard" data-id="${d.id}">Recipe card</button></div>
    <div class="kpis">
     <div><span>Ingredient cost · 10–12 pax</span><b id="hS">—</b><small id="hSg"></small></div>
     <div><span>Tray price</span><b id="hTray">—</b><small id="hTrayNow"></small></div>
@@ -1618,7 +1639,7 @@ function lineCheck(cell, id, qty, price, serves, editable) {
   } else if (isBulkUnit(u) && price && price < 5) msg = `₱${fq(price)} per ${esc(u)} looks low — the price is for a whole ${esc(u)}.`;
   if (!msg) { el?.remove(); return; }
   if (!el) { el = document.createElement('div'); el.className = 'lchk small'; td.appendChild(el); }
-  if (el.dataset.m !== msg) { el.innerHTML = '⚠ ' + msg; el.dataset.m = msg; }
+  if (el.dataset.m !== msg) { el.innerHTML = '' + msg; el.dataset.m = msg; }
 }
 ACT.fixLine = el => {
   const id = el.dataset.item, q = document.querySelector(`[name="q_${id}"]`), p = document.querySelector(`[name="p_${id}"]`); if (!q) return;
@@ -1843,7 +1864,7 @@ routes['c/inquiry'] = async id => {
   ${items.length || pl.chefPick ? `<section class="card"><h2>Menu picked</h2>${pl.chefPick ? '<p>Chef to recommend the menu.</p>' : ''}
    ${items.map(i => `<div class="mline"><span class="mut small" style="min-width:120px">${esc(COURSE_OF[i.cat] || i.cat || '')}</span><span>${esc(i.dish)}</span>${i.tier === 'request' ? chip('special request', 'warn') : ''}<span class="sp"></span>${i.qty ? `<b>${esc(i.qty)}${pl.kind === 'tray' ? ' tray' + (num(i.qty) > 1 ? 's' : '') : ''}</b>` : ''}</div>`).join('')}</section>` : ''}
   ${canAct ? `<section class="card"><div class="row"><h2>Next step</h2></div>
-   <div class="row">${b.event_id ? `<a class="btn pri" href="#/c/event/${b.event_id}">Open the event</a> <button class="pdf" data-act="evPdf" data-id="${b.event_id}">🖨️ Print event sheet (PDF)</button>` : `<button class="pri" data-act="bkEvent" data-id="${b.id}">Create event from this inquiry</button>`}
+   <div class="row">${b.event_id ? `<a class="btn pri" href="#/c/event/${b.event_id}">Open the event</a> <button class="pdf" data-act="evPdf" data-id="${b.event_id}">Print event sheet (PDF)</button>` : `<button class="pri" data-act="bkEvent" data-id="${b.id}">Create event from this inquiry</button>`}
     <span class="sp"></span><label class="inline">Status <select data-bkstatus="${b.id}">${Object.entries(BK_STATUS).map(([v, l]) => opt(v, l, v === b.status)).join('')}</select></label></div>
    <p class="small mut">${b.event_id ? 'The event was made from this inquiry. Set the status to Won once the client confirms.' : 'Makes an event (status: Inquiry) with the customer, date, guests and the dishes they picked. Unknown dishes are kept as off-menu for the chef.'}</p></section>` : ''}`;
 };
@@ -1920,7 +1941,7 @@ function k86Html(rows, last, who, d) {
   clearTimeout(S.k86Timer); S.k86Timer = setTimeout(() => { if (location.hash.startsWith('#/r/kitchen')) refresh(); }, 60000);
   return `<div class="k86sum"><span class="k86c out"><b>${out.length}</b> out</span><span class="k86c low"><b>${low.length}</b> running low</span><span class="k86c ok"><b>${rows.length - out.length - low.length}</b> OK</span></div>
    <p class="small mut k86when">Stockist's count${when ? ` · ${esc(when)}` : ''}${who ? ` · ${esc(who)}` : ''}${last && d !== last.count_date ? ' · plus today\'s POS sales' : ''} · updates every minute</p>
-   ${out.length ? `<h2 class="k86h out">86 — don't take orders</h2><div class="k86g">${out.map(r => tile(r, true)).join('')}</div>` : '<div class="k86none">Nothing is 86 right now 👍</div>'}
+   ${out.length ? `<h2 class="k86h out">86 — don't take orders</h2><div class="k86g">${out.map(r => tile(r, true)).join('')}</div>` : '<div class="k86none">Nothing is 86 right now </div>'}
    ${low.length ? `<h2 class="k86h low">Running low — tell the guest it may run out</h2><div class="k86g">${low.map(r => tile(r, false)).join('')}</div>` : ''}`;
 }
 async function kDay(d) {
@@ -1980,7 +2001,7 @@ async function kRestock(d) {
    ${need.length ? `<div class="card tw"><h2>To cook — ${esc(fmtD(d))}</h2><p class="small mut">Dishes that ended below their low level. Cook back up to par.</p>
      <table><thead><tr><th>Dish</th><th class="n">Ending</th><th class="n">Par</th><th class="n">Cook</th></tr></thead><tbody>
      ${kGroups(need, 'protein').map(([g, l]) => `<tr class="grp"><td colspan="4">${esc(g)}</td></tr>${l.sort((a, b) => b.need - a.need).map(r => `<tr><td>${esc(r.name)}</td><td class="n ${r.end <= 0 ? 'bad-t' : ''}">${fq(r.end)}</td><td class="n">${fq(r.par)}</td><td class="n"><b>${fq(r.need)}</b></td></tr>`).join('')}`).join('')}
-     </tbody></table></div>` : '<div class="empty">Nothing is low. 👍</div>'}`;
+     </tbody></table></div>` : '<div class="empty">Nothing is low. </div>'}`;
 }
 // date-only arithmetic in UTC so the phone's time zone can't shift the day
 const addDays = (d, n) => new Date(Date.parse(d + 'T00:00:00Z') + n * 864e5).toISOString().slice(0, 10);
@@ -2040,7 +2061,7 @@ FORMS.addKDish = async f => {
 // The BIR invoice still comes from the registered POS — the slip printed here says so.
 const POS = { order: null, menu: [], sec: 'All', q: '', t: null, busy: false, settings: null, shift: null, tab: undefined, cash: 0, left: {}, drawer: false, search: false, ver: 0, saved: 0 };   // ver/saved: edits made vs. edits stored
 const KIND_L = { dine_in: 'Dine-in', take_out: 'Take-out', delivery: 'Delivery' };
-const KIND_I = { dine_in: '🍽', take_out: '🛍', delivery: '🛵' };
+const KIND_I = { dine_in: IC.plate(16), take_out: IC.bag(16), delivery: IC.bike(16) };
 const PROT_C = { Chicken: '#e8a33d', Pork: '#d9577a', Beef: '#c2412d', 'Fish & Seafood': '#3b8fd9', 'Veggies and Produce': '#46a35a', 'Noodles & Pasta': '#9b6ad8', Rice: '#b8ab8a', Others: '#7d8597' };
 const posCan = () => can('restaurant', 'cashier', 'manager', 'staff');
 const posCash = () => can('restaurant', 'cashier', 'manager');
@@ -2096,7 +2117,7 @@ function posTile(m, o) {
 function posHtml() {
   const o = POS.order, T = posTotals(o), first = nick();
   if (POS.tab === 'service') POS.tab = 'change';
-  if (POS.tab === undefined) POS.tab = innerHeight > 820 ? 'change' : null;   // short tablets: keypad folded until 💵 Cash is tapped
+  if (POS.tab === undefined) POS.tab = innerHeight > 820 ? 'change' : null;   // short tablets: keypad folded until Cash is tapped
   const priced = POS.menu.filter(m => m.price != null), unpriced = POS.menu.length - priced.length;
   const secs = [...new Set(priced.map(m => m.section))];
   const q = POS.q.trim().toLowerCase();
@@ -2113,8 +2134,8 @@ function posHtml() {
     discount: `<div class="ptab-grid"><label>Guests<span class="step"><button type="button" data-posstep="pax|-1">−</button><b>${o.pax}</b><button type="button" data-posstep="pax|1">＋</button></span></label>
        <label>Senior / PWD<span class="step"><button type="button" data-posstep="seniors|-1">−</button><b>${o.seniors}</b><button type="button" data-posstep="seniors|1">＋</button></span></label>
        <p class="small mut">${fq(POS.settings?.senior_pct ?? 20)}% off each Senior/PWD's share of the bill. Check their ID.</p></div>`,
-    print: `<div class="ptab-grid two"><button type="button" class="pbtn" data-act="posPreBill"${o.lines.length ? '' : ' disabled'}>🧾 Print bill</button>
-       <button type="button" class="pbtn" data-act="posBill"${o.lines.length && posCash() ? '' : ' disabled'}>💳 Card / split</button>${o.id && (!o.lines.some(l => l.sent_at) || can('restaurant', 'manager')) ? '<button type="button" class="pbtn danger" data-act="posVoid">✕ Void order</button>' : ''}</div>`
+    print: `<div class="ptab-grid two"><button type="button" class="pbtn" data-act="posPreBill"${o.lines.length ? '' : ' disabled'}>Print bill</button>
+       <button type="button" class="pbtn" data-act="posBill"${o.lines.length && posCash() ? '' : ' disabled'}>Card / split</button>${o.id && (!o.lines.some(l => l.sent_at) || can('restaurant', 'manager')) ? '<button type="button" class="pbtn danger" data-act="posVoid">✕ Void order</button>' : ''}</div>`
   }[POS.tab] || '';
   return `<div class="pos2 pos3">
    <div class="p-left">
@@ -2130,16 +2151,16 @@ function posHtml() {
     <div class="p-head"><div class="p-ono"><small>${o.id ? 'Order' : 'New order'}</small><b>#${nextNo}</b></div>
      <div class="p-kind">${Object.entries(KIND_L).map(([k, l]) => `<button type="button" class="${o.kind === k ? 'on' : ''}" data-poskind="${k}"><span>${KIND_I[k]}</span>${l}</button>`).join('')}</div></div>
     <div class="p-meta">${o.kind === 'dine_in' ? `<label>Table<input data-posf="table_no" value="${esc(o.table_no || '')}" inputmode="numeric" placeholder="—"></label>` : `<label class="wide">Name<input data-posf="customer" value="${esc(o.customer || '')}" placeholder="Customer"></label>`}
-     <span class="who">👤 ${esc(first)}</span>${POS.shift ? '<span class="dr ok">Drawer open</span>' : posCash() ? '<button type="button" class="dr btn" data-act="posShift">Open drawer</button>' : '<span class="dr">Drawer closed</span>'}</div>
+     <span class="who">${esc(first)}</span>${POS.shift ? '<span class="dr ok">Drawer open</span>' : posCash() ? '<button type="button" class="dr btn" data-act="posShift">Open drawer</button>' : '<span class="dr">Drawer closed</span>'}</div>
     ${POS.open.filter(x => x.id !== o.id).length ? `<div class="p-open">${POS.open.filter(x => x.id !== o.id).map(x => `<a href="#/r/pos/${x.id}" title="Switch to this order"><b>${x.table_no ? 'T' + esc(x.table_no) : '#' + x.order_no}</b>${KIND_I[x.kind]} ${peso(x.total).replace('.00', '')}</a>`).join('')}<a href="#/r/pos/new" class="new" title="New order">＋</a></div>` : ''}
     <div class="p-items"><span>${fq(nItems)} item${nItems === 1 ? '' : 's'}</span>${unsent && o.lines.some(l => l.sent_at) ? `<span class="chip warn">${fq(unsent)} not sent yet</span>` : ''}<span class="sp"></span>${o.lines.length && !o.lines.some(l => l.sent_at) ? '<button type="button" class="lnk" data-posclear>Clear order</button>' : ''}</div>
-    <div class="p-lines">${o.lines.length ? o.lines.map((l, i) => `<div class="pl ${l.sent_at ? 'sent' : ''}${POS.flash === l.dish_id && !l.sent_at ? ' flash' : ''}"><div class="pl-n" data-posnote="${i}"><b>${esc(l.name)}</b><small class="u">${peso(l.price).replace('.00', '')} each${l.sent_at ? ' · <span class="k">🍳 sent</span>' : ''}</small>${l.note ? `<small class="nt">✎ ${esc(l.note)}</small>` : '<small class="add">+ note</small>'}</div>
+    <div class="p-lines">${o.lines.length ? o.lines.map((l, i) => `<div class="pl ${l.sent_at ? 'sent' : ''}${POS.flash === l.dish_id && !l.sent_at ? ' flash' : ''}"><div class="pl-n" data-posnote="${i}"><b>${esc(l.name)}</b><small class="u">${peso(l.price).replace('.00', '')} each${l.sent_at ? ' · <span class="k">sent</span>' : ''}</small>${l.note ? `<small class="nt">✎ ${esc(l.note)}</small>` : '<small class="add">+ note</small>'}</div>
        <span class="step sm"><button type="button" data-posqty="${i}|-1" aria-label="One less">−</button><b>${fq(l.qty)}</b><button type="button" data-posqty="${i}|1" aria-label="One more">＋</button></span><span class="pl-a">${peso(num(l.qty) * num(l.price)).replace('.00', '')}</span></div>`).join('')
-      : `<div class="p-tap"><div class="p-circle">🍽</div><b>Tap a dish to start order #${nextNo}</b><span>${KIND_L[o.kind]}${o.kind === 'dine_in' ? ' · set the table above' : ''}</span></div>`}</div>
+      : `<div class="p-tap"><div class="p-circle">${IC.plate(34)}</div><b>Tap a dish to start order #${nextNo}</b><span>${KIND_L[o.kind]}${o.kind === 'dine_in' ? ' · set the table above' : ''}</span></div>`}</div>
     ${posSum(o)}
-    <div class="p-tabs2">${[['change', '💵 Cash'], ['discount', '🪪 Senior / PWD'], ['print', '⋯ More']].map(([k, l]) => `<button type="button" class="${POS.tab === k ? 'on' : ''}" data-postab="${k}">${l}${k === 'discount' && o.seniors ? ` <em>${o.seniors}</em>` : ''}</button>`).join('')}</div>
+    <div class="p-tabs2">${[['change', 'Cash'], ['discount', 'Senior / PWD'], ['print', '⋯ More']].map(([k, l]) => `<button type="button" class="${POS.tab === k ? 'on' : ''}" data-postab="${k}">${l}${k === 'discount' && o.seniors ? ` <em>${o.seniors}</em>` : ''}</button>`).join('')}</div>
     ${tabBody ? `<div class="p-tabbody">${tabBody}</div>` : ''}
-    <div class="p-act"><button type="button" class="send" data-act="posSend"${unsent ? '' : ' disabled'}>🍳 Send${unsent ? ` <em>${fq(unsent)}</em>` : ''}</button>
+    <div class="p-act"><button type="button" class="send" data-act="posSend"${unsent ? '' : ' disabled'}>Send${unsent ? ` <em>${fq(unsent)}</em>` : ''}</button>
      <button type="button" class="charge" data-act="posCharge"${o.lines.length && posCash() ? '' : ' disabled'}>Charge <b>${peso(T.total).replace('.00', '')}</b></button><button type="button" class="gcash" data-act="posGcash"${o.lines.length && posCash() ? '' : ' disabled'}>GCash</button></div>
    </div>
    ${POS.drawer ? `<div class="p-drawer" data-posdrawer-bg><div class="p-dpanel"><h2>Open orders</h2>
@@ -2567,11 +2588,11 @@ const tkWhen = t => {
 const tkLate = t => !t.done_at && t.due_date && (t.due_date < today() || (t.due_date === today() && t.due_time && mnl(t.due_date, t.due_time) < new Date()));
 function tkRow(t, lists, opts = {}) {
   const l = lists.find(x => x.id === t.list_id), rem = t.remind_at && !t.done_at ? mnlParts(t.remind_at) : null;
-  const chips = [t.due_date ? `<span class="tkc ${tkLate(t) ? 'late' : t.due_date === today() ? 'today' : ''}">📅 ${esc(tkWhen(t))}${tkLate(t) ? ' · late' : ''}</span>` : '',
-    rem ? `<span class="tkc">🔔 ${esc(rem[0] === today() ? fmtClock(rem[1]) : tkWhen({ due_date: rem[0], due_time: rem[1] }))}</span>` : '',
-    t.repeat !== 'none' ? `<span class="tkc">🔁 ${esc(REPEAT[t.repeat].replace('Every ', '').replace(' (Mon–Fri)', ''))}</span>` : '',
-    l && !opts.hideList ? `<span class="tkc" style="--lc:${esc(l.color || '#c9a44c')}"><i class="tkdot"></i>${esc((l.emoji ? l.emoji + ' ' : '') + l.name)}</span>` : '',
-    t.notes ? '<span class="tkc">📝</span>' : '', t.from_poke ? '<span class="tkc">👉 from a poke</span>' : ''].filter(Boolean).join('');
+  const chips = [t.due_date ? `<span class="tkc ${tkLate(t) ? 'late' : t.due_date === today() ? 'today' : ''}">${IC.cal(12)} ${esc(tkWhen(t))}${tkLate(t) ? ' · late' : ''}</span>` : '',
+    rem ? `<span class="tkc">${IC.bell(12)} ${esc(rem[0] === today() ? fmtClock(rem[1]) : tkWhen({ due_date: rem[0], due_time: rem[1] }))}</span>` : '',
+    t.repeat !== 'none' ? `<span class="tkc">${IC.repeat(12)} ${esc(REPEAT[t.repeat].replace('Every ', '').replace(' (Mon–Fri)', ''))}</span>` : '',
+    l && !opts.hideList ? `<span class="tkc" style="--lc:${esc(l.color || '#c9a44c')}"><i class="tkdot"></i>${esc(l.name)}</span>` : '',
+    t.notes ? `<span class="tkc">${IC.note(12)} note</span>` : '', t.from_poke ? `<span class="tkc">${IC.msg(12)} from a poke</span>` : ''].filter(Boolean).join('');
   return `<div class="tk${t.done_at ? ' done' : ''}${t.priority ? ' imp' : ''}" style="--lc:${esc(l?.color || 'transparent')}">
     <button class="tk-chk" data-act="${t.done_at ? 'tkUndone' : 'tkDone'}" data-id="${t.id}" aria-label="${t.done_at ? 'Mark not done' : 'Mark done'}">${t.done_at ? '✓' : ''}</button>
     <button class="tk-main" data-act="tkEdit" data-id="${t.id}"><span class="tk-t">${t.priority ? '<b class="tk-imp">!</b> ' : ''}${esc(t.title)}</span>${chips ? `<span class="tk-m">${chips}</span>` : ''}</button></div>`;
@@ -2590,9 +2611,9 @@ function tkForm(t, lists) {
       <label>Reminder<select name="remind" data-tkrem>${remOpts.map(([k, v]) => opt(k, v, k === rem)).join('')}</select></label>
       <label class="tk-cust"${rem === 'custom' ? '' : ' hidden'}>Remind me at<input type="datetime-local" name="custom" value="${custom}"></label>
       <label>Repeat<select name="repeat">${Object.entries(REPEAT).map(([k, v]) => opt(k, v, k === (t.repeat || 'none'))).join('')}</select></label>
-      <label>List<select name="list_id">${opt('', 'No list')}${lists.map(l => opt(l.id, (l.emoji ? l.emoji + ' ' : '') + l.name, l.id === (t.list_id ?? (isNew ? (TK.list || p.defaultList || '') : '')))).join('')}</select></label>
+      <label>List<select name="list_id">${opt('', 'No list')}${lists.map(l => opt(l.id, l.name, l.id === (t.list_id ?? (isNew ? (TK.list || p.defaultList || '') : '')))).join('')}</select></label>
     </div>
-    <label class="tk-impl"><input type="checkbox" name="priority" ${t.priority ? 'checked' : ''}> <span>❗ Important</span></label>
+    <label class="tk-impl"><input type="checkbox" name="priority" ${t.priority ? 'checked' : ''}> <span>Important</span></label>
     <div class="row end">${isNew ? '' : `<button type="button" class="lnk bad-t" data-act="tkDelete" data-id="${t.id}">Delete</button><span class="sp"></span>`}<button class="pri">${isNew ? 'Add task' : 'Save'}</button></div>
   </form>`;
 }
@@ -2632,10 +2653,10 @@ routes.tasks = async arg => {
     body = Object.keys(g).sort((a, b) => (a === 'late' ? '0' : a === 'none' ? 'z' : a).localeCompare(b === 'late' ? '0' : b === 'none' ? 'z' : b))
       .map(k => `<h3 class="tk-g${k === 'late' ? ' late' : ''}">${k === 'late' ? 'Late' : k === 'none' ? 'Anytime' : esc(tkWhen({ due_date: k }))}</h3>${g[k].map(t => tkRow(t, lists)).join('')}`).join('');
   } else body = shown.map(t => tkRow(t, lists)).join('');
-  const empty = { today: 'Nothing due today. 🎉 Add one above, or check Upcoming.', upcoming: 'Nothing planned for the coming days.', anytime: 'No tasks without a date.', all: 'No open tasks. 🎉', done: 'Nothing finished in the last 7 days yet.' }[view];
+  const empty = { today: 'Nothing due today. Add one above, or check Upcoming.', upcoming: 'Nothing planned for the coming days.', anytime: 'No tasks without a date.', all: 'No open tasks. ', done: 'Nothing finished in the last 7 days yet.' }[view];
   const editT = TK.edit === 'new' ? { title: '', due_date: view === 'today' ? t0 : null } : TK.edit ? [...open, ...done].find(t => t.id === TK.edit) : null;
   const jd = TK.justDone;
-  return `<div class="row"><h1>My tasks</h1><span class="sp"></span><button class="ghost tk-gear${TK.gear ? ' on' : ''}" data-act="tkGear" title="Customize">⚙︎ Customize</button></div>
+  return `<div class="row"><h1>My tasks</h1><span class="sp"></span><button class="ghost tk-gear${TK.gear ? ' on' : ''}" data-act="tkGear" title="Customize">︎ Customize</button></div>
   <p class="mut small" style="margin-top:-4px">Only you can see your tasks.</p>
   ${TK.gear ? await tkSettings(lists) : ''}
   <form class="tk-quick" data-form="tkQuick" autocomplete="off"><input name="q" placeholder="Add a task… e.g. Order eggs tomorrow 8am !" maxlength="240" data-tkq><button class="pri" aria-label="Add">＋</button>
@@ -2643,21 +2664,21 @@ routes.tasks = async arg => {
   ${editT ? tkForm(editT, lists) : ''}
   ${jd ? `<div class="tk-undo">✓ Done: <b>${esc(jd.title)}</b>${jd.next ? ' · next one added' : ''}<button class="lnk" data-act="tkUndo">Undo</button></div>` : ''}
   <div class="seg tk-views">${[['today', 'Today'], ['upcoming', 'Upcoming'], ['anytime', 'Anytime'], ['all', 'All'], ['done', 'Done']].map(([k, l]) => `<a href="#/tasks/${k}" class="${view === k ? 'on' : ''}">${l}${k !== 'done' && cnt(k) ? ` <i>${cnt(k)}</i>` : ''}</a>`).join('')}</div>
-  ${lists.length ? `<div class="tk-lists"><button class="${!TK.list ? 'on' : ''}" data-act="tkList" data-id="">All lists</button>${lists.map(l => `<button class="${TK.list === l.id ? 'on' : ''}" data-act="tkList" data-id="${l.id}" style="--lc:${esc(l.color || '#c9a44c')}"><i class="tkdot"></i>${esc((l.emoji ? l.emoji + ' ' : '') + l.name)}</button>`).join('')}</div>` : ''}
+  ${lists.length ? `<div class="tk-lists"><button class="${!TK.list ? 'on' : ''}" data-act="tkList" data-id="">All lists</button>${lists.map(l => `<button class="${TK.list === l.id ? 'on' : ''}" data-act="tkList" data-id="${l.id}" style="--lc:${esc(l.color || '#c9a44c')}"><i class="tkdot"></i>${esc(l.name)}</button>`).join('')}</div>` : ''}
   <div class="tk-list">${body || `<div class="tk-empty">${empty}</div>`}</div>
   <p class="small mut mt">Tip: type <b>today</b>, <b>tomorrow</b>, a day (<b>fri</b>), a date (<b>dec 5</b>), a time (<b>8am</b>, <b>3:30pm</b>), <b>!</b> for important${lists.length ? ' and <b>#' + esc(lists[0].name.split(' ')[0]) + '</b> for a list' : ''}.</p>`;
 };
 async function tkSettings(lists) {
   const p = tkPrefs();
   return `<section class="card tk-set"><h2>Customize my tasks</h2>
-    <h3>My lists</h3><p class="small mut">Group your tasks your way — e.g. 🥚 Purchasing, 🔪 Prep, 🏠 Personal.</p>
-    <div class="tk-ls">${lists.map(l => `<form class="tk-l" data-form="tkListSave" data-id="${l.id}"><input name="emoji" value="${esc(l.emoji || '')}" maxlength="4" placeholder="🙂" class="tk-em"><input name="name" value="${esc(l.name)}" maxlength="40" required><input type="color" name="color" value="${esc(l.color || '#c9a44c')}"><button class="ghost">Save</button><button type="button" class="lnk bad-t" data-act="tkListDel" data-id="${l.id}" title="Delete list">✕</button></form>`).join('')}
-      <form class="tk-l" data-form="tkListSave" data-id=""><input name="emoji" maxlength="4" placeholder="🙂" class="tk-em"><input name="name" maxlength="40" required placeholder="New list name"><input type="color" name="color" value="${TK_COLORS[lists.length % TK_COLORS.length]}"><button class="pri">Add list</button></form></div>
+    <h3>My lists</h3><p class="small mut">Group your tasks your way — e.g. Purchasing, Prep, Personal.</p>
+    <div class="tk-ls">${lists.map(l => `<form class="tk-l" data-form="tkListSave" data-id="${l.id}"><input name="name" value="${esc(l.name)}" maxlength="40" required><input type="color" name="color" value="${esc(l.color || '#c9a44c')}"><button class="ghost">Save</button><button type="button" class="lnk bad-t" data-act="tkListDel" data-id="${l.id}" title="Delete list">✕</button></form>`).join('')}
+      <form class="tk-l" data-form="tkListSave" data-id=""><input name="name" maxlength="40" required placeholder="New list name"><input type="color" name="color" value="${TK_COLORS[lists.length % TK_COLORS.length]}"><button class="pri">Add list</button></form></div>
     <form data-form="tkPrefs" class="tk-pf">
       <label>Open on<select name="view">${[['today', 'Today'], ['upcoming', 'Upcoming'], ['all', 'All']].map(([k, l]) => opt(k, l, p.view === k)).join('')}</select></label>
       <label>My morning time <span class="small mut">(reminders for tasks with a date but no time)</span><input type="time" name="morning" value="${esc(p.morning)}"></label>
       <label>Default reminder for tasks with a time<select name="defRemind">${REMIND_T.filter(o => ['none', 'at', '10', '30', '60'].includes(o[0])).map(([k, v]) => opt(k, v, p.defRemind === k)).join('')}</select></label>
-      <label>New tasks go to<select name="defaultList">${opt('', 'No list')}${lists.map(l => opt(l.id, (l.emoji ? l.emoji + ' ' : '') + l.name, p.defaultList === l.id)).join('')}</select></label>
+      <label>New tasks go to<select name="defaultList">${opt('', 'No list')}${lists.map(l => opt(l.id, l.name, p.defaultList === l.id)).join('')}</select></label>
       <label class="tk-impl"><input type="checkbox" name="home" ${p.home !== false ? 'checked' : ''}> <span>Show my tasks for today on the home screen</span></label>
       <div class="row end"><button class="pri">Save settings</button></div></form>
     ${await pushCard(null)}</section>`;
@@ -2667,7 +2688,7 @@ document.addEventListener('input', e => {
   if (!e.target.matches('[data-tkq]')) return;
   const box = e.target.form.querySelector('.tk-prev'), v = e.target.value.trim(); if (!v) { box.hidden = true; return; }
   const r = tkParse(v, TK.lists || []), l = (TK.lists || []).find(x => x.id === r.list_id);
-  const bits = [r.due_date && '📅 ' + tkWhen(r), r.priority && '❗ Important', l && '📁 ' + l.name].filter(Boolean);
+  const bits = [r.due_date && tkWhen(r), r.priority && 'Important', l && 'List: ' + l.name].filter(Boolean);
   box.hidden = !bits.length; box.innerHTML = bits.map(b => `<span class="tkc">${esc(b)}</span>`).join('') + (bits.length ? `<span class="small mut">“${esc(r.title)}”</span>` : '');
 });
 FORMS.tkQuick = async (f, form) => {
@@ -2677,7 +2698,7 @@ FORMS.tkQuick = async (f, form) => {
   if (t.list_id && !(TK.lists || []).some(l => l.id === t.list_id)) t.list_id = null;
   t.remind_at = remindAt(t);
   if (t.remind_at && new Date(t.remind_at) < new Date()) { t.remind_at = null; t.remind = 'none'; }
-  await db.insert('tasks', t); form.reset(); toast('Added' + (t.due_date ? ' · ' + tkWhen(t) : '') + (t.remind_at ? ' · 🔔' : ''));
+  await db.insert('tasks', t); form.reset(); toast('Added' + (t.due_date ? ' · ' + tkWhen(t) : '') + (t.remind_at ? ' · ' : ''));
   refresh(); setTimeout(() => $('[data-tkq]')?.focus(), 150);
 };
 FORMS.tkSave = async (f, form) => {
@@ -2692,7 +2713,7 @@ FORMS.tkSave = async (f, form) => {
   TK.edit = null; toast(form.dataset.id ? 'Saved' : 'Task added'); refresh();
 };
 FORMS.tkListSave = async (f, form) => {
-  const row = { name: f.name, emoji: f.emoji || null, color: f.color || null };
+  const row = { name: f.name, color: f.color || null };
   if (form.dataset.id) await db.update('task_lists', row, { id: form.dataset.id }); else await db.insert('task_lists', { ...row, sort: (TK.lists || []).length });
   toast('List saved'); refresh();
 };
@@ -2729,11 +2750,11 @@ async function homeTasks() {
     const t0 = today(), [lists, rows] = await Promise.all([db.select('task_lists'), db.select('tasks', { eq: { done_at: null }, lte: { due_date: t0 }, order: [['due_date'], ['due_time']], limit: 30 })]);
     TK.lists = lists;
     const list = rows.sort((a, b) => tkLate(b) - tkLate(a) || b.priority - a.priority || (a.due_time || '99').localeCompare(b.due_time || '99'));
-    return `<section class="hw-panel"><div class="hp-h"><span class="hp-ic hp-tk">✓</span><h2>My tasks today</h2>${list.length ? `<span class="hp-n hp-dark">${list.length}</span>` : ''}<span class="sp"></span>
+    return `<section class="hw-panel"><div class="hp-h"><span class="hp-ic hp-tk">${IC.check(18)}</span><h2>My tasks today</h2>${list.length ? `<span class="hp-n hp-dark">${list.length}</span>` : ''}<span class="sp"></span>
         <a class="hp-a" href="#/tasks">Open</a></div>
       <form class="hp-quick" data-form="tkQuick" autocomplete="off"><input name="q" placeholder="＋ Add a task… e.g. Count the rice 3pm" maxlength="240" data-tkq><div class="tk-prev" hidden></div></form>
       ${list.length ? `<div class="tk-list">${list.slice(0, 5).map(t => tkRow(t, lists)).join('')}</div>${list.length > 5 ? `<a class="hp-more" href="#/tasks/today">+ ${list.length - 5} more today →</a>` : ''}`
-        : `<div class="hp-empty"><span>☀️</span><div><b>Nothing due today</b><small>Type above to add one — try “tomorrow 8am”.</small></div></div>`}</section>`;
+        : `<div class="hp-empty"><div><b>Nothing due today</b><small>Type above to add one — try “tomorrow 8am”.</small></div></div>`}</section>`;
   } catch (e) { return ''; }
 }
 // In-app reminder pop-ups while the app is open (the phone notification comes from the server)
@@ -2742,9 +2763,9 @@ async function tkReminderCheck() {
   const now = Date.now(), rows = await db.select('tasks', { cols: 'id,title,priority,remind_at', eq: { done_at: null }, lte: { remind_at: new Date(now).toISOString() }, gte: { remind_at: new Date(now - 15 * 60000).toISOString() } }).catch(() => []);
   for (const t of rows) {
     if (TK_SHOWN.has(t.id + t.remind_at)) continue; TK_SHOWN.add(t.id + t.remind_at);
-    toast(`${t.priority ? '❗' : '⏰'} Reminder: ${t.title}`);
+    toast(`${t.priority ? 'Important reminder' : 'Reminder'}: ${t.title}`);
     if (document.hidden && 'Notification' in window && Notification.permission === 'granted' && !(await pushSub())) {
-      const reg = await navigator.serviceWorker?.getRegistration(); reg?.showNotification(`⏰ Reminder: ${t.title}`, { body: 'From My tasks', tag: 'task-' + t.id, icon: './icons/icon-192.png', data: { url: './#/tasks' } });
+      const reg = await navigator.serviceWorker?.getRegistration(); reg?.showNotification(`Reminder: ${t.title}`, { body: 'From My tasks', tag: 'task-' + t.id, icon: './icons/icon-192.png', data: { url: './#/tasks' } });
     }
   }
   try { sessionStorage.setItem('rom-tk-shown', JSON.stringify([...TK_SHOWN].slice(-200))); } catch (e) {}
@@ -2817,7 +2838,7 @@ routes.me = async () => {
         return `<div class="me-role"><b>${esc(roleName(r.role))}</b>${def?.[2] ? `<span class="small mut">${esc(def[2])}</span>` : ''}
           ${ROLE_DO[r.role] ? `<ul>${ROLE_DO[r.role].map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</div>`; }).join('')}`).join('')
       : '<p class="mut">You have no roles yet. Ask the owner to set them on the People page.</p>';
-  const go2 = [member('catering') && ['#/c', '🍽️ Catering'], member('restaurant') && ['#/r', '🍳 Restaurant'], ['#/events', '📅 Events board'], me.is_admin && ['#/people', '👥 People']].filter(Boolean);
+  const go2 = [member('catering') && ['#/c', 'Catering'], member('restaurant') && ['#/r', 'Restaurant'], ['#/events', 'Events board'], me.is_admin && ['#/people', 'People']].filter(Boolean);
   const actRows = (acts || []).map(e => { const w = audWhat(e, {}), row = e.new_row || e.old_row || {};
     if (e.tbl === 'profiles' && e.action === 'UPDATE') return `<span>You updated ${row.username === S.me?.username ? 'your details' : 'the details of <b>' + esc(row.full_name || '') + '</b>'}</span>`;
     const lbl = row.ref || row.pr_no || row.po_no || row.bill_no || (row.order_no != null && e.tbl.startsWith('pos_') ? '#' + row.order_no : '') || row.title || row.name
@@ -2827,7 +2848,7 @@ routes.me = async () => {
   }).map((h, i, all) => h && (i === 0 || h !== all[i - 1]) && `<div class="li"><div class="li-main">${h}<span class="mut small">${ago(acts[i].at)}</span></div></div>`).filter(Boolean);
   const actList = acts == null ? '<p class="small mut">Needs the latest database update.</p>'
     : !actRows.length ? '<p class="small mut">Nothing yet. What you create, change, approve or void will show here.</p>' : `<div class="list">${actRows.join('')}</div>`;
-  return `<div class="me-hero"><div class="me-avw"><label class="av-up" title="Change photo">${av(me.id, me.full_name || me.username, "me-av")}<span class="av-cam">📷</span><input type="file" accept="image/*" data-avatar hidden></label>${AV.img[me.id] ? '<button class="lnk me-avx" data-act="avatarRemove">Remove photo</button>' : '<span class="me-avx">Add a photo</span>'}</div>
+  return `<div class="me-hero"><div class="me-avw"><label class="av-up" title="Change photo">${av(me.id, me.full_name || me.username, "me-av")}<span class="av-cam">${IC.cam(15)}</span><input type="file" accept="image/*" data-avatar hidden></label>${AV.img[me.id] ? '<button class="lnk me-avx" data-act="avatarRemove">Remove photo</button>' : '<span class="me-avx">Add a photo</span>'}</div>
       <div><span class="me-hi">Hi, ${esc(nick())}</span><h1>${esc(me.full_name || me.username || '')}</h1>
       <div class="me-chips">${me.is_admin ? chip('Owner', 'ok') : roles.map(r => chip(`${roleName(r.role)} · ${WS_NAME[r.ws] || r.ws}`, 'info')).join('')}</div></div></div>
   <div class="me-grid">
@@ -2851,7 +2872,7 @@ routes.me = async () => {
     ${me.last_sign_in ? `<p class="small mut mt">Last signed in: ${fmtT(me.last_sign_in)}</p>` : ''}
     <div class="me-ro"><span>This device</span><b>${dev?.registered ? `POS tablet “${esc(dev.name || '')}”` : 'Not a POS tablet'}</b></div>
     <button class="ghost mt" data-act="logout">Log out of this device</button></section>
-  <section class="card"><h2>Go to</h2><div class="me-go">${go2.map(([h, l]) => `<a class="btn" href="${h}">${l}</a>`).join('')}${canInstall() ? '<button class="ghost" data-act="install">📲 Get the app</button>' : ''}</div>
+  <section class="card"><h2>Go to</h2><div class="me-go">${go2.map(([h, l]) => `<a class="btn" href="${h}">${l}</a>`).join('')}${canInstall() ? '<button class="ghost" data-act="install">Get the app</button>' : ''}</div>
     <h2 class="mt">Good to know</h2><ul class="me-tips">
       <li>Keep your password to yourself. Everything you do is saved under your name.</li>
       <li>Using a shared or borrowed phone? Log out when you're done.</li>
@@ -2880,7 +2901,7 @@ function teamHtml(team) {
       return `<div class="tm"><div class="tm-av ${st}">${av(t.id, t.full_name)}<i></i></div>
         <div class="tm-main"><b>${esc(t.name)}</b>${t.name !== t.full_name ? ` <span class="mut small">${esc(t.full_name)}</span>` : ''}
           <div class="tm-roles">${roles(t)}</div><span class="tm-st ${st}">${esc(txt)}</span></div>
-        <a class="btn" href="#/pokes/new~${t.id}" title="Poke ${esc(t.name)}">👉 Poke</a></div>`; }).join('') || '<p class="mut">No teammates yet.</p>'}</div></section>`;
+        <a class="btn" href="#/pokes/new~${t.id}" title="Poke ${esc(t.name)}">Poke</a></div>`; }).join('') || '<p class="mut">No teammates yet.</p>'}</div></section>`;
 }
 FORMS.meSave = async f => {
   await db.rpc('my_update_profile', { p_nickname: f.nickname || '', p_phone: f.phone || '' });
@@ -2895,7 +2916,7 @@ document.addEventListener('change', e => { if (e.target.matches('[data-showpw]')
 
 /* ================= POKES (endorsements) ================= */
 // A short note to a person or a team ("Put the crispy pata in the oven by 8AM tomorrow"). It shows on their home screen,
-// the 🔔 in the header counts what's open, and their phone gets a notification. Owner, managers and head chefs see every poke.
+// the in the header counts what's open, and their phone gets a notification. Owner, managers and head chefs see every poke.
 const POKE = { unread: { open: 0, unseen: 0, replies: 0 }, lastId: null, lastReply: null };
 const pokeDue = d => {
   if (!d) return '';
@@ -2908,7 +2929,7 @@ function pokeCard(p, mode) {
   // mode: 'in' (for me), 'sent' (I sent it), 'all' (overseer view)
   const head = mode === 'in' ? `<b>${esc(p.from_name)}</b>${p.others > 0 ? ` <span class="mut small">to you + ${p.others} other${p.others > 1 ? 's' : ''}</span>` : ''}`
     : `<b>${esc(mode === 'sent' ? 'You' : p.from_name)}</b> → ${esc(p.to_label || (p.recipients || []).map(r => r.name).join(', '))}`;
-  const rec = mode !== 'in' && p.recipients ? `<div class="pk-rec">${p.recipients.map(r => `<span class="pk-st ${r.done_at ? 'done' : r.seen_at ? 'seen' : ''}${mode === 'sent' && r.done_at && r.done_at > (p.sender_seen_at || p.created_at) ? ' new' : ''}" title="${r.done_at ? 'Done ' + fmtT(r.done_at) : r.seen_at ? 'Seen ' + fmtT(r.seen_at) : 'Not seen yet'}">${r.done_at ? '✓' : r.seen_at ? '👀' : '•'} ${esc(r.name)}${r.reply ? `: “${esc(r.reply)}”` : ''}</span>`).join('')}</div>` : '';
+  const rec = mode !== 'in' && p.recipients ? `<div class="pk-rec">${p.recipients.map(r => `<span class="pk-st ${r.done_at ? 'done' : r.seen_at ? 'seen' : ''}${mode === 'sent' && r.done_at && r.done_at > (p.sender_seen_at || p.created_at) ? ' new' : ''}" title="${r.done_at ? 'Done ' + fmtT(r.done_at) : r.seen_at ? 'Seen ' + fmtT(r.seen_at) : 'Not seen yet'}">${r.done_at ? '✓' : r.seen_at ? 'Seen ·' : '•'} ${esc(r.name)}${r.reply ? `: “${esc(r.reply)}”` : ''}</span>`).join('')}</div>` : '';
   const allDone = p.recipients && p.recipients.every(r => r.done_at);
   const acts = p.cancelled_at ? `<span class="chip mut">Taken back</span>`
     : mode === 'in' ? (p.done_at ? `<span class="chip ok">Done ${ago(p.done_at)}</span>${p.reply ? ` <span class="small mut">“${esc(p.reply)}”</span>` : ''} <button class="lnk" data-act="pokeUndo" data-id="${p.id}">Undo</button>`
@@ -2918,7 +2939,7 @@ function pokeCard(p, mode) {
   return `<div class="poke${p.urgent ? ' urgent' : ''}${(mode === 'in' && p.done_at) || p.cancelled_at ? ' done' : ''}">
     <div class="pk-h"><span class="pk-who">${face}<span>${head}</span></span><span class="mut small">${ago(p.created_at)}</span></div>
     <div class="pk-b">${esc(p.body)}</div>
-    ${p.urgent || p.due_at ? `<div class="pk-tags">${p.urgent ? '<span class="chip bad">Urgent</span>' : ''}${p.due_at ? `<span class="chip ${pokeLate(p) ? 'bad' : 'warn'}">⏰ ${esc(pokeDue(p.due_at))}${pokeLate(p) ? ' · late' : ''}</span>` : ''}</div>` : ''}
+    ${p.urgent || p.due_at ? `<div class="pk-tags">${p.urgent ? '<span class="chip bad">Urgent</span>' : ''}${p.due_at ? `<span class="chip ${pokeLate(p) ? 'bad' : 'warn'}">${esc(pokeDue(p.due_at))}${pokeLate(p) ? ' · late' : ''}</span>` : ''}</div>` : ''}
     ${rec}<div class="pk-a">${acts}</div></div>`;
 }
 // Mark what's on screen as seen (clears the bell)
@@ -2941,11 +2962,11 @@ async function homePokes() {
   const open = d.inbox.filter(p => !p.done_at);
   setTimeout(() => pokesSeen(open), 1200);
   const news = pokeNews(d.sent);
-  return `<section class="hw-panel"><div class="hp-h"><span class="hp-ic pk">👉</span><h2>Pokes for you</h2>${open.length ? `<span class="hp-n">${open.length}</span>` : ''}<span class="sp"></span>
+  return `<section class="hw-panel"><div class="hp-h"><span class="hp-ic pk">${IC.msg(18)}</span><h2>Pokes for you</h2>${open.length ? `<span class="hp-n">${open.length}</span>` : ''}<span class="sp"></span>
       <a class="hp-a" href="#/pokes/new" title="Poke someone">＋ Poke</a></div>
     ${news.length ? `<div class="hp-news">${news.slice(0, 3).map(newsLine).join('')}${news.length > 3 ? `<a class="small" href="#/pokes/sent">+ ${news.length - 3} more updates</a>` : ''}</div>` : ''}
     ${open.length ? open.slice(0, 4).map(p => pokeCard(p, 'in')).join('') + (open.length > 4 ? `<a class="hp-more" href="#/pokes">See all ${open.length} →</a>` : '')
-      : `<div class="hp-empty"><span>🙌</span><div><b>All clear</b><small>No endorsements waiting for you.</small></div></div>`}</section>`;
+      : `<div class="hp-empty"><div><b>All clear</b><small>No endorsements waiting for you.</small></div></div>`}</section>`;
 }
 routes.pokes = async arg => {
   const tab = arg === 'sent' || arg === 'all' ? arg : 'in', compose = (arg || '').startsWith('new'), preTo = (arg || '').split('~')[1] || '';
@@ -2983,11 +3004,11 @@ function pokeForm(people, preTo) {
     ${others.length > 10 ? '<input class="search pk-find" placeholder="Find a person…" data-filter=".pk-faces .pk-face">' : ''}
     <div class="pk-faces">${others.map(p => `<label class="pk-face" title="${esc(p.full_name)}"><input type="checkbox" name="u_${p.id}"${p.id === preTo ? ' checked' : ''} data-label="${esc(p.name)}">
       <span class="pk-fav">${av(p.id, p.full_name, '')}<i class="pk-ck">✓</i></span><b>${esc(p.name)}</b><small>${esc(role1(p))}</small><span hidden>${esc(p.full_name)}</span></label>`).join('')}</div>
-    <details class="pk-tdet"><summary>👥 Send to a whole team</summary>
+    <details class="pk-tdet"><summary>Send to a whole team</summary>
       ${groups.map(([ws, ts]) => `<div class="pk-tg"><span>${WS_NAME[ws]}</span><div class="pk-teams">${ts.map(t => `<label class="pk-chip"><input type="checkbox" name="t_${t.ws}|${t.role}" data-label="${esc(t.label)}"><span>${esc(plural(t.role))} <i>${t.n}</i></span></label>`).join('')}</div></div>`).join('')}</details>
     <label>Message<textarea name="body" maxlength="500" rows="3" required placeholder="e.g. Put the crispy pata in the oven by 8AM tomorrow"></textarea></label>
     <div class="pk-row"><label>Needed by <span class="small mut">(optional)</span><input type="datetime-local" name="due"></label>
-      <label class="pk-urg"><input type="checkbox" name="urgent"> <span>🔴 Urgent</span></label></div>
+      <label class="pk-urg"><input type="checkbox" name="urgent"> <span>Urgent</span></label></div>
     <div class="row end"><a class="btn" href="#/pokes">Cancel</a><button class="pri">Send poke</button></div></form>`;
 }
 // "To: Kamata, Jeoff + Chefs · Catering" as you tap
@@ -2996,7 +3017,7 @@ function pkSummary(form) {
   const sum = form.querySelector('.pk-sum'); sum.textContent = on.length ? on.join(', ') : 'Tap a face (or a team below)';
   sum.classList.toggle('mut', !on.length); form.querySelector('.pk-clear').hidden = !on.length;
   const nT = form.querySelectorAll('.pk-tdet input:checked').length, s = form.querySelector('.pk-tdet summary');
-  s.textContent = nT ? `👥 ${nT} team${nT > 1 ? 's' : ''} picked` : '👥 Send to a whole team';
+  s.textContent = nT ? `${nT} team${nT > 1 ? 's' : ''} picked` : 'Send to a whole team';
 }
 document.addEventListener('change', e => { const f = e.target.closest('form[data-form="sendPoke"]'); if (f && e.target.type === 'checkbox' && e.target.name !== 'urgent') pkSummary(f); });
 ACT.pkClear = async el => { const f = el.closest('form'); f.querySelectorAll('.pk-face input, .pk-tdet input').forEach(i => i.checked = false); pkSummary(f); };
@@ -3015,9 +3036,9 @@ ACT.pokeReply = async el => { const r = prompt('Reply (it also marks the poke do
 ACT.pokeUndo = async el => { await db.rpc('poke_undo', { p_poke: el.dataset.id }); pokePoll(); refresh(); };
 ACT.pokeCancel = async el => { if (!confirm('Take back this poke? It disappears from their home screen.')) return; await db.rpc('poke_cancel', { p_poke: el.dataset.id }); toast('Taken back'); refresh(); };
 
-// The 🔔 count: checked every 30 seconds and whenever the app comes back to the front
+// The count: checked every 30 seconds and whenever the app comes back to the front
 function bellHtml() { const u = POKE.unread, n = (u.open || 0) + (u.replies || 0);
-  return `<a href="#/pokes${!u.open && u.replies ? '/sent' : ''}" class="bell${u.unseen || u.replies ? ' new' : ''}" title="Pokes${u.replies ? ` · ${u.replies} update${u.replies > 1 ? 's' : ''} on pokes you sent` : ''}">🔔${n ? `<i>${n}</i>` : ''}</a>`; }
+  return `<a href="#/pokes${!u.open && u.replies ? '/sent' : ''}" class="bell${u.unseen || u.replies ? ' new' : ''}" title="Pokes${u.replies ? ` · ${u.replies} update${u.replies > 1 ? 's' : ''} on pokes you sent` : ''}">${IC.bell(22)}${n ? `<i>${n}</i>` : ''}</a>`; }
 function paintBell() {
   document.querySelectorAll('.bell-slot').forEach(s => s.innerHTML = bellHtml());
   document.querySelectorAll('.mn-pokes i').forEach(i => { const n = (POKE.unread.open || 0) + (POKE.unread.replies || 0); i.textContent = n || ''; i.hidden = !n; });
@@ -3027,14 +3048,14 @@ let pokeBusy = false;
 async function pokePoll() {
   if (!S.user || !S.me || pokeBusy || !navigator.onLine) return; pokeBusy = true;
   try {
-    if (!document.hidden) db.rpc('i_am_here').catch(() => {});
-    tkReminderCheck();   // "in the app now" for My teammates
+    if (!document.hidden) db.rpc('i_am_here').catch(() => {});   // "in the app now" for My teammates
+    tkReminderCheck();
     const u = await db.rpc('poke_unread'); const prev = POKE.lastId; POKE.unread = u; paintBell();
     const l = u.latest;
     if (l && l.id !== prev && prev !== null) {
-      toast(`👉 ${l.from} poked you: ${l.body.slice(0, 70)}${l.body.length > 70 ? '…' : ''}`);
+      toast(`${l.from} poked you: ${l.body.slice(0, 70)}${l.body.length > 70 ? '…' : ''}`);
       if (document.hidden && 'Notification' in window && Notification.permission === 'granted' && !(await pushSub())) {
-        const reg = await navigator.serviceWorker?.getRegistration(); reg?.showNotification(`${l.urgent ? '🔴' : '👉'} ${l.from} poked you`, { body: l.body, tag: 'poke-' + l.id, icon: './icons/icon-192.png' });
+        const reg = await navigator.serviceWorker?.getRegistration(); reg?.showNotification(`${l.urgent ? 'Urgent: ' : ''}${l.from} poked you`, { body: l.body, tag: 'poke-' + l.id, icon: './icons/icon-192.png' });
       }
       if (['home', 'pokes'].includes((current || 'home').split('/')[0])) refresh();
     }
@@ -3042,7 +3063,7 @@ async function pokePoll() {
     // someone did (or answered) a poke I sent
     const r = u.latest_reply, prevR = POKE.lastReply;
     if (r && r.key !== prevR && prevR !== null) {
-      const t = r.reply ? `💬 ${r.from} replied: “${r.reply}”` : `✓ ${r.from} did your poke`;
+      const t = r.reply ? `${r.from} replied: “${r.reply}”` : `✓ ${r.from} did your poke`;
       toast(`${t} — ${r.body.slice(0, 50)}${r.body.length > 50 ? '…' : ''}`);
       if (document.hidden && 'Notification' in window && Notification.permission === 'granted' && !(await pushSub())) {
         const reg = await navigator.serviceWorker?.getRegistration(); reg?.showNotification(t, { body: 're: ' + r.body, tag: 'pokedone-' + r.key, icon: './icons/icon-192.png' });
@@ -3064,10 +3085,10 @@ async function pushCard(d) {
   const IOS = /iphone|ipad|ipod/i.test(navigator.userAgent), standalone = matchMedia('(display-mode: standalone)').matches || navigator.standalone;
   const ok = 'Notification' in window && 'serviceWorker' in navigator && 'PushManager' in window;
   const perm = ok ? Notification.permission : 'unsupported', sub = ok ? await pushSub() : null;
-  const status = !ok ? (IOS && !standalone ? 'On iPhone, add the app to your home screen first (📲 Get the app), open it from there, then come back here.' : "This browser can't show notifications. Pokes still appear on your home screen.")
+  const status = !ok ? (IOS && !standalone ? 'On iPhone, add the app to your home screen first (Get the app), open it from there, then come back here.' : "This browser can't show notifications. Pokes still appear on your home screen.")
     : perm === 'denied' ? 'Notifications are blocked for this app. Allow them in the phone’s Settings → Notifications (or the browser’s site settings), then come back here.'
     : sub ? 'On for this phone ✓ You’ll be pinged when someone pokes you.' : perm === 'granted' ? 'Allowed, but not connected yet. Tap the button to finish.' : 'Off for this phone.';
-  return `<section class="card mt"><h2>🔔 Phone notifications</h2><p class="small">${status}</p>
+  return `<section class="card mt"><h2>Phone notifications</h2><p class="small">${status}</p>
     <div class="row" style="gap:8px;flex-wrap:wrap">${ok && perm !== 'denied' && !sub ? '<button class="pri" data-act="pushOn">Turn on for this phone</button>' : ''}${sub ? '<button class="ghost" data-act="pushTest">Send me a test</button><button class="lnk" data-act="pushOff">Turn off for this phone</button>' : ''}</div>
     ${d?.overseer ? `<label class="row small mt" style="gap:8px;justify-content:flex-start"><input type="checkbox" data-watch ${d.watch !== false ? 'checked' : ''} style="width:18px;height:18px"> Also notify me of every poke between other team members</label>` : ''}</section>`;
 }
@@ -3081,7 +3102,7 @@ ACT.pushOn = async () => {
   toast('Notifications on for this phone'); refresh();
 };
 ACT.pushOff = async () => { const s = await pushSub(); if (s) { await db.rpc('push_unsubscribe', { p_endpoint: s.endpoint }).catch(() => {}); await s.unsubscribe(); } toast('Notifications off for this phone'); refresh(); };
-ACT.pushTest = async () => { const reg = await navigator.serviceWorker.ready; await reg.showNotification("👉 Test from Romualdo's", { body: 'This is how a poke will look on this phone.', icon: './icons/icon-192.png' }); };
+ACT.pushTest = async () => { const reg = await navigator.serviceWorker.ready; await reg.showNotification("Test from Romualdo's", { body: 'This is how a poke will look on this phone.', icon: './icons/icon-192.png' }); };
 document.addEventListener('change', async e => { if (!e.target.matches('[data-watch]')) return;
   try { await db.rpc('set_watch_pokes', { p_on: e.target.checked }); toast(e.target.checked ? 'You’ll be notified of every poke' : 'Only pokes to you will notify you'); } catch (err) { toast(err.message, true); } });
 
@@ -3101,7 +3122,7 @@ ACT.vapidMake = async el => {
     <ol><li>Supabase → <b>Edge Functions</b> → <b>Secrets</b> → add these three (name and value):</li></ol>
     ${row('VAPID_PUBLIC_KEY', pub)}${row('VAPID_PRIVATE_KEY', priv)}${row('VAPID_SUBJECT', 'https://romualdos.ph')}
     <ol start="2"><li>Edge Functions → <b>Deploy a new function</b> → name it <b>poke-push</b> → paste the code from <code>supabase/functions/poke-push/index.ts</code> on GitHub → deploy → turn <b>Verify JWT</b> off in its settings.</li>
-    <li>Each person opens <b>🔔 Pokes</b> and taps <b>Turn on for this phone</b>.</li></ol>
+    <li>Each person opens <b>Pokes</b> and taps <b>Turn on for this phone</b>.</li></ol>
     <p>Don't paste the private key anywhere else — not in chat, not on GitHub.</p></div>`;
   el.remove();
 };
@@ -3246,7 +3267,7 @@ function billCard(ev, B) {
     <div class="row end"><button class="pri" data-act="billCreate" data-id="${ev.id}">Create statement of account</button></div>
     ${pays.length ? payList(ev, pays) : ''}</section>`;
   const C = billCalc(bill, lines, pays, pax), overdue = bill.due && bill.due < today() && C.balance > 0;
-  return `<section class="card" id="billing"><div class="row"><h2>Billing &amp; payment</h2>${payChip(B.money)}${overdue ? chip('Overdue', 'bad') : ''}<span class="sp"></span><button class="pdf" data-act="soaPdf" data-id="${ev.id}">🖨️ Statement of Account (PDF)</button></div>
+  return `<section class="card" id="billing"><div class="row"><h2>Billing &amp; payment</h2>${payChip(B.money)}${overdue ? chip('Overdue', 'bad') : ''}<span class="sp"></span><button class="pdf" data-act="soaPdf" data-id="${ev.id}">Statement of Account (PDF)</button></div>
    <div class="kpis"><div class="kpi"><span>Total</span><b>${peso(C.total)}</b></div><div class="kpi"><span>Paid</span><b>${peso(C.paid)}</b></div><div class="kpi"><span>Balance</span><b class="${C.balance > 0 ? 'bad-t' : 'ok-t'}">${peso(C.balance)}</b></div><div class="kpi"><span>${esc(bill.soa_no)}</span><b style="font-size:15px">${bill.due ? 'Due ' + esc(fmtD(bill.due)) : 'No due date'}</b></div></div>
    <details class="mt" ${lines.length && C.total ? '' : 'open'}><summary>Edit the statement</summary>
    <form data-form="saveBill" data-id="${ev.id}" data-pax="${esc(pax ?? '')}" class="mt">
@@ -3431,7 +3452,7 @@ async function checkVersion() {
     if (live && live !== MY_VER) {
       verShown = true;
       const bar = document.createElement('div'); bar.className = 'verbar';
-      bar.innerHTML = '<span>✨ A new version of the app is ready.</span><button type="button">Update now</button>';
+      bar.innerHTML = '<span>A new version of the app is ready.</span><button type="button">Update now</button>';
       bar.querySelector('button').onclick = () => {
         if (typeof EVW !== 'undefined' && EVW.dirty && !confirm('You have unsaved typing on this page. Update anyway?')) return;
         location.reload();

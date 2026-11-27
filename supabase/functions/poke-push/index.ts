@@ -40,7 +40,7 @@ Deno.serve(async (req) => {
     let sent = 0;
     await Promise.all(due.flatMap((t: any) => (subs ?? []).filter((s: any) => s.user_id === t.user_id).map(async (s: any) => {
       const when = t.due_time ? " · " + String(t.due_time).slice(0, 5) : "";
-      const payload = JSON.stringify({ title: `${t.priority ? "❗ " : "⏰ "}Reminder: ${t.title}`.slice(0, 120), body: "From My tasks" + when, tag: "task-" + t.id, url: "./#/tasks", urgent: !!t.priority });
+      const payload = JSON.stringify({ title: `${t.priority ? "Important reminder" : "Reminder"}: ${t.title}`.slice(0, 120), body: "From My tasks" + when, tag: "task-" + t.id, url: "./#/tasks", urgent: !!t.priority });
       try { await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload, { TTL: 60 * 60, urgency: "high" }); sent++; }
       catch (e: any) { if (e?.statusCode === 404 || e?.statusCode === 410) await db.from("push_subs").delete().eq("endpoint", s.endpoint); }
     })));
@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
     const { data: me } = await db.from("profiles").select("full_name, nickname").eq("id", who.user.id).maybeSingle();
     const name = (me?.nickname || "").trim() || String(me?.full_name || "Someone").split(" ")[0];
     const payload = JSON.stringify({
-      title: mine.reply ? `💬 ${name} replied` : `✓ ${name} did your poke`,
+      title: mine.reply ? `${name} replied` : `${name} did your poke`,
       body: (mine.reply ? `“${mine.reply}” — ` : "") + "re: " + poke.body.slice(0, 140),
       tag: "pokedone-" + poke.id + "-" + who.user.id, url: "./#/pokes/sent",
     });
@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
   await Promise.all((subs ?? []).map(async (s: any) => {
     const mine = recipients.has(s.user_id);
     const payload = JSON.stringify({
-      title: mine ? `${poke.urgent ? "🔴 " : "👉 "}${fromName} poked you` : `${fromName} → ${toNames}`,
+      title: mine ? `${poke.urgent ? "Urgent: " : ""}${fromName} poked you` : `${fromName} → ${toNames}`,
       body: poke.body.slice(0, 180) + due,
       tag: "poke-" + poke.id, url: "./#/pokes", urgent: mine && poke.urgent,
     });

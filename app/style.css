@@ -859,3 +859,25 @@ header#top .bell{font-size:19px;margin:0 2px}
 @media (max-width:900px){.hw-today{grid-template-columns:1fr}}
 @media (max-width:560px){.hw-hero{padding:20px 18px 18px}.hw-glance a{padding:7px 12px}.hw-panel{padding:14px 12px 10px;border-radius:16px}}
 .hw-panel [data-act=pokeToTask]{display:none}
+/* ================= Phone menu: plain, calm list ================= */
+.mn-p{padding:8px}
+.mn-h{margin:10px 10px 4px;font-size:10.5px;letter-spacing:.16em;color:#9a8a63}
+.mn-g{grid-template-columns:1fr 1fr;gap:2px;margin:0 0 6px}
+.mn-g a,.mn-l a{border:0!important;background:none!important;border-radius:10px;padding:11px 12px;font-size:15px;font-weight:500;color:var(--ink)}
+.mn-g a.on,.mn-l a.on{background:#f1ead3!important;color:var(--navy)!important;font-weight:700;box-shadow:inset 3px 0 0 var(--gold)}
+.mn-l{gap:0;margin-bottom:4px;border-top:1px solid #eee7d6;padding-top:4px}
+.mn-pokes i{background:#b42318}
+a.mn-acct{display:flex!important;align-items:center;gap:10px;border-top:1px solid #eee7d6;padding:12px 10px 8px!important;margin-top:4px;text-decoration:none;flex-wrap:nowrap}
+a.mn-acct>span:not(.av){flex:1;display:grid;margin:0!important;color:var(--ink)}a.mn-acct b{font-size:14.5px;color:var(--navy)}a.mn-acct small{font-size:12px;color:var(--mut)}
+.mn-x{display:flex;gap:6px;padding:4px 6px 4px}
+.mn-x button{flex:1;background:#fff;border:1px solid #e3ddcf;border-radius:10px;padding:9px;font-size:14px;color:var(--navy)}
+.mn-x .mn-out{color:#b42318}
+/* icons */
+.ico{display:inline-block;vertical-align:-2px;flex:0 0 auto}
+.tkc .ico{vertical-align:-1px}
+.hp-ic .ico{display:block}
+.bell .ico{display:block}
+.evb-where .ico{vertical-align:-2px;color:#8a5a00}
+.av-cam .ico{color:var(--navy)}
+.p-kind .ico,.p-open .ico{vertical-align:-3px}
+.hp-ic.pk{background:#fff3d9;color:#8a5a00}
