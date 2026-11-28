@@ -27,7 +27,7 @@ function handleOps(req) {
   const me = requireOps(req.token);
   switch (req.action) {
     case 'opsSync':  return opsSync(me, req);
-    case 'opsWrite': return opsWrite(me, req.ops);
+    case 'opsWrite': { const r = opsWrite(me, req.ops); if (r && r.ok) appSyncDocs(r.docs); return r; }
     case 'sheetSync': return sheetSync(me, req);
     case 'archiveSync': return archiveSync(me);
     case 'opsUpload': return opsUpload(me, req);
@@ -546,6 +546,7 @@ function syncAllBookings(force) {
   return n;
 }
 function dailyBookingJob() {
+  try { appSyncAll(); } catch (e) { Logger.log('app sync: ' + e); }      // /ops Event sheets → staff app (catches anything missed)
   try { appFlush(0, true); } catch (e) { Logger.log('app copy: ' + e); }      // website inquiries the staff app is missing
   try { syncAllBookings(false); } catch (e) { Logger.log(e); }
   const target = Utilities.formatDate(new Date(Date.now() + BOOK.DAYS_BEFORE * 864e5), BOOK.TZ, 'yyyy-MM-dd');
@@ -921,6 +922,7 @@ function importWebInquiries(list) {
     return out;
   });
   made.forEach(function (x) { try { syncCalendar(x.id, x.ev, false); } catch (e) { Logger.log('calendar ' + x.id + ': ' + e); } });
+  try { appSyncDocs(made.map(function (x) { return { path: 'events/' + x.id, data: x.ev }; })); } catch (e) {}
   return made;
 }
 /** /ops pulls in any website inquiries for today onward that aren't event sheets yet (catches anything sent before this link existed). */
@@ -929,4 +931,59 @@ function webImport(me) {
   const list = (readDb().inquiries || []).filter(function (q) { return q.source === 'web' && ((q.event || {}).date || '') >= from; });
   try { appFlush(20); } catch (e) {}                 // also retries any inquiry the staff app didn't receive
   return { ok: true, added: importWebInquiries(list).length };
+}
+
+
+/* ===================== /ops Event sheets → staff app (romualdos.ph/app) =====================
+   /ops is the master copy until the team moves: every saved sheet is sent to the app (client, date, time, venue,
+   guests, status, details, menu). The app joins website orders to their inquiry, so nothing is duplicated.
+   The /ops server proves who it is with its own key (Script Properties, never in the code), registered once. */
+function appKey_() {
+  const P = PropertiesService.getScriptProperties(); let k = P.getProperty('APP_SYNC_KEY');
+  if (!k) { k = (Utilities.getUuid() + Utilities.getUuid()).replace(/-/g, ''); P.setProperty('APP_SYNC_KEY', k); }
+  return k;
+}
+function appRpc_(fn, body) {
+  const r = UrlFetchApp.fetch(CONFIG.APP_URL + '/rest/v1/rpc/' + fn, { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { apikey: CONFIG.APP_KEY, Authorization: 'Bearer ' + CONFIG.APP_KEY }, payload: JSON.stringify(body) });
+  const c = r.getResponseCode(); if (c >= 200 && c < 300) return JSON.parse(r.getContentText() || 'null');
+  throw new Error('HTTP ' + c + ' ' + r.getContentText().slice(0, 200));
+}
+/** Run once from the editor after the owner runs the ops_sync update in Supabase: links /ops, then copies every upcoming sheet. */
+function linkOpsToApp() {
+  Logger.log('link: ' + appRpc_('ops_register', { p_key: appKey_() }));
+  Logger.log(JSON.stringify(appSyncAll()));
+}
+function appEventPayload_(id, d) {
+  const s = d.sheet || {}, web = (s.web && s.web.ref) || (/^RCS-/.test(s.ref || '') ? s.ref : '');
+  const keep = ['contact', 'mobile', 'email', 'source', 'call', 'pull', 'coord', 'pkg', 'motif', 'setup', 'staff', 'equip', 'fulfil', 'allergy', 'special', 'approvedOn', 'preparedBy'], sheet = { ops_ref: s.ref || '' };
+  keep.forEach(function (k) { if (s[k] !== undefined && s[k] !== '') sheet[k] = String(s[k]); });
+  return { ops_id: id, deleted: d.status === 'void', kind: s.kind || 'catering', status: s.status || 'draft', web_ref: web,
+    event_type: s.type || '', event_date: s.date || d.date || '', serve_time: /^\d{1,2}:\d{2}/.test(s.serve || '') ? s.serve : '',
+    venue: s.venue || d.venue || '', pax: String(parseInt(s.pax || d.pax, 10) || ''),
+    client: { name: s.client || d.client || d.name || '', phone: s.mobile || '', email: s.email || '' }, sheet: sheet,
+    menu: (s.menu || []).filter(function (m) { return m && m.dish; }).map(function (m) { return { course: m.course || '', name: m.dish, qty: m.qty ? String(m.qty) : '', note: m.note || '' }; }) };
+}
+function appSyncOne_(id, d) {
+  if (!d || !d.sheet || !(d.sheet.date || d.date)) return false;
+  appRpc_('ops_sync_event', { p_key: appKey_(), p: appEventPayload_(id, d) }); return true;
+}
+/** After each /ops save: send the changed event sheets. A failure never blocks the save; it's retried by the daily job. */
+function appSyncDocs(docs) {
+  if (!CONFIG.APP_URL || !PropertiesService.getScriptProperties().getProperty('APP_SYNC_KEY')) return;   // not linked yet
+  (docs || []).forEach(function (x) {
+    if (!x || String(x.path).indexOf('events/') !== 0) return;
+    try { appSyncOne_(String(x.path).slice(7), x.data); } catch (e) { console.error('app sync ' + x.path + ': ' + e); }
+  });
+}
+/** Every event sheet from yesterday onward (and deletions), so the app matches /ops. */
+function appSyncAll() {
+  if (!PropertiesService.getScriptProperties().getProperty('APP_SYNC_KEY')) return { skipped: 'not linked' };
+  const from = Utilities.formatDate(new Date(Date.now() - 864e5), 'Asia/Manila', 'yyyy-MM-dd'); let sent = 0, failed = 0;
+  readAll(opsSheet()).forEach(function (r) {
+    if (r.coll !== 'events') return; const d = toDoc(r).data, s = d.sheet || {};
+    if (!s || !((s.date || d.date || '') >= from)) return;
+    try { if (appSyncOne_(String(r.path).slice(7), d)) sent++; } catch (e) { failed++; console.error('app sync ' + r.path + ': ' + e); }
+  });
+  return { sent: sent, failed: failed };
 }
