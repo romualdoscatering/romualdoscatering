@@ -10,3 +10,9 @@ grant usage on schema auth to anon, authenticated;
 grant execute on function auth.uid() to anon, authenticated;
 grant usage on schema public to anon, authenticated;
 -- like the project setting "Grant API access to new tables automatically" = OFF: no default grants
+-- newer migrations grant to Supabase's server role and read sign-in times
+do $$ begin
+  if not exists (select from pg_roles where rolname='service_role') then create role service_role nologin; end if;
+end $$;
+alter table auth.users add column if not exists last_sign_in_at timestamptz;
+alter table auth.users add column if not exists created_at timestamptz default now();

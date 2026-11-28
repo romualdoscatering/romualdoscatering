@@ -51,4 +51,7 @@ createdb rom
 psql -d rom -f test/00_supabase_stub.sql
 for f in supabase/migrations/*.sql supabase/seed.sql private_seed.sql; do psql -d rom -v ON_ERROR_STOP=1 -f $f; done
 bash test/run.sh
+bash test/service_role.sh   # waiter / service role: 50 checks
 ```
+
+`20261127001100_task_reminders_job.sql` needs Supabase's pg_net extension; skip it locally.
