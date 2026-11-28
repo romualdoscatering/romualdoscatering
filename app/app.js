@@ -430,7 +430,7 @@ async function saveContract(id, f) { if (!('contract_price' in f) || !can('cater
 const autoTitle = (client, type) => [client, type].filter(Boolean).join(' · ');
 // Delete (as in /ops): anyone in catering while the client hasn't approved yet; after that only the owner
 const NOT_APPROVED = ['inquiry', 'draft', 'for_client_approval'];
-const canDelEvent = e => isAdmin() || (member('catering') && NOT_APPROVED.includes(e.status));
+const canDelEvent = e => isAdmin() || can('catering', 'manager', 'event_specialist') || (member('catering') && NOT_APPROVED.includes(e.status));
 const delEvBtn = (e, label, cls = 'x') => canDelEvent(e) ? `<button type="button" class="${cls}" data-act="delEvent" data-id="${e.id}" data-name="${esc(e._name || e.title || '')}" data-ref="${esc(e.ref || '')}" title="Delete this event">${label}</button>` : '';
 async function saveClient(f, current) {
   const name = (f.client_name || '').trim(), phone = (f.client_phone || '').trim() || null, email = (f.client_email || '').trim() || null;
@@ -673,7 +673,7 @@ routes['c/event'] = async id => {
     <div class="kpi ${margin != null && margin < 0 ? 'bad' : ''}"><span>Margin</span><b>${margin != null ? peso(margin) + (num(ev.contract_price) ? ` <small>${Math.round(margin / num(ev.contract_price) * 100)}%</small>` : '') : '—'}</b></div>
     <div class="kpi"><span>Cost per guest</span><b>${ev.pax ? peso(num(cost.total_cost) / ev.pax) : '—'}</b></div></div>
     <p class="small mut">Ingredients used = stock issued to the event minus leftovers returned, at purchase prices.</p></section>` : ''}
-  ${eventAdmin() ? `<div class="ev-danger"><button class="ghost danger" data-act="evDelete" data-id="${ev.id}" data-ref="${esc(ev.ref)}">Delete this event</button><a class="lnk" href="#/c/duplicates">Find duplicate events</a></div>` : ''}`;
+  ${eventAdmin() ? `<div class="ev-danger"><a class="lnk" href="#/c/duplicates">Find duplicate events</a></div>` : ''}`;
 };
 FORMS.editEvent = async (f, el) => {
   const [ev] = await db.select('events', { eq: { id: el.dataset.id } });
@@ -833,6 +833,10 @@ ACT.delEvent = async el => {
   if (!confirm(`Delete this event?\n\n${what}\n\nIts menu and draft purchase requests are deleted too. This can't be undone.`)) return;
   try { const ref = await db.rpc('delete_event', { p_event: el.dataset.id }); EVW.dirty = false; toast(`${ref || 'Event'} deleted`); go('#/c/events'); }
   catch (err) { toast(/delete_event|function/i.test(err.message) && /not find|exist/i.test(err.message) ? 'Deleting needs the latest database update — ask the owner to run it.' : err.message, true); }
+};
+ACT.delInquiry = async el => {
+  if (!confirm(`Delete this inquiry${el.dataset.name ? ' from ' + el.dataset.name : ''}?\n\nUse this for spam, tests and duplicates. A copy is kept in Activity. Any event made from it stays.`)) return;
+  const ref = await db.rpc('delete_booking', { p_id: el.dataset.id }); toast(`${ref} deleted`); go('#/c/inquiries');
 };
 ACT.keepMine = el => { const f = el.closest('form'); f.dataset.force = '1'; f.requestSubmit(); };
 ACT.showTheirs = () => { EVW.dirty = false; refreshKeep(); toast('Showing the latest saved version'); };
@@ -1929,7 +1933,7 @@ routes['c/inquiry'] = async id => {
   const row = (l, v) => v ? `<tr><td class="mut">${l}</td><td>${v}</td></tr>` : '';
   const plan = pl.kind === 'package' ? `${esc(pl.packageName || 'Package')}${canBill() && num(pl.pricePerHead) ? ` · ${peso(pl.pricePerHead)} per head` : ''}` : esc(BK_KIND[pl.kind] || pl.kind || '');
   return `<div class="row"><a href="#/c/inquiries" class="back">‹ Inquiries</a></div>
-  <div class="row"><h1>${esc(b.client_name || 'Inquiry')}</h1>${chip(BK_STATUS[b.status], BK_TONE[b.status])}</div>
+  <div class="row"><h1>${esc(b.client_name || 'Inquiry')}</h1>${chip(BK_STATUS[b.status], BK_TONE[b.status])}<span class="sp"></span>${eventAdmin() ? `<button class="ghost danger" data-act="delInquiry" data-id="${b.id}" data-name="${esc(b.client_name || '')}">Delete</button>` : ''}</div>
   <p class="lede">${esc(b.ref)}${b.website_ref ? ' · website ref ' + esc(b.website_ref) : ''} · received ${esc(fmtT(b.received_at))}</p>
   <section class="card"><h2>Customer and event</h2><table class="kv"><tbody>
    ${row('Mobile', c.phone ? `<a href="tel:${esc(String(c.phone).replace(/\s+/g, ''))}">${esc(c.phone)}</a>` : '')}${row('Email', c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '')}
@@ -3366,12 +3370,12 @@ routes['c/equipment'] = async () => {
 FORMS.eqNew = async f => { await db.insert('equipment', { name: f.name.trim(), category: (f.category || 'Other').trim() || 'Other', owned: Math.max(0, Math.round(num(f.owned))) }); toast('Added'); refresh(); };
 
 /* ================= DUPLICATE EVENTS: merge or delete (owner and catering managers) ================= */
-const eventAdmin = () => isAdmin() || can('catering', 'manager');
+const eventAdmin = () => isAdmin() || can('catering', 'manager', 'event_specialist');
 const linkTxt = l => [l.menu && `${l.menu} menu line${l.menu > 1 ? 's' : ''}`, l.payments && `${l.payments} payment${l.payments > 1 ? 's' : ''} (${peso(l.paid)})`, l.bill && 'a bill',
   l.requests && `${l.requests} purchase request${l.requests > 1 ? 's' : ''}`, l.orders && `${l.orders} order${l.orders > 1 ? 's' : ''}`, l.expenses && `${l.expenses} expense${l.expenses > 1 ? 's' : ''}`,
   l.advances && `${l.advances} cash advance${l.advances > 1 ? 's' : ''}`, l.stock && 'stock issued', l.equipment && 'equipment list', l.inquiry && 'website inquiry'].filter(Boolean);
 routes['c/duplicates'] = async () => {
-  if (!eventAdmin()) return '<div class="card">Only the owner or a catering manager can merge or delete events.</div>';
+  if (!eventAdmin()) return '<div class="card">Only the owner, catering managers and event specialists can merge or delete events.</div>';
   const groups = await db.rpc('event_duplicates');
   return `<div class="row"><a href="#/c/events" class="back">‹ Events</a></div><h1>Duplicate events</h1>
     <p class="lede">Events on the same day for the same client. Tap <b>Keep this one</b> on the right copy: everything attached to the others (payments, purchases, menu if the kept one has none) moves to it, then the others are removed. A copy of anything removed is kept in Activity.</p>
