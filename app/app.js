@@ -25,7 +25,7 @@ const ROLES = [['manager', 'Manager', 'Runs the workspace: approvals, events, bi
   ['event_specialist', 'Event specialist', 'Bookings, inquiries and events: creates events'], ['coordinator', 'Coordinator', 'Runs events: menu, details, print (cannot create events)'],
   ['purchaser', 'Purchaser', 'Orders and buying'], ['storekeeper', 'Storekeeper', 'Stockist: receiving, stock counts, Kitchen stocks daily count'],
   ['head_chef', 'Head chef', 'Recipes, dish details and costing'], ['rnd_chef', 'R&D chef', 'Writes and costs recipes only'], ['chef', 'Chef', 'Kitchen work: event menus, prep (reads recipes)'],
-  ['driver', 'Driver', 'Delivery runs: loads, leaves, arrives, hands over'], ['cashier', 'Cashier', 'POS payments and Z-reading'], ['staff', 'Staff', 'POS orders; sees the 86 / running-low list']];
+  ['driver', 'Driver', 'Delivery runs: loads, leaves, arrives, hands over'], ['cashier', 'Cashier', 'POS payments and Z-reading'], ['waiter', 'Waiter', 'View only: events, reservations, 86 list; marks guests arrived'], ['staff', 'Staff', 'POS orders; sees the 86 / running-low list']];
 const roleName = k => (ROLES.find(r => r[0] === k) || [k, k])[1];
 const chip = (label, tone) => `<span class="chip ${tone || ''}">${esc(label)}</span>`;
 const statusTone = s => ({ draft: 'mut', inquiry: 'mut', for_client_approval: 'warn', submitted: 'warn', confirmed: 'ok', approved: 'ok', in_prep: 'info', ordered: 'info', open: 'info', partly_received: 'warn', done: 'ok', received: 'ok', closed: 'mut', rejected: 'bad', cancelled: 'bad' }[s] || '');
@@ -185,14 +185,15 @@ function afterRender() {
 /* ================= shell ================= */
 function renderShell(key) {
   requestAnimationFrame(fitHeader);
-  const inCat = key.startsWith('c/'), inRes = key.startsWith('r/');
-  const nav = inCat ? (driverOnly() ? [['c/runs', 'Runs'], ['c/equipment', 'Equipment'], ['c/production', 'Production']] : [['c/events', 'Events'], ...(runTeam() ? [['c/runs', 'Runs']] : []), ['c/production', 'Production'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/equipment', 'Equipment'], ['c/recipes', 'Recipes'], ...(can('catering', 'manager', 'finance') ? [['c/billing', 'Billing']] : [])])
-    : inRes ? (resFront() ? [['r/pos', 'POS'], ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['r/kitchen', '86 & running low'], ['r/requests', 'Requests']]
-      : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ...(canProd() ? [['c/production', 'Production']] : []), ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
+  const resPg = key === 'reservations', inRes = key.startsWith('r/') || (resPg && member('restaurant')), inCat = key.startsWith('c/') || (resPg && !inRes && member('catering'));
+  const nav = inCat ? (waiterOnly() ? [['reservations', 'Reservations'], ['events', 'Events']] : driverOnly() ? [['c/runs', 'Runs'], ['c/equipment', 'Equipment'], ['c/production', 'Production']] : [['c/events', 'Events'], ...(runTeam() ? [['c/runs', 'Runs']] : []), ['c/production', 'Production'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/equipment', 'Equipment'], ['c/recipes', 'Recipes'], ...(can('catering', 'manager', 'finance') ? [['c/billing', 'Billing']] : [])])
+    : inRes ? (waiterOnly() ? [['reservations', 'Reservations'], ['r/kitchen', '86 & running low']]
+      : resFront() ? [...(can('restaurant', 'cashier', 'staff') ? [['r/pos', 'POS']] : []), ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['reservations', 'Reservations'], ['r/kitchen', '86 & running low'], ...(can('restaurant', 'cashier', 'staff') ? [['r/requests', 'Requests']] : [])]
+      : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['reservations', 'Reservations'], ['r/kitchen', 'Kitchen stocks'], ...(canProd() ? [['c/production', 'Production']] : []), ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
     <div class="who">${[['tasks', 'Tasks'], ['pokes', 'Pokes'], ['events', 'Events']].map(([k, l]) => `<a href="#/${k}" class="hn${key === k ? ' on' : ''}">${l}</a>`).join('')}<span class="bell-slot">${bellHtml()}</span>${acctMenu(key)}</div>
     ${mobileMenu(key, nav, inCat, inRes)}</div>
-    ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a></nav>` : ''}`;
+    ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}${member('catering') && member('restaurant') ? `<a href="#/${inCat ? 'r' : 'c'}" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a>` : ''}</nav>` : ''}`;
 }
 // Computer: your photo opens a small menu with your account and the owner's pages
 function acctMenu(key) {
@@ -207,7 +208,7 @@ function acctMenu(key) {
 }
 // Phones: one "☰ Menu" button opens a dropdown with every page and account action (pills and header links are hidden there).
 function mobileMenu(key, nav, inCat, inRes) {
-  const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People', me: 'My account', pokes: 'Pokes', tasks: 'My tasks', dash: 'Dashboard', approvals: 'Approvals' }[key.split('/')[0]] || 'Home';
+  const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People', me: 'My account', pokes: 'Pokes', tasks: 'My tasks', dash: 'Dashboard', approvals: 'Approvals', reservations: 'Reservations' }[key.split('/')[0]] || 'Home';
   const a = (href, label, on) => `<a href="#/${href}"${on ? ' class="on"' : ''}>${label}</a>`;
   const sect = nav.length ? `<div class="mn-h">${inCat ? 'Catering' : 'Restaurant'}</div><div class="mn-g">${nav.map(([k, l]) => a(k, l, navOf(key) === k)).join('')}</div>` : '';
   const go = [a('', 'Home', key === '' || key === 'home'), a('tasks', 'My tasks', key === 'tasks'), a('events', 'Events board', key === 'events'),
@@ -339,7 +340,7 @@ routes.home = async () => {
   const t = today(), tm = addDays(t, 1), hour = new Date(Date.now() + 8 * 3600e3).getUTCHours();
   const [fil, en] = GREET(hour), first = esc(nick());
   const doy = Math.floor((Date.parse(t) - Date.parse(t.slice(0, 4) + '-01-01')) / 864e5);
-  const [ev, pk, tk, , rn, ib] = await Promise.all([db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null), homePokes(), homeTasks(), appCfg().catch(() => null), homeRuns(), homeInbox()]);
+  const [ev, pk, tk, , rn, ib, rs] = await Promise.all([db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null), homePokes(), homeTasks(), appCfg().catch(() => null), homeRuns(), homeInbox(), homeRes()]);
   const nextGo = ev && CFG.v ? ev.map(e => ({ e, p: sendOff(e, e.travel_mins != null ? { mins: e.travel_mins, km: e.travel_km, source: e.travel_source } : null, CFG.v) })).filter(x => x.p?.leave && x.p.leave > Date.now() - 15 * 60000 && mnlParts(x.p.leave)[0] === t).sort((a, b) => a.p.leave - b.p.leave)[0] : null;
   const nToday = ev ? ev.filter(e => e.event_date === t).length : null, nTmr = ev ? ev.filter(e => e.event_date === tm).length : null;
   const next = ev?.find(e => e.event_date === t && e.serve_time && e.serve_time.slice(0, 5) >= new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16));
@@ -358,7 +359,7 @@ routes.home = async () => {
       </div>` : ''}
     </section>
     ${ib}
-    <div class="hw-today${[pk, tk, rn].filter(Boolean).length === 2 ? '' : ' one'}${[pk, tk, rn].filter(Boolean).length === 3 ? ' three' : ''}">${rn}${pk}${tk}</div>
+    <div class="hw-today${[pk, tk, rn, rs].filter(Boolean).length === 2 ? '' : ' one'}${[pk, tk, rn, rs].filter(Boolean).length >= 3 ? ' three' : ''}">${rs}${rn}${pk}${tk}</div>
     <h2 class="hw-where">Where are you working today?</h2>
     <div class="hw-grid">${cards.join('')}</div>
     ${!member('restaurant') && !member('catering') ? `<div class="card mt"><p>You don't have a workspace yet — ask the owner to give you a role. Meanwhile you can see the Events board.</p></div>` : ''}
@@ -2149,6 +2150,7 @@ function posTotals(o) {   // preview while tapping; the database recalculates on
   return { sub, sc, disc, total: Math.round((sub + sc - disc) * 100) / 100 };
 }
 routes['r/pos'] = async arg => {
+  if (!can('restaurant', 'cashier', 'manager', 'staff')) return '<div class="card">The POS is for cashiers and restaurant staff. <a href="#/reservations">Reservations</a> · <a href="#/r/kitchen">86 &amp; running low</a></div>';
   if (!posCan()) return '<div class="card">The POS is for cashiers, servers and managers. Ask the owner to add the Cashier or Staff job in Restaurant.</div>';
   const dev = await db.rpc('pos_device_status').catch(() => ({ registered: true }));   // before the database update: no lock yet
   if (!dev.registered && !isAdmin()) return `<div class="card"><h2>This device isn't a POS tablet</h2>
@@ -3394,6 +3396,86 @@ ACT.evDelete = async el => {
   catch (err) { toast(err.message, true); }
 };
 
+/* ================= RESERVATIONS + the floor's day (waiters see it without prices) ================= */
+const RES_STATUS = { tentative: ['Tentative', 'warn'], confirmed: ['Confirmed', 'ok'], seated: ['Seated', 'info'], done: ['Done', 'mut'], no_show: ['No-show', 'bad'], cancelled: ['Cancelled', 'mut'] };
+const RES_AREAS = ['Dining area', 'Private room', 'Whole restaurant (exclusive)', 'Take-out / pick-up', 'Delivery'];
+const resEditor = () => isAdmin() || can('restaurant', 'manager', 'cashier', 'finance');
+const resViewer = () => member('restaurant') || can('catering', 'waiter', 'manager', 'event_specialist', 'coordinator');
+const resFloor = () => resEditor() || can('restaurant', 'waiter', 'staff');
+const waiterOnly = () => !isAdmin() && (S.me?.roles || []).length > 0 && (S.me.roles || []).every(r => r.role === 'waiter');
+function resCard(r, ed) {
+  const [sl, st] = RES_STATUS[r.status] || [r.status, ''];
+  const time = r.time_in ? (r.time_out ? 'until ' + fmtClock(r.time_out) : '') : 'Time TBC';
+  return `<article class="rs rs-${r.status}"><div class="rs-top"><div class="rs-time"><b>${esc(r.time_in ? fmtClock(r.time_in) : '—')}</b><small>${r.pax ? r.pax + ' pax' : ''}</small></div>
+    <div class="rs-who"><h3>${esc(r.guest)}</h3><span class="small mut">${esc([r.area, r.table_no ? 'table ' + r.table_no : '', r.occasion, time].filter(Boolean).join(' · '))}</span></div>${chip(sl, st)}</div>
+    ${r.allergy ? `<div class="rn-late soft">Allergy: ${esc(r.allergy)}</div>` : ''}
+    ${[['Pre-order', r.preorder], ['Setup', r.setup], ['Notes', r.note], ...(ed ? [['Contact', r.contact], ['Down payment', r.downpayment != null ? peso(r.downpayment) : ''], ['Hold until', r.status === 'tentative' && r.hold_until ? fmtD(r.hold_until) : '']] : [])]
+      .filter(([, v]) => v).map(([k, v]) => `<div class="rs-f"><span>${k}</span><p>${esc(v)}</p></div>`).join('')}
+    <div class="rn-act">${resFloor() && ['tentative', 'confirmed'].includes(r.status) ? `<button class="pri" data-act="resMark" data-id="${r.id}" data-s="seated">Guests arrived</button><button class="ghost" data-act="resMark" data-id="${r.id}" data-s="no_show">No-show</button>` : ''}
+      ${resFloor() && r.status === 'seated' ? `<button class="ghost" data-act="resMark" data-id="${r.id}" data-s="done">Done</button>` : ''}
+      ${ed ? `<a class="lnk" href="#/reservations/edit/${r.id}">Edit</a>` : ''}<span class="sp"></span><span class="small mut">${esc(r.ref)}</span></div></article>`;
+}
+routes.reservations = async arg => {
+  if (!resViewer()) return '<div class="card">Reservations are for the restaurant and service team.</div>';
+  const [a0, a1] = (arg || '').split('/');
+  if (a0 === 'new' || a0 === 'edit') return resForm(a0 === 'edit' ? a1 : null);
+  const t = today(), d = /^\d{4}-\d{2}-\d{2}$/.test(a0 || '') ? a0 : t, week = a0 === 'week';
+  const from = week ? t : d, to = week ? addDays(t, 6) : d;
+  const x = await db.rpc('service_day', { p_from: from, p_to: to }), ed = x.editor;
+  const live = x.reservations.filter(r => r.status !== 'cancelled'), pax = live.reduce((s, r) => s + num(r.pax), 0);
+  const byDay = list => week ? [...new Set(list.map(i => i.res_date || i.date))].map(dd => [dd, list.filter(i => (i.res_date || i.date) === dd)]) : [[d, list]];
+  clearTimeout(S.resTimer); S.resTimer = setTimeout(() => { if (location.hash.startsWith('#/reservations') && !location.hash.includes('/edit') && !location.hash.includes('/new')) refresh(); }, 60000);
+  return `<div class="row"><h1>Reservations</h1><span class="sp"></span>${ed ? '<a class="btn pri" href="#/reservations/new">New reservation</a>' : ''}</div>
+    <div class="seg">${[[t, 'Today'], [addDays(t, 1), 'Tomorrow'], ['week', 'Next 7 days']].map(([k, l]) => `<a href="#/reservations/${k}" class="${(week ? 'week' : d) === k ? 'on' : ''}">${l}</a>`).join('')}
+      <label class="rn-date"><input type="date" value="${d}" data-resdate></label></div>
+    <p class="small mut">${week ? 'Today to ' + esc(fmtD(to)) : esc(fmtLong(d))} · ${live.length} reservation${live.length === 1 ? '' : 's'}${pax ? ', ' + pax + ' guests' : ''} · ${x.events.length} catering event${x.events.length === 1 ? '' : 's'}</p>
+    <h2 class="rs-h">Restaurant</h2>
+    ${x.reservations.length ? byDay(x.reservations).map(([dd, l]) => (week ? `<h3 class="rs-day">${esc(fmtLong(dd))}</h3>` : '') + l.map(r => resCard(r, ed)).join('')).join('') : '<div class="card mut">No reservations.</div>'}
+    <h2 class="rs-h">Catering events</h2>
+    ${x.events.length ? byDay(x.events).map(([dd, l]) => (week ? `<h3 class="rs-day">${esc(fmtLong(dd))}</h3>` : '') + l.map(e => `<article class="rs rs-ev"><div class="rs-top"><div class="rs-time"><b>${esc(e.time ? fmtClock(e.time) : '—')}</b><small>${e.pax ? e.pax + ' pax' : ''}</small></div>
+      <div class="rs-who"><h3>${esc(e.client)}</h3><span class="small mut">${esc([KIND[e.kind], e.type, e.venue].filter(Boolean).join(' · '))}</span></div>${chip(EVENT_STATUS[e.status] || e.status, statusTone(e.status))}</div>
+      ${e.allergy ? `<div class="rn-late soft">Allergy: ${esc(e.allergy)}</div>` : ''}
+      ${[['Call time', e.call], ['Staff', e.staff], ['Table setup', e.setup]].filter(([, v]) => v).map(([k, v]) => `<div class="rs-f"><span>${k}</span><p>${esc(v)}</p></div>`).join('')}
+      ${member('catering') ? `<div class="rn-act"><a class="lnk" href="#/c/event/${e.id}">Event details</a></div>` : ''}</article>`).join('')).join('') : '<div class="card mut">No catering events.</div>'}`;
+};
+async function resForm(id) {
+  if (!resEditor()) return '<div class="card">Only the cashier, managers and the owner take reservations.</div>';
+  const r = id ? (await db.select('reservations', { eq: { id } }))[0] : { res_date: today(), status: 'tentative', area: RES_AREAS[0] };
+  if (!r) return '<div class="card">Reservation not found.</div>';
+  const v = k => esc(r[k] ?? ''), tm = k => esc((r[k] || '').slice(0, 5));
+  return `<div class="row"><a href="#/reservations/${r.res_date || ''}" class="back">‹ Reservations</a></div><h1>${id ? 'Edit ' + esc(r.ref) : 'New reservation'}</h1>
+    <form class="card" data-form="res" data-id="${id || ''}">
+      <div class="grid"><label>Guest / company<input name="guest" required maxlength="120" value="${v('guest')}"></label><label>Contact no.<input name="contact" maxlength="60" value="${v('contact')}"></label></div>
+      <div class="grid"><label>Date<input name="res_date" type="date" required value="${v('res_date')}"></label><label>Time in<input name="time_in" type="time" value="${tm('time_in')}"></label><label>Time out<input name="time_out" type="time" value="${tm('time_out')}"></label><label>Guests (pax)<input name="pax" type="number" min="1" value="${v('pax')}"></label></div>
+      <div class="grid"><label>Area<select name="area">${[...new Set([...RES_AREAS, r.area].filter(Boolean))].map(a => opt(a, a, a === r.area)).join('')}</select></label><label>Table no.<input name="table_no" maxlength="40" value="${v('table_no')}"></label><label>Occasion<input name="occasion" maxlength="80" value="${v('occasion')}" placeholder="Birthday, meeting…"></label></div>
+      <div class="grid"><label>Status<select name="status">${Object.entries(RES_STATUS).map(([k, [l]]) => opt(k, l, k === r.status)).join('')}</select></label><label>Hold until (if tentative)<input name="hold_until" type="date" value="${v('hold_until')}"></label><label>Down payment (₱)<input name="downpayment" type="number" min="0" step="0.01" value="${v('downpayment')}"></label></div>
+      <label>Food &amp; drinks pre-order<textarea name="preorder" rows="3" maxlength="2000" placeholder="Item and quantity, serve time">${v('preorder')}</textarea></label>
+      <div class="grid"><label>Setup &amp; requests<textarea name="setup" rows="2" maxlength="1000" placeholder="Table setup, cake, decor, sound">${v('setup')}</textarea></label><label>Allergies<textarea name="allergy" rows="2" maxlength="300">${v('allergy')}</textarea></label></div>
+      <label>Notes<textarea name="note" rows="2" maxlength="1000">${v('note')}</textarea></label>
+      <p class="small mut">A booking is confirmed only after the down payment is received. Waiters see everything here except the contact number and the down payment.</p>
+      <div class="row end"><button class="pri">${id ? 'Save' : 'Add reservation'}</button></div></form>`;
+}
+FORMS.res = async (f, el) => {
+  const row = { guest: f.guest.trim(), contact: f.contact || null, res_date: f.res_date, time_in: f.time_in || null, time_out: f.time_out || null, pax: f.pax ? Math.round(num(f.pax)) : null,
+    area: f.area, table_no: f.table_no || null, occasion: f.occasion || null, status: f.status, hold_until: f.hold_until || null, downpayment: f.downpayment === '' ? null : num(f.downpayment),
+    preorder: f.preorder || null, setup: f.setup || null, allergy: f.allergy || null, note: f.note || null };
+  if (row.status === 'confirmed' && !row.downpayment && !confirm('Mark as confirmed without a down payment?')) return;
+  if (el.dataset.id) await db.update('reservations', row, { id: el.dataset.id }); else await db.insert('reservations', row);
+  toast(el.dataset.id ? 'Saved' : 'Reservation added'); go('#/reservations/' + row.res_date);
+};
+ACT.resMark = async el => { await db.rpc('reservation_mark', { p_id: el.dataset.id, p_status: el.dataset.s }); toast({ seated: 'Marked as arrived', done: 'Done', no_show: 'Marked as no-show' }[el.dataset.s]); refresh(); };
+document.addEventListener('change', e => { if (e.target.matches('[data-resdate]') && e.target.value) go('#/reservations/' + e.target.value); });
+async function homeRes() {
+  if (!resViewer()) return '';
+  try {
+    const x = await db.rpc('service_day', { p_from: today(), p_to: today() }), l = x.reservations.filter(r => !['cancelled', 'done', 'no_show'].includes(r.status));
+    if (!l.length && !waiterOnly()) return '';
+    return `<section class="hw-panel"><div class="hp-h"><h2>Reservations today</h2>${l.length ? `<span class="hp-n hp-dark">${l.length}</span>` : ''}<span class="sp"></span><a class="hp-a" href="#/reservations">Open</a></div>
+      ${l.length ? l.slice(0, 6).map(r => `<a class="pk-nl" href="#/reservations"><span class="rn-mini">${r.time_in ? esc(fmtClock(r.time_in)) : '—'}</span><span><b>${esc(r.guest)}</b><small>${esc([r.pax ? r.pax + ' pax' : '', r.area, (RES_STATUS[r.status] || [])[0]].filter(Boolean).join(' · '))}</small></span></a>`).join('')
+        : '<div class="hp-empty"><div><b>No reservations today</b><small>Walk-ins only so far.</small></div></div>'}</section>`;
+  } catch (e) { return ''; }
+}
+
 /* ================= Profile photos ================= */
 // Small square JPEGs kept in the database; each phone keeps a copy and only downloads photos that changed.
 const AV = { img: {}, key: 'rom-avatars' };
@@ -3434,6 +3516,7 @@ ACT.avatarClear = async el => { if (!confirm('Remove this person’s photo?')) r
 
 /* ================= My account: your details, your roles and what they let you do, password, this device, your recent activity ================= */
 const ROLE_DO = {
+  waiter: ['Sees today\'s reservations and catering events, without prices', 'Marks guests arrived, done or no-show', 'Checks the 86 / running-low list before taking orders'],
   driver: ['Sees the day\'s runs in send-off order, with directions and the client contact', 'Taps Loaded, Left, Arrived and Handed over (with a photo)'],
   manager: ['Approves purchase requests, orders and reports', 'Creates and edits events; closes and voids when needed', 'Sees billing, sales and costing for the workspace'],
   finance: ['Makes billing statements and records payments', 'Sets contract prices', 'Sees costing and ingredient prices'],

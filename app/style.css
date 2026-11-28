@@ -1167,3 +1167,13 @@ button.danger{color:#b42318;border-color:#f0c2bc}button.danger:hover{background:
 .dup-ev{border:1px solid #e3ddcf;border-radius:12px;padding:12px;display:grid;gap:5px;background:#fffdf8}.dup-ev a{color:var(--navy)}
 .dup-l{margin-top:4px}
 html.night .dup-ev{background-color:#d0d9e9!important}
+/* ================= Reservations ================= */
+.rs{background:#fff;border:1px solid #e3ddcf;border-left:5px solid #c9c3b3;border-radius:14px;padding:12px 14px;margin-bottom:10px;display:grid;gap:8px}
+.rs-confirmed{border-left-color:#2f7a45}.rs-tentative{border-left-color:#e8b04a}.rs-seated{border-left-color:#294074}.rs-done,.rs-cancelled{opacity:.6}.rs-no_show{border-left-color:#b42318;opacity:.75}.rs-ev{border-left-color:#c9a44c}
+.rs-top{display:flex;gap:12px;align-items:flex-start}.rs-top .chip{margin-left:auto;white-space:nowrap}
+.rs-time{flex:0 0 auto;display:grid;text-align:center;background:#f4efe2;border-radius:10px;padding:6px 10px;min-width:84px}
+.rs-time b{font-family:'Playfair Display',Georgia,serif;font-size:18px;color:var(--navy)}.rs-time small{font-size:12px;color:var(--mut)}
+.rs-who{min-width:0}.rs-who h3{margin:0 0 2px;font-size:16.5px;color:var(--navy);text-transform:none;letter-spacing:0}
+.rs-f span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}.rs-f p{margin:2px 0 0;white-space:pre-line;font-size:14px}
+.rs-h{margin:18px 0 10px}.rs-day{margin:12px 0 8px;font-size:14px;color:#8a5a00}
+html.night .rs{background-color:#d0d9e9!important;border-top-color:#aebcd5!important;border-right-color:#aebcd5!important;border-bottom-color:#aebcd5!important}html.night .rs-time{background-color:#bdc9df!important}
