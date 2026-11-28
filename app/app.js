@@ -25,7 +25,8 @@ const ROLES = [['manager', 'Manager', 'Runs the workspace: approvals, events, bi
   ['event_specialist', 'Event specialist', 'Bookings, inquiries and events: creates events'], ['coordinator', 'Coordinator', 'Runs events: menu, details, print (cannot create events)'],
   ['purchaser', 'Purchaser', 'Orders and buying'], ['storekeeper', 'Storekeeper', 'Stockist: receiving, stock counts, Kitchen stocks daily count'],
   ['head_chef', 'Head chef', 'Recipes, dish details and costing'], ['rnd_chef', 'R&D chef', 'Writes and costs recipes only'], ['chef', 'Chef', 'Kitchen work: event menus, prep (reads recipes)'],
-  ['cashier', 'Cashier', 'POS payments and Z-reading'], ['staff', 'Staff', 'POS orders; sees the 86 / running-low list']];
+  ['cashier', 'Cashier', 'POS payments and Z-reading'], ['staff', 'Staff', 'POS orders; sees the 86 / running-low list'],
+  ['service', 'Service / waiter', 'View only: events, reservations and the 86 / running-low list']];
 const roleName = k => (ROLES.find(r => r[0] === k) || [k, k])[1];
 const chip = (label, tone) => `<span class="chip ${tone || ''}">${esc(label)}</span>`;
 const statusTone = s => ({ draft: 'mut', inquiry: 'mut', for_client_approval: 'warn', submitted: 'warn', confirmed: 'ok', approved: 'ok', in_prep: 'info', ordered: 'info', open: 'info', partly_received: 'warn', done: 'ok', received: 'ok', closed: 'mut', rejected: 'bad', cancelled: 'bad' }[s] || '');
@@ -66,11 +67,16 @@ applyTheme(); setInterval(applyTheme, 60000); document.addEventListener('visibil
 /* ================= state ================= */
 const S = { user: null, me: null, items: [], itemsById: {}, dishes: [], dishById: {}, aliasMap: {}, packs: [] };
 const isAdmin = () => !!S.me?.is_admin;
-const member = ws => isAdmin() || (S.me?.roles || []).some(r => r.ws === ws);
+const member = ws => isAdmin() || (S.me?.roles || []).some(r => r.ws === ws && r.role !== 'service');   // waiters (service) aren't workspace members
 const resFront = () => !can('restaurant', 'manager', 'finance', 'purchaser', 'storekeeper', 'head_chef', 'chef');   // Restaurant Staff / Cashier only
 const kCounts = () => can('restaurant', 'storekeeper', 'manager');   // the stockist (Storekeeper) and Manager enter the daily count
 const can = (ws, ...roles) => isAdmin() || (S.me?.roles || []).some(r => r.ws === ws && roles.includes(r.role));
 const canAny = (...roles) => isAdmin() || (S.me?.roles || []).some(r => roles.includes(r.role));
+// Waiters / service staff: only the Service role. They see the Events board, Reservations and the 86 list, view only.
+const svcOnly = () => !isAdmin() && (S.me?.roles || []).length > 0 && S.me.roles.every(r => r.role === 'service');
+const SVC_PAGES = ['home', 'events', 'r/reservations', 'r/kitchen', 'pokes', 'me'];
+// Restaurant reservations: managers (and the owner) take and change them; everyone else reads
+const canResv = () => can('restaurant', 'manager');
 const who = () => S.me?.full_name || S.me?.username || '';
 const nick = () => (S.me?.nickname || '').trim() || (S.me?.full_name || '').split(' ')[0] || S.me?.username || 'team';   // what the app calls them
 
@@ -163,6 +169,7 @@ async function route() {
   const pre = page === 'c' || page === 'r';
   const key = pre ? page + '/' + (rest[0] || (page === 'c' ? 'events' : 'kitchen')) : (page || 'home');
   const arg = pre ? rest.slice(1).join('/') : rest.join('/');
+  if (svcOnly() && !SVC_PAGES.includes(key)) { history.replaceState(null, '', '#/'); return route(); }   // waiters: only their pages
   const r = routes[key] || routes.home;
   current = key;
   document.body.classList.toggle('pos-mode', key === 'r/pos'); applyTheme();
@@ -185,14 +192,15 @@ function afterRender() {
 /* ================= shell ================= */
 function renderShell(key) {
   requestAnimationFrame(fitHeader);
-  const inCat = key.startsWith('c/'), inRes = key.startsWith('r/');
-  const nav = inCat ? [['c/events', 'Events'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes'], ...(can('catering', 'manager', 'finance') ? [['c/billing', 'Billing']] : [])]
-    : inRes ? (resFront() ? [['r/pos', 'POS'], ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['r/kitchen', '86 & running low'], ['r/requests', 'Requests']]
-      : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
-  $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
-    <div class="who">${[['tasks', 'Tasks'], ['pokes', 'Pokes'], ['events', 'Events']].map(([k, l]) => `<a href="#/${k}" class="hn${key === k ? ' on' : ''}">${l}</a>`).join('')}<span class="bell-slot">${bellHtml()}</span>${acctMenu(key)}</div>
-    ${mobileMenu(key, nav, inCat, inRes)}</div>
-    ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a></nav>` : ''}`;
+  const inCat = key.startsWith('c/'), inRes = key.startsWith('r/'), svc = svcOnly();
+  const nav = svc ? [['events', 'Events'], ['r/reservations', 'Reservations'], ['r/kitchen', '86 & running low']]
+    : inCat ? [['c/events', 'Events'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/recipes', 'Recipes'], ...(can('catering', 'manager', 'finance') ? [['c/billing', 'Billing']] : [])]
+    : inRes ? (resFront() ? [['r/pos', 'POS'], ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['r/kitchen', '86 & running low'], ['r/reservations', 'Reservations'], ['r/requests', 'Requests']]
+      : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['r/kitchen', 'Kitchen stocks'], ['r/reservations', 'Reservations'], ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
+  $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${svc ? 'Service' : inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
+    <div class="who">${(svc ? [['pokes', 'Pokes']] : [['tasks', 'Tasks'], ['pokes', 'Pokes'], ['events', 'Events']]).map(([k, l]) => `<a href="#/${k}" class="hn${key === k ? ' on' : ''}">${l}</a>`).join('')}<span class="bell-slot">${bellHtml()}</span>${acctMenu(key)}</div>
+    ${mobileMenu(key, nav, inCat, inRes, svc)}</div>
+    ${nav.length ? `<nav>${nav.map(([k, l]) => `<a href="#/${k}" class="${navOf(key) === k ? 'on' : ''}">${l}</a>`).join('')}${svc ? '' : `<a href="#/" class="sw">⇄ ${inCat ? 'Restaurant' : 'Catering'}</a>`}</nav>` : ''}`;
 }
 // Computer: your photo opens a small menu with your account and the owner's pages
 function acctMenu(key) {
@@ -205,11 +213,11 @@ function acctMenu(key) {
       <button type="button" class="acct-out" data-act="logout">Log out</button></div></details>`;
 }
 // Phones: one "☰ Menu" button opens a dropdown with every page and account action (pills and header links are hidden there).
-function mobileMenu(key, nav, inCat, inRes) {
+function mobileMenu(key, nav, inCat, inRes, svc) {
   const cur = nav.find(([k]) => navOf(key) === k)?.[1] || { events: 'Events board', activity: 'Activity', people: 'People', me: 'My account', pokes: 'Pokes', tasks: 'My tasks' }[key.split('/')[0]] || 'Home';
   const a = (href, label, on) => `<a href="#/${href}"${on ? ' class="on"' : ''}>${label}</a>`;
-  const sect = nav.length ? `<div class="mn-h">${inCat ? 'Catering' : 'Restaurant'}</div><div class="mn-g">${nav.map(([k, l]) => a(k, l, navOf(key) === k)).join('')}</div>` : '';
-  const go = [a('', 'Home', key === '' || key === 'home'), a('tasks', 'My tasks', key === 'tasks'), a('events', 'Events board', key === 'events'),
+  const sect = nav.length ? `<div class="mn-h">${svc ? 'Service' : inCat ? 'Catering' : 'Restaurant'}</div><div class="mn-g">${nav.map(([k, l]) => a(k, l, navOf(key) === k)).join('')}</div>` : '';
+  const go = svc ? [a('', 'Home', key === '' || key === 'home'), a('pokes', 'Pokes', key === 'pokes')].join('') : [a('', 'Home', key === '' || key === 'home'), a('tasks', 'My tasks', key === 'tasks'), a('events', 'Events board', key === 'events'),
     ...(inCat ? [a('r', 'Switch to Restaurant')] : inRes ? [a('c', 'Switch to Catering')] : []),
     ...(isAdmin() ? [a('people', 'People & roles', key === 'people'), a('activity', 'Activity', key.startsWith('activity'))] : [])].join('');
   return `<span class="bell-slot mob">${bellHtml()}</span><details class="mnav"><summary aria-label="Menu"><span class="mn-cur">${esc(cur)}</span><span class="mn-ic">☰</span></summary>
@@ -309,7 +317,7 @@ document.addEventListener('submit', async e => {
 async function afterLogin() {
   S.me = await db.rpc('my_access');
   if (!S.me || S.me.active === false) { await db.signOut(); S.user = null; return renderLogin(!S.me ? 'Your login is not set up yet. Ask the owner to add you on the People page.' : 'This account is switched off. Ask the owner.'); }
-  await Promise.all([loadMaster(), loadAvatars()]);
+  await Promise.all([svcOnly() ? null : loadMaster(), loadAvatars()]);
   route(); pokePoll();
 }
 
@@ -334,6 +342,7 @@ const ICONS = {
   evs: '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M8 14h3v3H8z"/></svg>'
 };
 routes.home = async () => {
+  if (svcOnly()) return svcHome();
   const t = today(), tm = addDays(t, 1), hour = new Date(Date.now() + 8 * 3600e3).getUTCHours();
   const [fil, en] = GREET(hour), first = esc(nick());
   const doy = Math.floor((Date.parse(t) - Date.parse(t.slice(0, 4) + '-01-01')) / 864e5);
@@ -361,6 +370,33 @@ routes.home = async () => {
     ${!member('restaurant') && !member('catering') ? `<div class="card mt"><p>You don't have a workspace yet — ask the owner to give you a role. Meanwhile you can see the Events board.</p></div>` : ''}
     `;
 };
+
+// Waiters' home: today at a glance (events, reservations, what's 86) and their three pages
+async function svcHome() {
+  const t = today(), tm = addDays(t, 1), hour = new Date(Date.now() + 8 * 3600e3).getUTCHours();
+  const [fil] = GREET(hour), doy = Math.floor((Date.parse(t) - Date.parse(t.slice(0, 4) + '-01-01')) / 864e5);
+  const [ev, rs, k, pk] = await Promise.all([db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null),
+    db.rpc('reservations_board', { p_from: t, p_to: t }).catch(() => null), db.rpc('board_86', { p_date: t }).catch(() => null), homePokes()]);
+  const nEv = ev ? ev.filter(e => e.event_date === t).length : '–', nRes = rs ? rs.tables.length : '–';
+  const n86 = k ? k.rows.filter(r => num(r.ending) <= 0).length : '–';
+  const card = (cls, href, ic, title, sub) => `<a class="hw-card ${cls}" href="${href}"><span class="hw-ic">${ic}</span><div class="hw-tx"><b>${title}</b><span>${sub}</span></div><em>→</em></a>`;
+  return `<section class="hw-hero">
+      <div class="hw-date">${esc(fmtLong(t))}</div>
+      <h1>${fil}, ${esc(nick())}!</h1>
+      <blockquote class="hw-line">${esc(DAILY_LINES[doy % DAILY_LINES.length])}</blockquote>
+      <div class="hw-glance">
+        <a href="#/events"><b>${nEv}</b><span>event${nEv === 1 ? '' : 's'} today</span></a>
+        <a href="#/r/reservations"><b>${nRes}</b><span>reservation${nRes === 1 ? '' : 's'} today</span></a>
+        <a href="#/r/kitchen"><b>${n86}</b><span>dish${n86 === 1 ? '' : 'es'} 86</span></a>
+      </div>
+    </section>
+    ${pk ? `<div class="hw-today one">${pk}</div>` : ''}
+    <div class="hw-grid">
+      ${card('evs', '#/events', ICONS.evs, 'Events', 'Today, tomorrow and upcoming catering events')}
+      ${card('cat', '#/r/reservations', ICONS.cat, 'Reservations', 'Table bookings and catering bookings')}
+      ${card('res', '#/r/kitchen', ICONS.res, '86 &amp; running low', "What's out and what's running low")}
+    </div>`;
+}
 
 /* ================= EVENTS BOARD (everyone, read-only) ================= */
 // The whole team sees what's coming (like the 86 board); only catering roles open and edit events.
@@ -413,6 +449,78 @@ routes.events = async () => {
     <section class="evb-sec later"><h2>Upcoming <span class="evb-n">${later.length}</span><span class="evb-d">next ${BOARD_DAYS - 1} days</span></h2>
     ${later.length ? days.map(d => `<h4 class="evb-day">${esc(fmtLong(d))}</h4>${later.filter(e => e.event_date === d).map(e => boardCard(e, false)).join('')}`).join('') : '<div class="evb-empty">Nothing booked yet.</div>'}</section>`;
 };
+
+/* ================= RESERVATIONS (restaurant tables + catering bookings; everyone reads, restaurant managers edit) ================= */
+// Waiters see these view only, without guest phone numbers. Cancelled reservations drop off the list.
+const RESV_STATUS = { booked: 'Booked', seated: 'Seated', done: 'Done', no_show: 'No-show', cancelled: 'Cancelled' };
+const RESV_TONE = { booked: 'info', seated: 'ok', done: 'mut', no_show: 'bad', cancelled: 'bad' };
+const RESV_DAYS = 30;
+const timeBox = v => { const t = /^\d{1,2}:\d{2}/.test(v || '') ? fmtClock(v).split(' ') : null;
+  return t ? `<b>${t[0]}</b><span>${t[1]}</span>` : v ? `<span>${esc(v)}</span>` : '<span>Time<br>TBC</span>'; };
+function resvCard(r) {
+  const facts = [r.pax ? r.pax + (r.pax === 1 ? ' guest' : ' guests') : '', r.table_label, r.occasion].filter(Boolean);
+  return `<article class="evb${['done', 'no_show'].includes(r.status) ? ' tent' : ''}">
+    <div class="evb-time">${timeBox(r.res_time)}</div>
+    <div class="evb-main">
+      <div class="evb-head"><h3>${esc(r.guest_name)}</h3>${chip(RESV_STATUS[r.status] || r.status, RESV_TONE[r.status])}</div>
+      ${facts.length ? `<div class="evb-facts">${facts.map(esc).join(' · ')}</div>` : ''}
+      ${r.notes ? `<div class="evb-note">${esc(r.notes)}</div>` : ''}
+      ${r.phone ? `<div class="small"><a href="tel:${esc(r.phone.replace(/[^\d+]/g, ''))}">${esc(r.phone)}</a></div>` : ''}
+      <div class="evb-foot"><span class="mut small">${r.taken_by ? 'Taken by ' + esc(r.taken_by) : ''}</span>${canResv() ? `<button type="button" class="lnk" data-act="resvEdit" data-id="${r.id}">Edit</button>` : ''}</div>
+    </div></article>`;
+}
+function bkCard(b) {
+  const facts = [b.event_type, b.pax ? b.pax + ' guests' : '', b.kind === 'tray' ? 'Food trays' : ''].filter(Boolean);
+  return `<article class="evb tent">
+    <div class="evb-time">${timeBox(b.time)}</div>
+    <div class="evb-main">
+      <div class="evb-head"><h3>${esc(b.client)}</h3>${chip(BK_STATUS[b.status] || b.status, BK_TONE[b.status])}</div>
+      <div class="evb-sub">${esc(fmtLong(b.event_date))}</div>
+      ${facts.length ? `<div class="evb-facts">${facts.map(esc).join(' · ')}</div>` : ''}
+      <div class="evb-foot"><span class="mut small">${esc(b.ref || '')} · not yet confirmed</span>${member('catering') ? `<a href="#/c/inquiry/${b.id}">Open inquiry →</a>` : ''}</div>
+    </div></article>`;
+}
+routes['r/reservations'] = async () => {
+  clearTimeout(S.rsTimer); S.rsTimer = setTimeout(() => { if (location.hash.startsWith('#/r/reservations') && !document.querySelector('.modal')) refresh(); }, 60000);
+  const t = today(), tm = addDays(t, 1);
+  const b = await db.rpc('reservations_board', { p_from: t, p_to: addDays(t, RESV_DAYS) });
+  S.resv = Object.fromEntries(b.tables.map(r => [r.id, r]));
+  const on = d => b.tables.filter(r => r.res_date === d), later = b.tables.filter(r => r.res_date > tm);
+  const guests = l => l.reduce((n, r) => n + num(r.pax), 0);
+  const sec = (cls, title, sub, list, empty) => `<section class="evb-sec ${cls}"><h2>${title} <span class="evb-n">${list.length}</span><span class="evb-d">${sub}${guests(list) ? ' · ' + guests(list) + ' guests' : ''}</span></h2>
+    ${list.length ? list.map(resvCard).join('') : `<div class="evb-empty">${empty}</div>`}</section>`;
+  const days = [...new Set(later.map(r => r.res_date))];
+  return `<div class="row"><h1>Reservations</h1><span class="sp"></span>${canResv() ? '<button type="button" class="pri" data-act="resvAdd">Add reservation</button>' : ''}</div>
+    <p class="mut small" style="margin-top:-6px">Restaurant table bookings, then catering bookings from the website that aren't events yet. Updates by itself every minute.${canResv() ? '' : ' View only.'}</p>
+    ${sec('today', 'Today', fmtLong(t), on(t), 'No reservations today.')}
+    ${sec('tmr', 'Tomorrow', fmtLong(tm), on(tm), 'No reservations tomorrow.')}
+    <section class="evb-sec later"><h2>Upcoming <span class="evb-n">${later.length}</span><span class="evb-d">next ${RESV_DAYS - 1} days</span></h2>
+    ${later.length ? days.map(d => `<h4 class="evb-day">${esc(fmtLong(d))}</h4>${later.filter(r => r.res_date === d).map(resvCard).join('')}`).join('') : '<div class="evb-empty">Nothing booked yet.</div>'}</section>
+    <section class="evb-sec later"><h2>Catering bookings <span class="evb-n">${b.catering.length}</span><span class="evb-d">from the website, not yet events · next ${RESV_DAYS} days</span></h2>
+    ${b.catering.length ? b.catering.map(bkCard).join('') : '<div class="evb-empty">No open catering bookings.</div>'}</section>`;
+};
+// Add / edit a table reservation (restaurant managers and the owner). Cancel = set the status to Cancelled.
+function resvForm(r) {
+  r = r || { res_date: today(), status: 'booked' };
+  const box = document.createElement('div'); box.className = 'modal';
+  box.innerHTML = `<form class="card" data-form="resv"${r.id ? ` data-id="${r.id}"` : ''}>
+    <div class="row"><h2>${r.id ? 'Edit reservation' : 'New reservation'}</h2><span class="sp"></span><button type="button" class="x" data-close aria-label="Close">✕</button></div>
+    <label>Guest name<input name="guest_name" required autocapitalize="words" value="${esc(r.guest_name || '')}"></label>
+    <div class="two">
+      <label>Date<input type="date" name="res_date" required value="${esc(r.res_date || '')}"></label>
+      <label>Time<input type="time" name="res_time" value="${esc((r.res_time || '').slice(0, 5))}"></label>
+      <label>Guests<input type="number" name="pax" min="1" inputmode="numeric" value="${esc(r.pax ?? '')}"></label>
+      <label>Table or area<input name="table_label" placeholder="e.g. T4, function room" value="${esc(r.table_label || '')}"></label>
+    </div>
+    <label>Phone<input name="phone" type="tel" value="${esc(r.phone || '')}"></label>
+    <label>Occasion<input name="occasion" placeholder="Birthday, anniversary …" value="${esc(r.occasion || '')}"></label>
+    <label>Notes<textarea name="notes" rows="2" placeholder="Allergies, seating requests, cake to set up …">${esc(r.notes || '')}</textarea></label>
+    ${r.id ? `<label>Status<select name="status">${Object.entries(RESV_STATUS).map(([k, l]) => opt(k, l, r.status === k)).join('')}</select></label>` : ''}
+    <div class="row end mt"><button type="button" class="ghost" data-close>Close</button><button class="pri">Save</button></div></form>`;
+  document.body.appendChild(box);
+  box.addEventListener('click', ev => { if (ev.target.closest('[data-close]') || ev.target === box) box.remove(); });
+  box.querySelector('input[name="guest_name"]').focus();
+}
 
 /* ================= EVENTS ================= */
 // The client is the headline; the event name is optional (shown only when it adds something)
@@ -817,6 +925,16 @@ FORMS.returnLeft = async (f, el) => {
   toast('Leftovers returned to the catering store'); refresh();
 };
 const ACT = {};
+// Reservations (see the RESERVATIONS section above)
+ACT.resvAdd = () => resvForm();
+ACT.resvEdit = el => resvForm(S.resv?.[el.dataset.id]);
+FORMS.resv = async (f, form) => {
+  const row = { guest_name: f.guest_name, res_date: f.res_date, res_time: f.res_time || null, pax: f.pax ? parseInt(f.pax, 10) : null,
+                table_label: f.table_label || null, phone: f.phone || null, occasion: f.occasion || null, notes: f.notes || null };
+  if (form.dataset.id) await db.update('table_reservations', { ...row, ...(f.status ? { status: f.status } : {}) }, { id: form.dataset.id });
+  else await db.insert('table_reservations', row);
+  form.closest('.modal')?.remove(); toast('Reservation saved'); refresh();
+};
 ACT.install = () => doInstall();
 ACT.delEvent = async el => {
   const what = [el.dataset.name, el.dataset.ref].filter(Boolean).join(' · ');
@@ -1952,6 +2070,11 @@ routes['r/kitchen'] = async arg => {
 };
 /* Staff, Cashier, Chef and others: the stockist's latest count, as a read-only 86 / running-low list (POS sales today included) */
 async function kOut() {
+  if (svcOnly()) {   // waiters read the same list through board_86 (names and counts only)
+    const d = today(), k = await db.rpc('board_86', { p_date: d });
+    const rows = (k.rows || []).map(r => ({ ...r, beginning: r.ending, produced: 0, pulled_out: 0, sold: 0 }));
+    return k86Html(rows, k.last, k.last?.who || '', d);
+  }
   const d = today(), [rows, days] = await Promise.all([db.rpc('kitchen_sheet', { p_date: d }), db.select('kitchen_days', { cols: 'count_date,saved_by,saved_at,note', order: [['count_date', false]], limit: 1 })]);
   const last = days[0], who = last?.saved_by ? (await db.select('profiles', { cols: 'full_name', eq: { id: last.saved_by } }))[0]?.full_name : (last?.note || '').replace(/^Counted by /, '').replace(/ \(copied from \/ops\)$/, '');
   return k86Html(rows, last, who, d);
@@ -3060,7 +3183,8 @@ const ROLE_DO = {
   rnd_chef: ['Writes, tests and costs recipes', 'Edits dish details'],
   chef: ['Kitchen work on events: menus, extra ingredients, prep day', 'Reads recipes'],
   cashier: ['Takes payments on the POS and opens/closes the cash drawer', 'Gives Senior/PWD discounts', 'Does the Z-reading on the Sales page'],
-  staff: ['Takes orders on the POS and sends them to the kitchen', 'Sees the 86 / running-low list']
+  staff: ['Takes orders on the POS and sends them to the kitchen', 'Sees the 86 / running-low list'],
+  service: ['Sees the Events board: today, tomorrow and upcoming', 'Sees table reservations and catering bookings', 'Sees the 86 / running-low list', 'View only: no POS, sales, purchasing or prices']
 };
 const WS_NAME = { catering: 'Catering', restaurant: 'Restaurant' };
 const initials = n => (n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
