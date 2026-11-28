@@ -2036,6 +2036,7 @@ async function kDay(d) {
   const saver = day?.saved_by ? (await db.select('profiles', { cols: 'full_name', eq: { id: day.saved_by } }))[0]?.full_name : '';
   return `<div class="card"><div class="row wrap"><label class="inline">Date <input type="date" value="${d}" data-kdate max="${today()}"></label>
      <label class="inline">Group by <select data-kgroup>${opt('section', 'Menu section', by === 'section')}${opt('protein', 'Main ingredient', by === 'protein')}</select></label><span class="sp"></span>
+     ${day ? `<button class="pdf" data-act="kDayPdf" data-d="${d}" title="One A4 page: counts by menu section, totals and the dishes to cook">Daily report (PDF)</button>` : ''}
      <span class="small mut">${day ? `Started ${saver ? 'by ' + esc(saver) : ''} ${day.note ? '· ' + esc(day.note) : ''}` : 'Not started yet — beginning stock is yesterday\'s ending.'}</span></div></div>
    ${low.length ? `<div class="alert warn"><b>${low.length} dish${low.length > 1 ? 'es are' : ' is'} low</b> (ending below the low level). <a href="#/r/kitchen/restock/${d}">Open the restock list →</a></div>` : ''}
    <input class="search" placeholder="Find a dish…" data-filter=".krow">
@@ -2079,7 +2080,7 @@ async function kRestock(d) {
   d = d || S.kDate || today();
   const rows = await db.rpc('kitchen_sheet', { p_date: d });
   const need = rows.map(r => ({ ...r, end: kEnd(r) })).filter(r => r.end < num(r.min_level)).map(r => ({ ...r, need: Math.max(num(r.par) - r.end, 0) }));
-  return `<div class="card"><div class="row wrap"><label class="inline">Date <input type="date" value="${d}" onchange="location.hash='#/r/kitchen/restock/'+this.value" max="${today()}"></label><span class="sp"></span><button class="ghost" onclick="window.print()">Print</button></div></div>
+  return `<div class="card"><div class="row wrap"><label class="inline">Date <input type="date" value="${d}" onchange="location.hash='#/r/kitchen/restock/'+this.value" max="${today()}"></label><span class="sp"></span><button class="pdf" data-act="kDayPdf" data-d="${d}">Daily report (PDF)</button><button class="ghost" onclick="window.print()">Print this list</button></div></div>
    ${need.length ? `<div class="card tw"><h2>To cook — ${esc(fmtD(d))}</h2><p class="small mut">Dishes that ended below their low level. Cook back up to par.</p>
      <table><thead><tr><th>Dish</th><th class="n">Ending</th><th class="n">Par</th><th class="n">Cook</th></tr></thead><tbody>
      ${kGroups(need, 'protein').map(([g, l]) => `<tr class="grp"><td colspan="4">${esc(g)}</td></tr>${l.sort((a, b) => b.need - a.need).map(r => `<tr><td>${esc(r.name)}</td><td class="n ${r.end <= 0 ? 'bad-t' : ''}">${fq(r.end)}</td><td class="n">${fq(r.par)}</td><td class="n"><b>${fq(r.need)}</b></td></tr>`).join('')}`).join('')}
@@ -2097,7 +2098,7 @@ async function kWeek(w) {
   const list = Object.values(by).map(x => ({ ...x, name: S.dishById[x.id]?.name || '?', section: menu[x.id]?.section || '' })).sort((a, b) => b.sold - a.sold || a.name.localeCompare(b.name));
   const days = new Set(rows.map(r => r.count_date)).size, T = k => list.reduce((s, x) => s + x[k], 0);
   const top = list.filter(x => x.sold > 0).slice(0, 5), pulled = list.filter(x => x.out > 0).sort((a, b) => b.out - a.out).slice(0, 5), idle = list.filter(x => !x.sold && (x.start || x.in));
-  return `<div class="card"><div class="row wrap"><a class="btn ghost" href="#/r/kitchen/week/${addDays(from, -7)}">‹ Previous</a><b>${esc(fmtD(from))} – ${esc(fmtD(to))}</b>${from < weekStart(today()) ? `<a class="btn ghost" href="#/r/kitchen/week/${addDays(from, 7)}">Next ›</a>` : ''}<span class="sp"></span><span class="small mut">${days} of 7 days counted</span><button class="ghost" onclick="window.print()">Print</button></div></div>
+  return `<div class="card"><div class="row wrap"><a class="btn ghost" href="#/r/kitchen/week/${addDays(from, -7)}">‹ Previous</a><b>${esc(fmtD(from))} – ${esc(fmtD(to))}</b>${from < weekStart(today()) ? `<a class="btn ghost" href="#/r/kitchen/week/${addDays(from, 7)}">Next ›</a>` : ''}<span class="sp"></span><span class="small mut">${days} of 7 days counted</span>${days ? `<button class="pdf" data-act="kWeekPdf" data-w="${from}">Weekly report (PDF)</button>` : ''}</div></div>
    ${list.length ? `<div class="kpis"><div class="kpi"><span>Portions sold</span><b>${fq(T('sold'))}</b></div><div class="kpi"><span>Cooked</span><b>${fq(T('in'))}</b></div><div class="kpi ${T('out') ? 'bad' : ''}"><span>Pulled out</span><b>${fq(T('out'))}</b></div></div>
    <div class="two"><div class="card"><h3>Best sellers</h3>${top.map((x, i) => `<div class="mline"><span>${i + 1}. ${esc(x.name)}</span><span class="sp"></span><b>${fq(x.sold)}</b></div>`).join('') || '<span class="mut small">No sales recorded.</span>'}</div>
      <div class="card"><h3>Pulled out — check waste</h3>${pulled.map(x => `<div class="mline"><span>${esc(x.name)}</span><span class="sp"></span><b class="warn-t">${fq(x.out)}</b></div>`).join('') || '<span class="mut small">None.</span>'}</div></div>
@@ -2106,6 +2107,75 @@ async function kWeek(w) {
    ${list.map(x => `<tr><td>${esc(x.name)}<div class="small mut">${esc(x.section)}${x.notes.length ? ' · ' + esc(x.notes.join(' · ')) : ''}</div></td><td class="n">${fq(x.start)}</td><td class="n">${x.in ? fq(x.in) : ''}</td><td class="n ${x.out ? 'warn-t' : ''}">${x.out ? fq(x.out) : ''}</td><td class="n"><b>${fq(x.sold)}</b></td><td class="n">${fq(x.end)}</td></tr>`).join('')}
    </tbody></table></div>` : '<div class="empty">No counts this week.</div>'}`;
 }
+/* ================= Kitchen stocks reports (PDF): one A4 page, same layout as the /ops daily and weekly reports ================= */
+function kReportHtml(title, sub, stats, groups, notes, extra, needs) {
+  const C = { navy: '#1A2C54', gold: '#F6E3B4', orange: '#E89908', cream: '#F3EFE2', line: '#E4DFC8', mut: '#4A5265', red: '#A3271F' };
+  const th = 'font-size:7pt;color:' + C.mut + ';text-align:right;font-weight:600;padding:1px 3px;border-bottom:.6pt solid #9C9479';
+  const td = 'padding:1.4px 3px;text-align:right;border-bottom:.4pt solid ' + C.line + ';font-size:8.4pt';
+  const v = x => x === 0 || x === '' || x == null ? '' : fq(x);
+  const tbl = g => `<table style="width:100%;border-collapse:collapse;margin-bottom:5px"><tr><td colspan="6" style="background:${C.gold};border-left:3pt solid ${C.orange};font-weight:700;padding:2px 5px;font-size:8.8pt">${esc(g.cat)}</td></tr>
+    <tr><th style="${th};text-align:left;width:44%">Dish</th><th style="${th}">Beg</th><th style="${th}">In</th><th style="${th}">Out</th><th style="${th}">Sold</th><th style="${th}">End</th></tr>
+    ${g.rows.map(r => `<tr><td style="${td};text-align:left">${esc(r.name)}${r.n ? ' *' : ''}</td><td style="${td}">${fq(r.b)}</td><td style="${td}">${v(r.i)}</td><td style="${td}">${v(r.o)}</td><td style="${td}"><b>${v(r.s)}</b></td><td style="${td}${r.e < 0 ? ';color:' + C.red : ''}"><b>${fq(r.e)}</b></td></tr>`).join('')}</table>`;
+  const hOf = g => g.rows.length + 2.2, prodH = needs?.length ? needs.length + 3 : 0, noteH = notes.length ? notes.length + 1.5 : 0;
+  const total = groups.reduce((a, g) => a + hOf(g), 0) + prodH + noteH; let acc = 0; const L = [], R = [];
+  groups.forEach(g => { const left = acc + hOf(g) / 2 <= total / 2; (left ? L : R).push(g); if (left) acc += hOf(g); });
+  const lh = L.reduce((a, g) => a + hOf(g), 0), rh = R.reduce((a, g) => a + hOf(g), 0), prodLeft = lh <= rh;
+  const prod = needs?.length ? `<table style="width:100%;border-collapse:collapse;border:.8pt solid ${C.orange};background:#FFFBF0"><tr><td colspan="4" style="font-weight:700;color:#7A4E00;font-size:8.6pt;padding:3px 5px">For production / purchase request</td></tr>
+      <tr><th style="${th};text-align:left">Dish</th><th style="${th}">End</th><th style="${th}">Par</th><th style="${th}">Need</th></tr>
+      ${needs.map(r => `<tr><td style="${td};font-size:7.8pt;text-align:left">${esc(r.name)}</td><td style="${td};font-size:7.8pt${r.e <= 0 ? ';color:' + C.red : ''}">${fq(r.e)}</td><td style="${td};font-size:7.8pt">${fq(r.par)}</td><td style="${td};font-size:7.8pt"><b>${fq(r.need)}</b></td></tr>`).join('')}
+      <tr><td colspan="4" style="font-size:6.8pt;color:#5B6478;padding:2px 5px">Need = Par − End (dishes below their low level).</td></tr></table>` : '';
+  const nts = notes.length ? `<div style="font-size:9pt;font-weight:700;margin:0 0 2px">Notes / remarks</div>${notes.map(n => `<div style="font-size:8.2pt;margin:1px 0">* ${esc(n)}</div>`).join('')}` : '';
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title><style>@page{size:A4;margin:10mm}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}body{font-family:Arial,sans-serif;color:#14213F;margin:0}
+    .bar{text-align:center;padding:10px;background:#F7F4EA}.bar button{font:600 13px Arial;border:0;border-radius:8px;padding:10px 18px;background:#1A2C54;color:#fff;cursor:pointer;margin:0 4px}.bar .alt{background:#E4DFC8;color:#14213F}@media print{.bar{display:none}}</style></head><body>
+    <div class="bar"><button onclick="print()">Save as PDF / Print</button><button class="alt" onclick="close()">Close</button></div>
+    <div style="font-size:8.5pt;color:${C.mut};border-bottom:1.5pt solid ${C.navy};padding-bottom:4px;margin-bottom:6px">${sub}</div>
+    <table style="width:100%;border-collapse:separate;border-spacing:4px 0;margin:0 -4px 7px"><tr>${stats.map(([l, x]) => `<td style="background:${C.cream};padding:4px 6px"><div style="font-size:7.5pt;color:${C.mut};text-transform:uppercase">${l}</div><div style="font-size:11.5pt;font-weight:700">${x}</div></td>`).join('')}</tr></table>
+    ${extra || ''}
+    <table style="width:100%;border-collapse:collapse"><tr><td style="width:50%;vertical-align:top;padding-right:3.5mm">${L.map(tbl).join('')}${prodLeft ? prod : ''}${prodLeft ? '' : nts}</td>
+      <td style="width:50%;vertical-align:top;padding-left:3.5mm">${R.map(tbl).join('')}${prodLeft ? '' : prod}<div style="margin-top:6px">${prodLeft ? nts : ''}</div></td></tr></table>
+    <table style="width:100%;margin-top:14px;font-size:7.5pt;color:${C.mut}"><tr><td style="width:46%;border-top:.7pt solid #14213F;padding-top:2px">Prepared by</td><td style="width:8%"></td><td style="width:46%;border-top:.7pt solid #14213F;padding-top:2px">Checked by</td></tr></table>
+    <script>window.onload=function(){setTimeout(function(){print()},400)}<\/script></body></html>`;
+}
+function kOpenWin() { const w = window.open('', '_blank'); if (!w) toast('Your browser blocked the report window. Allow pop-ups for romualdos.ph.', true); else w.document.write('<p style="font:14px Arial;padding:20px">Preparing the report…</p>'); return w; }
+function kShow(w, html) { if (!w) return; w.document.open(); w.document.write(html); w.document.close(); }
+const kSecGroups = rows => kGroups(rows, 'section').map(([cat, list]) => ({ cat: cat || 'Others', rows: list }));
+ACT.kDayPdf = async el => {
+  const d = el.dataset.d || S.kDate || today(), w = kOpenWin(); if (!w) return;
+  try {
+    const [rows, [day]] = await Promise.all([db.rpc('kitchen_sheet', { p_date: d }), db.select('kitchen_days', { eq: { count_date: d } })]);
+    const used = rows.filter(r => r.saved || [r.beginning, r.produced, r.pulled_out, r.sold].some(x => num(x)));
+    if (!day && !rows.some(r => r.saved)) { w.close(); return toast(`No count was saved for ${fmtD(d)}.`, true); }
+    const whoId = day?.saved_by || (await db.select('dish_day_counts', { cols: 'counted_by', eq: { count_date: d }, order: [['updated_at', false]], limit: 1 }).catch(() => []))[0]?.counted_by;
+    const by = (whoId ? (await db.select('profiles', { cols: 'full_name', eq: { id: whoId } }))[0]?.full_name : '') || (day?.note || '').replace(/^Counted by /, '').replace(/ \(copied from \/ops\)$/, '');
+    const R = used.map(r => ({ ...r, b: num(r.beginning), i: num(r.produced), o: num(r.pulled_out), s: num(r.sold), e: kEnd(r), n: r.note || '' }));
+    const needs = R.filter(r => r.e < num(r.min_level)).map(r => ({ name: r.name, e: r.e, min: num(r.min_level), par: num(r.par), need: Math.max(0, Math.ceil(num(r.par) - r.e)), sort: r.sort }))
+      .sort((a, b) => (a.e - a.min) - (b.e - b.min) || a.sort - b.sort);
+    const T = k => Math.round(R.reduce((a, r) => a + r[k], 0) * 100) / 100, neg = R.filter(r => r.e < 0).length;
+    kShow(w, kReportHtml('Kitchen stocks · ' + d, `${esc(fmtLong(d))} · Encoded by: <b>${esc(by || '—')}</b>`,
+      [['Dishes counted', R.length], ['Stock in', T('i')], ['Pulled out', T('o')], ['Sold', T('s')], ['Ending stock', T('e')], ...(neg ? [['Below zero', neg]] : [])],
+      kSecGroups(R), R.filter(r => r.n).map(r => r.name + ': ' + r.n), '', needs));
+  } catch (err) { w.close(); toast(err.message, true); }
+};
+ACT.kWeekPdf = async el => {
+  const from = weekStart(el.dataset.w || today()), to = addDays(from, 6), w = kOpenWin(); if (!w) return;
+  try {
+    const [rows, menu] = await Promise.all([db.select('dish_day_counts', { gte: { count_date: from }, lte: { count_date: to }, order: [['count_date']] }), db.select('restaurant_menu', { cols: 'dish_id,section,protein,sort' })]);
+    if (!rows.length) { w.close(); return toast('No daily counts saved for this week.', true); }
+    const M = Object.fromEntries(menu.map(m => [m.dish_id, m])), by = {};
+    rows.forEach(r => { const x = by[r.dish_id] ||= { b: num(r.beginning), i: 0, o: 0, s: 0, e: 0, notes: [] };
+      x.i += num(r.produced); x.o += num(r.pulled_out); x.s += num(r.sold); x.e = num(r.ending); if (r.note) x.notes.push(fmtD(r.count_date).split(',')[0] + ': ' + r.note); });
+    const list = Object.entries(by).map(([id, x]) => ({ ...x, name: S.dishById[id]?.name || '?', section: M[id]?.section || 'Others', sort: M[id]?.sort ?? 999, n: x.notes.join('; ') }));
+    const days = [...new Set(rows.map(r => r.count_date))], missing = []; for (let d = from; d <= to && d <= today(); d = addDays(d, 1)) if (!days.includes(d)) missing.push(d);
+    const top = [...list].filter(r => r.s > 0).sort((a, b) => b.s - a.s).slice(0, 5), po = list.filter(r => r.o > 0).sort((a, b) => b.o - a.o).slice(0, 5), slow = list.filter(r => !r.s && (r.b || r.i));
+    const T = k => Math.round(list.reduce((a, r) => a + r[k], 0) * 100) / 100;
+    const extra = `<table style="width:100%;border-collapse:collapse;margin-bottom:6px;font-size:8.4pt"><tr><td style="width:50%;vertical-align:top;padding-right:3.5mm"><div style="font-size:9pt;font-weight:700">Best sellers</div>${top.map((r, i) => `<div>${i + 1}. ${esc(r.name)} — <b>${fq(r.s)}</b></div>`).join('') || '<div>None</div>'}</td>
+      <td style="width:50%;vertical-align:top;padding-left:3.5mm"><div style="font-size:9pt;font-weight:700">Most pulled out</div>${po.map((r, i) => `<div>${i + 1}. ${esc(r.name)} — <b>${fq(r.o)}</b></div>`).join('') || '<div>None</div>'}${slow.length ? `<div style="margin-top:3px"><b>Not sold this week:</b> ${slow.map(r => esc(r.name)).join(', ')}</div>` : ''}</td></tr></table>`;
+    kShow(w, kReportHtml('KITCHEN STOCKS · WEEKLY REPORT', `<b>Kitchen stocks · weekly report</b> · ${esc(fmtD(from))} – ${esc(fmtD(to))} · ${days.length} day${days.length === 1 ? '' : 's'} counted${missing.length ? ' · missing ' + missing.map(x => esc(fmtD(x).split(', ').slice(0, 2).join(' '))).join(', ') : ''}`,
+      [['Dishes', list.length], ['Stock in', T('i')], ['Pulled out', T('o')], ['Sold', T('s')], ['Ending stock', T('e')]],
+      kSecGroups(list.sort((a, b) => a.sort - b.sort)), list.filter(r => r.n).map(r => r.name + ' — ' + r.n), extra, null));
+  } catch (err) { w.close(); toast(err.message, true); }
+};
+
 async function kDishes() {
   const rows = await db.select('restaurant_menu', { order: [['sort']] });
   const sections = [...new Set(rows.map(r => r.section))];
