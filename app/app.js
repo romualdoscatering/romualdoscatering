@@ -225,7 +225,7 @@ document.addEventListener('click', e => {
   });
 });
 function navOf(key) {
-  return { 'c/event': 'c/events', 'c/event-new': 'c/events', 'c/pr': 'c/requests', 'c/po': 'c/orders', 'c/count': 'c/stock', 'c/recipe': 'c/recipes', 'c/inquiry': 'c/inquiries',
+  return { 'c/event': 'c/events', 'c/event-new': 'c/events', 'c/duplicates': 'c/events', 'c/pr': 'c/requests', 'c/po': 'c/orders', 'c/count': 'c/stock', 'c/recipe': 'c/recipes', 'c/inquiry': 'c/inquiries',
     'r/pr': 'r/requests', 'r/po': 'r/orders', 'r/count': 'r/stock' }[key] || key;
 }
 
@@ -446,7 +446,9 @@ routes['c/events'] = async arg => {
   if (cids.length) (await db.select('clients', { cols: 'id,name', in: { id: cids } })).forEach(c => cl[c.id] = c);
   const MM = canBill() ? await moneyOf(ev.map(e => e.id)) : {};
   const tabs = [['upcoming', 'Upcoming'], ['past', 'Past'], ['all', 'All']];
+  const dups = eventAdmin() ? await db.rpc('event_duplicates').catch(() => []) : [];
   return `<div class="row"><h1>Events</h1><span class="sp"></span>${can('catering', 'event_specialist', 'manager') ? '<a class="btn pri" href="#/c/event-new">＋ New event</a>' : ''}</div>
+   ${dups.length ? `<a class="hw-inbox" href="#/c/duplicates"><b>${dups.length}</b><span>possible duplicate event${dups.length > 1 ? 's' : ''} (same client, same day)</span><em>Review →</em></a>` : ''}
    <div class="seg">${tabs.map(([k, l]) => `<a href="#/c/events/${k}" class="${tab === k ? 'on' : ''}">${l}</a>`).join('')}</div>
    ${ev.length ? (tab === 'upcoming' ? [['Today', ev.filter(e => e.event_date === t)], ['Tomorrow', ev.filter(e => e.event_date === addDays(t, 1))], ['Upcoming', ev.filter(e => e.event_date > addDays(t, 1))]] : [['', ev]])
       .filter(([h, g]) => g.length || h === 'Today').map(([h, g]) => `${h ? `<h2 class="ev-grp">${h} <span class="evb-n">${g.length}</span></h2>` : ''}${g.length ? `<div class="list">${g.map(e => `<a class="li" href="#/c/event/${e.id}"><div class="li-date"><b>${esc(fmtD(e.event_date).split(',')[0])}</b><span>${esc(fmtD(e.event_date).split(',').slice(1).join(','))}</span></div>
@@ -668,7 +670,8 @@ routes['c/event'] = async id => {
     <div class="kpi"><span>Total cost</span><b>${peso(cost.total_cost)}</b></div>
     <div class="kpi ${margin != null && margin < 0 ? 'bad' : ''}"><span>Margin</span><b>${margin != null ? peso(margin) + (num(ev.contract_price) ? ` <small>${Math.round(margin / num(ev.contract_price) * 100)}%</small>` : '') : '—'}</b></div>
     <div class="kpi"><span>Cost per guest</span><b>${ev.pax ? peso(num(cost.total_cost) / ev.pax) : '—'}</b></div></div>
-    <p class="small mut">Ingredients used = stock issued to the event minus leftovers returned, at purchase prices.</p></section>` : ''}`;
+    <p class="small mut">Ingredients used = stock issued to the event minus leftovers returned, at purchase prices.</p></section>` : ''}
+  ${eventAdmin() ? `<div class="ev-danger"><button class="ghost danger" data-act="evDelete" data-id="${ev.id}" data-ref="${esc(ev.ref)}">Delete this event</button><a class="lnk" href="#/c/duplicates">Find duplicate events</a></div>` : ''}`;
 };
 FORMS.editEvent = async (f, el) => {
   const [ev] = await db.select('events', { eq: { id: el.dataset.id } });
@@ -3358,6 +3361,38 @@ routes['c/equipment'] = async () => {
       <div class="row end"><button class="pri">Add</button></div></form>` : ''}`;
 };
 FORMS.eqNew = async f => { await db.insert('equipment', { name: f.name.trim(), category: (f.category || 'Other').trim() || 'Other', owned: Math.max(0, Math.round(num(f.owned))) }); toast('Added'); refresh(); };
+
+/* ================= DUPLICATE EVENTS: merge or delete (owner and catering managers) ================= */
+const eventAdmin = () => isAdmin() || can('catering', 'manager');
+const linkTxt = l => [l.menu && `${l.menu} menu line${l.menu > 1 ? 's' : ''}`, l.payments && `${l.payments} payment${l.payments > 1 ? 's' : ''} (${peso(l.paid)})`, l.bill && 'a bill',
+  l.requests && `${l.requests} purchase request${l.requests > 1 ? 's' : ''}`, l.orders && `${l.orders} order${l.orders > 1 ? 's' : ''}`, l.expenses && `${l.expenses} expense${l.expenses > 1 ? 's' : ''}`,
+  l.advances && `${l.advances} cash advance${l.advances > 1 ? 's' : ''}`, l.stock && 'stock issued', l.equipment && 'equipment list', l.inquiry && 'website inquiry'].filter(Boolean);
+routes['c/duplicates'] = async () => {
+  if (!eventAdmin()) return '<div class="card">Only the owner or a catering manager can merge or delete events.</div>';
+  const groups = await db.rpc('event_duplicates');
+  return `<div class="row"><a href="#/c/events" class="back">‹ Events</a></div><h1>Duplicate events</h1>
+    <p class="lede">Events on the same day for the same client. Tap <b>Keep this one</b> on the right copy: everything attached to the others (payments, purchases, menu if the kept one has none) moves to it, then the others are removed. A copy of anything removed is kept in Activity.</p>
+    ${groups.length ? groups.map(g => `<section class="card dup-g"><h2>${esc(g.who)} · ${esc(fmtD(g.date))}</h2><div class="dup-row">${g.events.map(e => {
+      const lk = linkTxt(e.links), others = g.events.filter(x => x.id !== e.id).map(x => x.id).join(',');
+      return `<div class="dup-ev"><div class="row"><a href="#/c/event/${e.id}"><b>${esc(e.ref)}</b></a><span class="sp"></span>${chip(EVENT_STATUS[e.status] || e.status, statusTone(e.status))}</div>
+        <div class="small">${esc([KIND[e.kind], e.serve_time ? fmtClock(e.serve_time) : '', e.pax ? e.pax + ' guests' : '', e.venue].filter(Boolean).join(' · ') || '—')}</div>
+        <div class="small mut">${esc(e.title || '')}${e.ops_id ? ' · moved from /ops' : ''} · made ${esc(fmtT(e.created_at))}</div>
+        <div class="small dup-l">${lk.length ? 'Has ' + esc(lk.join(', ')) : '<span class="mut">Nothing attached</span>'}</div>
+        <div class="row mt"><button class="pri" data-act="evKeep" data-keep="${e.id}" data-drop="${others}" data-ref="${esc(e.ref)}">Keep this one</button>
+          <button class="ghost danger" data-act="evDelete" data-id="${e.id}" data-ref="${esc(e.ref)}" data-back="dups">Delete</button></div></div>`; }).join('')}</div></section>`).join('')
+      : '<div class="card"><b>No duplicates found.</b> <span class="mut">Checked events from the last 60 days onward.</span></div>'}`;
+};
+ACT.evKeep = async el => {
+  const drop = el.dataset.drop.split(',').filter(Boolean);
+  if (!confirm(`Keep ${el.dataset.ref} and merge the other ${drop.length > 1 ? drop.length + ' copies' : 'copy'} into it? The other copy is removed. This can't be undone from the app.`)) return;
+  for (const d of drop) await db.rpc('event_merge', { p_drop: d, p_keep: el.dataset.keep });
+  toast(`Merged into ${el.dataset.ref}`); refresh();
+};
+ACT.evDelete = async el => {
+  if (!confirm(`Delete ${el.dataset.ref}? Its menu and checklists go with it. This can't be undone from the app.`)) return;
+  try { await db.rpc('event_delete', { p_event: el.dataset.id, p_reason: null }); toast(`${el.dataset.ref} deleted`); el.dataset.back ? refresh() : go('#/c/events'); }
+  catch (err) { toast(err.message, true); }
+};
 
 /* ================= Profile photos ================= */
 // Small square JPEGs kept in the database; each phone keeps a copy and only downloads photos that changed.

@@ -1160,3 +1160,10 @@ html.night .eq-tick{background-color:#d0d9e9!important}html.night .eq-cat td{bac
  .eq-t .eq-q{width:64px}
 }
 @media (min-width:761px){header#top nav{flex-wrap:wrap;row-gap:6px;overflow:visible}}
+/* ================= Duplicates / delete ================= */
+.ev-danger{display:flex;gap:16px;align-items:center;justify-content:flex-end;margin:24px 0 8px;padding-top:16px;border-top:1px dashed #d9d1bf}
+button.danger{color:#b42318;border-color:#f0c2bc}button.danger:hover{background:#fdecea}
+.dup-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.dup-ev{border:1px solid #e3ddcf;border-radius:12px;padding:12px;display:grid;gap:5px;background:#fffdf8}.dup-ev a{color:var(--navy)}
+.dup-l{margin-top:4px}
+html.night .dup-ev{background-color:#d0d9e9!important}
