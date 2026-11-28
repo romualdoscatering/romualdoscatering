@@ -1177,3 +1177,8 @@ html.night .dup-ev{background-color:#d0d9e9!important}
 .rs-f span{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mut)}.rs-f p{margin:2px 0 0;white-space:pre-line;font-size:14px}
 .rs-h{margin:18px 0 10px}.rs-day{margin:12px 0 8px;font-size:14px;color:#8a5a00}
 html.night .rs{background-color:#d0d9e9!important;border-top-color:#aebcd5!important;border-right-color:#aebcd5!important;border-bottom-color:#aebcd5!important}html.night .rs-time{background-color:#bdc9df!important}
+/* ================= Auto-save ================= */
+.draft-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#eef3fb;border:1px solid #c9d6ea;color:#1f3557;border-radius:10px;padding:8px 12px;margin:0 0 12px;font-size:13.5px}
+.draft-bar span{flex:1;min-width:200px}
+.autosave{margin:8px 0 0;color:var(--mut)}
+html.night .draft-bar{background-color:#c3d0e6!important}

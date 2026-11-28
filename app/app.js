@@ -179,6 +179,7 @@ function afterRender() {
   recalcCosting(); recalcCostTab();
   document.querySelectorAll('form[data-form="buyReport"]').forEach(brTotals);
   evBarWatch();
+  try { draftRestore(); } catch (e) { console.error(e); }
   document.querySelectorAll('[data-show-if]').forEach(el => { const [name, val] = el.dataset.showIf.split('='); const src = document.querySelector(`[name="${name}"]`); const upd = () => el.hidden = src?.value !== val; src?.addEventListener('change', upd); upd(); });
 }
 
@@ -533,7 +534,7 @@ async function overwriteCheck(form, ev, part) {
 }
 // typing in any form on the event page counts as unsaved work
 document.addEventListener('input', e => { if (current === 'c/event' && e.target.closest('#main form[data-form]')) EVW.dirty = true; });
-window.addEventListener('beforeunload', e => { if (current === 'c/event' && EVW.dirty) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', () => { try { draftFlushAll(); } catch (e) {} });   // typing is kept on this phone (see AUTO-SAVE), so no 'leave page?' prompt
 // re-render the page but keep the open sections open
 async function refreshKeep() {
   const open = [...document.querySelectorAll('#main details')].map(d => d.open);
@@ -3476,6 +3477,107 @@ async function homeRes() {
   } catch (e) { return ''; }
 }
 
+/* ================= AUTO-SAVE: what you type is kept on this phone as you type, and put back after an update, reload or crash.
+   The event sheet details also save online a few seconds after typing stops (same as /ops). ================= */
+const DRAFT = { pre: 'rom-draft|', days: 7, timers: new Map(), skip: null };
+const draftKey = form => `${DRAFT.pre}${S.user?.id || ''}|${location.hash.replace(/^#\/?/, '')}|${form.dataset.form}|${form.dataset.id || ''}`;
+const draftable = form => form?.dataset?.form && form.dataset.form !== 'none' && !form.dataset.nodraft && !form.querySelector('input[type=password]') && form.closest('#main');
+function draftFields(form) {
+  return [...form.elements].filter(el => el.name && !['password', 'file', 'hidden', 'submit', 'button', 'reset'].includes(el.type) && !el.disabled);
+}
+function draftValues(form) {
+  const v = {};
+  for (const el of draftFields(form)) {
+    if (el.type === 'checkbox') v[`cb:${el.name}:${el.value}`] = el.checked;
+    else if (el.type === 'radio') { if (el.checked) v[`rd:${el.name}`] = el.value; }
+    else if (el.multiple) v[el.name] = [...el.selectedOptions].map(o => o.value);
+    else v[el.name] = el.value;
+  }
+  return v;
+}
+function draftWrite(form) {
+  if (!draftable(form)) return;
+  try {
+    const now = draftValues(form), base = form._draftBase || {};
+    const changed = Object.keys(now).some(k => JSON.stringify(now[k]) !== JSON.stringify(base[k]));
+    if (changed) localStorage.setItem(draftKey(form), JSON.stringify({ at: Date.now(), v: now }));
+    else localStorage.removeItem(draftKey(form));
+  } catch (e) {}
+}
+const draftClear = form => { try { localStorage.removeItem(draftKey(form)); } catch (e) {} form.querySelector('.draft-bar')?.remove(); };
+function draftFlushAll() { document.querySelectorAll('#main form[data-form]').forEach(f => { clearTimeout(DRAFT.timers.get(f)); draftWrite(f); }); }
+// After every screen is drawn: remember the saved values, then put back any unsaved typing
+function draftRestore() {
+  document.querySelectorAll('#main form[data-form]').forEach(form => {
+    if (!draftable(form)) return;
+    form._draftBase = draftValues(form);
+    let d; try { d = JSON.parse(localStorage.getItem(draftKey(form)) || 'null'); } catch (e) { d = null; }
+    if (!d?.v) return;
+    if (Date.now() - d.at > DRAFT.days * 864e5) { draftClear(form); return; }
+    let n = 0;
+    for (const el of draftFields(form)) {
+      const k = el.type === 'checkbox' ? `cb:${el.name}:${el.value}` : el.type === 'radio' ? `rd:${el.name}` : el.name;
+      if (!(k in d.v)) continue;
+      const want = d.v[k];
+      if (el.type === 'checkbox') { if (el.checked !== want) { el.checked = want; n++; el.dispatchEvent(new Event('change', { bubbles: true })); } }
+      else if (el.type === 'radio') { if ((el.value === want) !== el.checked) { el.checked = el.value === want; n++; el.dispatchEvent(new Event('change', { bubbles: true })); } }
+      else if (el.multiple) { [...el.options].forEach(o => o.selected = want.includes(o.value)); n++; }
+      else if (el.value !== want) {
+        if (el.tagName === 'SELECT' && ![...el.options].some(o => o.value === want)) continue;
+        el.value = want; n++; el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }
+    if (!n) { draftClear(form); return; }
+    form.closest('details')?.setAttribute('open', '');
+    if (current === 'c/event') EVW.dirty = true;
+    const online = form.dataset.form === 'evSheet';
+    form.insertAdjacentHTML('afterbegin', `<div class="draft-bar"><span>Your unsaved typing from ${esc(clockOf(new Date(d.at).toISOString()))} was put back.${online ? ' It saves online in a few seconds.' : ' Tap Save when ready.'}</span><button type="button" class="lnk" data-act="draftDiscard">Discard it</button></div>`);
+    if (online) autoSaveSoon(form, 1500);
+  });
+}
+document.addEventListener('input', e => {
+  const form = e.target.closest?.('#main form[data-form]'); if (!draftable(form) || !e.isTrusted) return;
+  clearTimeout(DRAFT.timers.get(form)); DRAFT.timers.set(form, setTimeout(() => draftWrite(form), 300));
+  if (form.dataset.form === 'evSheet') autoSaveSoon(form);
+});
+document.addEventListener('change', e => { const form = e.target.closest?.('#main form[data-form]'); if (draftable(form) && e.isTrusted) { draftWrite(form); if (form.dataset.form === 'evSheet') autoSaveSoon(form); } });
+window.addEventListener('pagehide', draftFlushAll);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') draftFlushAll(); });
+ACT.draftDiscard = async el => { const form = el.closest('form'); draftClear(form); if (current === 'c/event') EVW.dirty = false; await refresh(); toast('Discarded'); };
+
+// Event sheet details: save online 3 seconds after typing stops, without reloading the page
+const AUTO = { timers: new Map() };
+function autoSaveSoon(form, ms = 3000) {
+  clearTimeout(AUTO.timers.get(form));
+  autoStatus(form, 'Unsaved changes, saving…');
+  AUTO.timers.set(form, setTimeout(() => autoSaveSheet(form), ms));
+}
+function autoStatus(form, txt, bad) {
+  let s = form.querySelector('.autosave'); if (!s) { form.insertAdjacentHTML('beforeend', '<p class="autosave small"></p>'); s = form.querySelector('.autosave'); }
+  s.textContent = txt; s.classList.toggle('bad-t', !!bad);
+}
+async function autoSaveSheet(form) {
+  if (!form.isConnected) return;
+  if (form._saving) return autoSaveSoon(form, 1500);
+  form._saving = true;
+  const rev = JSON.stringify(draftValues(form));
+  try {
+    const [ev] = await db.select('events', { eq: { id: form.dataset.id } });
+    if (await overwriteCheck(form, ev, 'sheet')) { autoStatus(form, 'Not saved: someone else changed this event. Choose a version above.', true); return; }
+    const f = formData(form);
+    const keys = ['contact', 'mobile', 'email', 'source', 'call', 'pull', 'coord', 'pkg', 'motif', 'setup', 'staff', 'equip', 'fulfil', 'allergy', 'special', 'approvedOn', 'preparedBy'];
+    const sheet = { ...(ev?.sheet || {}) }; keys.forEach(k => { if (k in f) { const x = String(f[k] ?? '').trim(); if (x) sheet[k] = x; else delete sheet[k]; } });
+    await db.update('events', { sheet }, { id: form.dataset.id });
+    const [after] = await db.select('events', { cols: 'updated_at', eq: { id: form.dataset.id } }).catch(() => []);
+    if (EVW.id === form.dataset.id && EVW.snap) { EVW.snap.sheet = sheet; if (after?.updated_at) EVW.at = after.updated_at; }
+    if (JSON.stringify(draftValues(form)) === rev) {      // nothing typed while saving
+      form._draftBase = draftValues(form); draftClear(form); EVW.dirty = false;
+      autoStatus(form, 'Saved online ' + clockOf(new Date().toISOString()));
+    } else autoSaveSoon(form, 1500);
+  } catch (e) { draftWrite(form); autoStatus(form, 'Not saved online yet (' + (e.message || 'offline') + '). Kept on this phone; trying again.', true); autoSaveSoon(form, 15000); }
+  finally { form._saving = false; }
+}
+
 /* ================= Profile photos ================= */
 // Small square JPEGs kept in the database; each phone keeps a copy and only downloads photos that changed.
 const AV = { img: {}, key: 'rom-avatars' };
@@ -3888,7 +3990,9 @@ document.addEventListener('submit', async e => {
   const form = e.target; const name = form.dataset.form; if (!name) return;
   e.preventDefault(); if (name === 'none' || !FORMS[name]) return;
   const btns = form.querySelectorAll('button'); btns.forEach(b => b.disabled = true);
-  try { await FORMS[name](formData(form), form); } catch (err) { console.error(err); toast(err.message, true); } finally { btns.forEach(b => b.disabled = false); }
+  const dk = draftable(form) ? draftKey(form) : null, dv = dk && localStorage.getItem(dk);
+  clearTimeout(DRAFT.timers.get(form)); clearTimeout(AUTO.timers.get(form)); if (dk) try { localStorage.removeItem(dk); } catch (e) {}
+  try { await FORMS[name](formData(form), form); } catch (err) { console.error(err); toast(err.message, true); if (dv) try { localStorage.setItem(dk, dv); } catch (e) {} } finally { btns.forEach(b => b.disabled = false); }
 });
 document.addEventListener('click', async e => {
   const el = e.target.closest('[data-act]'); if (!el || !ACT[el.dataset.act]) return;
@@ -4169,7 +4273,7 @@ async function checkVersion() {
       const bar = document.createElement('div'); bar.className = 'verbar';
       bar.innerHTML = '<span>A new version of the app is ready.</span><button type="button">Update now</button>';
       bar.querySelector('button').onclick = () => {
-        if (typeof EVW !== 'undefined' && EVW.dirty && !confirm('You have unsaved typing on this page. Update anyway?')) return;
+        draftFlushAll();   // what's being typed is kept on this phone and put back after the update
         location.reload();
       };
       document.body.appendChild(bar);
