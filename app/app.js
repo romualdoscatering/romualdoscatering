@@ -2573,26 +2573,95 @@ ACT.posCloseShift = async () => {
 ['requests', 'pr', 'orders', 'po', 'stock', 'count', 'supplies', 'equipment', 'eqcount', 'breakage', 'clean'].forEach(k => routes['r/' + k] = (...a) => routes['c/' + k](...a));
 
 /* ================= PEOPLE (owner) ================= */
+// People & roles: new sign-ins first with a one-tap role, search and filters, select several to add or remove a role, one person per page
+const ROLE_GROUPS = [['Leads', ['manager', 'finance']], ['Events and delivery', ['event_specialist', 'coordinator', 'driver']], ['Kitchen', ['head_chef', 'rnd_chef', 'chef', 'utility']],
+  ['Store', ['purchaser', 'storekeeper']], ['Front of house', ['cashier', 'waiter', 'staff']]];
+const WSL = { catering: 'Catering', restaurant: 'Restaurant' };
+const PP = { f: 'all', sel: new Set() };
+const ppName = p => p.full_name || (p.username || p.email.split('@')[0]).replace(/^./, c => c.toUpperCase());
+const ppNeeds = p => !p.is_admin && !(p.roles || []).length;
+const ppSeen = (x) => !x ? 'never logged in' : 'last in ' + ago(x);
+async function ppSave(p, roles, extra = {}) {
+  await db.rpc('admin_set_member', { p_email: p.email, p_username: p.username || p.email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, ''), p_full_name: ppName(p),
+    p_roles: roles, p_is_admin: !!p.is_admin, p_active: p.username ? !!p.active : true, ...extra });
+}
 routes.people = async arg => {
   if (!isAdmin()) return '<div class="card">Only the owner can manage people.</div>';
-  const [people, tabs, dev, vk] = await Promise.all([db.rpc('admin_people'),
-    db.select('pos_devices', { order: [['registered_at']] }).catch(() => null), db.rpc('pos_device_status').catch(() => null), vapidKey()]);
-  const sel = people.find(p => p.id === arg);
-  const has = (ws, role) => (sel?.roles || []).some(r => r.ws === ws && r.role === role);
-  return `<h1>People & roles</h1>
-  <div class="alert info"><b>Adding someone new:</b> first create their login in Supabase → <b>Authentication → Users → Add user</b> (their email, or <code>username@staff.romualdos.ph</code> if they have none, and a starting password). Then they appear below — open them and give them roles.</div>
-  <div class="list">${people.map(p => `<a class="li" href="#/people/${p.id}">${av(p.id, p.full_name || p.email, "sm")}<div class="li-main"><b>${esc(p.full_name || p.email)}${p.nickname ? ` <span class="mut">“${esc(p.nickname)}”</span>` : ''}</b><span class="mut small">${esc(p.email)}${p.username ? ' · ' + esc(p.username) : ''}</span>
-    <span class="small">${p.is_admin ? chip('Owner', 'info') + ' ' : ''}${(p.roles || []).map(r => chip(`${r.ws === 'catering' ? 'Catering' : 'Restaurant'} · ${roleName(r.role)}`)).join(' ')}${!p.username ? chip('not set up', 'warn') : ''}${p.username && !p.active ? chip('switched off', 'bad') : ''}</span></div></a>`).join('')}</div>
-  ${sel ? `<form class="card mt" data-form="savePerson" data-email="${esc(sel.email)}" data-id="${sel.id}"><div class="row" style="gap:12px">${av(sel.id, sel.full_name || sel.email, "md")}<h2 style="margin:0">${esc(sel.full_name || sel.email)}</h2>${AV.img[sel.id] ? `<span class="sp"></span><button type="button" class="lnk" data-act="avatarClear" data-id="${sel.id}">Remove photo</button>` : ""}</div>
-    <div class="grid"><label>Full name<input name="full_name" value="${esc(sel.full_name || '')}" required></label><label>Username<input name="username" value="${esc(sel.username || sel.email.split('@')[0])}" required pattern="[a-z0-9._\\-]{2,40}" title="lower-case letters, numbers, . _ -"></label>
-      <label>Nickname<input name="nickname" value="${esc(sel.nickname || '')}" maxlength="30" placeholder="${esc((sel.full_name || '').split(' ')[0] || 'e.g. Chef Jas')}"><span class="small mut">What the app calls them — on their home screen (“Magandang umaga, …!”) and at the top. Leave blank to use their first name.</span></label></div>
-    <table class="roles"><thead><tr><th></th><th>Catering</th><th>Restaurant</th></tr></thead><tbody>
-    ${ROLES.map(([k, l, h]) => `<tr><td>${l}<div class="small mut">${esc(h || '')}</div></td><td><input type="checkbox" name="r_catering_${k}" ${has('catering', k) ? 'checked' : ''}></td><td><input type="checkbox" name="r_restaurant_${k}" ${has('restaurant', k) ? 'checked' : ''}></td></tr>`).join('')}
-    </tbody></table>
+  const a = decodeURIComponent(arg || '');
+  if (a === 'settings') {
+    const [tabs, dev, vk] = await Promise.all([db.select('pos_devices', { order: [['registered_at']] }).catch(() => null), db.rpc('pos_device_status').catch(() => null), vapidKey()]);
+    return `${ppTabs('settings')}${tabletsHtml(tabs, dev)}${deliveryCfgHtml(await appCfg(true))}${pushSetupHtml(!!vk)}`;
+  }
+  const [people, logins] = await Promise.all([db.rpc('admin_people'), db.rpc('admin_logins').catch(() => [])]);
+  const L = Object.fromEntries(logins.map(l => [l.id, l]));
+  people.forEach(p => { p.created = L[p.id]?.created_at; p.seen = L[p.id]?.last_sign_in_at; });
+  S.ppPeople = people;
+  if (a && a !== 'list') return ppPerson(people, a);
+  const needs = people.filter(ppNeeds).sort((x, y) => (y.created || '').localeCompare(x.created || ''));
+  const off = people.filter(p => p.username && !p.active), f = PP.f;
+  const shown = people.filter(p => !ppNeeds(p)).filter(p => f === 'all' || (f === 'off' ? p.username && !p.active : f === 'owner' ? p.is_admin : (p.roles || []).some(r => r.ws === f)));
+  const roleOpts = `${opt('', 'Give a role…')}${['catering', 'restaurant'].map(ws => `<optgroup label="${WSL[ws]}">${ROLES.map(([k, l]) => opt(ws + '|' + k, `${WSL[ws]} · ${l}`)).join('')}</optgroup>`).join('')}`;
+  const fl = (k, l, n) => `<a href="#" data-act="ppFilter" data-f="${k}" class="${f === k ? 'on' : ''}">${l}${n != null ? ` <i>${n}</i>` : ''}</a>`;
+  PP.sel = new Set([...PP.sel].filter(id => people.some(p => p.id === id)));
+  return `${ppTabs('people')}
+    <div class="pp-stats"><div><b>${people.length}</b><span>logins</span></div><div class="${needs.length ? 'warn' : ''}"><b>${needs.length}</b><span>waiting for a role</span></div><div><b>${people.filter(p => p.username && p.active && !ppNeeds(p)).length}</b><span>active with roles</span></div><div><b>${off.length}</b><span>switched off</span></div></div>
+    ${needs.length ? `<section class="card pp-new"><h2>Waiting for a role <span class="hp-n hp-dark">${needs.length}</span></h2><p class="small mut">New sign-ins, newest first. Pick their main role and tap Give; open them to add more.</p>
+      ${needs.map(p => `<div class="pp-q">${av(p.id, ppName(p), 'sm')}<div class="pp-who"><a href="#/people/${p.id}"><b>${esc(ppName(p))}</b></a><span class="small mut">${esc(p.email)} · ${p.created ? 'made ' + esc(ago(p.created)) : ''}</span></div>
+        <select data-ppq="${p.id}">${roleOpts}</select><button class="pri" data-act="ppGive" data-id="${p.id}">Give</button></div>`).join('')}</section>` : ''}
+    <div class="row pp-tools"><input class="search" placeholder="Search name, username or role…" data-filter=".pp-row" style="flex:1;min-width:200px">
+      <div class="seg">${fl('all', 'All')}${fl('catering', 'Catering', people.filter(p => (p.roles || []).some(r => r.ws === 'catering')).length)}${fl('restaurant', 'Restaurant', people.filter(p => (p.roles || []).some(r => r.ws === 'restaurant')).length)}${fl('owner', 'Owners')}${off.length ? fl('off', 'Switched off', off.length) : ''}</div></div>
+    <div class="card pp-list">${shown.length ? shown.map(p => `<div class="pp-row${p.username && !p.active ? ' off' : ''}"><input type="checkbox" data-ppsel="${p.id}" ${PP.sel.has(p.id) ? 'checked' : ''} aria-label="Select ${esc(ppName(p))}">
+        <a class="pp-link" href="#/people/${p.id}">${av(p.id, ppName(p), 'sm')}<div class="pp-who"><b>${esc(ppName(p))}${p.nickname ? ` <span class="mut">“${esc(p.nickname)}”</span>` : ''}</b><span class="small mut">${esc(p.username || p.email)} · ${esc(ppSeen(p.seen))}</span></div>
+        <div class="pp-roles">${p.is_admin ? chip('Owner', 'info') : ''}${['catering', 'restaurant'].map(ws => { const rs = (p.roles || []).filter(r => r.ws === ws); return rs.length ? `<span class="pp-ws"><em>${ws === 'catering' ? 'C' : 'R'}</em>${rs.map(r => esc(roleName(r.role))).join(', ')}</span>` : ''; }).join('')}${p.username && !p.active ? chip('switched off', 'bad') : ''}</div></a></div>`).join('') : '<p class="mut">Nobody here.</p>'}</div>
+    <div class="pp-bulk${PP.sel.size ? '' : ' hid'}" id="ppBulk"><b id="ppN">${PP.sel.size} selected</b><select id="ppBulkRole">${roleOpts.replace('Give a role…', 'Choose a role…')}</select>
+      <button class="pri" data-act="ppBulk" data-op="add">Add role</button><button class="ghost" data-act="ppBulk" data-op="remove">Remove role</button><button class="lnk" data-act="ppClear">Clear</button></div>
+    <p class="small mut">Adding someone new: they need a login first. In Supabase → Authentication → Users → Add user, use <code>username@staff.romualdos.ph</code> (or their own email) and a starting password. They then appear under "Waiting for a role".</p>`;
+};
+const ppTabs = on => `<div class="row"><h1>People &amp; roles</h1></div><div class="seg">${[['people', '#/people', 'People'], ['settings', '#/people/settings', 'Tablets, delivery &amp; notifications']].map(([k, h, l]) => `<a href="${h}" class="${on === k ? 'on' : ''}">${l}</a>`).join('')}</div>`;
+function ppPerson(people, id) {
+  const sel = people.find(p => p.id === id); if (!sel) return '<div class="card">Not found. <a href="#/people">Back to everyone</a></div>';
+  const has = (ws, role) => (sel.roles || []).some(r => r.ws === ws && r.role === role);
+  const list = people.filter(p => !ppNeeds(p) || p.id === id), i = list.findIndex(p => p.id === id), prev = list.at(i - 1), next = list.at((i + 1) % list.length);
+  return `<div class="row"><a href="#/people" class="back">‹ Everyone</a><span class="sp"></span>${list.length > 1 ? `<a class="btn ghost" href="#/people/${prev.id}">‹ ${esc(ppName(prev).split(' ')[0])}</a><a class="btn ghost" href="#/people/${next.id}">${esc(ppName(next).split(' ')[0])} ›</a>` : ''}</div>
+  <form class="card" data-form="savePerson" data-email="${esc(sel.email)}" data-id="${sel.id}">
+    <div class="row" style="gap:12px">${av(sel.id, ppName(sel), 'md')}<div><h2 style="margin:0">${esc(ppName(sel))}</h2><span class="small mut">${esc(sel.email)} · ${esc(ppSeen(sel.seen))}${sel.created ? ' · login made ' + esc(fmtD(sel.created.slice(0, 10))) : ''}</span></div>${AV.img[sel.id] ? `<span class="sp"></span><button type="button" class="lnk" data-act="avatarClear" data-id="${sel.id}">Remove photo</button>` : ''}</div>
+    <div class="grid mt"><label>Full name<input name="full_name" value="${esc(sel.full_name || '')}" required></label><label>Username<input name="username" value="${esc(sel.username || sel.email.split('@')[0])}" required pattern="[a-z0-9._\\-]{2,40}" title="lower-case letters, numbers, . _ -"><span class="small mut">Shown in the app only. To change what they type to log in, ask Claude: the login email changes with it.</span></label>
+      <label>Nickname<input name="nickname" value="${esc(sel.nickname || '')}" maxlength="30" placeholder="${esc((sel.full_name || '').split(' ')[0] || 'e.g. Chef Jas')}"><span class="small mut">What the app calls them. Blank = first name.</span></label></div>
+    <div class="row mt pp-copy"><h3 style="margin:0">Roles</h3><span class="sp"></span><select data-ppcopy>${opt('', 'Copy roles from…')}${people.filter(p => p.id !== id && (p.roles || []).length).map(p => opt(p.id, `${ppName(p)}: ${(p.roles || []).map(r => (r.ws === 'catering' ? 'C ' : 'R ') + roleName(r.role)).join(', ')}`)).join('')}</select></div>
+    <div class="pp-grid">${['catering', 'restaurant'].map(ws => `<div class="pp-wsbox"><h3>${WSL[ws]}</h3>${ROLE_GROUPS.map(([g, ks]) => `<div class="pp-g"><span>${g}</span><div>${ks.map(k => { const r = ROLES.find(x => x[0] === k); return `<label class="pill" title="${esc(r[2])}"><input type="checkbox" name="r_${ws}_${k}" ${has(ws, k) ? 'checked' : ''}><span>${esc(r[1])}</span></label>`; }).join('')}</div></div>`).join('')}</div>`).join('')}</div>
+    <p class="small mut">Hover or long-press a role to see what it does. Most people need one or two.</p>
     <label class="tick"><input type="checkbox" name="is_admin" ${sel.is_admin ? 'checked' : ''}> Owner (everything, both workspaces)</label>
     <label class="tick"><input type="checkbox" name="active" ${!sel.username || sel.active ? 'checked' : ''}> Can log in</label>
-    <div class="row end"><a class="btn ghost" href="#/people">Close</a><button class="pri">Save</button></div></form>` : ''}
-  ${tabletsHtml(tabs, dev)}${deliveryCfgHtml(await appCfg(true))}${pushSetupHtml(!!vk)}`;
+    <div class="row end"><a class="btn ghost" href="#/people">Close</a><button class="pri">Save</button></div></form>`;
+}
+ACT.ppFilter = el => { PP.f = el.dataset.f; refresh(); };
+ACT.ppGive = async el => {
+  const v = document.querySelector(`[data-ppq="${el.dataset.id}"]`)?.value; if (!v) return toast('Pick a role first.', true);
+  const p = S.ppPeople.find(x => x.id === el.dataset.id), [ws, role] = v.split('|');
+  await ppSave(p, [{ ws, role }]); toast(`${ppName(p)}: ${WSL[ws]} · ${roleName(role)}`); refresh();
+};
+document.addEventListener('change', e => {
+  const c = e.target.closest('[data-ppsel]');
+  if (c) { c.checked ? PP.sel.add(c.dataset.ppsel) : PP.sel.delete(c.dataset.ppsel); const b = document.getElementById('ppBulk'); if (b) { b.classList.toggle('hid', !PP.sel.size); document.getElementById('ppN').textContent = PP.sel.size + ' selected'; } return; }
+  const cp = e.target.closest('[data-ppcopy]');
+  if (cp && cp.value) {
+    const src = S.ppPeople.find(p => p.id === cp.value), form = cp.closest('form');
+    form.querySelectorAll('input[name^="r_"]').forEach(x => { x.checked = (src.roles || []).some(r => x.name === `r_${r.ws}_${r.role}`); x.dispatchEvent(new Event('change', { bubbles: true })); });
+    toast(`Roles copied from ${ppName(src)}. Tap Save to keep them.`); cp.value = '';
+  }
+});
+ACT.ppClear = () => { PP.sel.clear(); refresh(); };
+ACT.ppBulk = async el => {
+  const v = document.getElementById('ppBulkRole').value; if (!v) return toast('Choose a role.', true);
+  const [ws, role] = v.split('|'), add = el.dataset.op === 'add', list = S.ppPeople.filter(p => PP.sel.has(p.id));
+  if (!confirm(`${add ? 'Add' : 'Remove'} ${WSL[ws]} · ${roleName(role)} ${add ? 'to' : 'from'} ${list.length} ${list.length === 1 ? 'person' : 'people'}?`)) return;
+  let n = 0;
+  for (const p of list) {
+    const cur = (p.roles || []).map(r => ({ ws: r.ws, role: r.role })), hasIt = cur.some(r => r.ws === ws && r.role === role);
+    if (add === hasIt) continue;
+    await ppSave(p, add ? [...cur, { ws, role }] : cur.filter(r => !(r.ws === ws && r.role === role))); n++;
+  }
+  PP.sel.clear(); toast(`${n} updated${list.length - n ? ` · ${list.length - n} ${add ? 'already had' : 'did not have'} it` : ''}`); refresh();
 };
 /* ================= activity log (owner) ================= */
 // Every change in the database is stamped with who and when (audit_log). This page reads it in plain words.

@@ -1192,3 +1192,30 @@ html.night .draft-bar{background-color:#c3d0e6!important}
 .cl-row.on{background:#f1f8f3;border-color:#cfe6d6}.cl-row.on .cl-box{background:#2f7a45;border-color:#2f7a45}.cl-row.on .cl-t{color:#4a5a4f}
 .cl-t{flex:1}.cl-who{font-size:12px;color:var(--mut);white-space:nowrap}
 html.night .cl-row,html.night .cl-prog{background-color:#d0d9e9!important}html.night .cl-row.on{background-color:#e6f4ea!important}
+/* ================= People & roles ================= */
+.pp-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+.pp-stats>div{background:#fff;border:1px solid #ebe5d6;border-radius:12px;padding:10px;text-align:center}.pp-stats b{display:block;font-family:'Playfair Display',Georgia,serif;font-size:22px;color:var(--navy)}.pp-stats span{font-size:12px;color:var(--mut)}
+.pp-stats .warn{background:#fff3d9;border-color:#f0dca8}
+.pp-new{border-left:4px solid #e8b04a}.pp-new h2{display:flex;align-items:center;gap:8px}
+.pp-q{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid #eee7d6;flex-wrap:wrap}.pp-q select{width:auto;max-width:260px;flex:1 1 200px}
+.pp-who{display:grid;min-width:0;flex:1}.pp-who a{color:var(--navy);text-decoration:none}
+.pp-tools{gap:10px;align-items:center;flex-wrap:wrap;margin:8px 0}.pp-tools .seg{margin:0}.seg a i{font-style:normal;font-size:11px;background:#eee7d6;border-radius:8px;padding:0 6px;margin-left:2px}
+.pp-list{padding:4px 12px}
+.pp-row{display:flex;align-items:center;gap:10px;border-top:1px solid #eee7d6;padding:8px 0}.pp-row:first-child{border-top:0}.pp-row.off{opacity:.55}
+.pp-row>input{width:18px;height:18px;flex:0 0 18px}
+.pp-link{display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-decoration:none;color:var(--ink)}
+.pp-roles{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:52%}
+.pp-ws{font-size:12px;background:#f4f0e5;border-radius:999px;padding:3px 10px 3px 4px;white-space:nowrap}.pp-ws em{font-style:normal;font-weight:700;font-size:10.5px;background:#14213f;color:#fff;border-radius:999px;padding:1px 6px;margin-right:5px}
+.pp-bulk{position:sticky;bottom:12px;z-index:20;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:#14213f;color:#fff;border-radius:14px;padding:10px 14px;margin:12px 0;box-shadow:0 6px 20px rgba(20,33,63,.25)}
+.pp-bulk.hid{display:none}.pp-bulk select{width:auto;flex:1 1 200px;max-width:320px}.pp-bulk .lnk{color:#e2c77e}.pp-bulk .ghost{background:transparent;color:#fff;border-color:#5b6b8f}
+.pp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0}
+.pp-wsbox{border:1px solid #e3ddcf;border-radius:12px;padding:10px 12px}.pp-wsbox h3{margin:0 0 6px;color:var(--navy)}
+.pp-g{display:grid;grid-template-columns:96px 1fr;gap:8px;align-items:start;padding:6px 0;border-top:1px dashed #eee7d6}.pp-g:first-of-type{border-top:0}
+.pp-g>span{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:#8a5a00;padding-top:7px}.pp-g>div{display:flex;flex-wrap:wrap;gap:6px}
+.pill{display:inline-flex;cursor:pointer;margin:0}.pill input{position:absolute;opacity:0;width:1px;height:1px}
+.pill span{border:1.5px solid #cfc7b3;border-radius:999px;padding:6px 12px;font-size:13.5px;background:#fff;color:var(--ink);user-select:none}
+.pill input:checked+span{background:#14213f;border-color:#14213f;color:#fff}.pill input:focus-visible+span{outline:2px solid #c9a44c;outline-offset:2px}
+.pp-copy select{width:auto;max-width:360px}
+@media (max-width:760px){.pp-grid{grid-template-columns:1fr}.pp-stats{grid-template-columns:repeat(2,1fr)}.pp-roles{max-width:100%;justify-content:flex-start}.pp-link{flex-wrap:wrap}.pp-g{grid-template-columns:1fr}.pp-g>span{padding-top:0}}
+html.night .pp-stats>div,html.night .pill span,html.night .pp-wsbox{background-color:#d0d9e9!important}html.night .pill input:checked+span{background-color:#14213f!important;color:#fff!important}html.night .pp-ws{background-color:#bdc9df!important}
+@media (max-width:760px){.pp-q .pp-who{flex:1 1 calc(100% - 48px)}.pp-q select{flex:1 1 auto;max-width:none}.pp-link .pp-roles{flex:1 1 100%;padding-left:42px}}
