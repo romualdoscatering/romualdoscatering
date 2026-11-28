@@ -10,3 +10,6 @@ grant usage on schema auth to anon, authenticated;
 grant execute on function auth.uid() to anon, authenticated;
 grant usage on schema public to anon, authenticated;
 -- like the project setting "Grant API access to new tables automatically" = OFF: no default grants
+do $$ begin create role service_role; exception when duplicate_object then null; end $$;
+alter table auth.users add column if not exists last_sign_in_at timestamptz;
+alter table auth.users add column if not exists email text;
