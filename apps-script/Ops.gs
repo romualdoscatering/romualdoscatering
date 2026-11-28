@@ -198,6 +198,26 @@ function checkStaff(coll, before, after, fin) {
   });
 }
 
+/* Switch-over (Nov 28 2026): catering events are now encoded in the staff app (romualdos.ph/app).
+   /ops Event sheets stay readable and printable; only billing and payment can still be changed here.
+   New website inquiries go to the app only, and /ops no longer sends updates to the app. */
+const EVENTS_IN_APP = true;
+const SHEET_EVENT_KEYS_ = ['kind', 'fulfil', 'client', 'contact', 'mobile', 'email', 'source', 'type', 'date', 'serve', 'call', 'pull', 'venue', 'coord', 'pax', 'pkg', 'motif', 'setup', 'equip', 'staff', 'allergy', 'special', 'status', 'approvedOn', 'preparedBy'];
+function sheetEventPart_(sh) {
+  sh = sh || {}; const o = {};
+  SHEET_EVENT_KEYS_.forEach(function (k) { const v = sh[k] === undefined || sh[k] === null ? '' : String(sh[k]).trim(); o[k] = k === 'pax' ? String(parseInt(v, 10) || '') : v; });
+  o.menu = (sh.menu || []).filter(function (m) { return m && (String(m.dish || '').trim() || String(m.note || '').trim()); })
+    .map(function (m) { return [m.course, m.dish, m.qty, m.note].map(function (x) { return String(x === undefined || x === null ? '' : x).trim(); }).join('|'); });
+  return JSON.stringify(o);
+}
+function checkEventsMoved_(coll, before, after) {
+  if (!EVENTS_IN_APP || coll !== 'events') return;
+  const msg = 'Event sheets have moved to the staff app (romualdos.ph/app). Make this change there.';
+  if (!before && after.sheet) forbid(msg);
+  if (before && before.sheet && after.status === 'void' && before.status !== 'void') forbid(msg);
+  if (before && (before.sheet || after.sheet) && sheetEventPart_(before.sheet) !== sheetEventPart_(after.sheet)) forbid(msg);
+}
+
 function opsWrite(me, ops) {
   if (!Array.isArray(ops) || !ops.length || ops.length > OPS.MAX_OPS) return { ok: false, error: 'Nothing to save.' };
   const admin = me.role === 'Admin';
@@ -225,6 +245,7 @@ function opsWrite(me, ops) {
       else if (o.op === 'set') after = JSON.parse(JSON.stringify(o.data));
       else if (o.op === 'update') { if (!ex) forbid('Record not found.'); after = deepMerge(before, o.data); }
       else forbid('Unknown operation.');
+      checkEventsMoved_(coll, before, after);
       // server-controlled fields
       after.createdAt = before ? before.createdAt : now;
       after.createdBy = before ? before.createdBy : me.username;
@@ -906,6 +927,7 @@ function webSheetFor(q) {
 }
 /** Adds draft event sheets for inquiries that aren't in /ops yet. Returns the new [{id, ev}]. */
 function importWebInquiries(list) {
+  if (EVENTS_IN_APP) return [];                                  // website inquiries go to the staff app only
   list = (list || []).filter(function (q) { return q && q.ref && (q.plan || {}).kind !== 'corporate' && q.status !== 'Declined' && (q.customer || {}).name && (q.event || {}).date; });
   if (!list.length) return [];
   const made = withLock(function () {
@@ -970,6 +992,7 @@ function appSyncOne_(id, d) {
 }
 /** After each /ops save: send the changed event sheets. A failure never blocks the save; it's retried by the daily job. */
 function appSyncDocs(docs) {
+  if (EVENTS_IN_APP) return;                                     // switched over: the app is the master copy now
   if (!CONFIG.APP_URL || !PropertiesService.getScriptProperties().getProperty('APP_SYNC_KEY')) return;   // not linked yet
   (docs || []).forEach(function (x) {
     if (!x || String(x.path).indexOf('events/') !== 0) return;
@@ -978,6 +1001,7 @@ function appSyncDocs(docs) {
 }
 /** Every event sheet from yesterday onward (and deletions), so the app matches /ops. */
 function appSyncAll() {
+  if (EVENTS_IN_APP) return { skipped: 'events are kept in the app now' };
   if (!PropertiesService.getScriptProperties().getProperty('APP_SYNC_KEY')) return { skipped: 'not linked' };
   const from = Utilities.formatDate(new Date(Date.now() - 864e5), 'Asia/Manila', 'yyyy-MM-dd'); let sent = 0, failed = 0;
   readAll(opsSheet()).forEach(function (r) {

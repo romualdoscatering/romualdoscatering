@@ -144,6 +144,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--line)}
 .tabs-mini{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 details summary{cursor:pointer;font-weight:600}
 @media (max-width:640px){.conn span{display:none}.who span{display:none}.who{margin-left:6px}main{padding:10px}.card{padding:12px}h2{font-size:20px}}
+#sheetForm.moved input:disabled,#sheetForm.moved select:disabled,#sheetForm.moved textarea:disabled{background:transparent;color:inherit;opacity:1;-webkit-text-fill-color:currentColor;border-color:transparent;cursor:default}
 </style>
 </head>
 <body>
@@ -424,7 +425,22 @@ function render() {
     <datalist id="dl-units">${UNITS.map(s => `<option value="${s}">`).join('')}</datalist>`;
   $('#view').innerHTML = banner + (V[tab] ? V[tab]() : '') + dl;
   $('#view').querySelectorAll('[data-b]').forEach(el => { const v = getPath(D, el.dataset.b); if (el.type === 'checkbox') el.checked = !!v; else el.value = v ?? ''; });
+  if (tab === 'sheets' && EVENTS_IN_APP) lockSheetForm();
   if ($('#view [data-live]')) live();
+}
+/* Events moved to the staff app: the /ops sheet form is view-only. Admin and Finance can still update billing, payment and prices. */
+function lockSheetForm() {
+  const f = $('#sheetForm'); if (!f) return;
+  f.querySelectorAll('input, select, textarea').forEach(el => {
+    const b = el.dataset.b || '', billing = S.canBill && (el.closest('.billbox') || /^sheet\.menu\.\d+\.price$/.test(b));
+    if (!billing) { el.disabled = true; el.removeAttribute('placeholder'); }
+  });
+  f.querySelectorAll('button[data-act]').forEach(el => {
+    const a = el.dataset.act, keep = ['saveSheet', 'pdfSheet', 'pdfSheetNoBill', 'openEvent', 'conflictTheirs', 'conflictMine', 'discardDraft'].includes(a) || !!el.closest('.billbox');
+    if (!keep || (a === 'saveSheet' && el.dataset.arg !== 'pdf' && !S.canBill)) el.style.display = 'none';
+  });
+  f.querySelectorAll('.seg').forEach(el => { const r = el.closest('.row'); if (r) r.style.display = 'none'; });
+  f.querySelectorAll('button[data-act="saveSheet"]').forEach(el => { if (el.dataset.arg === 'pdf') el.innerHTML = '🖨️ Print PDF'; });
 }
 function live() {
   document.querySelectorAll('#view [data-live]').forEach(el => {
@@ -765,8 +781,12 @@ const fmtLong = s => s ? new Date(s + 'T00:00').toLocaleDateString('en-PH', {wee
 const fmtClock = t => { if (!t) return ''; const [h, m] = t.split(':').map(Number); return `${(h % 12) || 12}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
 const sheetOf = e => e.sheet ? {...newSheet(), ...e.sheet, id: e.id} : newSheet({id: e.id, client: e.client || e.name || '', date: e.date, pax: String(e.pax || ''), venue: e.venue || ''});
 const sheetRef = d => d.ref || ('EV-' + (d.date || '').replace(/-/g, '').slice(0, 8) + '-' + (d.id || '').slice(-3).toUpperCase());
+const EVENTS_IN_APP = true;   // Nov 28 2026: events are encoded in the staff app; /ops sheets are view & print (billing still editable here)
+const APP_EVENTS_URL = 'https://romualdos.ph/app/';
 V.sheets = () => {
-  D.sheet ||= newSheet(); maybeRestoreDraft();
+  if (EVENTS_IN_APP && D.sheet && !D.sheet.id) D.sheet = null;
+  if (EVENTS_IN_APP) D.sheet ||= newSheet();
+  if (!EVENTS_IN_APP) { D.sheet ||= newSheet(); maybeRestoreDraft(); }
   if (S.canBill && !D.sheet.bill) D.sheet.bill = (D.sheet.kind || 'catering') === 'catering' ? newBillParts() : {...newBillParts(), sections: []};
   const d = D.sheet, f = D.ui, k = d.kind || 'catering', cat = k === 'catering';
   const evs = Object.values(S.events).filter(e => e.status !== 'void').sort((a, b) => a.date.localeCompare(b.date));
@@ -775,12 +795,13 @@ V.sheets = () => {
   const inp = (k, ph = '', type = 'text', extra = '') => `<input type="${type}" data-b="sheet.${k}" placeholder="${esc(ph)}" ${extra}>`;
   const listRow = e => { const sh = sheetOf(e), st = SHEET_STATUS.find(x => x[0] === sh.status) || SHEET_STATUS[0];
     const editing = D.sheet?.id === e.id;
-    return `<tr class="click${editing ? ' editing' : ''}" data-act="editSheet" data-arg="${e.id}"><td>${fmtD(e.date)}</td><td>${editing ? '<span class="chip editing-chip">✎ Editing now</span><br>' : ''}<b>${esc(sh.client || e.name)}</b>${sh.kind && sh.kind !== 'catering' ? ` <span class="chip warn">${sheetKindLabel(sh.kind)}</span>` : ` <span class="chip" style="background:#E3E7F0;color:#1A2C54">Catering</span>`}<div class="small mut">${esc([sh.kind && sh.kind !== 'catering' ? sh.fulfil : sh.type, sh.venue].filter(Boolean).join(' · '))}</div></td><td class="n">${esc(sh.pax || e.pax || '')}</td>
+    return `<tr class="click${editing ? ' editing' : ''}" data-act="editSheet" data-arg="${e.id}"><td>${fmtD(e.date)}</td><td>${editing ? `<span class="chip editing-chip">${EVENTS_IN_APP ? 'Viewing' : '✎ Editing now'}</span><br>` : ''}<b>${esc(sh.client || e.name)}</b>${sh.kind && sh.kind !== 'catering' ? ` <span class="chip warn">${sheetKindLabel(sh.kind)}</span>` : ` <span class="chip" style="background:#E3E7F0;color:#1A2C54">Catering</span>`}<div class="small mut">${esc([sh.kind && sh.kind !== 'catering' ? sh.fulfil : sh.type, sh.venue].filter(Boolean).join(' · '))}</div></td><td class="n">${esc(sh.pax || e.pax || '')}</td>
       <td><span class="chip ${sh.status === 'approved' ? 'ok' : sh.status === 'approval' ? 'warn' : sh.status === 'cancelled' ? 'mut' : 'info'}">${st[1]}</span>${S.canBill && sh.status !== 'cancelled' && (sh.pay === 'down' || sh.pay === 'paid') ? ' ' + payChip(sh.pay) : ''}${sh.web ? ' <span class="chip mut" title="Sent from the website">🌐 Website</span>' : ''}<div class="small mut" style="margin-top:4px" title="Last changed by">✎ ${lastChanged(e)}</div></td>
-      <td class="row"><button class="sm" data-act="editSheet" data-arg="${e.id}">Edit</button><button class="sm pdf" data-act="pdfSheet" data-arg="${e.id}">🖨️ ${S.canBill && sheetBillCalc(sh).any ? 'PDF + billing' : 'PDF'}</button>${S.canBill && sheetBillCalc(sh).any ? `<button class="sm" data-act="pdfSheetNoBill" data-arg="${e.id}" title="Event sheet only, without prices">No prices</button>` : ''}${canDelSheet(e) ? `<button class="sm ghost del-btn" data-act="delSheet" data-arg="${e.id}" title="Delete this event sheet">🗑 Delete</button>` : ''}</td></tr>`; };
-  return `<h2>Event sheets</h2>
-  <p class="lede">Encode each event's details once. <b>Generate PDF</b> makes a polished event sheet with the Romualdo's logo, for the kitchen and for the client to approve. Billing is not included; that stays with the admin and finance.</p>
-  <div class="card" id="sheetForm"><div class="sheetbar" id="sheetBar">${sheetBarHtml()}</div><div class="row" style="margin-bottom:6px"><h3 style="margin:0">${d.id ? 'Edit event sheet' : 'New event sheet'}</h3><span id="sheetSaveState" class="save-state ${AS.err ? 'warn' : AS.dirty ? 'busy' : 'ok'}">${esc(saveStateText())}</span><span class="spacer"></span>${d.id ? `<button class="pdf" data-act="saveSheet" data-arg="pdf" title="Saves, then prints this sheet at any status">🖨️ Print PDF</button>${canDelSheet(S.events[d.id]) ? `<button class="sm ghost del-btn" data-act="delSheet" data-arg="${d.id}" title="Delete this event sheet">🗑 Delete</button>` : ''}<button class="sm ghost" data-act="newSheet">＋ Start a new one instead</button>` : ''}</div>
+      <td class="row"><button class="sm" data-act="editSheet" data-arg="${e.id}">${EVENTS_IN_APP ? 'View' : 'Edit'}</button><button class="sm pdf" data-act="pdfSheet" data-arg="${e.id}">🖨️ ${S.canBill && sheetBillCalc(sh).any ? 'PDF + billing' : 'PDF'}</button>${S.canBill && sheetBillCalc(sh).any ? `<button class="sm" data-act="pdfSheetNoBill" data-arg="${e.id}" title="Event sheet only, without prices">No prices</button>` : ''}${canDelSheet(e) ? `<button class="sm ghost del-btn" data-act="delSheet" data-arg="${e.id}" title="Delete this event sheet">🗑 Delete</button>` : ''}</td></tr>`; };
+  const moved = EVENTS_IN_APP ? `<div class="alert warn" style="display:block;margin:0 0 12px;line-height:1.55;font-size:1.02em"><b>Events are now encoded in the staff app.</b> Add new events and change details, menus and status at <a href="${APP_EVENTS_URL}" target="_blank" rel="noopener"><b>romualdos.ph/app</b></a> (Catering → Events). New website inquiries go there too. The sheets below are kept here to view and print${S.canBill ? '; billing and payment can still be updated here' : ''}.</div>` : '';
+  return `<h2>Event sheets</h2>${moved}
+  ${EVENTS_IN_APP ? '' : `<p class="lede">Encode each event's details once. <b>Generate PDF</b> makes a polished event sheet with the Romualdo's logo, for the kitchen and for the client to approve. Billing is not included; that stays with the admin and finance.</p>`}
+  ${EVENTS_IN_APP && !d.id ? '' : `<div class="card${EVENTS_IN_APP ? ' moved' : ''}" id="sheetForm"><div class="sheetbar" id="sheetBar">${sheetBarHtml()}</div><div class="row" style="margin-bottom:6px"><h3 style="margin:0">${EVENTS_IN_APP ? 'Event sheet (view and print)' : d.id ? 'Edit event sheet' : 'New event sheet'}</h3><span id="sheetSaveState" class="save-state ${AS.err ? 'warn' : AS.dirty ? 'busy' : 'ok'}">${esc(saveStateText())}</span><span class="spacer"></span>${d.id ? `<button class="pdf" data-act="saveSheet" data-arg="pdf" title="Saves, then prints this sheet at any status">🖨️ Print PDF</button>${canDelSheet(S.events[d.id]) ? `<button class="sm ghost del-btn" data-act="delSheet" data-arg="${d.id}" title="Delete this event sheet">🗑 Delete</button>` : ''}<button class="sm ghost" data-act="newSheet">＋ Start a new one instead</button>` : ''}</div>
    ${d.id && S.events[d.id]?.updatedAt ? `<div class="small mut" style="margin:-2px 0 8px">✎ ${lastChanged(S.events[d.id], true)}</div>` : ''}
    ${AS.conflict ? `<div class="alert bad" style="display:block;margin:8px 0;line-height:1.55"><b>⚠ ${esc(AS.conflict.by)} changed this sheet at ${esc(clockNow(AS.conflict.at))} while you were editing.</b> Your changes are kept on this device but are <b>not saved yet</b>, so nothing of theirs was overwritten.<br><button class="sm" data-act="conflictTheirs">See their version (drop my changes)</button> <button class="sm ghost" data-act="conflictMine">Save my version over theirs</button></div>` : ''}
    ${AS.restoredAt ? `<div class="alert info" style="margin:8px 0">Restored your unsaved work from ${esc(clockNow(AS.restoredAt))}${new Date(AS.restoredAt).toDateString() !== new Date().toDateString() ? ' on ' + esc(fmtD(new Date(AS.restoredAt).toISOString().slice(0, 10))) : ''}. It saves online automatically. <span class="spacer"></span><button class="sm ghost" data-act="discardDraft">Discard draft</button></div>` : ''}
@@ -819,7 +840,7 @@ V.sheets = () => {
    <h4 class="sub">${cat ? 6 : 5}. Approval</h4>
    <div class="grid">${lab('Status', sel('sheet.status', SHEET_STATUS.map(([v, l]) => opt(v, l)).join(''), false))}${lab('Approved on', inp('approvedOn', '', 'date'))}${lab('Prepared by', inp('preparedBy', S.me?.name || '', 'text', 'list="dl-staff"'))}</div>
    <div class="row end" style="margin-top:12px">${d.id ? `<button class="ghost" data-act="openEvent" data-arg="${d.id}">Costing &amp; stock →</button>` : ''}<button class="ghost" data-act="newSheet">Clear</button><button class="pdf lg" data-act="saveSheet" data-arg="pdf">🖨️ Save &amp; print PDF</button><button class="pri" data-act="saveSheet">Save</button></div>
-  </div>
+  </div>`}
   <div class="card"><h3>Upcoming events (${up.length})</h3>
    ${up.length ? `<div class="tw"><table><thead><tr><th>Date</th><th>Client</th><th class="n">Pax</th><th>Status</th><th></th></tr></thead><tbody>${up.map(listRow).join('')}</tbody></table></div>` : '<div class="empty">No upcoming events yet.</div>'}
    ${past.length ? `<details style="margin-top:10px" open><summary class="small">Past events not yet archived (${past.length}) · <a href="#archive">mark them fulfilled in the Archive →</a></summary><div class="tw"><table><tbody>${past.map(listRow).join('')}</tbody></table></div></details>` : ''}
@@ -903,7 +924,7 @@ async function autoSaveSheet() {
     clearTimeout(calTimer); const sid = d.id; calTimer = setTimeout(() => bookingSync(sid, false), 45000);
     if (AS.rev === rev && D.sheet === d) { AS.dirty = false; draftClear(); }
     else AS.timer = setTimeout(autoSaveSheet, 1500); // more typing happened while saving
-    const h = document.querySelector('#sheetForm h3'); if (h && D.ui.tab === 'sheets') h.textContent = 'Edit event sheet';
+    const h = document.querySelector('#sheetForm h3'); if (h && D.ui.tab === 'sheets') h.textContent = EVENTS_IN_APP ? 'Event sheet (view and print)' : 'Edit event sheet';
   } catch (e) {
     if (e?.data?.conflict) { sheetConflict(e.data); return; }
     AS.err = e?.message ? String(e.message).slice(0, 60) : 'offline'; draftWrite(); AS.timer = setTimeout(autoSaveSheet, 15000); }
@@ -975,7 +996,7 @@ function pdfWindow() {
   if (w) w.document.write('<!DOCTYPE html><title>Preparing PDF…</title><body style="font:15px Montserrat,Arial,sans-serif;color:#1A2C54;display:grid;place-items:center;height:90vh;margin:0">Preparing the event sheet…</body>');
   return w;
 }
-const canDelSheet = e => !!e && (S.isAdmin || ((e.sheet?.status || 'draft') !== 'approved' && !e.archive));
+const canDelSheet = e => !EVENTS_IN_APP && !!e && (S.isAdmin || ((e.sheet?.status || 'draft') !== 'approved' && !e.archive));
 ACT.delSheet = id => {
   const e = S.events[id]; if (!e) return;
   if (!canDelSheet(e)) return toast('This sheet is approved by the client. Only an Admin can delete it.', true);
