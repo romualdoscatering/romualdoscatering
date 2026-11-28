@@ -25,7 +25,7 @@ const ROLES = [['manager', 'Manager', 'Runs the workspace: approvals, events, bi
   ['event_specialist', 'Event specialist', 'Bookings, inquiries and events: creates events'], ['coordinator', 'Coordinator', 'Runs events: menu, details, print (cannot create events)'],
   ['purchaser', 'Purchaser', 'Orders and buying'], ['storekeeper', 'Storekeeper', 'Stockist: receiving, stock counts, Kitchen stocks daily count'],
   ['head_chef', 'Head chef', 'Recipes, dish details and costing'], ['rnd_chef', 'R&D chef', 'Writes and costs recipes only'], ['chef', 'Chef', 'Kitchen work: event menus, prep (reads recipes)'],
-  ['driver', 'Driver', 'Delivery runs: loads, leaves, arrives, hands over'], ['cashier', 'Cashier', 'POS payments and Z-reading'], ['waiter', 'Waiter', 'View only: events, reservations, 86 list; marks guests arrived'], ['staff', 'Staff', 'POS orders; sees the 86 / running-low list']];
+  ['driver', 'Driver', 'Delivery runs: loads, leaves, arrives, hands over'], ['utility', 'Utility', 'Cleaning checklists, equipment and breakage, non-food supplies'], ['cashier', 'Cashier', 'POS payments and Z-reading'], ['waiter', 'Waiter', 'View only: events, reservations, 86 list; marks guests arrived'], ['staff', 'Staff', 'POS orders; sees the 86 / running-low list']];
 const roleName = k => (ROLES.find(r => r[0] === k) || [k, k])[1];
 const chip = (label, tone) => `<span class="chip ${tone || ''}">${esc(label)}</span>`;
 const statusTone = s => ({ draft: 'mut', inquiry: 'mut', for_client_approval: 'warn', submitted: 'warn', confirmed: 'ok', approved: 'ok', in_prep: 'info', ordered: 'info', open: 'info', partly_received: 'warn', done: 'ok', received: 'ok', closed: 'mut', rejected: 'bad', cancelled: 'bad' }[s] || '');
@@ -161,7 +161,7 @@ async function route() {
   if (!S.user) return renderLogin();
   const [page, ...rest] = hash.split('/');
   const pre = page === 'c' || page === 'r';
-  const key = pre ? page + '/' + (rest[0] || (page === 'c' ? (driverOnly() ? 'runs' : 'events') : 'kitchen')) : (page || 'home');
+  const key = pre ? page + '/' + (rest[0] || (utilityOnly() ? 'clean' : page === 'c' ? (driverOnly() ? 'runs' : 'events') : 'kitchen')) : (page || 'home');
   const arg = pre ? rest.slice(1).join('/') : rest.join('/');
   const r = routes[key] || routes.home;
   current = key;
@@ -187,10 +187,10 @@ function afterRender() {
 function renderShell(key) {
   requestAnimationFrame(fitHeader);
   const resPg = key === 'reservations', inRes = key.startsWith('r/') || (resPg && member('restaurant')), inCat = key.startsWith('c/') || (resPg && !inRes && member('catering'));
-  const nav = inCat ? (waiterOnly() ? [['reservations', 'Reservations'], ['events', 'Events']] : driverOnly() ? [['c/runs', 'Runs'], ['c/equipment', 'Equipment'], ['c/production', 'Production']] : [['c/events', 'Events'], ...(runTeam() ? [['c/runs', 'Runs']] : []), ['c/production', 'Production'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/equipment', 'Equipment'], ['c/recipes', 'Recipes'], ...(can('catering', 'manager', 'finance') ? [['c/billing', 'Billing']] : [])])
+  const nav = utilityOnly() ? [[P() + '/clean', 'Cleaning'], [P() + '/equipment', 'Equipment'], [P() + '/supplies', 'Supplies']] : inCat ? (waiterOnly() ? [['reservations', 'Reservations'], ['events', 'Events']] : driverOnly() ? [['c/runs', 'Runs'], ['c/equipment', 'Equipment'], ['c/production', 'Production']] : [['c/events', 'Events'], ...(runTeam() ? [['c/runs', 'Runs']] : []), ['c/production', 'Production'], ['c/inquiries', 'Inquiries'], ['c/requests', 'Requests'], ['c/orders', 'Orders & receiving'], ['c/stock', 'Stock'], ['c/equipment', 'Equipment'], ['c/clean', 'Cleaning'], ['c/recipes', 'Recipes'], ...(can('catering', 'manager', 'finance') ? [['c/billing', 'Billing']] : [])])
     : inRes ? (waiterOnly() ? [['reservations', 'Reservations'], ['r/kitchen', '86 & running low']]
-      : resFront() ? [...(can('restaurant', 'cashier', 'staff') ? [['r/pos', 'POS']] : []), ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['reservations', 'Reservations'], ['r/kitchen', '86 & running low'], ...(can('restaurant', 'cashier', 'staff') ? [['r/requests', 'Requests']] : [])]
-      : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['reservations', 'Reservations'], ['r/kitchen', 'Kitchen stocks'], ...(canProd() ? [['c/production', 'Production']] : []), ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par']]) : [];
+      : resFront() ? [...(can('restaurant', 'cashier', 'staff') ? [['r/pos', 'POS']] : []), ...(can('restaurant', 'cashier') ? [['r/sales', 'Sales']] : []), ['reservations', 'Reservations'], ['r/kitchen', '86 & running low'], ['r/clean', 'Cleaning'], ...(can('restaurant', 'cashier', 'staff') ? [['r/requests', 'Requests']] : [])]
+      : [['r/pos', 'POS'], ['r/sales', 'Sales'], ['reservations', 'Reservations'], ['r/kitchen', 'Kitchen stocks'], ...(canProd() ? [['c/production', 'Production']] : []), ['r/requests', 'Requests'], ['r/orders', 'Orders & receiving'], ['r/stock', 'Store & par'], ['r/equipment', 'Equipment'], ['r/clean', 'Cleaning']]) : [];
   $('#top').innerHTML = `<div class="bar"><a class="brand" href="#/"><img src="../assets/logo.png" alt="Romualdo's"><em>${inCat ? 'Catering' : inRes ? 'Restaurant' : 'Staff'}</em></a>
     <div class="who">${[['tasks', 'Tasks'], ['pokes', 'Pokes'], ['events', 'Events']].map(([k, l]) => `<a href="#/${k}" class="hn${key === k ? ' on' : ''}">${l}</a>`).join('')}<span class="bell-slot">${bellHtml()}</span>${acctMenu(key)}</div>
     ${mobileMenu(key, nav, inCat, inRes)}</div>
@@ -341,7 +341,7 @@ routes.home = async () => {
   const t = today(), tm = addDays(t, 1), hour = new Date(Date.now() + 8 * 3600e3).getUTCHours();
   const [fil, en] = GREET(hour), first = esc(nick());
   const doy = Math.floor((Date.parse(t) - Date.parse(t.slice(0, 4) + '-01-01')) / 864e5);
-  const [ev, pk, tk, , rn, ib, rs] = await Promise.all([db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null), homePokes(), homeTasks(), appCfg().catch(() => null), homeRuns(), homeInbox(), homeRes()]);
+  const [ev, pk, tk, , rn, ib, rs, cl] = await Promise.all([db.rpc('events_board', { p_from: t, p_to: tm }).catch(() => null), homePokes(), homeTasks(), appCfg().catch(() => null), homeRuns(), homeInbox(), homeRes(), homeClean()]);
   const nextGo = ev && CFG.v ? ev.map(e => ({ e, p: sendOff(e, e.travel_mins != null ? { mins: e.travel_mins, km: e.travel_km, source: e.travel_source } : null, CFG.v) })).filter(x => x.p?.leave && x.p.leave > Date.now() - 15 * 60000 && mnlParts(x.p.leave)[0] === t).sort((a, b) => a.p.leave - b.p.leave)[0] : null;
   const nToday = ev ? ev.filter(e => e.event_date === t).length : null, nTmr = ev ? ev.filter(e => e.event_date === tm).length : null;
   const next = ev?.find(e => e.event_date === t && e.serve_time && e.serve_time.slice(0, 5) >= new Date(Date.now() + 8 * 3600e3).toISOString().slice(11, 16));
@@ -360,7 +360,7 @@ routes.home = async () => {
       </div>` : ''}
     </section>
     ${ib}
-    <div class="hw-today${[pk, tk, rn, rs].filter(Boolean).length === 2 ? '' : ' one'}${[pk, tk, rn, rs].filter(Boolean).length >= 3 ? ' three' : ''}">${rs}${rn}${pk}${tk}</div>
+    <div class="hw-today${[pk, tk, rn, rs, cl].filter(Boolean).length === 2 ? '' : ' one'}${[pk, tk, rn, rs, cl].filter(Boolean).length >= 3 ? ' three' : ''}">${cl}${rs}${rn}${pk}${tk}</div>
     <h2 class="hw-where">Where are you working today?</h2>
     <div class="hw-grid">${cards.join('')}</div>
     ${!member('restaurant') && !member('catering') ? `<div class="card mt"><p>You don't have a workspace yet — ask the owner to give you a role. Meanwhile you can see the Events board.</p></div>` : ''}
@@ -1272,12 +1272,13 @@ routes['c/count'] = async id => {
      ${diff.length ? `<div class="card tw"><table><thead><tr><th>Item</th><th class="n">Expected</th><th class="n">Counted</th><th class="n">Difference</th></tr></thead><tbody>${diff.map(l => `<tr><td>${esc(itemName(l.item_id))}</td><td class="n">${fq(l.expected)}</td><td class="n">${fq(l.counted)}</td><td class="n ${l.d < 0 ? 'bad-t' : 'ok-t'}">${l.d > 0 ? '+' : ''}${fq(l.d)} ${esc(itemUnit(l.item_id))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="alert ok">Everything matched.</div>'}
      <p class="small mut">Missing stock left the store without an issue or waste record. Recount big differences and ask who had access.</p>`;
   }
-  const cats = [...new Set(S.items.map(i => i.category))], kc = c.loc ? ((await appCfg()).kitchens || []).find(k => k.id === c.loc) : null;
-  return `<div class="row"><a href="#/${P()}/stock" class="back">‹ Stock</a></div><h1>Count ${kc ? esc(kc.name) : 'the ' + STORE()}</h1>
+  const nf = c.scope === 'nonfood', NF = new Set(NONFOOD_CATS), its = S.items.filter(i => !nf || NF.has(i.category));
+  const cats = [...new Set(its.map(i => i.category))], kc = c.loc ? ((await appCfg()).kitchens || []).find(k => k.id === c.loc) : null;
+  return `<div class="row"><a href="#/${P()}/${nf ? 'supplies' : 'stock'}" class="back">‹ ${nf ? 'Supplies' : 'Stock'}</a></div><h1>${nf ? 'Count non-food supplies' : 'Count ' + (kc ? esc(kc.name) : 'the ' + STORE())}</h1>
    <p class="lede">Count what is physically on the shelves, chiller and freezer. Expected quantities are hidden so nobody copies them. Leave items you didn't count blank.</p>
    <form class="card" data-form="saveCount" data-id="${id}"><label>Witness<input name="witness" value="${esc(c.witness || '')}" placeholder="Second person present"></label>
    <input class="search mt" placeholder="Find item…" data-filter=".count-row">
-   ${cats.map(cat => `<h3>${esc(cat)}</h3>${S.items.filter(i => i.category === cat).map(i => `<div class="count-row mline"><span>${esc(i.name)}</span><span class="sp"></span><input name="n_${i.id}" type="number" step="any" min="0" class="qty" value="${got[i.id] ? num(got[i.id].counted) : ''}"> <span class="unit">${esc(i.stock_unit)}</span></div>`).join('')}`).join('')}
+   ${cats.map(cat => `<h3>${esc(cat)}</h3>${its.filter(i => i.category === cat).map(i => `<div class="count-row mline"><span>${esc(i.name)}</span><span class="sp"></span><input name="n_${i.id}" type="number" step="any" min="0" class="qty" value="${got[i.id] ? num(got[i.id].counted) : ''}"> <span class="unit">${esc(i.stock_unit)}</span></div>`).join('')}`).join('')}
    <div class="row end sticky"><button class="ghost">Save</button><button type="button" class="pri" data-act="postCount" data-id="${id}">Post count</button></div></form>`;
 };
 async function saveCount(f, id) {
@@ -2569,7 +2570,7 @@ ACT.posCloseShift = async () => {
 };
 
 // Restaurant reuses the purchasing, receiving and store pages; they read the workspace from the address (#/r/…)
-['requests', 'pr', 'orders', 'po', 'stock', 'count'].forEach(k => routes['r/' + k] = (...a) => routes['c/' + k](...a));
+['requests', 'pr', 'orders', 'po', 'stock', 'count', 'supplies', 'equipment', 'eqcount', 'breakage', 'clean'].forEach(k => routes['r/' + k] = (...a) => routes['c/' + k](...a));
 
 /* ================= PEOPLE (owner) ================= */
 routes.people = async arg => {
@@ -3368,7 +3369,7 @@ async function homeInbox() {
 }
 
 /* ================= EQUIPMENT: what goes out to each event, what comes back ================= */
-const equipTeam = () => isAdmin() || can('catering', 'manager', 'event_specialist', 'coordinator', 'storekeeper', 'head_chef', 'chef', 'driver');
+const equipTeam = () => equipTeamWs('catering');
 async function evEquipCard(ev) {
   if (!(isAdmin() || member('catering'))) return '';
   const [lines, eq] = await Promise.all([db.select('event_equipment', { eq: { event_id: ev.id } }), db.select('equipment', { eq: { active: true }, order: [['category'], ['name']] })]);
@@ -3418,26 +3419,6 @@ document.addEventListener('change', async e => {
   const o = e.target.closest('[data-eqown]');
   if (o) { try { await db.update('equipment', { owned: Math.max(0, Math.round(num(o.value))) }, { id: o.dataset.eqown }); toast('Saved'); refresh(); } catch (err) { toast(err.message, true); } }
 });
-routes['c/equipment'] = async () => {
-  if (!(isAdmin() || member('catering'))) return '<div class="card">Equipment is for the catering team.</div>';
-  const [st, open] = await Promise.all([db.rpc('equipment_status'), db.rpc('equipment_open')]), edit = equipTeam();
-  const cats = [...new Set(st.map(q => q.category))];
-  const miss = st.reduce((s, q) => s + num(q.missing), 0), out = st.reduce((s, q) => s + num(q.out_now), 0);
-  return `<div class="row"><h1>Equipment</h1></div>
-    <p class="lede">Chafing dishes, linens, utensils and boxes: how many we own, how many are out at events, and what never came back.</p>
-    <div class="pd-sum"><div><b>${st.filter(q => q.active).length}</b><span>kinds of items</span></div><div><b>${out}</b><span>out at events now</span></div><div><b class="${miss ? 'bad-t' : ''}">${miss}</b><span>missing after events</span></div><div><b>${open.length}</b><span>past events not all back</span></div></div>
-    ${open.length ? `<section class="card"><h2>Not all back yet</h2><div class="list">${open.map(o => `<a class="li" href="#/c/event/${o.id}"><div class="li-main"><b>${esc(o.client)}</b><span class="mut small">${esc(fmtD(o.date))}${o.not_back ? ` · ${o.not_back} not checked in` : ''}${o.missing ? ` · ${o.missing} missing` : ''}</span></div>${o.missing ? chip('Missing', 'bad') : chip('Check in', 'warn')}</a>`).join('')}</div></section>` : ''}
-    <input class="search" placeholder="Search…" data-filter="#eqTable tbody tr">
-    <div class="card tw"><table id="eqTable"><thead><tr><th>Item</th><th class="n">We own</th><th class="n">Out now</th><th class="n">Booked ahead</th><th class="n">Missing</th></tr></thead><tbody>
-    ${cats.map(c => `<tr class="eq-cat"><td colspan="5">${esc(c)}</td></tr>${st.filter(q => q.category === c && q.active).map(q => `<tr><td>${esc(q.name)}${(q.where_now || []).length ? `<div class="small mut">${q.where_now.slice(0, 3).map(w => `<a href="#/c/event/${w.event_id}">${esc(w.client)}</a> ${esc(fmtD(w.date))}`).join(' · ')}</div>` : ''}</td>
-      <td class="n">${edit ? `<input class="qty" type="number" min="0" value="${q.owned}" data-eqown="${q.id}">` : q.owned}</td><td class="n">${q.out_now || '—'}</td>
-      <td class="n ${q.owned && num(q.booked) > q.owned ? 'bad-t' : ''}">${q.booked || '—'}</td><td class="n ${q.missing ? 'bad-t' : ''}">${q.missing || '—'}</td></tr>`).join('')}`).join('')}
-    </tbody></table></div>
-    ${edit ? `<form class="card" data-form="eqNew"><h2>Add equipment</h2><div class="grid"><label>Name<input name="name" required maxlength="80" placeholder="e.g. Chafing dish (half size)"></label>
-      <label>Group<input name="category" list="eqcats" maxlength="40" placeholder="Buffet, Linens…"><datalist id="eqcats">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist></label><label>We own<input name="owned" type="number" min="0" value="0"></label></div>
-      <div class="row end"><button class="pri">Add</button></div></form>` : ''}`;
-};
-FORMS.eqNew = async f => { await db.insert('equipment', { name: f.name.trim(), category: (f.category || 'Other').trim() || 'Other', owned: Math.max(0, Math.round(num(f.owned))) }); toast('Added'); refresh(); };
 
 /* ================= DUPLICATE EVENTS: merge or delete (owner and catering managers) ================= */
 const eventAdmin = () => isAdmin() || can('catering', 'manager', 'event_specialist');
@@ -3652,6 +3633,167 @@ async function autoSaveSheet(form) {
   finally { form._saving = false; }
 }
 
+/* ================= UTILITY: non-food supplies, equipment counts and breakage, cleaning checklists ================= */
+const NONFOOD_CATS = ['Cleaning', 'Disposables & packaging', 'Paper & tissue', 'LPG & fuel', 'Kitchen supplies', 'Office & others'];
+const onlyRole = role => !isAdmin() && (S.me?.roles || []).length > 0 && (S.me.roles || []).every(r => r.role === role);
+const utilityOnly = () => onlyRole('utility');
+const equipTeamWs = ws => isAdmin() || (ws === 'catering' ? can('catering', 'manager', 'event_specialist', 'coordinator', 'storekeeper', 'head_chef', 'chef', 'driver', 'utility') : can('restaurant', 'manager', 'storekeeper', 'head_chef', 'chef', 'utility'));
+const equipBoss = ws => isAdmin() || can(ws, 'manager', 'head_chef', 'storekeeper');
+const supplyStaff = ws => isAdmin() || can(ws, 'utility', 'storekeeper', 'manager');
+const cleanBoss = ws => isAdmin() || can(ws, 'manager', 'head_chef');
+
+// Supplies: non-food on hand against par, no prices
+routes['c/supplies'] = async () => {
+  const ws = WS(); if (!(isAdmin() || member(ws))) return '<div class="card">Supplies are for the team of this store.</div>';
+  const [rows, counts] = await Promise.all([db.rpc('supplies_status', { p_ws: ws }), db.select('stock_counts', { eq: { ws, scope: 'nonfood' }, order: [['counted_at', false]], limit: 5 }).catch(() => [])]);
+  const low = rows.filter(r => r.par != null && num(r.par) > 0 && num(r.on_hand) < num(r.par)), cats = [...new Set(rows.map(r => r.category))];
+  const open = counts.find(c => c.status === 'open'), mayAdd = isAdmin() || can(ws, 'manager', 'storekeeper', 'purchaser', 'chef');
+  return `<div class="row"><h1>Supplies</h1><span class="sp"></span>${supplyStaff(ws) ? (open ? `<a class="btn pri" href="#/${P()}/count/${open.id}">Continue the count</a>` : `<button class="pri" data-act="supplyCount">Count supplies</button>`) : ''}</div>
+    <p class="lede">Non-food supplies for the ${ws === 'restaurant' ? 'restaurant' : 'catering'} store: cleaning, disposables and packaging, paper and tissue, LPG and fuel. Count them, then request what is below par.</p>
+    <div class="kpis"><div class="kpi"><span>Supplies</span><b>${rows.length}</b></div><div class="kpi ${low.length ? 'warn' : ''}"><span>Below par</span><b>${low.length}</b></div><div class="kpi"><span>Last count</span><b>${counts.find(c => c.status === 'posted') ? esc(fmtD(counts.find(c => c.status === 'posted').counted_at.slice(0, 10))) : '—'}</b></div></div>
+    ${low.length ? `<div class="alert warn"><b>${low.length} below par:</b> ${low.map(r => esc(r.name)).join(', ')}${supplyStaff(ws) ? ` <button class="ghost" data-act="supplyPr">Request them</button>` : ''}</div>` : ''}
+    <input class="search" placeholder="Find a supply…" data-filter="#supTable tbody tr">
+    <div class="card tw"><table id="supTable"><thead><tr><th>Supply</th><th class="n">On hand</th><th class="n">Par</th></tr></thead><tbody>
+    ${cats.map(c => `<tr class="eq-cat"><td colspan="3">${esc(c)}</td></tr>${rows.filter(r => r.category === c).map(r => `<tr><td>${esc(r.name)}</td><td class="n ${r.par != null && num(r.on_hand) < num(r.par) ? 'warn-t' : ''}">${fq(r.on_hand)} ${esc(r.unit)}</td><td class="n">${r.par != null ? fq(r.par) : '<span class="mut">—</span>'}</td></tr>`).join('')}`).join('')}
+    </tbody></table></div>
+    <p class="small mut">Par levels are set by a manager on Store &amp; par. Supplies come in through receiving like any other item, and go out when issued from the store.</p>
+    ${mayAdd ? `<form class="card" data-form="supplyNew"><h2>Add a supply</h2><div class="grid"><label>Name<input name="name" required maxlength="80" placeholder="e.g. Kitchen towel"></label>
+      <label>Group<select name="category">${NONFOOD_CATS.map(c => opt(c, c)).join('')}</select></label><label>Counted in<input name="unit" required maxlength="20" placeholder="pc, L, pack, roll"></label></div>
+      <div class="row end"><button class="pri">Add</button></div></form>` : ''}`;
+};
+ACT.supplyCount = async () => { const c = (await db.insert('stock_counts', { ws: WS(), scope: 'nonfood', counted_by: S.user.id }))[0]; go(`#/${P()}/count/${c.id}`); };
+ACT.supplyPr = async () => { const r = await db.rpc('generate_supplies_pr', { p_ws: WS() }); if (!r.pr) { toast('Nothing is below par.'); return refresh(); } toast(`${r.pr}: ${r.lines} supplies to buy`); go(`#/${P()}/pr/${r.pr_id}`); };
+FORMS.supplyNew = async f => {
+  const name = f.name.trim().replace(/\s+/g, ' '); if (itemIdFromName(name)) return toast('An item with that name exists already.', true);
+  await db.insert('items', { name, category: f.category, stock_unit: f.unit.trim(), purchase_unit: f.unit.trim(), units_per_purchase: 1, last_cost: 0 });
+  await loadMaster(); toast('Added'); refresh();
+};
+
+// Equipment and smallwares, per workspace
+routes['c/equipment'] = async () => {
+  const ws = WS(); if (!(isAdmin() || member(ws))) return '<div class="card">Equipment is for the team of this workspace.</div>';
+  const cat = ws === 'catering';
+  const [st, open, brk] = await Promise.all([db.rpc('equipment_status', { p_ws: ws }), cat ? db.rpc('equipment_open') : [], db.select('equipment_breakage', { eq: { ws, status: 'open' }, order: [['reported_at', false]] })]);
+  const edit = equipTeamWs(ws), boss = equipBoss(ws), byId = Object.fromEntries(st.map(q => [q.id, q]));
+  const cats = [...new Set(st.map(q => q.category))];
+  const miss = st.reduce((s, q) => s + num(q.missing), 0), out = st.reduce((s, q) => s + num(q.out_now), 0), broken = st.reduce((s, q) => s + num(q.broken), 0);
+  const names = await namesOf(brk.map(b => b.reported_by));
+  const cols = cat ? 6 : 4;
+  return `<div class="row"><h1>Equipment</h1><span class="sp"></span>${edit ? `<a class="btn" href="#/${P()}/eqcount">Count equipment</a>` : ''}<a class="btn pri" href="#/${P()}/breakage">Report breakage</a></div>
+    <p class="lede">${cat ? 'Chafing dishes, linens, utensils and boxes: how many we own, how many are out at events, what is broken and what never came back.' : 'Plates, glasses, cutlery, pans and linens: how many we own, what is broken, and what the last count found.'}</p>
+    <div class="pd-sum"><div><b>${st.filter(q => q.active).length}</b><span>kinds of items</span></div>${cat ? `<div><b>${out}</b><span>out at events now</span></div>` : ''}<div><b class="${broken ? 'warn-t' : ''}">${broken}</b><span>broken, not yet replaced</span></div>${cat ? `<div><b class="${miss ? 'bad-t' : ''}">${miss}</b><span>missing after events</span></div>` : ''}</div>
+    ${brk.length ? `<section class="card"><h2>Breakage reports</h2><div class="list">${brk.map(b => `<div class="li"><div class="li-main"><b>${esc(byId[b.equipment_id]?.name || 'Item')} × ${b.qty} ${b.kind === 'missing' ? 'missing' : 'broken'}</b>
+        <span class="mut small">${esc([names[b.reported_by] || NAMES[b.reported_by] || '', fmtT(b.reported_at), b.note].filter(Boolean).join(' · '))}</span></div>
+        ${b.photo ? `<button class="ghost" data-act="brkPhoto" data-id="${b.id}">Photo</button>` : ''}${boss ? `<button class="ghost" data-act="brkResolve" data-id="${b.id}" data-s="replaced" title="Bought again: we still own the same number">Replaced</button><button class="ghost danger" data-act="brkResolve" data-id="${b.id}" data-s="written_off" title="We now own fewer">Write off</button>` : ''}</div>`).join('')}</div></section>` : ''}
+    ${cat && open.length ? `<section class="card"><h2>Not all back yet</h2><div class="list">${open.map(o => `<a class="li" href="#/c/event/${o.id}"><div class="li-main"><b>${esc(o.client)}</b><span class="mut small">${esc(fmtD(o.date))}${o.not_back ? ` · ${o.not_back} not checked in` : ''}${o.missing ? ` · ${o.missing} missing` : ''}</span></div>${o.missing ? chip('Missing', 'bad') : chip('Check in', 'warn')}</a>`).join('')}</div></section>` : ''}
+    <input class="search" placeholder="Search…" data-filter="#eqTable tbody tr">
+    <div class="card tw"><table id="eqTable"><thead><tr><th>Item</th><th class="n">We own</th>${cat ? '<th class="n">Out now</th><th class="n">Booked ahead</th>' : ''}<th class="n">Broken</th><th class="n">Last count</th></tr></thead><tbody>
+    ${cats.map(c => `<tr class="eq-cat"><td colspan="${cols}">${esc(c)}</td></tr>${st.filter(q => q.category === c && q.active).map(q => { const lc = q.last_count, exp = num(q.owned) - num(q.out_now) - num(q.broken), short = lc && num(lc.n) < exp;
+      return `<tr><td>${esc(q.name)}${(q.where_now || []).length ? `<div class="small mut">${q.where_now.slice(0, 3).map(w => `<a href="#/c/event/${w.event_id}">${esc(w.client)}</a> ${esc(fmtD(w.date))}`).join(' · ')}</div>` : ''}</td>
+      <td class="n">${boss ? `<input class="qty" type="number" min="0" value="${q.owned}" data-eqown="${q.id}">` : q.owned}</td>${cat ? `<td class="n">${q.out_now || '—'}</td><td class="n ${q.owned && num(q.booked) > q.owned ? 'bad-t' : ''}">${q.booked || '—'}</td>` : ''}
+      <td class="n ${q.broken ? 'warn-t' : ''}">${q.broken || '—'}</td><td class="n ${short ? 'bad-t' : ''}" title="${lc ? 'Counted ' + esc(fmtT(lc.at)) + (short ? ' · ' + (exp - num(lc.n)) + ' fewer than expected' : '') : ''}">${lc ? fq(lc.n) : '—'}</td></tr>`; }).join('')}`).join('')}
+    </tbody></table></div>
+    <p class="small mut">Last count in red = fewer found than we own${cat ? ', minus what is out at events and' : ', minus'} what is reported broken. Report it, or ask who had them last.</p>
+    ${boss ? `<form class="card" data-form="eqNew"><h2>Add equipment</h2><div class="grid"><label>Name<input name="name" required maxlength="80" placeholder="${cat ? 'e.g. Chafing dish (half size)' : 'e.g. Dessert plate'}"></label>
+      <label>Group<input name="category" list="eqcats" maxlength="40" placeholder="${cat ? 'Buffet, Linens…' : 'Plates and bowls, Kitchen…'}"><datalist id="eqcats">${cats.map(c => `<option value="${esc(c)}">`).join('')}</datalist></label><label>We own<input name="owned" type="number" min="0" value="0"></label></div>
+      <div class="row end"><button class="pri">Add</button></div></form>` : ''}`;
+};
+FORMS.eqNew = async f => { await db.insert('equipment', { ws: WS(), name: f.name.trim(), category: (f.category || 'Other').trim() || 'Other', owned: Math.max(0, Math.round(num(f.owned))) }); toast('Added'); refresh(); };
+ACT.brkResolve = async el => {
+  if (el.dataset.s === 'written_off' && !confirm('Write it off? We will own fewer of this item from now on.')) return;
+  await db.rpc('breakage_resolve', { p_id: el.dataset.id, p_status: el.dataset.s }); toast(el.dataset.s === 'replaced' ? 'Marked replaced' : 'Written off'); refresh();
+};
+ACT.brkPhoto = async el => {
+  const [b] = await db.select('equipment_breakage', { cols: 'photo', eq: { id: el.dataset.id } }); if (!b?.photo) return toast('No photo', true);
+  const box = document.createElement('div'); box.className = 'modal';
+  box.innerHTML = `<div class="card"><div class="row"><h2>Breakage photo</h2><span class="sp"></span><button type="button" class="x" data-close>✕</button></div><img src="${b.photo}" alt="" style="width:100%;border-radius:10px"></div>`;
+  document.body.appendChild(box); box.addEventListener('click', ev => { if (ev.target.dataset.close !== undefined || ev.target === box) box.remove(); });
+};
+routes['c/eqcount'] = async () => {
+  const ws = WS(); if (!equipTeamWs(ws)) return '<div class="card">Counting equipment is for the utility, kitchen and store team.</div>';
+  const st = (await db.rpc('equipment_status', { p_ws: ws })).filter(q => q.active), cats = [...new Set(st.map(q => q.category))];
+  return `<div class="row"><a href="#/${P()}/equipment" class="back">‹ Equipment</a></div><h1>Count equipment</h1>
+    <p class="lede">Count what is here now${ws === 'catering' ? ' (not what is out at events)' : ''}. Leave a line blank if you didn't count it.</p>
+    <form class="card" data-form="eqCount"><input class="search" placeholder="Find…" data-filter=".eqc-row">
+    ${cats.map(c => `<h3>${esc(c)}</h3>${st.filter(q => q.category === c).map(q => `<div class="eqc-row mline"><span>${esc(q.name)}</span><span class="sp"></span><input name="c_${q.id}" type="number" inputmode="numeric" min="0" step="1" class="qty"></div>`).join('')}`).join('')}
+    <label class="mt">Note<input name="note" maxlength="300" placeholder="e.g. 3 glasses chipped, set aside"></label>
+    <div class="row end sticky"><button class="pri">Save count</button></div></form>`;
+};
+FORMS.eqCount = async f => {
+  const lines = Object.entries(f).filter(([k, v]) => k.startsWith('c_') && v !== '').map(([k, v]) => ({ equipment_id: k.slice(2), counted: Math.max(0, Math.round(num(v))) }));
+  if (!lines.length) return toast('Enter at least one count.', true);
+  const c = (await db.insert('equipment_counts', { ws: WS(), note: f.note || null }))[0];
+  await db.insert('equipment_count_lines', lines.map(l => ({ ...l, count_id: c.id })));
+  toast(`${lines.length} items counted`); go(`#/${P()}/equipment`);
+};
+routes['c/breakage'] = async () => {
+  const ws = WS(), st = (await db.rpc('equipment_status', { p_ws: ws })).filter(q => q.active);
+  const evs = ws === 'catering' ? await db.select('events', { cols: 'id,ref,title,event_date', gte: { event_date: addDays(today(), -14) }, lte: { event_date: addDays(today(), 1) }, order: [['event_date', false]] }).catch(() => []) : [];
+  return `<div class="row"><a href="#/${P()}/equipment" class="back">‹ Equipment</a></div><h1>Report breakage</h1>
+    <p class="lede">Broken or missing plates, glasses, pans, chafing dishes, linens. Report it the same day, with a photo if you can.</p>
+    <form class="card" data-form="brkNew"><div class="grid"><label>Item<select name="eq" required>${opt('', 'Choose…')}${[...new Set(st.map(q => q.category))].map(c => `<optgroup label="${esc(c)}">${st.filter(q => q.category === c).map(q => opt(q.id, q.name)).join('')}</optgroup>`).join('')}</select></label>
+      <label>How many<input name="qty" type="number" min="1" max="500" value="1" required></label><label>What happened<select name="kind">${opt('broken', 'Broken')}${opt('missing', 'Missing')}</select></label>
+      ${evs.length ? `<label>At an event (optional)<select name="event">${opt('', '—')}${evs.map(e => opt(e.id, `${fmtD(e.event_date)} · ${e.title || e.ref}`)).join('')}</select></label>` : ''}</div>
+      <label>Note<input name="note" maxlength="300" placeholder="e.g. dropped while washing"></label>
+      <label class="btn ghost mt">Add a photo<input type="file" accept="image/*" capture="environment" name="photo_file" data-brkphoto hidden></label> <span class="small mut" id="brkPhotoOk"></span>
+      <div class="row end"><button class="pri">Send report</button></div></form>`;
+};
+document.addEventListener('change', async e => {
+  const f = e.target.closest('[data-brkphoto]'); if (!f || !f.files?.[0]) return;
+  try { S.brkPhoto = await photoJpeg(f.files[0]); document.getElementById('brkPhotoOk').textContent = 'Photo added'; } catch (err) { toast(err.message, true); }
+});
+FORMS.brkNew = async f => {
+  if (!f.eq) return toast('Choose the item.', true);
+  await db.insert('equipment_breakage', { ws: WS(), equipment_id: f.eq, qty: Math.max(1, Math.round(num(f.qty))), kind: f.kind, event_id: f.event || null, note: f.note || null, photo: S.brkPhoto || null, reported_by: S.user.id });
+  S.brkPhoto = null; toast('Reported. A manager will mark it replaced or written off.'); go(`#/${P()}/equipment`);
+};
+
+// Cleaning checklists: opening, closing and anytime duties per area; tick with your name and the time
+const SHIFT_L = { opening: 'Opening', closing: 'Closing', anytime: 'Anytime' };
+routes['c/clean'] = async arg => {
+  const ws = WS(); if (!(isAdmin() || member(ws))) return '<div class="card">Cleaning checklists are for the team of this workspace.</div>';
+  const [a0] = (arg || '').split('/');
+  if (a0 === 'edit') return cleanEdit(ws);
+  const t = today(), d = /^\d{4}-\d{2}-\d{2}$/.test(a0 || '') ? a0 : t, mayTick = d >= addDays(t, -1) && d <= t;
+  const rows = await db.rpc('clean_day', { p_ws: ws, p_date: d }), done = rows.filter(r => r.done_at).length;
+  const pct = rows.length ? Math.round(done / rows.length * 100) : 0;
+  return `<div class="row"><h1>Cleaning</h1><span class="sp"></span>${cleanBoss(ws) ? `<a class="btn ghost" href="#/${P()}/clean/edit">Edit the list</a>` : ''}</div>
+    <div class="seg">${[[t, 'Today'], [addDays(t, -1), 'Yesterday']].map(([k, l]) => `<a href="#/${P()}/clean/${k}" class="${d === k ? 'on' : ''}">${l}</a>`).join('')}<label class="rn-date"><input type="date" value="${d}" max="${t}" data-cleandate></label></div>
+    <div class="cl-prog"><div><b>${done} of ${rows.length}</b> done · ${esc(fmtLong(d))}</div><i style="width:${pct}%"></i></div>
+    ${['opening', 'closing', 'anytime'].map(sh => { const l = rows.filter(r => r.shift === sh); if (!l.length) return '';
+      const areas = [...new Set(l.map(r => r.area))];
+      return `<section class="card cl-sec"><h2>${SHIFT_L[sh]} <span class="small mut">${l.filter(r => r.done_at).length}/${l.length}</span></h2>${areas.map(a => `<h3>${esc(a)}</h3>${l.filter(r => r.area === a).map(r => `<button class="cl-row${r.done_at ? ' on' : ''}" ${mayTick ? `data-act="cleanTick" data-id="${r.id}" data-d="${d}" data-done="${r.done_at ? 1 : ''}"` : 'disabled'}>
+          <span class="cl-box">${r.done_at ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>' : ''}</span><span class="cl-t">${esc(r.task)}</span>${r.done_at ? `<span class="cl-who">${esc((r.who || '').split(' ')[0])} · ${esc(clockOf(r.done_at))}</span>` : ''}</button>`).join('')}`).join('')}</section>`; }).join('') || '<div class="card mut">No checklist yet.</div>'}
+    <p class="small mut">Tap a task when it is done; your name and the time are recorded. Tap again to undo (today only). ${cleanBoss(ws) ? 'You can see past days with the date box.' : ''}</p>`;
+};
+document.addEventListener('change', e => { if (e.target.matches('[data-cleandate]') && e.target.value) go(`#/${P()}/clean/${e.target.value}`); });
+ACT.cleanTick = async el => {
+  if (el.dataset.done) { try { await db.remove('clean_ticks', { task_id: el.dataset.id, tick_date: el.dataset.d }); } catch (err) { return toast('Only the person who ticked it (today) or a manager can undo it.', true); } }
+  else await db.insert('clean_ticks', { task_id: el.dataset.id, tick_date: el.dataset.d, done_by: S.user.id });
+  refresh();
+};
+async function cleanEdit(ws) {
+  if (!cleanBoss(ws)) return '<div class="card">Only a manager or the head chef can change the checklist.</div>';
+  const rows = await db.select('clean_tasks', { eq: { ws }, order: [['shift'], ['area'], ['sort']] }), areas = [...new Set(rows.map(r => r.area))];
+  return `<div class="row"><a href="#/${P()}/clean" class="back">‹ Cleaning</a></div><h1>Edit the cleaning list</h1>
+    <div class="card tw"><table><thead><tr><th>When</th><th>Area</th><th>Task</th><th class="n">On the list</th></tr></thead><tbody>
+    ${rows.map(r => `<tr><td>${esc(SHIFT_L[r.shift])}</td><td>${esc(r.area)}</td><td>${esc(r.task)}</td><td class="n"><input type="checkbox" data-cleanact="${r.id}" ${r.active ? 'checked' : ''}></td></tr>`).join('')}</tbody></table></div>
+    <form class="card" data-form="cleanNew"><h2>Add a task</h2><div class="grid"><label>When<select name="shift">${Object.entries(SHIFT_L).map(([k, l]) => opt(k, l, k === 'closing')).join('')}</select></label>
+      <label>Area<input name="area" list="clareas" required maxlength="40" placeholder="Kitchen, Dining area…"><datalist id="clareas">${areas.map(a => `<option value="${esc(a)}">`).join('')}</datalist></label></div>
+      <label>Task<input name="task" required maxlength="160" placeholder="e.g. Clean the exhaust filters"></label><div class="row end"><button class="pri">Add</button></div></form>`;
+}
+document.addEventListener('change', async e => { const c = e.target.closest('[data-cleanact]'); if (!c) return; try { await db.update('clean_tasks', { active: c.checked }, { id: c.dataset.cleanact }); toast(c.checked ? 'Back on the list' : 'Taken off the list'); } catch (err) { toast(err.message, true); } });
+FORMS.cleanNew = async f => { await db.insert('clean_tasks', { ws: WS(), shift: f.shift, area: f.area.trim(), task: f.task.trim(), sort: 500 }); toast('Added'); refresh(); };
+async function homeClean() {
+  if (!(isAdmin() || canAny('utility', 'manager', 'head_chef'))) return '';
+  const wss = ['restaurant', 'catering'].filter(w => (S.me?.roles || []).some(r => r.ws === w && ['utility', 'manager', 'head_chef'].includes(r.role)) || (isAdmin() && w === 'restaurant'));
+  try {
+    const out = await Promise.all(wss.map(async w => { const r = await db.rpc('clean_day', { p_ws: w, p_date: today() }); return [w, r.filter(x => x.done_at).length, r.length]; }));
+    if (!out.some(([, , n]) => n)) return '';
+    return `<section class="hw-panel"><div class="hp-h"><h2>Cleaning today</h2><span class="sp"></span></div>${out.filter(([, , n]) => n).map(([w, d, n]) => `<a class="pk-nl" href="#/${w === 'restaurant' ? 'r' : 'c'}/clean"><span class="rn-mini">${d}/${n}</span><span><b>${w === 'restaurant' ? 'Restaurant' : 'Catering kitchen'}</b><small>${d === n ? 'All done' : n - d + ' still to do'}</small></span></a>`).join('')}</section>`;
+  } catch (e) { return ''; }
+}
+
 /* ================= Profile photos ================= */
 // Small square JPEGs kept in the database; each phone keeps a copy and only downloads photos that changed.
 const AV = { img: {}, key: 'rom-avatars' };
@@ -3692,6 +3834,7 @@ ACT.avatarClear = async el => { if (!confirm('Remove this person’s photo?')) r
 
 /* ================= My account: your details, your roles and what they let you do, password, this device, your recent activity ================= */
 const ROLE_DO = {
+  utility: ['Ticks off the opening and closing cleaning checklist', 'Counts equipment and non-food supplies; reports breakage with a photo', 'Requests supplies that are below par'],
   waiter: ['Sees today\'s reservations and catering events, without prices', 'Marks guests arrived, done or no-show', 'Checks the 86 / running-low list before taking orders'],
   driver: ['Sees the day\'s runs in send-off order, with directions and the client contact', 'Taps Loaded, Left, Arrived and Handed over (with a photo)'],
   manager: ['Approves purchase requests, orders and reports', 'Creates and edits events; closes and voids when needed', 'Sees billing, sales and costing for the workspace'],
